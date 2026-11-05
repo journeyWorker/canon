@@ -165,7 +165,7 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
 
     let e = error_of(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "nope"]);
     assert_eq!(e["field"], "--disposition");
-    assert_eq!(strings(&e["expected"]), ["open", "fixed", "rejected", "deferred"]);
+    assert_eq!(strings(&e["expected"]), ["fixed", "rejected", "deferred"]);
 
     let e = error_of(dir.path(), &["change", "new", "x", "--subject", "demo", "--title", "t", "--change-kind", "nope"]);
     assert_eq!(e["field"], "--change-kind");

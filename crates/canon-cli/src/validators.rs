@@ -61,8 +61,11 @@ pub fn refusal(cli: &Cli, root: &clap::Command, matches: &clap::ArgMatches) -> O
     }
     let (label, result): (&str, Result<(), CliError>) = match &cli.command {
         Command::Brief { action: BriefCommand::Approve(args) } => ("canon brief approve", crate::brief_approve::check_approve(args)),
-        Command::Policy { action: PolicyCommand::Approve(args) } => ("canon policy approve", crate::relay::check_arguments("canon policy approve", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: args.note.as_deref() }).and_then(|()| crate::policy_approval::check_approver(&args.approver))),
-        Command::Divergence { action: DivergenceCliCommand::Accept(args) } => ("canon divergence accept", crate::relay::check_arguments("canon divergence accept", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: Some(&args.actor_id), approver: args.approver.as_deref(), note: args.note.as_deref() })),
+        Command::Policy { action: PolicyCommand::Approve(args) } => ("canon policy approve", crate::relay::check_arguments("canon policy approve", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: args.note.as_deref() })),
+        Command::Divergence { action: DivergenceCliCommand::Accept(args) } => (
+            "canon divergence accept",
+            crate::divergence::check_role(args.role.as_ref()).and_then(|()| crate::relay::check_arguments("canon divergence accept", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: Some(&args.actor_id), approver: args.approver.as_deref(), note: args.note.as_deref() })),
+        ),
         Command::Migrate(args) => ("canon migrate", crate::relay::check_arguments("canon migrate", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: args.approver.as_deref(), note: args.note.as_deref() })),
         Command::Evidence { action } => match &**action {
             EvidenceCommand::Add(args) => ("canon evidence add", crate::evidence::check_add(args)),

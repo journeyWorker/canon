@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-approval-evidence-037",
+    "role": "implementer",
+    "session_id": "s-0-37-approval-evidence"
+  },
+  "at": "2026-11-05T11:58:57.495010Z",
+  "attachments": [
+    {
+      "case": "gate_approval_tree_01_approving_records_the_code_tree_outside_the_digest_and_again_the_new_one",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "9cf640b63c2913562fd45bac1dde3f2223b0316bbbe76995a883b02fcb908fa0"
+    }
+  ],
+  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "gate.approval-tree.01",
+  "schema": 1,
+  "staging_id": "b2398728",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

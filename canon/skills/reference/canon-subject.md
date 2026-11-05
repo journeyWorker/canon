@@ -547,8 +547,9 @@ warn, and a command that writes and judges it is refused
   `reason`), one rule in one section, reason required; add `match` to waive
   only the findings whose matched text contains it. Listed in the output.
 - **`approve`** records the human's answer: it writes
-  `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the
-  brief and records the policy approval in the same call. It refuses
+  `Approved: <who> <when> — "<words>" (code tree <id>) (brief sha256:<digest>)`
+  into the brief (the code tree, 0.37, is the work tree's as it is now and is
+  left out outside git or with no commit) and records the policy approval in the same call. It refuses
   (exit 2) while the check has structure blockers. Edit the brief
   afterwards and every reader says `BRIEF_APPROVAL_STALE` until a
   human answers again and `approve` runs again. Run it only from the
@@ -617,8 +618,8 @@ uses, so status and the gate cannot disagree about a gap:
   something after it, and sits outside HTML comments (`<!-- … -->`,
   multi-line included) and fenced code blocks (```` ``` ```` or `~~~`).
   `canon brief approve` writes it from the human's answer, as
-  `Approved: <who> <when> — "<the human's words>" (brief sha256:<digest>)`,
-  the digest covering the brief without its `Approved:` lines. A brief
+  `Approved: <who> <when> — "<the human's words>" (code tree <id>) (brief sha256:<digest>)`,
+  the digest covering the brief without its `Approved:` lines (the tree marker is outside it; a line without one is read as before). A brief
   edited after that reads `brief: not approved (<brief> changed after its
   approval (BRIEF_APPROVAL_STALE))` and names the re-approval
   command: the changed brief needs a new human answer. A line with no

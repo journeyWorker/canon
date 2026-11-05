@@ -13,16 +13,16 @@ pub enum PolicyCommand {
 #[derive(Debug, Args)]
 pub struct PolicyApproveArgs {
     /// Who approved it (a human's name or id)
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: String,
     /// Why, or what was reviewed
     #[arg(long, value_name = "TEXT")]
     pub note: Option<String>,
     /// Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it, and then --note carries the human's answer
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long, value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor: Option<String>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

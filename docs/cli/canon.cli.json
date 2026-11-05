@@ -3,7 +3,7 @@
   "cli": {
     "about": "Specs, evidence gates, and agent memory for your repo",
     "name": "canon",
-    "version": "0.36.0"
+    "version": "0.37.0"
   },
   "commands": [
     {
@@ -360,6 +360,9 @@
       ],
       "options": [
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "Who approved (the human, not the agent)",
           "name": "approver",
           "required": true,
@@ -373,7 +376,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it",
           "name": "relayed-via",
@@ -382,7 +385,7 @@
         {
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
@@ -430,6 +433,13 @@
         },
         {
           "arguments": [
+            "relayed-via"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`)."
+        },
+        {
+          "arguments": [
             "relayed-via",
             "actor"
           ],
@@ -447,11 +457,10 @@
         },
         {
           "arguments": [
-            "approver",
             "note"
           ],
           "code": "APPROVAL_INVALID",
-          "description": "The human's own answer (`--approver` and `--note`) is one line and, written by the human without `--relayed-via`, not blank once trimmed (a blank answer under `--relayed-via` is the relayed validator's, `USAGE`)."
+          "description": "The human's own words (`--note`) are one line and, written by the human without `--relayed-via`, not blank once trimmed (a blank answer under `--relayed-via` is the relayed validator's, `USAGE`; the name, `--approver`, is the domain of its own)."
         },
         {
           "arguments": [
@@ -1166,6 +1175,9 @@
           "name": "role"
         },
         {
+          "domain": {
+            "pattern": "^[^/\\p{White_Space}]+/[^/\\p{White_Space}]+/[^/\\p{White_Space}]+/[0-9a-f]{6,64}$"
+          },
           "help": "Full regime key (<role>/<repo>/<area>/<hash>) to retrieve guidance for",
           "name": "regime",
           "required": true,
@@ -1173,6 +1185,9 @@
         },
         {
           "default": "canon",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "The dispatching agent's id (recorded as the run's actor)",
           "name": "actor",
           "valueName": "ACTOR_ID"
@@ -1449,7 +1464,7 @@
         "project",
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "help": "Why the gap is accepted",
           "name": "reason",
@@ -1458,7 +1473,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "Where the gap is tracked: an issue URL or reference",
           "name": "tracking",
@@ -1467,9 +1482,9 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence",
+          "help": "When the acceptance stops holding: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); none means it holds until new evidence",
           "name": "expiry",
           "valueName": "TIMESTAMP"
         },
@@ -1477,7 +1492,7 @@
         {
           "defaultNote": "the role declared with --as or CANON_ROLE",
           "domain": {
-            "pattern": "^reviewer$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "env": "CANON_ROLE",
           "help": "Must be reviewer (default: the declared role, --as / CANON_ROLE; required when none is declared)",
@@ -1485,13 +1500,16 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence",
           "name": "session",
           "valueName": "SESSION_ID"
         },
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it, and then --approver and --note are required",
           "name": "relayed-via",
           "valueName": "NAME"
@@ -1520,7 +1538,14 @@
             "expiry"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
+        },
+        {
+          "arguments": [
+            "role"
+          ],
+          "code": "DIVERGENCE_DENIED",
+          "description": "`--role`, when given, names the reviewer step: only a reviewer step accepts a divergence (a role that is only declared with `--as` is judged after the repository is read)."
         },
         {
           "arguments": [
@@ -1529,6 +1554,13 @@
           ],
           "code": "USAGE",
           "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable."
+        },
+        {
+          "arguments": [
+            "relayed-via"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`)."
         },
         {
           "arguments": [
@@ -1621,7 +1653,7 @@
       "options": [
         {
           "domain": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "name": "project",
@@ -1641,15 +1673,18 @@
           "valueType": "enum"
         },
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "Why the divergence is recorded; required with `--state deferred`",
           "name": "reason",
           "valueName": "TEXT"
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`",
+          "help": "When a deferral lapses: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); required with `--state deferred`",
           "name": "expiry",
           "valueName": "TIMESTAMP"
         },
@@ -1682,7 +1717,7 @@
             "expiry"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -1746,7 +1781,7 @@
       "options": [
         {
           "domain": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "name": "project",
@@ -1757,6 +1792,9 @@
         "actor",
         "session",
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "Why the divergence is deferred",
           "name": "reason",
           "required": true,
@@ -1764,9 +1802,9 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)",
+          "help": "When the deferral lapses: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "expiry",
           "required": true,
           "valueName": "TIMESTAMP"
@@ -1794,7 +1832,7 @@
             "expiry"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -1837,9 +1875,9 @@
         {
           "defaultNote": "now",
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Governs Deferred expiry; defaults to now",
+          "help": "Governs Deferred expiry; an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); defaults to now",
           "name": "as-of",
           "valueName": "TIMESTAMP"
         },
@@ -1873,7 +1911,7 @@
             "as-of"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -1937,7 +1975,7 @@
       "options": [
         {
           "domain": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "name": "project",
@@ -2185,7 +2223,7 @@
         },
         {
           "domain": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (SPEC_ROOT_NOT_FOUND) before anything is written",
           "name": "project",
@@ -2194,7 +2232,7 @@
         {
           "defaultNote": "test-run when a --report is given",
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`",
           "name": "class"
@@ -2202,7 +2240,7 @@
         {
           "defaultNote": "the --report paths, comma-separated, when one is given",
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "The reference a reader can resolve: a command line, commit sha, or report path (default: the --report paths, comma-separated, when one is given). NEVER run or resolved by canon",
           "name": "ref",
@@ -2221,9 +2259,9 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
-          "help": "One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)",
+          "help": "One line of text, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers). The white space around it is trimmed; a control character or line break inside it is refused",
           "name": "summary",
           "valueName": "TEXT"
         },
@@ -2239,7 +2277,7 @@
         "run",
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([^\\n\\r\u0000]*\\P{White_Space})?$"
           },
           "help": "Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref",
           "name": "surface-ref",
@@ -2249,9 +2287,9 @@
         {
           "default": "canon",
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
-          "help": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
+          "help": "The attesting actor's id (recorded as the attestation's author). One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
           "name": "actor",
           "valueName": "ACTOR_ID"
         },
@@ -2266,7 +2304,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count",
           "name": "session",
@@ -2274,7 +2312,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "help": "Human approval identity; authentication comes only from the detached signature",
           "name": "approver",
@@ -2297,9 +2335,9 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$"
           },
-          "help": "Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload",
+          "help": "The approval time included in the signed approval payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over",
           "name": "approval-at",
           "valueName": "TIMESTAMP"
         },
@@ -2349,7 +2387,7 @@
             "approval-at"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused."
         },
         {
           "arguments": [
@@ -2426,7 +2464,7 @@
         },
         {
           "domain": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "Spec corpus id for --scenario. Required only when canon.yaml configures more than one spec root",
           "name": "project",
@@ -2451,7 +2489,7 @@
         "rev",
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([^\\n\\r\u0000]*\\P{White_Space})?$"
           },
           "help": "The risk surface being approved: a repository-relative path or `effect:<kebab-slug>` (repeatable)",
           "name": "surface-ref",
@@ -2460,14 +2498,22 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "help": "Who approved (the human whose detached signature the payload is for)",
           "name": "approver",
           "required": true,
           "valueName": "NAME"
         },
-        "approval-at",
+        {
+          "domain": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$"
+          },
+          "help": "The approval time that is signed into the payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused). Fix it once and give the same value to the signature and to `evidence add`",
+          "name": "approval-at",
+          "required": true,
+          "valueName": "TIMESTAMP"
+        },
         "repo",
         "as"
       ],
@@ -2485,7 +2531,7 @@
             "approval-at"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused."
         },
         {
           "arguments": [
@@ -2614,7 +2660,7 @@
       "options": [
         {
           "domain": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (SPEC_ROOT_NOT_FOUND) when it names none",
           "name": "project",
@@ -2622,7 +2668,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon",
           "name": "ref",
@@ -2631,9 +2677,9 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
-          "help": "One-line note (scanned for fabrication markers; line breaks refused)",
+          "help": "One line of text (scanned for fabrication markers). The white space around it is trimmed; a control character or line break inside it is refused",
           "name": "summary",
           "valueName": "TEXT"
         },
@@ -2642,9 +2688,9 @@
         {
           "default": "canon",
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
-          "help": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
+          "help": "The attesting actor's id (recorded as the attestation's author). One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
           "name": "actor",
           "valueName": "ACTOR_ID"
         },
@@ -2659,7 +2705,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The attesting session (recorded as actor.session_id)",
           "name": "session",
@@ -2683,7 +2729,7 @@
         "max-artifact-mib",
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space})?$"
           },
           "help": "The external evaluator that re-audited the scenario (canon never runs it)",
           "name": "evaluator",
@@ -2692,7 +2738,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^\\P{White_Space}([\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space})?$"
           },
           "help": "The evaluator's version",
           "name": "evaluator-version",
@@ -2823,17 +2869,17 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+          "help": "Only records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "before",
           "valueName": "TIMESTAMP"
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
+          "help": "Only records at or after this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "after",
           "valueName": "TIMESTAMP"
         },
@@ -2925,7 +2971,7 @@
             "after"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         },
         {
           "arguments": [
@@ -2995,6 +3041,9 @@
         },
         {
           "default": "canon-scaffold",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "env": "CANON_ACTOR",
           "help": "Agent id written into provenance (env: CANON_ACTOR)",
           "name": "actor",
@@ -3003,7 +3052,7 @@
         "session",
         {
           "domain": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
           "name": "project",
@@ -3179,18 +3228,18 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
-          "help": "The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)",
+          "help": "The reviewer who raised it, recorded as the finding's reviewer and author. One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
           "name": "actor",
           "required": true,
           "valueName": "ACTOR_ID"
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
-          "help": "One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)",
+          "help": "One line of what the finding IS, in the reviewer's own words. NEVER checked against the code. The white space around it is trimmed; a control character or line break inside it is refused",
           "name": "summary",
           "required": true,
           "valueName": "TEXT"
@@ -3199,7 +3248,7 @@
         "resolution-rev",
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "The SOURCED introducing commit, any git revision (resolved to the full sha). Leave it unset when it is not known, never guess (see --help). Existence only; canon never reads the commit's message or diff",
           "name": "introduced-rev",
@@ -3220,7 +3269,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^[\\P{White_Space}\\p{Zs}\\t]*$"
           },
           "help": "Where in the tree, as path/to/file.rs:120-134 (line breaks refused)",
           "name": "file-ref",
@@ -3246,7 +3295,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The authoring session (recorded as actor.session_id)",
           "name": "session",
@@ -3324,7 +3373,6 @@
           "help": "Only a `fixed` finding was closed by a commit.",
           "if": {
             "in": [
-              "open",
               "rejected",
               "deferred"
             ],
@@ -3413,10 +3461,9 @@
           "valueType": "integer"
         },
         {
-          "help": "Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed records --resolution-rev, default HEAD, and only fixed may carry one",
+          "help": "Where it lands: fixed / rejected / deferred (`open` is refused: a defect that came back is a new finding). fixed records --resolution-rev, default HEAD, and only fixed may carry one",
           "name": "disposition",
           "possibleValues": [
-            "open",
             "fixed",
             "rejected",
             "deferred"
@@ -3427,14 +3474,17 @@
         "resolution-rev",
         {
           "domain": {
-            "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
-          "help": "Why it was closed, one line. Required for rejected and deferred, optional for fixed and open; stored on the closing version and shown by `finding list`",
+          "help": "Why it was closed, one line. Required for rejected and deferred, optional for fixed; stored on the closing version and shown by `finding list`",
           "name": "reason",
           "valueName": "TEXT"
         },
         {
           "default": "canon",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes",
           "name": "actor",
           "valueName": "ACTOR_ID"
@@ -3450,7 +3500,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The session that authored the TRANSITION (recorded as actor.session_id)",
           "name": "session",
@@ -4117,13 +4167,16 @@
           "valueType": "switch"
         },
         {
-          "help": "Harnesses to install the canon skill for, without asking (`claude`, `codex`, `omp`, `pi`, comma-separated; `none` for none)",
+          "domain": {
+            "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
+          },
+          "help": "Harnesses to install the canon skill for, without asking: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item)",
           "name": "providers",
           "valueName": "LIST"
         },
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*\\p{White_Space}*$"
           },
           "help": "Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml",
           "name": "language",
@@ -4401,12 +4454,18 @@
           "valueType": "path"
         },
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "With --commit, record the human's answer to a plan that re-binds `Approved:` lines on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may commit such a plan only with it",
           "name": "relayed-via",
           "valueName": "NAME"
         },
         {
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
           "name": "actor",
@@ -4431,6 +4490,13 @@
           ],
           "code": "USAGE",
           "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable."
+        },
+        {
+          "arguments": [
+            "relayed-via"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`)."
         },
         {
           "arguments": [
@@ -4581,6 +4647,9 @@
       "kind": "command",
       "options": [
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "Who approved it (a human's name or id)",
           "name": "approver",
           "required": true,
@@ -4593,7 +4662,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it, and then --note carries the human's answer",
           "name": "relayed-via",
@@ -4602,7 +4671,7 @@
         {
           "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　()\"']+[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "env": "CANON_ACTOR",
           "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
@@ -4636,6 +4705,13 @@
         },
         {
           "arguments": [
+            "relayed-via"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`)."
+        },
+        {
+          "arguments": [
             "relayed-via",
             "actor"
           ],
@@ -4650,13 +4726,6 @@
           ],
           "code": "USAGE",
           "description": "A relayed approval carries the human's own name and answer word for word: with `--relayed-via`, `--approver` and `--note` are not blank."
-        },
-        {
-          "arguments": [
-            "approver"
-          ],
-          "code": "APPROVAL_INVALID",
-          "description": "The human's name (`--approver`) is not blank once trimmed (a blank name under `--relayed-via` is the relayed validator's, `USAGE`)."
         }
       ],
       "x-canon": {
@@ -4882,9 +4951,9 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+          "help": "Remove records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "before",
           "required": true,
           "valueName": "TIMESTAMP"
@@ -4907,7 +4976,7 @@
             "before"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -5049,9 +5118,9 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$"
           },
-          "help": "Only records with at >= <since> (RFC3339/ISO-8601)",
+          "help": "Only records with at >= <since>: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
           "name": "since",
           "valueName": "TIMESTAMP"
         },
@@ -5080,6 +5149,9 @@
           "name": "status"
         },
         {
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "Scope --kind subject by domain (other kinds exit 2)",
           "name": "domain",
           "valueName": "NAME"
@@ -5218,7 +5290,7 @@
             "since"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused."
         }
       ],
       "x-canon": {
@@ -5243,7 +5315,7 @@
       "options": [
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+            "pattern": "^[\\p{White_Space}/]*[^\\p{White_Space}/][^\u0000]*$"
           },
           "help": "The <role> segment (canonicalized)",
           "name": "role-segment",
@@ -5252,7 +5324,7 @@
         },
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+            "pattern": "^[\\p{White_Space}/]*[^\\p{White_Space}/][^\u0000]*$"
           },
           "help": "The <repo> segment (canonicalized)",
           "name": "repo-name",
@@ -5261,7 +5333,7 @@
         },
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　/][^\u0000]*$"
+            "pattern": "^[\\p{White_Space}/]*[^\\p{White_Space}/][^\u0000]*$"
           },
           "help": "The <area> segment (canonicalized)",
           "name": "area",
@@ -5270,7 +5342,7 @@
         },
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9A-Fa-f]{6,64}[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*[0-9A-Fa-f]{6,64}\\p{White_Space}*$"
           },
           "help": "The <hash> segment (6-64-char lowercase hex; passed through, never re-hashed)",
           "name": "hash",
@@ -5470,13 +5542,16 @@
         },
         {
           "domain": {
-            "pattern": "^[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[^/ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]+/[0-9a-f]{6,64}$"
+            "pattern": "^[^/\\p{White_Space}]+/[^/\\p{White_Space}]+/[^/\\p{White_Space}]+/[0-9a-f]{6,64}$"
           },
           "help": "Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject",
           "name": "regime",
           "valueName": "KEY"
         },
         {
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "help": "Derive the regime from a domain slug; mutually exclusive with --regime",
           "name": "domain",
           "valueName": "NAME"
@@ -5492,7 +5567,7 @@
         {
           "default": 5,
           "domain": {
-            "minimum": 0
+            "minimum": 1
           },
           "flagOnly": true,
           "help": "Cap on the guidance items returned",
@@ -5556,7 +5631,6 @@
         "CONFIG_UNAVAILABLE",
         "LAYOUT_MIGRATION_REQUIRED",
         "REPO_LOCK_UNAVAILABLE",
-        "REVIEW_ARGUMENT_INVALID",
         "REVIEW_ARTIFACT_DENIED",
         "REVIEW_ARTIFACT_INVALID",
         "REVIEW_ARTIFACT_NOT_FOUND",
@@ -5601,7 +5675,10 @@
       "options": [
         "project",
         {
-          "help": "The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
+          "help": "The reviewer's id (recorded as the review's author and as its reviewer). One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
           "name": "actor",
           "required": true,
           "valueName": "ACTOR_ID"
@@ -5620,7 +5697,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "name": "session",
@@ -5690,7 +5767,6 @@
         "CONFIG_UNAVAILABLE",
         "LAYOUT_MIGRATION_REQUIRED",
         "REPO_LOCK_UNAVAILABLE",
-        "REVIEW_ARGUMENT_INVALID",
         "REVIEW_ARTIFACT_DENIED",
         "REVIEW_ARTIFACT_INVALID",
         "REVIEW_ARTIFACT_NOT_FOUND",
@@ -5736,7 +5812,10 @@
       "options": [
         "project",
         {
-          "help": "The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
+          "help": "The reviewer's id (recorded as the review's author and as its reviewer). One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
           "name": "actor",
           "required": true,
           "valueName": "ACTOR_ID"
@@ -5755,7 +5834,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+            "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
           },
           "help": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "name": "session",
@@ -5825,7 +5904,6 @@
         "REPO_LOCK_UNAVAILABLE",
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
-        "SCAFFOLD_ARGUMENT_INVALID",
         "SCENARIO_TAG_EXISTS",
         "SPEC_ROOT_NOT_FOUND",
         "SPEC_ROOT_REQUIRED",
@@ -5909,6 +5987,9 @@
         },
         {
           "default": "canon-scaffold",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "env": "CANON_ACTOR",
           "help": "Agent id written into provenance (env: CANON_ACTOR)",
           "name": "actor",
@@ -5924,7 +6005,7 @@
         },
         {
           "domain": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$"
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
           "name": "project",
@@ -6036,7 +6117,7 @@
       "outputs": [
         {
           "schemaRef": "#/schemas/SchemaReport",
-          "schemaVersion": "1.4"
+          "schemaVersion": "1.5"
         }
       ],
       "summary": "Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes",
@@ -6078,7 +6159,7 @@
       "operands": [
         {
           "domain": {
-            "pattern": "^[^\u0000]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\u0000]*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "The text to find, read as typed: quotes and words such as AND are not syntax",
           "name": "text",
@@ -6124,7 +6205,6 @@
         {
           "default": 20,
           "domain": {
-            "maximum": 4294967295,
             "minimum": 1
           },
           "flagOnly": true,
@@ -6298,9 +6378,9 @@
         {
           "defaultNote": "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories",
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[Nn][Oo][Nn][Ee][ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*,)*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(,[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*)?)*)$"
+            "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
           },
-          "help": "Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
+          "help": "Providers to project: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
           "name": "providers",
           "valueName": "LIST"
         },
@@ -6460,7 +6540,6 @@
         "REPO_INVALID",
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
-        "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_EVALUATION_INVALID",
         "STRATEGY_FILE_INVALID",
@@ -6494,12 +6573,23 @@
           "valueType": "path"
         },
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "Who approves (the human whose detached signature the payload is for)",
           "name": "approver",
           "required": true,
           "valueName": "NAME"
         },
-        "approval-at",
+        {
+          "domain": {
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$"
+          },
+          "help": "The approval time that is signed into the payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused). Fix it once and give the same value to the signature and to `strategy rollback`",
+          "name": "approval-at",
+          "required": true,
+          "valueName": "TIMESTAMP"
+        },
         "repo",
         "as"
       ],
@@ -6517,7 +6607,7 @@
             "approval-at"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused."
         }
       ],
       "x-canon": {
@@ -6565,7 +6655,6 @@
         "LAYOUT_MIGRATION_REQUIRED",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
-        "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_FILE_INVALID",
         "STRATEGY_INCOMPLETE",
@@ -6663,7 +6752,6 @@
         "REPO_LOCK_UNAVAILABLE",
         "REPO_UNAVAILABLE",
         "ROLE_INVALID",
-        "STRATEGY_ARGUMENT_INVALID",
         "STRATEGY_DEMOTION_FAILED",
         "STRATEGY_NOT_FOUND",
         "STRATEGY_ROLLBACK_FAILED",
@@ -6711,12 +6799,18 @@
       ],
       "options": [
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "Why the strategy is rolled back (signed: `strategy:<id>:rollback:<sha256(reason)>`)",
           "name": "reason",
           "required": true,
           "valueName": "TEXT"
         },
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "The approver; must be a policy-pinned approver",
           "name": "actor",
           "required": true,
@@ -6731,9 +6825,9 @@
         },
         {
           "domain": {
-            "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$"
           },
-          "help": "When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)",
+          "help": "When the approver signed: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over",
           "name": "approval-at",
           "required": true,
           "valueName": "TIMESTAMP"
@@ -6765,7 +6859,7 @@
             "approval-at"
           ],
           "code": "USAGE",
-          "description": "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused."
+          "description": "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused."
         }
       ],
       "x-canon": {
@@ -6932,7 +7026,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "help": "Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories",
           "name": "override-reason",
@@ -6940,7 +7034,7 @@
         },
         {
           "domain": {
-            "pattern": "^[^\\n\\r]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r]*$"
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
           "help": "Why the subject moves (required for shipped → verifying, optional on every other transition); recorded on the subject with the actor",
           "name": "reason",
@@ -6948,6 +7042,9 @@
         },
         {
           "default": "canon",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "The invoking actor's id, recorded with an --override-reason waiver or a --reason",
           "name": "actor",
           "valueName": "ACTOR_ID"
@@ -7041,6 +7138,9 @@
           "valueName": "TEXT"
         },
         {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "The subject's summary (optional)",
           "name": "summary",
           "valueName": "TEXT"
@@ -7056,6 +7156,9 @@
         },
         {
           "default": "canon",
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
           "help": "The invoking actor's id",
           "name": "actor",
           "valueName": "ACTOR_ID"
@@ -7379,7 +7482,7 @@
       "operands": [
         {
           "domain": {
-            "pattern": "^[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*$"
+            "pattern": "^\\p{White_Space}*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)\\p{White_Space}*$"
           },
           "help": "A review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`)",
           "name": "id",
@@ -7407,7 +7510,7 @@
     }
   ],
   "contract": "atip/1",
-  "contractVersion": "1.4",
+  "contractVersion": "1.5",
   "envVars": [
     {
       "about": "Default actor id (`--actor`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`",
@@ -11576,14 +11679,17 @@
           "canon brief approve add-login --approver alice --note ok --relayed-via ask --actor impl --digest add-login=sha256:0123456789abcdef"
         ],
         [
-          "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --digest add-login=sha256:0123456789abcdef"
+          "canon brief approve add-login --approver alice --note ok --relayed-via \"a b\" --as implementer --actor impl --digest add-login=sha256:0123456789abcdef",
+          "canon brief approve add-login --approver alice --note ok --relayed-via \"a(b\" --as implementer --actor impl --digest add-login=sha256:0123456789abcdef"
         ],
         [
-          "canon brief approve add-login --approver \" \" --note ok --relayed-via ask --as implementer --actor impl --digest add-login=sha256:0123456789abcdef",
+          "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --digest add-login=sha256:0123456789abcdef",
+          "canon brief approve add-login --approver alice --note ok --relayed-via ask --as implementer --actor \"a b\" --digest add-login=sha256:0123456789abcdef"
+        ],
+        [
           "canon brief approve add-login --approver alice --note \" \" --relayed-via ask --as implementer --actor impl --digest add-login=sha256:0123456789abcdef"
         ],
         [
-          "canon brief approve add-login --approver \" \" --note ok",
           "canon brief approve add-login --approver alice --note \" \""
         ],
         [
@@ -16665,10 +16771,15 @@
           "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2026-02-30 --role reviewer"
         ],
         [
+          "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role implementer"
+        ],
+        [
           "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --approver alice --note ok"
         ],
         [
-          "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver \" \" --note ok",
+          "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via \"a b\" --as implementer --approver alice --note ok"
+        ],
+        [
           "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver alice --note \" \""
         ]
       ],
@@ -16803,7 +16914,7 @@
               "type": "string"
             },
             "expiry": {
-              "description": "The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence",
+              "description": "When the acceptance stops holding: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); none means it holds until new evidence",
               "type": "string"
             },
             "note": {
@@ -17216,7 +17327,7 @@
               "type": "string"
             },
             "expiry": {
-              "description": "When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`",
+              "description": "When a deferral lapses: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`); required with `--state deferred`",
               "type": "string"
             },
             "noPromote": {
@@ -17650,7 +17761,7 @@
               "type": "string"
             },
             "expiry": {
-              "description": "When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)",
+              "description": "When the deferral lapses: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
               "type": "string"
             },
             "operands": {
@@ -18451,7 +18562,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30"
+          "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30T10:00:00Z"
         ],
         [
           "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --surface-ref /etc/passwd",
@@ -18726,7 +18837,7 @@
           "additionalProperties": false,
           "properties": {
             "actor": {
-              "description": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
+              "description": "The attesting actor's id (recorded as the attestation's author). One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
               "type": "string"
             },
             "allScenarios": {
@@ -18734,7 +18845,7 @@
               "type": "boolean"
             },
             "approvalAt": {
-              "description": "Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload",
+              "description": "The approval time included in the signed approval payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over",
               "type": "string"
             },
             "approvalRole": {
@@ -18775,7 +18886,7 @@
               "type": "boolean"
             },
             "overrideReason": {
-              "description": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
+              "description": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line of text, recorded on the record with --actor)",
               "type": "string"
             },
             "project": {
@@ -18829,7 +18940,7 @@
               "type": "string"
             },
             "summary": {
-              "description": "One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)",
+              "description": "One line of text, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers). The white space around it is trimmed; a control character or line break inside it is refused",
               "type": "string"
             },
             "surfaceRef": {
@@ -19168,7 +19279,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30"
+          "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30T10:00:00Z"
         ],
         [
           "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --surface-ref /etc/passwd",
@@ -19483,7 +19594,7 @@
           "additionalProperties": false,
           "properties": {
             "actor": {
-              "description": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
+              "description": "The attesting actor's id (recorded as the attestation's author). One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
               "type": "string"
             },
             "artifact": {
@@ -19539,7 +19650,7 @@
               "type": "array"
             },
             "overrideReason": {
-              "description": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
+              "description": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line of text, recorded on the record with --actor)",
               "type": "string"
             },
             "project": {
@@ -19585,7 +19696,7 @@
               "type": "string"
             },
             "summary": {
-              "description": "One-line note (scanned for fabrication markers; line breaks refused)",
+              "description": "One line of text (scanned for fabrication markers). The white space around it is trimmed; a control character or line break inside it is refused",
               "type": "string"
             }
           },
@@ -20133,11 +20244,11 @@
           "additionalProperties": false,
           "properties": {
             "after": {
-              "description": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
+              "description": "Only records at or after this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
               "type": "string"
             },
             "before": {
-              "description": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+              "description": "Only records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
               "type": "string"
             },
             "dryRun": {
@@ -21223,7 +21334,7 @@
           "additionalProperties": false,
           "properties": {
             "actor": {
-              "description": "The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)",
+              "description": "The reviewer who raised it, recorded as the finding's reviewer and author. One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
               "type": "string"
             },
             "change": {
@@ -21311,7 +21422,7 @@
               ]
             },
             "summary": {
-              "description": "One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)",
+              "description": "One line of what the finding IS, in the reviewer's own words. NEVER checked against the code. The white space around it is trimmed; a control character or line break inside it is refused",
               "type": "string"
             }
           },
@@ -21786,9 +21897,8 @@
               "type": "string"
             },
             "disposition": {
-              "description": "Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed records --resolution-rev, default HEAD, and only fixed may carry one",
+              "description": "Where it lands: fixed / rejected / deferred (`open` is refused: a defect that came back is a new finding). fixed records --resolution-rev, default HEAD, and only fixed may carry one",
               "enum": [
-                "open",
                 "fixed",
                 "rejected",
                 "deferred"
@@ -21812,7 +21922,7 @@
               "type": "boolean"
             },
             "reason": {
-              "description": "Why it was closed, one line. Required for rejected and deferred, optional for fixed and open; stored on the closing version and shown by `finding list`",
+              "description": "Why it was closed, one line. Required for rejected and deferred, optional for fixed; stored on the closing version and shown by `finding list`",
               "type": "string"
             },
             "resolutionRev": {
@@ -21926,7 +22036,6 @@
             },
             "disposition": {
               "enum": [
-                "open",
                 "fixed",
                 "rejected",
                 "deferred"
@@ -25388,7 +25497,7 @@
               ]
             },
             "providers": {
-              "description": "Harnesses to install the canon skill for, without asking (`claude`, `codex`, `omp`, `pi`, comma-separated; `none` for none)",
+              "description": "Harnesses to install the canon skill for, without asking: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item)",
               "type": "string"
             }
           },
@@ -26173,10 +26282,12 @@
           "canon migrate --commit --plan-digest abc --relayed-via ask --actor impl --approver alice --note ok"
         ],
         [
+          "canon migrate --commit --plan-digest abc --relayed-via \"a b\" --as implementer --actor impl --approver alice --note ok"
+        ],
+        [
           "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --approver alice --note ok"
         ],
         [
-          "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver \" \" --note ok",
           "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver alice"
         ]
       ],
@@ -26893,14 +27004,15 @@
           "canon policy approve --approver alice --note ok --relayed-via ask --actor impl"
         ],
         [
-          "canon policy approve --approver alice --note ok --relayed-via ask --as implementer"
+          "canon policy approve --approver alice --note ok --relayed-via \"a b\" --as implementer --actor impl",
+          "canon policy approve --approver alice --note ok --relayed-via \"a(b\" --as implementer --actor impl"
         ],
         [
-          "canon policy approve --approver alice --relayed-via ask --as implementer --actor impl --note \" \"",
-          "canon policy approve --approver \" \" --note ok --relayed-via ask --as implementer --actor impl"
+          "canon policy approve --approver alice --note ok --relayed-via ask --as implementer",
+          "canon policy approve --approver alice --note ok --relayed-via ask --as implementer --actor \"a b\""
         ],
         [
-          "canon policy approve --approver \" \""
+          "canon policy approve --approver alice --relayed-via ask --as implementer --actor impl --note \" \""
         ]
       ],
       "schemas": {
@@ -28035,7 +28147,7 @@
           "additionalProperties": false,
           "properties": {
             "before": {
-              "description": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
+              "description": "Remove records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)",
               "type": "string"
             },
             "kind": {
@@ -29716,7 +29828,7 @@
           ],
           "properties": {
             "actor": {
-              "description": "The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)",
+              "description": "The reviewer's id (recorded as the review's author and as its reviewer). One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
               "type": "string"
             },
             "artifact": {
@@ -30303,7 +30415,7 @@
           ],
           "properties": {
             "actor": {
-              "description": "The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)",
+              "description": "The reviewer's id (recorded as the review's author and as its reviewer). One line of text: the white space around it is trimmed; a control character or line break inside it is refused",
               "type": "string"
             },
             "artifact": {
@@ -32819,7 +32931,7 @@
               "type": "boolean"
             },
             "providers": {
-              "description": "Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
+              "description": "Providers to project: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
               "type": "string"
             },
             "skillsSource": {
@@ -33059,6 +33171,10 @@
             "status": {
               "$ref": "#/schemas/BriefState",
               "description": "`approved`, `unapproved` or `changed` (edited after its approval)."
+            },
+            "treeUnchanged": {
+              "description": "An approved chore whose approval recorded the code tree that is the\ncurrent code tree (0.37): it asks for no evidence, only its\nchange-level review. Set by `canon status` for a chore entry.",
+              "type": "boolean"
             }
           },
           "required": [
@@ -33603,7 +33719,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2026-02-30 --json"
+          "canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2026-02-30T10:00:00Z --json"
         ]
       ],
       "schemas": {
@@ -34023,7 +34139,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2026-02-30"
+          "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2026-02-30T10:00:00Z"
         ]
       ],
       "schemas": {
@@ -34348,7 +34464,7 @@
               "type": "string"
             },
             "approvalAt": {
-              "description": "When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)",
+              "description": "When the approver signed: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over",
               "type": "string"
             },
             "contradictingTrajectory": {
@@ -38881,7 +38997,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
         },
         "help": "The acting session (recorded as actor.session_id); optional",
         "name": "session",
@@ -38889,19 +39005,25 @@
       },
       {
         "domain": {
-          "pattern": "^[a-z0-9][a-z0-9-]*$"
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
         },
         "help": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
         "name": "project",
         "valueName": "PROJECT_ID"
       },
       {
+        "domain": {
+          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+        },
         "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
         "name": "actor",
         "required": true,
         "valueName": "ACTOR_ID"
       },
       {
+        "domain": {
+          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+        },
         "help": "With --relayed-via, who the human is",
         "name": "approver",
         "valueName": "NAME"
@@ -38920,7 +39042,7 @@
         "default": 1,
         "domain": {
           "maximum": 4294967295,
-          "minimum": 0
+          "minimum": 1
         },
         "help": "The review round this version belongs to (1-based)",
         "name": "round",
@@ -39008,20 +39130,11 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　][^\\n\\r\u000b\f\\p{Zl}\\p{Zp}]*$"
+          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
         },
-        "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
+        "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line of text, recorded on the record with --actor)",
         "name": "override-reason",
         "valueName": "TEXT"
-      },
-      {
-        "domain": {
-          "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+−][0-9]{2}:[0-9]{2}))$"
-        },
-        "help": "The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)",
-        "name": "approval-at",
-        "required": true,
-        "valueName": "TIMESTAMP"
       },
       {
         "defaultNote": "HEAD when --disposition is fixed",
@@ -39073,7 +39186,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
         },
         "help": "The reviewer runtime's provider (e.g. anthropic, openai)",
         "name": "reviewer-provider",
@@ -39081,7 +39194,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
         },
         "help": "The reviewer runtime's model id",
         "name": "reviewer-model",
@@ -39089,7 +39202,7 @@
       },
       {
         "domain": {
-          "pattern": "^[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　])?$"
+          "pattern": "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
         },
         "help": "The harness that ran the reviewer (e.g. omp, codex, claude)",
         "name": "reviewer-harness",
@@ -39113,9 +39226,9 @@
       {
         "defaultNote": "the providers `skills install` would use",
         "domain": {
-          "pattern": "^([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*[Nn][Oo][Nn][Ee][ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*|([ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*,)*[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(,[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r   - \\p{Zl}\\p{Zp}  　]*)?)*)$"
+          "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
         },
-        "help": "Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install",
+        "help": "Providers to inspect: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item). Omitted: as for install",
         "name": "providers",
         "valueName": "LIST"
       }

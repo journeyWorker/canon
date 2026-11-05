@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-approval-evidence-037",
+    "role": "implementer",
+    "session_id": "s-0-37-approval-evidence"
+  },
+  "at": "2026-11-05T12:42:30.029690Z",
+  "attachments": [
+    {
+      "case": "subject_lifecycle_52_the_briefs_list_carries_the_relayed_approvals",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "9380d3877d953ae2cfd59320e28480920482c8005a007dbcf0a12e5e8399aefe"
+    },
+    {
+      "case": "subject_lifecycle_52_a_relayed_approval_of_two_briefs_marks_both_lines_and_status_and_show_name_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "9380d3877d953ae2cfd59320e28480920482c8005a007dbcf0a12e5e8399aefe"
+    }
+  ],
+  "code_tree": "c860b5a2a3ec5dd80941f624e1c64bb57dc75dc6",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "c9810ea62e29f06186591327ebcb2c11a0447f1b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1141,
+  "scenario_id": "subject.lifecycle.52",
+  "schema": 1,
+  "staging_id": "47ebf6fa",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

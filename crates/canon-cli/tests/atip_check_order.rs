@@ -531,20 +531,25 @@ fn atip_checkorder_08_a_constraint_is_answered_before_a_validator() {
 /// the two alone keeps its own code: the constraint's call is not swallowed by the validator, nor the validator's by the constraint.
 #[test]
 fn atip_checkorder_18_a_constraint_beside_a_validators_fault_answers_and_each_alone_keeps_its_code() {
-    // brief approve: `--actor` needs `--relayed-via` (a constraint, USAGE); a blank `--approver` is a validator (APPROVAL_INVALID).
-    let validator = empty("canon brief approve add-login --approver \" \" --note ok", &[]);
-    assert_answer(&validator, "APPROVAL_INVALID", "--approver");
+    // brief approve: `--actor` needs `--relayed-via` (a constraint, USAGE); a blank `--note` is a validator (APPROVAL_INVALID).
+    let validator = empty("canon brief approve add-login --approver alice --note \" \"", &[]);
+    assert_answer(&validator, "APPROVAL_INVALID", "--note");
     let constraint = empty("canon brief approve add-login --approver alice --note ok --actor impl", &[]);
     assert_answer(&constraint, "USAGE", "--relayed-via");
-    let both = empty("canon brief approve add-login --approver \" \" --note ok --actor impl", &[]);
+    let both = empty("canon brief approve add-login --approver alice --note \" \" --actor impl", &[]);
     assert_answer(&both, "USAGE", "--relayed-via");
-    let flipped = empty("canon brief approve add-login --actor impl --note ok --approver \" \"", &[]);
+    let flipped = empty("canon brief approve add-login --actor impl --approver alice --note \" \"", &[]);
     assert_answer(&flipped, "USAGE", "--relayed-via");
-    // policy approve: the same shape with the validator APPROVAL_INVALID.
-    let validator = empty("canon policy approve --approver \" \"", &[]);
-    assert_answer(&validator, "APPROVAL_INVALID", "--approver");
-    let both = empty("canon policy approve --approver \" \" --actor impl", &[]);
-    assert_answer(&both, "USAGE", "--relayed-via");
+    // The name of the human is a domain (0.37), which answers before a constraint: a blank `--approver` is `APPROVAL_INVALID` beside the same constraint.
+    let domain = empty("canon brief approve add-login --approver \" \" --note ok", &[]);
+    assert_answer(&domain, "APPROVAL_INVALID", "--approver");
+    let domain_first = empty("canon brief approve add-login --approver \" \" --note ok --actor impl", &[]);
+    assert_answer(&domain_first, "APPROVAL_INVALID", "--approver");
+    // policy approve: the same, its `--approver` holds the one domain.
+    let domain = empty("canon policy approve --approver \" \"", &[]);
+    assert_answer(&domain, "APPROVAL_INVALID", "--approver");
+    let domain_first = empty("canon policy approve --approver \" \" --actor impl", &[]);
+    assert_answer(&domain_first, "APPROVAL_INVALID", "--approver");
 }
 
 // ----------------------------------------------------------------------------------------------------------------- F5
@@ -613,7 +618,7 @@ fn atip_checkorder_11_the_field_of_each_kind_of_rule_follows_the_contracts_table
     assert_answer(&empty("canon evidence add --scenario auth.login.01", &implementer), "USAGE", "--class");
     assert_answer(&empty("canon evidence add --scenario auth.login.01 --class test-run", &implementer), "USAGE", "--ref");
     assert_answer(&empty("canon evidence add --class test-run --ref r", &implementer), "EVIDENCE_REQUIRED", "--task");
-    assert_answer(&empty("canon evidence approval-payload --approver a --approval-at 2030-01-01", &implementer), "EVIDENCE_REQUIRED", "--task");
+    assert_answer(&empty("canon evidence approval-payload --approver a --approval-at 2030-01-01T00:00:00Z", &implementer), "EVIDENCE_REQUIRED", "--task");
 }
 
 /// atip.checkorder.12 (every rule): the answer for each rule of each command is the code of the rule and the field the table names for

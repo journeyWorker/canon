@@ -39,10 +39,10 @@ pub struct EvidenceApprovalPayloadArgs {
     #[arg(long = "surface-ref", value_parser = crate::evidence::accept_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// Who approved (the human whose detached signature the payload is for)
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: String,
-    /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
+    /// The approval time that is signed into the payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused). Fix it once and give the same value to the signature and to `evidence add`
+    #[arg(long, value_name = "TIMESTAMP")]
     pub approval_at: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -68,8 +68,8 @@ pub struct EvidenceAddArgs {
     /// faithful / not-applicable / divergent. Given a --report and no --verdict, the verdict is derived from the bound cases (any failed: divergent; a skipped case and none failed: not-applicable; else faithful), one record at a time with --all-scenarios; with no report the default is faithful. An explicit faithful over a failed or skipped case is refused
     #[arg(long, value_parser = crate::evidence::verdict_parser(), value_name = "VERDICT")]
     pub verdict: Option<EvidenceVerdict>,
-    /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
-    #[arg(long, value_name = "TEXT")]
+    /// One line of text, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers). The white space around it is trimmed; a control character or line break inside it is refused
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub summary: Option<String>,
     /// The real captured output backing --summary (requires --summary; scanned for fabrication markers)
     #[arg(long, value_name = "TEXT")]
@@ -83,8 +83,8 @@ pub struct EvidenceAddArgs {
     /// Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref
     #[arg(long = "surface-ref", value_parser = crate::evidence::accept_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
-    /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
-    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
+    /// The attesting actor's id (recorded as the attestation's author). One line of text: the white space around it is trimmed; a control character or line break inside it is refused
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
@@ -93,7 +93,7 @@ pub struct EvidenceAddArgs {
     #[arg(long = "session", value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     /// Human approval identity; authentication comes only from the detached signature.
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: Option<String>,
     /// Approval role; only human is eligible for risk approval.
     #[arg(long, value_parser = crate::cli_error::closed_set(["human"], |word| RoleId::parse(word)), value_name = "ROLE")]
@@ -101,8 +101,8 @@ pub struct EvidenceAddArgs {
     /// Armored SSH detached signature file. Canon never signs on the user's behalf.
     #[arg(long, value_name = "FILE")]
     pub signature_file: Option<PathBuf>,
-    /// Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload.
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
+    /// The approval time included in the signed approval payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over
+    #[arg(long, value_name = "TIMESTAMP")]
     pub approval_at: Option<String>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -121,8 +121,8 @@ pub struct EvidenceAddArgs {
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
     #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = crate::cli::safe_min1)]
     pub max_artifact_mib: u64,
-    /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)
-    #[arg(long, value_name = "TEXT")]
+    /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line of text, recorded on the record with --actor)
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub override_reason: Option<String>,
     #[command(flatten)]
     pub promote: PromoteArgs,
@@ -148,8 +148,8 @@ pub struct EvidenceAuditArgs {
     /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
     #[arg(long = "ref", value_name = "TEXT")]
     pub evidence_ref: String,
-    /// One-line note (scanned for fabrication markers; line breaks refused)
-    #[arg(long, value_name = "TEXT")]
+    /// One line of text (scanned for fabrication markers). The white space around it is trimmed; a control character or line break inside it is refused
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub summary: Option<String>,
     /// The real captured output backing --summary (requires --summary; scanned for fabrication markers)
     #[arg(long, value_name = "TEXT")]
@@ -157,8 +157,8 @@ pub struct EvidenceAuditArgs {
     /// RunId (ULID) of the run that produced this evidence
     #[arg(long = "run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
-    /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
-    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
+    /// The attesting actor's id (recorded as the attestation's author). One line of text: the white space around it is trimmed; a control character or line break inside it is refused
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
@@ -192,8 +192,8 @@ pub struct EvidenceAuditArgs {
     /// confirmed / refuted / indeterminate; the record's verdict follows it (confirmed → faithful, refuted → divergent, indeterminate → not-applicable)
     #[arg(long, value_parser = ["confirmed", "refuted", "indeterminate"], value_name = "RESULT")]
     pub audit_result: String,
-    /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)
-    #[arg(long, value_name = "TEXT")]
+    /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line of text, recorded on the record with --actor)
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub override_reason: Option<String>,
     #[command(flatten)]
     pub promote: PromoteArgs,

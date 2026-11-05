@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-forms",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-forms-rev"
+  },
+  "at": "2026-11-05T17:22:40.786115Z",
+  "code_tree": "ce5d39d8e2cbcf751ed225ab10ec4151a41c9b2e",
+  "kind": "review",
+  "pin": "60b8a7668b49253a51c37565ba9e0d4382e761bf",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_optionforms_15_the_checker_fixture_lists_values_the_new_domains_refuse_and_the_recipes_run_at_1_5"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "a498b7cbfb2b41e4672d88e84b1815dafdf6521f1871d59d31efd962ac5d1c45",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-37-option-forms/brief.md"
+  },
+  "review_id": "01M6PBQWGJVJ5PTG2WZFB640GB",
+  "reviewer": "rev-0-37-option-forms",
+  "scenario_id": "atip.optionforms.15",
+  "schema": 2,
+  "worktree_dirty": false
+}

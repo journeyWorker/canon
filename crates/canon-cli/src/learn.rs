@@ -435,8 +435,8 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
             return ExitCode::from(CliError::refused(crate::read_cause::signature_code(&error), format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy rollback", json));
         }
     };
-    let approved_at = match chrono::DateTime::parse_from_rfc3339(approved_at) {
-        Ok(value) => value.with_timezone(&Utc),
+    let approved_at = match crate::timestamp::parse_date_time(approved_at) {
+        Ok(value) => value,
         Err(error) => {
             return ExitCode::from(CliError::failed("STRATEGY_ARGUMENT_INVALID", format!("invalid --approval-at timestamp: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json));
         }

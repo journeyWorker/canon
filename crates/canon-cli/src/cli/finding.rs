@@ -33,11 +33,11 @@ pub struct FindingAddArgs {
     /// open / fixed / rejected / deferred (fixed records --resolution-rev, default HEAD, and only fixed may carry one)
     #[arg(long, default_value = "open", value_parser = crate::finding::disposition_parser(), value_name = "DISPOSITION")]
     pub disposition: canon_model::FindingDisposition,
-    /// The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)
-    #[arg(long = "actor", value_name = "ACTOR_ID")]
+    /// The reviewer who raised it, recorded as the finding's reviewer and author. One line of text: the white space around it is trimmed; a control character or line break inside it is refused
+    #[arg(long = "actor", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
-    /// One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)
-    #[arg(long, value_name = "TEXT")]
+    /// One line of what the finding IS, in the reviewer's own words. NEVER checked against the code. The white space around it is trimmed; a control character or line break inside it is refused
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub summary: String,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -87,17 +87,17 @@ pub struct FindingCloseArgs {
     /// The finding's index within the round (1-based)
     #[arg(long, value_name = "N")]
     pub seq: u32,
-    /// Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed records --resolution-rev, default HEAD, and only fixed may carry one
-    #[arg(long, value_parser = crate::finding::disposition_parser(), value_name = "DISPOSITION")]
+    /// Where it lands: fixed / rejected / deferred (`open` is refused: a defect that came back is a new finding). fixed records --resolution-rev, default HEAD, and only fixed may carry one
+    #[arg(long, value_parser = crate::finding::close_disposition_parser(), value_name = "DISPOSITION")]
     pub disposition: canon_model::FindingDisposition,
     /// The commit that closed it, any git revision (resolved to the full sha, with the code tree it saw). Permitted only with --disposition fixed, where it defaults to HEAD. Existence only; canon never reads the commit's message or diff
     #[arg(long, value_name = "REV")]
     pub resolution_rev: Option<String>,
-    /// Why it was closed, one line. Required for rejected and deferred, optional for fixed and open; stored on the closing version and shown by `finding list`
-    #[arg(long, value_name = "TEXT")]
+    /// Why it was closed, one line. Required for rejected and deferred, optional for fixed; stored on the closing version and shown by `finding list`
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub reason: Option<String>,
     /// The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes
-    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     /// Attribution only — no partition key derives from it
     #[arg(long, default_value = "reviewer", value_parser = crate::retrieve::parse_role, value_name = "ROLE")]

@@ -136,10 +136,15 @@ fn says_for(domain: &Domain) -> String {
         return integer_says(*minimum, *maximum);
     }
     let Domain::Text { pattern: Some(pattern), .. } = domain else { return "is outside its domain".to_string() };
-    let breaks = pattern.contains("[^\\n\\r");
-    let blank = pattern.contains("[^ \\t");
-    if *pattern == super::KEBAB || *pattern == super::PROJECT_ID {
+    // A pattern refuses a line separator when it writes the class of any character but one (`LINE_CHAR`) or leaves `\n` and `\r` out of a class;
+    // it refuses a blank text when a character that is not white space is required, outside the one-line class that names it too.
+    let breaks = pattern.contains(super::LINE_CHAR) || pattern.contains("[^\\n\\r");
+    let without_line = pattern.replace(super::LINE_CHAR, "");
+    let blank = without_line.contains("\\P{White_Space}") || without_line.contains("[^\\p{White_Space}");
+    if *pattern == super::KEBAB {
         "must be a kebab-case slug: lowercase letters and digits, single hyphens between them".to_string()
+    } else if *pattern == super::LINE_TEXT {
+        "must be one non-empty line of text: it is blank, or has a control character, a line separator or a paragraph separator inside it".to_string()
     } else if breaks && blank {
         "must be one non-empty line: it is blank or carries a line separator".to_string()
     } else if breaks {
@@ -240,6 +245,62 @@ mod tests {
             .arg(Arg::new("name").value_name("SUBJECT_ID"))
             .arg(Arg::new("limit").long("limit").default_value("20").value_parser(clap::value_parser!(i64)))
             .arg(Arg::new("plain").long("plain").num_args(1))
+    }
+
+    /// What 0.36.0 said of a text value outside a domain (`says_for` read the pattern by the characters it listed: `[^\n\r` and `[^ \t`).
+    fn said_in_0_36(pattern: &str) -> String {
+        let breaks = pattern.contains("[^\\n\\r");
+        let blank = pattern.contains("[^ \\t");
+        if breaks && blank {
+            "must be one non-empty line: it is blank or carries a line separator".to_string()
+        } else if breaks {
+            "must be one line: it carries a line separator".to_string()
+        } else if blank {
+            "is empty or only white space".to_string()
+        } else {
+            format!("does not match its pattern {pattern}")
+        }
+    }
+
+    /// atip.claim15.04 (F2): the words a refusal uses for a value outside a text domain are read from the shape of its pattern; the pattern of each place that
+    /// listed white space in 0.36.0 is written with the property now, and its refusal says what it said.
+    #[test]
+    fn atip_claim15_04_a_refusal_says_for_each_pattern_that_listed_white_space_what_it_said_in_0_36() {
+        let golden: serde_json::Value = serde_json::from_str(include_str!("../../tests/atip/white_space_0_36.json")).expect("the golden patterns are JSON");
+        let model = crate::spec::model();
+        let mut compared = 0;
+        let mut changed = 0;
+        for entry in golden["patterns"].as_array().expect("patterns") {
+            let old = entry["pattern"].as_str().expect("a pattern");
+            for place in entry["at"].as_array().expect("places") {
+                let place = place.as_str().expect("a place");
+                let (owner, name) = place.rsplit_once(' ').expect("a place names its owner and its argument");
+                // The six name and sentence options have one text domain since 0.37 (`canon-0-37-option-values`) and say what it says, which is its own sentence; the time
+                // options and the provider list have the RFC 3339 and exact-name patterns (`canon-0-37-option-forms`), which name no white space.
+                if ["--actor", "--approver", "--relayed-via", "--reason", "--summary", "--override-reason", "--approval-at", "--expiry", "--as-of", "--before", "--after", "--since", "--providers"].contains(&name) {
+                    changed += 1;
+                    continue;
+                }
+                let name = name.trim_start_matches("--");
+                let argument = model["commands"]
+                    .as_array()
+                    .expect("commands")
+                    .iter()
+                    .filter(|doc| owner == "tree" || doc["command"] == owner)
+                    .flat_map(|doc| doc["options"].as_array().into_iter().flatten().chain(doc["operands"].as_array().into_iter().flatten()))
+                    .find(|argument| (argument["name"] == name || argument["valueName"] == name) && argument["domain"]["pattern"].is_string())
+                    .unwrap_or_else(|| panic!("`{place}` declares a pattern"));
+                let new = argument["domain"]["pattern"].as_str().expect("a pattern").to_string();
+                assert!(new.contains("White_Space"), "`{place}` says white space as the property: {new}");
+                let domain = Domain::matching(Box::leak(new.clone().into_boxed_str()));
+                // A refusal that has no words for the shape of its pattern quotes the pattern: the pattern it quotes is the one declared now.
+                let before = said_in_0_36(old);
+                let expected = if before.starts_with("does not match its pattern ") { format!("does not match its pattern {new}") } else { before };
+                assert_eq!(says_for(&domain), expected, "`{place}`: {new}");
+                compared += 1;
+            }
+        }
+        assert_eq!((compared, changed), (29, 30), "the 59 places that listed white space: 29 keep their wording, 17 hold a name or a sentence option and 13 a time option or the provider list");
     }
 
     /// atip.checkorder.16: a domain judges the argument object (the value given, else the environment's, else the default), a constraint

@@ -101,8 +101,18 @@ impl Drop for Live {
 /// Starts `canon dashboard --port 0 --json` with no `duckdb` on `PATH` and
 /// waits for its one JSON document on stdout.
 fn serve(repo: &Path) -> Live {
+    serve_with(repo, false)
+}
+
+/// [`serve`], with `git` (and nothing else) on the server's `PATH` when `git` is set: an approval from the page
+/// computes the code tree it records with it (0.37).
+fn serve_with(repo: &Path, git: bool) -> Live {
     let no_tools = repo.join("no-tools");
     std::fs::create_dir_all(&no_tools).unwrap();
+    if git {
+        let found = std::env::split_paths(&std::env::var_os("PATH").unwrap()).map(|dir| dir.join("git")).find(|path| path.is_file()).expect("git on PATH");
+        std::os::unix::fs::symlink(found, no_tools.join("git")).unwrap();
+    }
     let stderr = repo.join("dashboard.stderr");
     let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
         .args(["dashboard", "--port", "0", "--json"])
@@ -462,6 +472,57 @@ fn report_dashboard_13_several_selected_briefs_are_approved_as_the_cli_approves_
     let legacy = post_approval(&live, &approval_request(&live, "ready4"));
     assert_eq!(legacy.code, 200, "a request with one brief in the old shape is still accepted: {}", legacy.body);
     assert_eq!(legacy.json()["data"]["change"], "ready4");
+}
+
+/// gate.approval-tree.03: the page's approval, the command's and a relayed one
+/// record the same code tree in the same place, and the relay still reads back.
+#[test]
+fn gate_approval_tree_03_the_page_the_command_and_a_relay_record_the_tree_alike() {
+    let dir = repo_with_more_briefs();
+    let repo = dir.path();
+    let git = |args: &[&str]| {
+        let out = Command::new("git").current_dir(repo).args(args).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q", "-b", "main"]);
+    git(&["config", "user.name", "t"]);
+    git(&["config", "user.email", "t@example.com"]);
+    // What the dashboard server writes into the repo is not code.
+    let config = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    std::fs::write(repo.join("canon.yaml"), format!("{config}\ncode:\n  exclude: [\"dashboard.stderr\", \"no-tools/**\"]\n")).unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "setup"]);
+    let live = serve_with(repo, true);
+
+    let page = post_approval(&live, &approval_request(&live, "ready"));
+    assert_eq!(page.code, 200, "{}", page.body);
+    ok(repo, &["brief", "approve", "ready2", "--approver", "Ana", "--note", "Go."]);
+    let shown = canon(repo, &["brief", "show", "ready3", "--body"]);
+    let digest = String::from_utf8(shown.stdout).unwrap().lines().last().unwrap().strip_prefix("digest: ").unwrap().to_string();
+    let relayed = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["brief", "approve", "ready3", "--approver", "Ana", "--note", "Go.", "--relayed-via", "ask", "--actor", "plan-1", "--digest", &format!("ready3={digest}")])
+        .current_dir(repo)
+        .env("CANON_ROLE", "planner")
+        .output()
+        .unwrap();
+    assert!(relayed.status.success(), "{}", String::from_utf8_lossy(&relayed.stderr));
+
+    let line = |change: &str| -> String {
+        let text = std::fs::read_to_string(brief_path(repo, change)).unwrap();
+        text.lines().find_map(|l| l.strip_prefix("Approved: ")).unwrap_or_else(|| panic!("no approval in {text}")).to_string()
+    };
+    let (from_page, from_command, from_relay) = (line("ready"), line("ready2"), line("ready3"));
+    let tree = canon_cli::brief::approval_tree(&from_command).unwrap_or_else(|| panic!("the command's approval records a tree: {from_command}")).to_string();
+    assert_eq!(canon_cli::brief::approval_tree(&from_page), Some(tree.as_str()), "the page records the tree the command does: {from_page}");
+    assert_eq!(canon_cli::brief::approval_tree(&from_relay), Some(tree.as_str()), "{from_relay}");
+    assert!(from_relay.contains(&format!("(relayed by planner plan-1 via ask) (code tree {tree}) (brief sha256:")), "the relay marker comes first: {from_relay}");
+    assert!(from_page.contains(&format!(" (code tree {tree}) (brief sha256:")), "{from_page}");
+
+    let list = get(&live, "/api/briefs").json();
+    let relayed = list["data"]["relayed"].as_array().unwrap();
+    assert_eq!(relayed.len(), 1, "only ready3 was relayed: {list}");
+    assert_eq!(relayed[0]["changeId"], "ready3");
+    assert_eq!(relayed[0]["relay"], json!({ "role": "planner", "actor": "plan-1", "tool": "ask" }), "{list}");
 }
 
 /// report.dashboard.14: a selected brief edited after the page read it

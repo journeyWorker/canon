@@ -1481,6 +1481,33 @@ fn finding_close_85_a_blank_or_multi_line_reason_is_refused() {
     }
 }
 
+/// finding.close.05 (0.37, `canon-0-37-option-values`): a fix that did not hold is not reopened; `--disposition open` is refused with exit 2 naming the three
+/// dispositions that close a finding, and nothing is staged or committed. The defect that came back is a new finding.
+#[test]
+fn finding_close_05_a_fix_that_did_not_hold_is_a_new_finding_and_closing_to_open_is_refused() {
+    let (dir, head) = git_repo();
+    let repo = dir.path();
+    let added = add(repo, &["--round", "1", "--seq", "1", "--actor", "r", "--summary", "needs a guard", "--introduced-rev", &head, "--rev", &head]);
+    assert!(added.status.success(), "{}", stderr(&added));
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+    let fixed = close(repo, &["--disposition", "fixed", "--resolution-rev", head.as_str()]);
+    assert!(fixed.status.success(), "{}{}", stdout(&fixed), stderr(&fixed));
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+    let committed = committed_findings(repo).len();
+
+    let out = close(repo, &["--disposition", "open", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
+    let error = error_json(&out);
+    assert_eq!((error["code"].as_str(), error["field"].as_str()), (Some("USAGE"), Some("--disposition")), "{error}");
+    assert_eq!(error["expected"], serde_json::json!(["fixed", "rejected", "deferred"]), "{error}");
+    assert!(staged_findings(repo).is_empty(), "nothing is staged");
+    assert_eq!(committed_findings(repo).len(), committed, "nothing is committed");
+
+    // The defect that came back is the next finding of the round, raised open.
+    let again = add(repo, &["--round", "1", "--seq", "2", "--actor", "r", "--summary", "the guard is gone again", "--introduced-rev", &head, "--rev", &head]);
+    assert!(again.status.success(), "{}", stderr(&again));
+}
+
 /// finding.close.02: a close changes the disposition, the resolution sha, the
 /// optional reason, and the actor and time of the transition; every other
 /// field of the body is the previous version's.

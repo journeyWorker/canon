@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-option-values",
+    "role": "implementer",
+    "session_id": "s-0-37-option-values"
+  },
+  "at": "2026-11-05T15:25:51.237224Z",
+  "attachments": [
+    {
+      "path": "target/atip-deep.txt",
+      "sha256": "39c29a17058f84da664957441a9ee30ce95e4c5455446a81f70d81ec9a97c054"
+    }
+  ],
+  "code_tree": "965fd3dccd1265f6e584194abb2cb5cd4fbece70",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "just atip-deep"
+  },
+  "evidence_note": {
+    "summary": "L2 met: 74 MUST passed, 0 MUST failed, 0 MUST unprovided, 7 not applicable, 1 SHOULD advisories (checker atip-check 0.2.0, contract 1.5, fixture canon.fixture.json; the advisory is L1.one-meaning-values for --kind)"
+  },
+  "evidence_sha": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "atip.optionvalues.16",
+  "schema": 1,
+  "staging_id": "e557402a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

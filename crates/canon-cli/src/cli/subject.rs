@@ -32,13 +32,13 @@ pub struct SubjectNewArgs {
     #[arg(long, value_name = "TEXT")]
     pub title: String,
     /// The subject's summary (optional)
-    #[arg(long, value_name = "TEXT")]
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub summary: Option<String>,
     /// The accountable owning role
     #[arg(long, value_parser = crate::retrieve::parse_role, default_value = "implementer", value_name = "ROLE")]
     pub owner_role: RoleId,
     /// The invoking actor's id
-    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
@@ -110,13 +110,13 @@ pub struct SubjectMoveArgs {
     #[arg(long, value_name = "STATE", value_parser = crate::subject::status_parser())]
     pub to: canon_model::SubjectStatus,
     /// Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories
-    #[arg(long, value_name = "TEXT")]
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub override_reason: Option<String>,
     /// Why the subject moves (required for shipped → verifying, optional on every other transition); recorded on the subject with the actor
-    #[arg(long, value_name = "TEXT")]
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub reason: Option<String>,
     /// The invoking actor's id, recorded with an --override-reason waiver or a --reason
-    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-option-values",
+    "role": "implementer",
+    "session_id": "s-0-37-option-values"
+  },
+  "at": "2026-11-05T15:25:08.405528Z",
+  "attachments": [
+    {
+      "case": "atip_checkorder_17_a_leading_unknown_role_answers_before_an_unknown_or_missing_command",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3c07b00179b92c311b2d141e0b1c9db321cf3887dcc37a73b70b6a40542398a8"
+    }
+  ],
+  "code_tree": "965fd3dccd1265f6e584194abb2cb5cd4fbece70",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 436,
+  "scenario_id": "atip.checkorder.17",
+  "schema": 1,
+  "staging_id": "d84fad38",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

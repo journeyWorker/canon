@@ -1,0 +1,209 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-5",
+    "role": "implementer",
+    "session_id": "s-0-37-claim-1-5"
+  },
+  "at": "2026-11-05T13:19:51.429682Z",
+  "attachments": [
+    {
+      "case": "atip_l0_24_a_directory_that_cannot_be_written_refuses_with_exit_2_and_changes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_a_write_that_fails_after_the_first_record_is_exit_1_write_failed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_ingest_records_into_a_read_only_trajectory_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_change_new_refuses_a_read_only_change_store_before_creating_the_change",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_export_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_dispatch_end_into_a_read_only_manifest_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_dispatch_begin_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_plugin_sync_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_ingest_plans_into_a_read_only_change_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_inventory_sync_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_artifacts_store_into_a_read_only_blob_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_context_pack_add_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_gate_promote_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_divergence_resolve_and_defer_into_a_read_only_ledger_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_tier_age_and_purge_refuse_a_read_only_store_before_moving_or_removing_a_record",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_ledger_compact_refuses_a_read_only_ledger_before_moving_a_version",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_report_snapshot_into_a_read_only_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_skills_install_into_a_read_only_repo_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_subject_new_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_prompt_add_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_subject_move_into_a_read_only_ledger_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_report_build_into_a_read_only_canon_directory_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "strategy::atip_l0_24_strategy_rollback_into_a_read_only_strategy_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_subject_adopt_and_unadopt_into_a_read_only_ledger_are_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "strategy::atip_l0_24_strategy_promote_into_a_read_only_strategy_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_l0_24_ingest_sessions_into_a_read_only_hot_store_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    }
+  ],
+  "code_tree": "a50d9de6eec3d1bdba2244a9908f12a31be06ade",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "cargo nextest run --workspace --locked --no-fail-fast (canon-0-37-claim-1-5; 3848 tests passed at 95d68d37f, the atip crate at atip-crate-v0.2.0, canon declares 1.5); just atip, just atip-deep (L2 met: 74 MUST passed, L1.patterns passes), lint, visibility and the docs and conformance bless (no diff) are attached to atip.claim15.01, .10 and .12; the patterns of 0.36.0 against 1.5 to .03 and .04"
+  },
+  "evidence_sha": "95d68d37f5b636526d663887a395ccfe68a2df35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 818,
+  "scenario_id": "atip.l0.24",
+  "schema": 1,
+  "staging_id": "c3855c0c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

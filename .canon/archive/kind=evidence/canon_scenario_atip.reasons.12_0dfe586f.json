@@ -1,0 +1,87 @@
+{
+  "actor": {
+    "agent_id": "impl-option-forms",
+    "role": "implementer",
+    "session_id": "s-0-37-option-forms"
+  },
+  "at": "2026-11-05T17:01:36.933524Z",
+  "attachments": [
+    {
+      "case": "atip_reasons_12_every_unavailable_code_is_driven_by_a_test_here_or_is_no_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_12_dispatch_diff_names_a_records_read_the_system_failed_as_its_unavailable_warning",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_12_a_policy_approval_the_system_fails_to_read_refuses_the_ship_as_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_12_a_detached_signature_the_system_fails_to_read_is_strategy_signature_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_12_the_local_artifact_store_the_system_fails_to_read_is_artifacts_store_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_12_the_files_a_migrate_plan_and_its_preview_read_are_migration_unavailable_for_an_eio",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_12_the_dispatch_manifest_the_plan_corpus_and_the_run_lock_are_unavailable_for_a_repeat",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_12_every_call_site_that_reads_answers_its_subjects_unavailable_code_for_an_eio",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_12_every_reader_of_the_plan_corpus_answers_by_the_cause_of_an_unreadable_canon_yaml",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    }
+  ],
+  "code_tree": "ce5d39d8e2cbcf751ed225ab10ec4151a41c9b2e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "2a49a90afa4d8c7eb0ab721132b525c2afd01142",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 138,
+  "scenario_id": "atip.reasons.12",
+  "schema": 1,
+  "staging_id": "38af97f3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

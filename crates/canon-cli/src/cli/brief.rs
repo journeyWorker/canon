@@ -12,7 +12,7 @@ pub enum BriefCommand {
     /// Read the brief against the rules: blocker and advisory findings (exit 0 clean, 1 blockers, 2 refused)
     Check(BriefCheckArgs),
     /// Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers
-    #[command(after_help = "Examples:\n  canon brief approve add-login --approver Ana --note 'Go. Ship the failure flow too.'\n  canon brief approve add-login add-search fix-sync --approver Ana --note 'All three, go.'\n\nSeveral ids take one name, one answer and one timestamp. Every id is checked\nfirst; one refused id refuses the call (the first refused id's code, with a\ndetail for each) and nothing is\nwritten. Writes `Approved: <who> <when> — \"<words>\" (brief sha256:<digest>)` into the\nbrief (the digest covers the brief without its `Approved:` lines) and records\n`canon policy approve` in the same call. Edit the brief afterwards and it reads as\nnot approved (BRIEF_APPROVAL_STALE) until a human answers again and this\nruns again. Run it only from the human's answer, with their words as --note.")]
+    #[command(after_help = "Examples:\n  canon brief approve add-login --approver Ana --note 'Go. Ship the failure flow too.'\n  canon brief approve add-login add-search fix-sync --approver Ana --note 'All three, go.'\n\nSeveral ids take one name, one answer and one timestamp. Every id is checked\nfirst; one refused id refuses the call (the first refused id's code, with a\ndetail for each) and nothing is\nwritten. Writes `Approved: <who> <when> — \"<words>\" (code tree <id>) (brief sha256:<digest>)` into the\nbrief (the digest covers the brief without its `Approved:` lines; the code tree is the work\ntree's as it is now, uncommitted code included, and is left out outside git or with no commit: a\nchore whose approval saw the code tree that is still the current one asks for no evidence) and records\n`canon policy approve` in the same call. Edit the brief afterwards and it reads as\nnot approved (BRIEF_APPROVAL_STALE) until a human answers again and this\nruns again. Run it only from the human's answer, with their words as --note.")]
     Approve(BriefApproveArgs),
 }
 
@@ -49,16 +49,16 @@ pub struct BriefCheckArgs {
 #[derive(Debug, Args)]
 pub struct BriefApproveArgs {
     /// Who approved (the human, not the agent)
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: String,
     /// The human's own words
     #[arg(long, value_name = "TEXT")]
     pub note: String,
     /// Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long, value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor: Option<String>,
     /// With --relayed-via, the digest `canon brief show --body` showed the human, as `<change>=<sha256:digest>`, once per change; a brief whose digest differs is refused
     #[arg(long = "digest", value_name = "DIGEST")]

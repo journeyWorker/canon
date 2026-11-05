@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-option-values",
+    "role": "implementer",
+    "session_id": "s-0-37-option-values"
+  },
+  "at": "2026-11-05T17:20:17.088904Z",
+  "attachments": [
+    {
+      "case": "ledger_naming_05_a_long_name_hashes_its_free_text_component",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "1ca8df582c2331466b37964ced5bca1d8b05d574cda564843af25702d6adcff3"
+    }
+  ],
+  "code_tree": "6c821ebc0206bfdb9c42effe7b848374defa9e37",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "95c690e4732859ae66b4158c00ca0c0c53ed6c19",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 720,
+  "scenario_id": "ledger.naming.05",
+  "schema": 1,
+  "staging_id": "45c392b8",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

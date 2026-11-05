@@ -3,14 +3,11 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, ANSWER_RELAYED, CALENDAR, ROLE_DESCRIPTION, NOT_BLANK, ONE_LINE, ONE_LINE_NOT_BLANK, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE};
+use super::{DomainRow, Scope, Tables, ANSWER_RELAYED, CALENDAR, CALENDAR_DATE_TIME, ROLE_DESCRIPTION, NOT_BLANK, ONE_LINE, SESSION_ID, SHA256_HEX, TRIMMED_ONE_LINE, VIA_DESCRIPTION};
 
-/// A text that neither starts nor ends with white space, is not empty, and carries no `\n` and no `\r`: the approver of
-/// `evidence add` (the handler refuses only those two line breaks, unlike the shared `TRIMMED_ONE_LINE`).
-const APPROVER: &str = concat!("^[^", white_space!(), "]([^\\n\\r]*[^", white_space!(), "])?$");
 /// A risk surface that is not empty, is trimmed and carries no `\n`, `\r` or NUL (the shape every `--surface-ref` has; the
 /// `effect:` form and the path rules are the validator's).
-const SURFACE_REF: &str = concat!("^[^", white_space!(), "]([^\\n\\r\u{0}]*[^", white_space!(), "])?$");
+const SURFACE_REF: &str = concat!("^", not_white_space!(), "([^\\n\\r\u{0}]*", not_white_space!(), ")?$");
 /// A `--report` is `<junit|cucumber|swift-testing>:<path>` with a path.
 const REPORT: &str = "^(junit|cucumber|swift-testing):[^\u{0}]+$";
 /// A `--prompt-bundle` is `NAME@VERSION`: a name and a version, neither empty, the version without a second `@`.
@@ -63,7 +60,7 @@ pub(crate) static TABLES: Tables = Tables {
             "finding close",
             &[
                 Rule::requires_in("disposition", &["rejected", "deferred"], &["reason"]).code("FINDING_REASON_REQUIRED").help("A rejected or deferred finding records why.").says("a rejected or deferred finding records why: --reason is required with --disposition rejected or deferred").hint("canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition {value} --reason \"<WHY>\""),
-                Rule::forbids_in("disposition", &["open", "rejected", "deferred"], &["resolution-rev"]).code("FINDING_RESOLUTION_REV_CONFLICT").help("Only a `fixed` finding was closed by a commit."),
+                Rule::forbids_in("disposition", &["rejected", "deferred"], &["resolution-rev"]).code("FINDING_RESOLUTION_REV_CONFLICT").help("Only a `fixed` finding was closed by a commit."),
             ],
         ),
         ("dispatch begin", &[Rule::requires("skill-digest", &["skill"]).code("DISPATCH_ARGUMENT_INVALID").help("A skill digest is the digest of a named skill.")]),
@@ -97,19 +94,28 @@ pub(crate) static TABLES: Tables = Tables {
                     rejects: &["canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2026-02-30 --role reviewer"],
                 },
                 Validator {
+                    arguments: &["role"],
+                    code: "DIVERGENCE_DENIED",
+                    description: "`--role`, when given, names the reviewer step: only a reviewer step accepts a divergence (a role that is only declared with `--as` is judged after the repository is read).",
+                    rejects: &["canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role implementer"],
+                },
+                Validator {
                     arguments: &["relayed-via", "as"],
                     code: "USAGE",
                     description: ROLE_DESCRIPTION,
                     rejects: &["canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --approver alice --note ok"],
                 },
                 Validator {
+                    arguments: &["relayed-via"],
+                    code: "USAGE",
+                    description: VIA_DESCRIPTION,
+                    rejects: &["canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via \"a b\" --as implementer --approver alice --note ok"],
+                },
+                Validator {
                     arguments: &["relayed-via", "approver", "note"],
                     code: "USAGE",
                     description: ANSWER_RELAYED,
-                    rejects: &[
-                        "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver \" \" --note ok",
-                        "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver alice --note \" \"",
-                    ],
+                    rejects: &["canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --role reviewer --relayed-via ask --as implementer --approver alice --note \" \""],
                 },
             ],
         ),
@@ -123,8 +129,8 @@ pub(crate) static TABLES: Tables = Tables {
                 Validator {
                     arguments: &["approval-at"],
                     code: "USAGE",
-                    description: CALENDAR,
-                    rejects: &["canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30"],
+                    description: CALENDAR_DATE_TIME,
+                    rejects: &["canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer --approver alice --approval-role human --signature-file approval.sig --approval-at 2026-02-30T10:00:00Z"],
                 },
                 Validator {
                     arguments: &["surface-ref"],
@@ -168,8 +174,8 @@ pub(crate) static TABLES: Tables = Tables {
                 Validator {
                     arguments: &["approval-at"],
                     code: "USAGE",
-                    description: CALENDAR,
-                    rejects: &["canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30"],
+                    description: CALENDAR_DATE_TIME,
+                    rejects: &["canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2026-02-30T10:00:00Z"],
                 },
                 Validator {
                     arguments: &["surface-ref"],
@@ -214,16 +220,11 @@ pub(crate) static TABLES: Tables = Tables {
         // evidence add / audit: the checks run_add makes on the strings it records.
         DomainRow::new(Scope::Arguments(&["evidence add"], "class"), Domain::matching(NOT_BLANK), "EVIDENCE_ARGUMENT_INVALID").inside(&["test-run", " a "]).outside(&["", " ", "\t"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "ref"), Domain::matching(NOT_BLANK), "EVIDENCE_ARGUMENT_INVALID").inside(&["npm test", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "summary"), Domain::matching(ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["Tests pass", ""]).outside(&["a\nb", "a\rb", "a\u{2028}b", "a\u{85}b"]),
-        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "actor"), Domain::matching(ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["alice", ""]).outside(&["a\nb", "a\u{b}b", "a\u{2029}b"]),
-        DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "override-reason"), Domain::matching(ONE_LINE_NOT_BLANK), "EVIDENCE_ARGUMENT_INVALID").inside(&["the human is away", " a "]).outside(&["", " ", "a\nb"]),
         DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["eval-1", "a b"]).outside(&["", " a", "a ", "a\nb"]),
         DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator-version"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["2.1", "a b"]).outside(&["", " 1", "1 ", "1\n2"]),
         DomainRow::new(Scope::Arguments(&["evidence audit"], "evaluator-digest"), Domain::matching(SHA256_HEX), "EVIDENCE_ARGUMENT_INVALID")
             .inside(&["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"])
             .outside(&["", "0123456789abcdef", "0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"]),
-        DomainRow::new(Scope::Arguments(&["evidence add"], "approver"), Domain::matching(APPROVER), "EVIDENCE_APPROVAL_INVALID").reason("MALFORMED").inside(&["alice", "a b", "a\u{2028}b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
-        DomainRow::new(Scope::Arguments(&["evidence approval-payload"], "approver"), Domain::matching(TRIMMED_ONE_LINE), "EVIDENCE_ARGUMENT_INVALID").inside(&["alice", "a b"]).outside(&["", " a", "a ", "a\nb", "a\u{2028}b"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence approval-payload"], "surface-ref"), Domain::matching(SURFACE_REF), "USAGE").inside(&["src/lib.rs", "effect:payments", "a b"]).outside(&["", " a", "a ", "a\nb", "a\rb"]),
         DomainRow::new(Scope::Arguments(&["evidence add", "evidence audit"], "report"), Domain::matching(REPORT), "USAGE").inside(&["junit:r.xml", "cucumber:r.json", "swift-testing:e.jsonl", "junit:a:b"]).outside(&["r.xml", "junit:", "mocha:r.xml", ":r.xml", "JUnit:r.xml"]),
         // review: the runtime labels clap's value parser reads.
@@ -231,17 +232,12 @@ pub(crate) static TABLES: Tables = Tables {
         DomainRow::new(Scope::Arguments(&["review scenario", "review change"], "reviewer-model"), Domain::matching(RUNTIME_LABEL), "USAGE").inside(&["claude-sonnet-5", "a b"]).outside(&["", " a", "a ", "a\tb", "a\nb"]),
         DomainRow::new(Scope::Arguments(&["review scenario", "review change"], "reviewer-harness"), Domain::matching(RUNTIME_LABEL), "USAGE").inside(&["omp", "a b"]).outside(&["", " a", "a ", "a\tb", "a\nb"]),
         // divergence accept.
-        DomainRow::new(Scope::Arguments(&["divergence accept"], "reason"), Domain::matching(NOT_BLANK), "DIVERGENCE_ARGUMENT_INVALID").inside(&["the engine drops the event", " a "]).outside(&["", " ", "\t"]),
         DomainRow::new(Scope::Arguments(&["divergence accept"], "tracking"), Domain::matching(NOT_BLANK), "DIVERGENCE_ARGUMENT_INVALID").says("is empty: a blank tracking reference names no issue").inside(&["https://example.com/issues/1", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["divergence accept"], "role"), Domain::matching("^reviewer$"), "DIVERGENCE_DENIED").reason("NOT_REVIEWER").says("must name the reviewer step: only a reviewer step accepts a divergence").inside(&["reviewer"]).outside(&["implementer", "planner"]),
         // finding add / close.
         DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "round"), Domain::at_least(1), "FINDING_ARGUMENT_INVALID"),
         DomainRow::new(Scope::Arguments(&["finding add", "finding close"], "seq"), Domain::at_least(1), "FINDING_ARGUMENT_INVALID"),
-        DomainRow::new(Scope::Arguments(&["finding add"], "actor"), Domain::matching(ONE_LINE_NOT_BLANK), "FINDING_ARGUMENT_INVALID").inside(&["alice", " a "]).outside(&["", " ", "a\nb", "a\u{2028}b"]),
-        DomainRow::new(Scope::Arguments(&["finding add"], "summary"), Domain::matching(ONE_LINE_NOT_BLANK), "FINDING_ARGUMENT_INVALID").inside(&["Token is logged", " a "]).outside(&["", " ", "a\nb", "a\u{2029}b"]),
         DomainRow::new(Scope::Arguments(&["finding add"], "file-ref"), Domain::matching(ONE_LINE), "FINDING_ARGUMENT_INVALID").inside(&["src/main.rs:120-134", ""]).outside(&["a\nb", "a\u{85}b"]),
         DomainRow::new(Scope::Arguments(&["finding add"], "introduced-rev"), Domain::matching(NOT_BLANK), "USAGE").inside(&["HEAD~1", " a "]).outside(&["", " ", "\t"]),
-        DomainRow::new(Scope::Arguments(&["finding close"], "reason"), Domain::matching(ONE_LINE_NOT_BLANK), "FINDING_REASON_REQUIRED").inside(&["works as designed", " a "]).outside(&["", " ", "a\nb", "a\u{2028}b"]),
         // dispatch begin.
         DomainRow::new(Scope::Arguments(&["dispatch begin"], "prompt-bundle"), Domain::matching(PROMPT_BUNDLE), "USAGE").inside(&["bundle@1", "a@b.c"]).outside(&["bundle", "@1", "bundle@", "a@b@c", ""]),
     ],

@@ -228,7 +228,7 @@ pub fn sample(doc: &Value, example: &[String], argument: &Value) -> String {
         "TASK_ID" => "add-login#1",
         "RUN_ID" | "REVIEW_ID" | "STRATEGY_ID" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
         "SESSION_ID" => "s1",
-        "TIMESTAMP" => "2030-01-01",
+        "TIMESTAMP" => "2030-01-01T00:00:00Z",
         "ACTOR_ID" => "alice",
         "N" => "2",
         "REV" => "HEAD",
@@ -592,7 +592,18 @@ pub fn repair(doc: &Value, example: &[String], rules: &[ConstraintDoc], assignme
                 let victims: Vec<String> = then.iter().filter(|name| *name != keep).cloned().collect();
                 if victims.is_empty() {
                     if let Some(when) = &rule.when {
-                        assignment.remove(&when.name);
+                        // The argument that triggers the rule, when the command cannot do without it (`query --kind`), takes a value the rule does not list.
+                        let trigger = argument(doc, &when.name);
+                        let listed: Vec<String> = when.values.iter().flatten().map(|value| value.as_str().map_or_else(|| value.to_string(), str::to_string)).collect();
+                        let outside = trigger.filter(|trigger| trigger["required"] == true).and_then(|trigger| trigger["possibleValues"].as_array()).and_then(|members| members.iter().filter_map(Value::as_str).find(|member| !listed.iter().any(|value| value == member)));
+                        match outside {
+                            Some(member) => {
+                                assignment.insert(when.name.clone(), vec![member.to_string()]);
+                            }
+                            None => {
+                                assignment.remove(&when.name);
+                            }
+                        }
                     }
                 }
                 for victim in victims {

@@ -344,9 +344,20 @@ fn atip_codenames_09_a_code_missing_from_the_registry_and_from_the_table_is_foun
     assert!(codes_0_35().iter().any(|code| code == "HUMAN_ONLY"), "the fixture holds the 0.35 names");
 }
 
-/// atip.codenames.01: RETRIEVE_INVALID (it was `RETRIEVE_FAILED`, exit 2): a `--domain` that cannot make a regime key refuses the retrieval.
+/// atip.codenames.01: RETRIEVE_INVALID (it was `RETRIEVE_FAILED`, exit 2): a repo directory that cannot make a regime key refuses the retrieval (a `--domain` that is no kebab
+/// slug is `USAGE` since 0.37, `canon-0-37-option-values`; the directory whose name is blank is the other way to a key the grammar refuses).
 #[test]
 fn atip_codenames_01_retrieve_with_a_domain_that_makes_no_regime_key_is_retrieve_invalid() {
-    let dir = repo();
-    fails(dir.path(), Some("implementer"), &["retrieve", "--for-role", "implementer", "--domain", ""], 2, "RETRIEVE_INVALID", None, None);
+    let parent = TempDir::new().unwrap();
+    let d = parent.path().join(" ");
+    std::fs::create_dir(&d).unwrap();
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(&d).output().unwrap();
+        assert!(out.status.success(), "git {args:?}");
+    }
+    let out = canon(&d, &["init", "--providers", "none"], None);
+    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
+    fails(&d, Some("implementer"), &["retrieve", "--for-role", "implementer", "--domain", "dev"], 2, "RETRIEVE_INVALID", None, None);
+    // A domain that is no slug is the usage of the option now.
+    fails(&d, Some("implementer"), &["retrieve", "--for-role", "implementer", "--domain", ""], 2, "USAGE", None, Some("--domain"));
 }

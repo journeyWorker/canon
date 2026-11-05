@@ -97,10 +97,10 @@ fn atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with
     let good = close(1, "deferred");
     // a type, an enumeration, an unknown key, a domain and a constraint: each refused whole, at index 1
     for (bad, code, field) in [
-        (json!({"operands": ["add-login"], "round": "x", "seq": 1, "disposition": "open"}), "INPUT_INVALID", "/1/round"),
+        (json!({"operands": ["add-login"], "round": "x", "seq": 1, "disposition":"fixed"}), "INPUT_INVALID", "/1/round"),
         (json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "nope"}), "INPUT_INVALID", "/1/disposition"),
-        (json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "open", "bogus": true}), "INPUT_INVALID", "/1/bogus"),
-        (json!({"operands": ["add-login"], "round": 0, "seq": 1, "disposition": "open"}), "FINDING_ARGUMENT_INVALID", "/1/round"),
+        (json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition":"fixed", "bogus": true}), "INPUT_INVALID", "/1/bogus"),
+        (json!({"operands": ["add-login"], "round": 0, "seq": 1, "disposition":"fixed"}), "FINDING_ARGUMENT_INVALID", "/1/round"),
         (json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "rejected"}), "", "/1"),
     ] {
         let (exit, body) = run_batch(repo, &leaf, &[good.clone(), bad.clone()]);
@@ -115,7 +115,7 @@ fn atip_batchpointers_01_a_preflight_refusal_is_the_items_code_at_its_index_with
         assert_eq!(tree(repo), before, "{bad}: the first item did not run");
     }
     // the same item at index 0 is `/0/…`, and the single document keeps `/round`
-    let (exit, body) = run_batch(repo, &leaf, &[json!({"operands": ["add-login"], "round": "x", "seq": 1, "disposition": "open"})]);
+    let (exit, body) = run_batch(repo, &leaf, &[json!({"operands": ["add-login"], "round": "x", "seq": 1, "disposition":"fixed"})]);
     assert_eq!((exit, body["error"]["field"].as_str()), (Some(2), Some("/0/round")), "{body}");
     let out = canon(repo, &["finding", "close", "--input", r#"{"round":"x"}"#, "--json"]);
     assert_eq!(json_of(&out)["error"]["field"], "/round");
@@ -158,14 +158,14 @@ fn atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_
     let dir = fixture();
     let repo = dir.path();
     // item 1 names a finding no ledger has: it passes preflight and fails when it runs
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "open"), close(1, "rejected")]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "fixed"), close(1, "rejected")]);
     assert_eq!(exit, Some(1), "{body}");
     assert_eq!((body["ok"].as_bool(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(false), Some("BATCH_INCOMPLETE"), Some("/1")), "{body}");
     assert_eq!(statuses(&body), ["written", "failed", "skipped"], "{body}");
     assert_eq!(body["data"]["items"][1]["error"]["code"], "FINDING_NOT_FOUND", "{body}");
     assert_eq!(body["meta"]["command"], "finding close", "{body}");
     // a repeat reports the finished item unchanged and fails at the same place
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "open"), close(1, "rejected")]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "fixed"), close(1, "rejected")]);
     assert_eq!((exit, body["error"]["field"].as_str()), (Some(1), Some("/1")), "{body}");
     assert_eq!(statuses(&body), ["unchanged", "failed", "skipped"], "{body}");
 }
@@ -174,7 +174,7 @@ fn atip_batchpointers_03_an_item_that_fails_when_it_runs_is_batch_incomplete_at_
 fn atip_batchpointers_04_the_first_item_failing_is_exit_one_at_index_zero_and_the_field_is_only_the_index() {
     let dir = fixture();
     let repo = dir.path();
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(9, "open"), close(1, "deferred")]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(9, "fixed"), close(1, "deferred")]);
     assert_eq!(exit, Some(1), "not exit 2 although the first item failed: {body}");
     assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("BATCH_INCOMPLETE"), Some("/0")), "{body}");
     assert_eq!(statuses(&body), ["failed", "skipped"], "{body}");
@@ -241,7 +241,7 @@ fn atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_p
 fn atip_batchpointers_07_a_failed_item_has_its_error_and_no_data_and_a_skipped_item_has_neither() {
     let dir = fixture();
     let repo = dir.path();
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "open"), close(1, "rejected"), close(1, "open")]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "fixed"), close(1, "rejected"), close(1, "fixed")]);
     assert_eq!(exit, Some(1), "{body}");
     let items = body["data"]["items"].as_array().unwrap();
     assert_eq!(items.len(), 4, "one entry per submitted item: {body}");
@@ -260,7 +260,7 @@ fn atip_batchpointers_08_a_batch_with_an_item_that_fails_is_never_exit_zero_and_
     let dir = fixture();
     let repo = dir.path();
     // item 1 names a finding no ledger has: the batch has a failure, so it is not the success report of step 2
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "open"), close(1, "rejected")]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "fixed"), close(1, "rejected")]);
     assert_eq!(exit, Some(1), "{body}");
     assert_eq!((body["ok"].as_bool(), body["error"]["code"].as_str()), (Some(false), Some("BATCH_INCOMPLETE")), "{body}");
     let items = body["data"]["items"].as_array().expect("a batch report");

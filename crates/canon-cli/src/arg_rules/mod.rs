@@ -84,8 +84,8 @@ pub(crate) struct Tables {
 }
 
 /// Every group's tables, and the rows shared by all.
-pub(crate) fn groups() -> [&'static Tables; 4] {
-    [&SHARED, &evidence::TABLES, &authoring::TABLES, &reads::TABLES]
+pub(crate) fn groups() -> [&'static Tables; 5] {
+    [&SHARED, &evidence::TABLES, &authoring::TABLES, &reads::TABLES, &values::TABLES]
 }
 
 /// The rules of the command `path` that its tables state themselves, in the order the tables list them.
@@ -164,22 +164,34 @@ pub fn codes_for(path: &str, arguments: &[(String, Option<String>)]) -> Vec<&'st
 
 // ------------------------------------------------------------------ patterns
 
-/// The character classes the patterns below are written in. A domain `pattern` is `^`, a restricted I-Regexp body and
-/// `$` (spec 10.7.4): no `.`, no `\d`, no `|` outside parentheses. The characters are written out because I-Regexp has no `\s`.
-/// A pattern carries no raw line terminator (`^\^.*\$$` of the contract's schema must match it, and `.` does not match one),
-/// so LF, CR, U+2028 and U+2029 are written as `\n`, `\r`, `\p{Zl}` and `\p{Zp}`.
+/// The white space the patterns below are written with. A domain `pattern` is `^`, a restricted I-Regexp body and `$` (spec 10.7.4,
+/// Annex V2): no `.`, no `\d`, no `\s`, no `|` outside parentheses. Since atip/1 1.5 the body says white space as the Unicode
+/// property `White_Space` (`\p{White_Space}`, `\P{White_Space}`), outside and inside a class, a name Rust `regex` and ECMAScript with
+/// the `u` flag read the same: U+0009 to U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F and
+/// U+3000. A pattern carries no raw line terminator (`^\^.*\$$` of the contract's schema must match it, and `.` does not match one).
 macro_rules! white_space {
     () => {
-        " \\t\\n\u{b}\u{c}\\r\u{85}\u{a0}\u{1680}\u{2000}-\u{200a}\\p{Zl}\\p{Zp}\u{202f}\u{205f}\u{3000}"
+        "\\p{White_Space}"
     };
 }
 
-/// The line separators a line of text may not carry: U+000A, U+000B, U+000C, U+000D, U+0085, U+2028 and U+2029.
-macro_rules! line_breaks {
+/// A character that is not white space.
+macro_rules! not_white_space {
     () => {
-        "\\n\\r\u{b}\u{c}\u{85}\\p{Zl}\\p{Zp}"
+        "\\P{White_Space}"
     };
 }
+
+/// Any character but a line separator (U+000A to U+000D, U+0085, U+2028 and U+2029). `White_Space` is the space separators, the tab and
+/// those seven, so this class (Annex V2) names none of them.
+macro_rules! line_char {
+    () => {
+        "[\\P{White_Space}\\p{Zs}\\t]"
+    };
+}
+
+/// The text of [`line_char!`] for the code that reads a pattern's shape.
+pub(crate) const LINE_CHAR: &str = line_char!();
 
 /// Any character a command line can carry.
 macro_rules! any_char {
@@ -194,11 +206,10 @@ pub mod semantic;
 mod authoring;
 mod evidence;
 mod reads;
+mod values;
 
 /// A kebab-case slug: `[a-z0-9]+(-[a-z0-9]+)*` (change, subject and role ids, a domain, a lane).
 pub const KEBAB: &str = "^[a-z0-9]+(-[a-z0-9]+)*$";
-/// A spec corpus id: `[a-z0-9][a-z0-9-]*`.
-pub const PROJECT_ID: &str = "^[a-z0-9][a-z0-9-]*$";
 /// `<area>.<surface>.<nn>`: two `[a-z0-9-]+` words and two or more digits.
 pub const SCENARIO_ID: &str = "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$";
 /// `<change>#<n>(.<n>)*`.
@@ -207,22 +218,29 @@ pub const TASK_ID: &str = "^[a-z0-9]+(-[a-z0-9]+)*#[0-9]+(\\.[0-9]+)*$";
 pub const ULID: &str = "^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$";
 /// A session id: not empty, no leading or trailing white space, no control character.
 pub const SESSION_ID: &str = concat!("^[^\\p{Cc}", white_space!(), "]([^\\p{Cc}]*[^\\p{Cc}", white_space!(), "])?$");
-/// A time as every `<TIMESTAMP>` option reads it: an RFC 3339 time, or a date written with or without leading zeros
-/// (the shape only; that the date exists is a validator's).
-pub const TIMESTAMP: &str = concat!(
-    "^(",
-    "[", white_space!(), "]*[-+]?[0-9]+-[", white_space!(), "]*[0-9]{1,2}-[", white_space!(), "]*[0-9]{1,2}",
-    "|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+\u{2212}][0-9]{2}:[0-9]{2})",
-    ")$"
-);
+/// A time as a time option reads it (`--expiry`, `--as-of`, `--before`, `--after`, `--since`): an RFC 3339 full-date (`2030-01-01`, that day's UTC
+/// midnight) or date-time (`2030-01-01T10:00:00Z`): four digits of year, two of month and day and of each field of the time, `T` and `Z` in either
+/// case, an optional fraction and `Z` or `+HH:MM` / `-HH:MM`; no sign on the year, no white space and no other separator (the shape only; that the
+/// date exists is a validator's).
+pub const TIMESTAMP: &str = "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$";
+/// A time as `--approval-at` reads it: an RFC 3339 date-time and nothing else, the spelling of [`TIMESTAMP`] with a time.
+pub const DATE_TIME: &str = "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$";
+/// `--providers` of `init` and of the `skills` commands (0.37 `canon-0-37-option-forms`): `none`, or one or more of `claude`, `codex`, `omp`, `pi` (lowercase)
+/// joined by single commas: no white space, no empty item, `none` alone. A name written twice is taken.
+pub const PROVIDERS: &str = "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$";
 /// Text with at least one character that is not white space.
-pub const NOT_BLANK: &str = concat!("^", any_char!(), "*[^", white_space!(), "]", any_char!(), "*$");
+pub const NOT_BLANK: &str = concat!("^", any_char!(), "*", not_white_space!(), any_char!(), "*$");
 /// One line (no line separator), possibly empty.
-pub const ONE_LINE: &str = concat!("^[^", line_breaks!(), "]*$");
-/// One line with at least one character that is not white space.
-pub const ONE_LINE_NOT_BLANK: &str = concat!("^[^", line_breaks!(), "]*[^", white_space!(), "][^", line_breaks!(), "]*$");
+pub const ONE_LINE: &str = concat!("^", line_char!(), "*$");
+/// A name or a sentence (`--actor`, `--approver`, `--relayed-via`, `--reason`, `--summary`, `--override-reason`): one line of text that is taken
+/// with the white space around it (the parser trims it, and a value that is nothing but white space is refused), with no control
+/// character, line separator or paragraph separator inside it. The inner class is `[^\p{Cc}\p{Zl}\p{Zp}]` (a space and a no-break space are
+/// in it, a tab, an escape and a line break are not); the first and the last character are not white space.
+pub const LINE_TEXT: &str = concat!("^", white_space!(), "*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}", white_space!(), "])", white_space!(), "*$");
+/// A regime key: four `/` separated segments, the first three without white space, the last 6 to 64 lowercase hex digits (`retrieve --regime`, `dispatch begin --regime`).
+pub const REGIME_KEY: &str = concat!("^[^/", white_space!(), "]+/[^/", white_space!(), "]+/[^/", white_space!(), "]+/[0-9a-f]{6,64}$");
 /// One line that neither starts nor ends with white space, and is not empty.
-pub const TRIMMED_ONE_LINE: &str = concat!("^[^", white_space!(), "]([^", line_breaks!(), "]*[^", white_space!(), "])?$");
+pub const TRIMMED_ONE_LINE: &str = concat!("^", not_white_space!(), "(", line_char!(), "*", not_white_space!(), ")?$");
 /// A lowercase hex sha-256: 64 digits.
 pub const SHA256_HEX: &str = "^[0-9a-f]{64}$";
 
@@ -243,28 +261,40 @@ static SHARED: Tables = Tables {
         DomainRow::new(Scope::ValueName("CHANGE_ID"), Domain::matching(KEBAB), "USAGE").inside(&["add-login", "a", "a1-b2"]).outside(&["Add-login", "add_login", "-a", "a-", "a--b", ""]),
         DomainRow::new(Scope::ValueName("SUBJECT_ID"), Domain::matching(KEBAB), "USAGE").inside(&["demo", "a-1"]).outside(&["Demo", "de mo", "a--b"]),
         DomainRow::new(Scope::ValueName("ROLE"), Domain::matching(KEBAB), "USAGE").inside(&["reviewer", "x-y"]).outside(&["Reviewer", "x_y", "-x"]),
-        DomainRow::new(Scope::ValueName("PROJECT_ID"), Domain::matching(PROJECT_ID), "USAGE").inside(&["root", "a--b", "a-"]).outside(&["-a", "Root", "a_b"]),
+        DomainRow::new(Scope::ValueName("PROJECT_ID"), Domain::matching(KEBAB), "USAGE").inside(&["root", "a-1"]).outside(&["-a", "Root", "a_b", "a-", "a--b"]),
         DomainRow::new(Scope::ValueName("SCENARIO_ID"), Domain::matching(SCENARIO_ID), "USAGE").inside(&["auth.login.01", "a-.-b.123"]).outside(&["auth.login.1", "Auth.login.01", "auth.login", "a.b.c.01"]),
         DomainRow::new(Scope::ValueName("TASK_ID"), Domain::matching(TASK_ID), "USAGE").inside(&["add-login#1", "add-login#1.2.3", "a#007"]).outside(&["Add#1", "add-login", "add-login#", "add-login#1.", "add-login#a"]),
         DomainRow::new(Scope::ValueName("RUN_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "01arz3ndektsv4rrffq69g5fav"]).outside(&["01ARZ3NDEKTSV4RRFFQ69G5FA", "01ARZ3NDEKTSV4RRFFQ69G5FAI", "01ARZ3NDEKTSV4RRFFQ69G5FAVV"]),
         DomainRow::new(Scope::ValueName("REVIEW_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV"]).outside(&["not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FAL"]),
         DomainRow::new(Scope::ValueName("STRATEGY_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV"]).outside(&["not-a-ulid", "01ARZ3NDEKTSV4RRFFQ69G5FAO"]),
-        DomainRow::new(Scope::ValueName("SESSION_ID"), Domain::matching(SESSION_ID), "USAGE").inside(&["s-1", "a b"]).outside(&[" s", "s ", "a\tb"]),
-        DomainRow::new(Scope::ValueName("TIMESTAMP"), Domain::matching(TIMESTAMP), "USAGE").says("is an invalid timestamp: an RFC 3339 time (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`) is expected").inside(&["2030-01-01", "2030-01-01T00:00:00Z", "2030-1-1", "2030-01-01 10:00:00+02:00"]).outside(&["tomorrow", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "01/02/2030"]),
+        DomainRow::new(Scope::ValueName("SESSION_ID"), Domain::matching(SESSION_ID), "USAGE").inside(&["s-1", "a b", "a\u{a0}b", "a\u{feff}"]).outside(&[" s", "s ", "a\tb", "\u{a0}s", "s\u{3000}", "\u{2003}s"]),
+        DomainRow::new(Scope::ValueName("TIMESTAMP"), Domain::matching(TIMESTAMP), "USAGE")
+            .says("is an invalid timestamp: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`) is expected")
+            .inside(&["2030-01-01", "2030-01-01T00:00:00Z", "2030-01-01t10:00:00z", "2030-01-01T10:00:00.5+09:00", "2030-01-01T10:00:00-02:00"])
+            .outside(&["tomorrow", "2030-1-1", "2030-1-01", "2030-01-1", " 2030-01-01", "2030-01-01 ", "+2030-01-01", "20300-01-01", "2030- 01-01", "2030-01-01 10:00:00Z", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "2030-01-01T10:00:00\u{2212}02:00", "01/02/2030"]),
+        // `--approval-at` is signed into the payload: a date-time, which a date alone is not.
+        DomainRow::new(Scope::Arguments(&["evidence add", "evidence approval-payload", "strategy approval-payload", "strategy rollback"], "approval-at"), Domain::matching(DATE_TIME), "USAGE")
+            .says("is an invalid timestamp: an RFC 3339 date-time (`2030-01-01T10:00:00Z`) is expected; a date alone is refused")
+            .inside(&["2030-01-01T00:00:00Z", "2030-01-01t10:00:00z", "2030-01-01T10:00:00.123456789+09:00", "2030-01-01T10:00:00-02:00"])
+            .outside(&["tomorrow", "2030-01-01", "2030-1-1T10:00:00Z", " 2030-01-01T10:00:00Z", "2030-01-01T10:00:00Z ", "+2030-01-01T10:00:00Z", "2030-01-01 10:00:00Z", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "2030-01-01T10:00:00\u{2212}02:00"]),
         // The most records or hits per page, and the size limit of a bound file: at least 1 (clap's `range(1..)`).
-        DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search"], "limit"), Domain::at_least(1), "USAGE"),
+        DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search", "retrieve"], "limit"), Domain::at_least(1), "USAGE"),
         DomainRow::new(Scope::Everywhere("max-artifact-mib"), Domain::at_least(1), "USAGE"),
     ],
 };
 
-/// What the validator of a `<TIMESTAMP>` option says (every command that has one writes the same sentence): the shape is
-/// the option's domain, that the date exists is this.
-pub const CALENDAR: &str = "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`, UTC midnight); the date must exist on the calendar: `2026-02-30` is refused.";
+/// What the validator of a time option says (every command that has one writes the same sentence): the spelling is the option's domain, that the
+/// date exists is this.
+pub const CALENDAR: &str = "Reads the value as RFC 3339: a date (`2030-01-01`, UTC midnight) or a date-time (`2030-01-01T10:00:00Z`); the date must exist on the calendar: `2026-02-30` is refused.";
+/// What the validator of `--approval-at` says: the same, for a date-time alone.
+pub const CALENDAR_DATE_TIME: &str = "Reads the value as an RFC 3339 date-time (`2030-01-01T10:00:00Z`), the instant signed into the payload; the date and the time must exist on the calendar and the clock: `2026-02-30T10:00:00Z` and `2030-01-01T25:00:00Z` are refused.";
 
 /// What the validators of a relayed approval say (`brief approve`, `policy approve`, `divergence accept`, `migrate`): the environment is
 /// a stateless input (spec 11.7), so the role and the actor the variables fill are read here, not by a precondition.
 pub const ROLE_DESCRIPTION: &str = "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable.";
 pub const ACTOR_DESCRIPTION: &str = "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word.";
+/// The tool of a relayed approval is one word, the same on the four commands that take `--relayed-via`.
+pub const VIA_DESCRIPTION: &str = "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`).";
 pub const ANSWER_RELAYED: &str = "A relayed approval carries the human's own name and answer word for word: with `--relayed-via`, `--approver` and `--note` are not blank.";
 
 /// `--commit` and `--plan-digest` go together (0.28 D6): the bare run is the preview.

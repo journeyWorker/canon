@@ -1,0 +1,44 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-05T10:24:17.662922Z",
+  "change_ids": [
+    "canon-0-34-atip-schema-doc",
+    "canon-0-34-atip-constraints",
+    "canon-0-35-canon-cursor-1-2",
+    "canon-0-35-canon-check-order",
+    "canon-0-35-claim-l2",
+    "canon-0-36-claim-1-4",
+    "canon-0-36-help-json",
+    "canon-0-37-claim-1-5",
+    "canon-0-37-option-values",
+    "canon-0-37-option-forms"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-37-orch"
+    },
+    "change": "canon-0-37-option-forms",
+    "reason": "0.37: atip 1.5, option rules, approval evidence (briefs approved)"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-37-orch"
+    },
+    "reason": "0.37: atip 1.5, option rules, approval evidence (briefs approved)"
+  },
+  "subject_id": "atip-schema",
+  "summary": "schema tree, group and command documents with value types, typed defaults, constraints, domains, validators and output schemas",
+  "title": "ATIP: canon's atip/1 L1 self-description (schema)"
+}

@@ -113,7 +113,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .arg(&source)
         .args(["--repo"])
         .arg(&target)
-        .args(["--providers", "pi,OMP"])
+        .args(["--providers", "pi,omp"])
         .output()
         .expect("spawn canon skills install");
     assert!(first.status.success(), "stderr: {}", String::from_utf8_lossy(&first.stderr));
@@ -158,7 +158,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .arg(&source)
         .args(["--repo"])
         .arg(&target)
-        .args(["--providers", "OMP,pi"])
+        .args(["--providers", "omp,pi"])
         .output()
         .expect("spawn canon skills install");
     assert!(second.status.success(), "stderr: {}", String::from_utf8_lossy(&second.stderr));
@@ -167,7 +167,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .arg(&source)
         .args(["--repo"])
         .arg(&target)
-        .args(["--providers", "OMP,pi"])
+        .args(["--providers", "omp,pi"])
         .output()
         .expect("spawn canon skills install");
     let again: Value = serde_json::from_slice(&again.stdout).expect("the install report is JSON");

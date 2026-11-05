@@ -68,7 +68,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   @atip.constraints.07
   Scenario: Every validator refuses every call it rejects with its code, and an impossible calendar date is refused by all 12 time options
     Given a built canon and the story repo
-    When the rejects call of every validator runs, and --since, --before, --after, --expiry, --as-of and --approval-at are each given 2026-02-30
+    When the rejects call of every validator runs, and --since, --before, --after, --expiry and --as-of are each given 2026-02-30 and --approval-at, which takes a date-time, is given 2026-02-30T10:00:00Z
     Then every rejects call exits 2 with the validator's code and a field that is one of its arguments and writes nothing; each of the 12 time options is named by the calendar validator of its command and refuses the date
 
   # canon: {"schema":1,"at":"2026-11-01T11:00:15Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
@@ -139,7 +139,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A relayed approval is a relation: its role, its actor and its answer are validators over --relayed-via, the environment is declared on --as and --actor, and the human's blank answer has its own code
     Given a built canon
     When canon schema brief approve, policy approve, divergence accept and migrate run
-    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver and --note of brief approve and policy approve have no domain and a validator each with APPROVAL_INVALID
+    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver of brief approve and policy approve declares the one domain of a name with APPROVAL_INVALID, and --note has no domain and a validator with APPROVAL_INVALID
 
   # canon: {"schema":1,"at":"2026-11-01T14:23:12Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
   @subject:atip-schema

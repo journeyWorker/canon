@@ -1,0 +1,10 @@
+# Search for the old tag names at a5f6b6ba0b9e4d5fbb4492067402b082ac4287f2 (tree 58b93acd046099d5de3ea6c368a5025ae51a83a7)
+$ git grep -n -e atip-crate-v0.1.3 -e atip-check-v0.1.4 -- . (tracked files; the workspace, justfile, workflows, docs, tests, specs)
+CHANGELOG.md:421:**The proof.** CI runs `atip check --level L2 --contract 1.4 --deep` (the job `atip`, `just atip-deep`; `just atip` runs the interface checks, without `--deep`) with the checker at `a
+CHANGELOG.md:429:- The workspace no longer holds `crates/atip`, `crates/atip-check` (with its fake tool and its own fixture) and `crates/atip-probe`. `canon-cli` takes `atip` as a git dependency at th
+CHANGELOG.md:430:- CI installs the checker from the atip repository (`cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.4 atip-check --locked`, cached by its tag and the 
+(exit 0)
+
+Reading of the result:
+- CHANGELOG.md lines 421, 429 and 430 are inside the section `## 0.36.0 — 2026-11-05`: the release notes of a shipped release that say which tags 0.36.0 used. They are history, not a statement of the tags canon uses now, and are left as they were. Every other tracked file (Cargo.toml, Cargo.lock, justfile, .github/workflows/test.yml, README.md, ARCHITECTURE.md, the tests, the specs) has no match.
+- Excluded from the search: .canon/ledger, .canon/archive and .canon/artifacts (immutable evidence records of earlier changes) and .canon/changes (the approved brief of this change, which names the old tags to say what moves).

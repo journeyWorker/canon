@@ -223,7 +223,7 @@ use canon_model::{
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -490,7 +490,7 @@ pub struct EvidenceArgs {
     pub approval_by: Option<String>,
     pub approval_role: Option<RoleId>,
     pub approval_signature_file: Option<PathBuf>,
-    /// RFC3339 timestamp covered by the external signature.
+    /// RFC 3339 date-time covered by the external signature.
     pub approval_at: Option<String>,
     /// The commit the evidence is about (`--rev`, resolved by the caller): its
     /// sha is persisted as `evidence_sha` and bound by an approval, with the
@@ -715,9 +715,7 @@ fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalB
         || first_row_line_break(&args.approval_by).is_some() {
         return Err(ArgRefusal::at("--approver", "--approver must be a non-empty trimmed single-line identity").into());
     }
-    #[expect(clippy::map_err_ignore, reason = "the error is a fixed message string with no source slot; the chrono parse detail is not part of the pinned wording")]
-    let at = args.approval_at.parse::<DateTime<Utc>>()
-        .map_err(|_| ArgRefusal::at("--approval-at", "--approval-at must be an RFC3339 timestamp"))?;
+    let at = crate::timestamp::parse_date_time(&args.approval_at).map_err(|error| ArgRefusal::at("--approval-at", format!("--approval-at is not an RFC 3339 date-time: {error}")))?;
     // An argument that is wrong is refused before any state is read: a surface ref that is no repository-relative path or `effect:<slug>` is the
     // same `EVIDENCE_ARGUMENT_INVALID` `canon evidence add` answers (the argument validator already stops one in the command line).
     for value in &args.surface_ref {
@@ -1117,7 +1115,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     if approval_requested {
         let approver = args.approval_by.as_ref().expect("approval_requested implies --approver");
         let role = args.approval_role.as_ref().expect("approval_requested implies --approval-role");
-        let approval_at = args.approval_at.as_ref().expect("approval_requested implies --approval-at").parse::<DateTime<Utc>>().expect("--approval-at was validated as RFC3339 above");
+        let approval_at = crate::timestamp::parse_date_time(args.approval_at.as_ref().expect("approval_requested implies --approval-at")).expect("--approval-at was validated as an RFC 3339 date-time above");
         let artifact_sha = &args.commit.sha;
         let subject = args.task_id.as_ref().map(ToString::to_string).or_else(|| args.scenario_id.as_ref().map(ToString::to_string)).expect("a task or scenario id was required above");
         let (payload, surface, effects) = match approval_binding(&repo, &ApprovalPayloadArgs {
@@ -1422,8 +1420,8 @@ pub(crate) fn check_approval(args: &crate::cli::evidence::EvidenceAddArgs) -> Re
     if args.approval_role.as_ref().is_none_or(|role| role.as_str() != "human") {
         return refuse("only the human approval role can satisfy risk approval", "--approval-role");
     }
-    if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
-        return refuse("--approval-at must be an RFC3339 timestamp", "--approval-at");
+    if args.approval_at.as_deref().and_then(|value| crate::timestamp::parse_date_time(value).ok()).is_none() {
+        return refuse("--approval-at must be an RFC 3339 date-time (`2030-01-01T10:00:00Z`)", "--approval-at");
     }
     Ok(())
 }

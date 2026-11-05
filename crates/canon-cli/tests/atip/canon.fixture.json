@@ -66,11 +66,68 @@
         ]
       ]
     },
+    "dispatch begin": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "regime": [
+          "a/b/c",
+          "a/b c/d/abcdef"
+        ]
+      }
+    },
+    "divergence accept": {
+      "domainRejects": {
+        "expiry": [
+          "2030-01-1",
+          "+2030-01-01"
+        ]
+      }
+    },
+    "divergence add": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "expiry": [
+          "2030-1-1",
+          " 2030-01-01"
+        ],
+        "project": [
+          "Core",
+          "a--b"
+        ],
+        "reason": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "round": [
+          "0"
+        ]
+      }
+    },
+    "divergence defer": {
+      "domainRejects": {
+        "expiry": [
+          "2030-1-1",
+          "2030-01-01 10:00:00Z"
+        ]
+      }
+    },
     "divergence list": {
       "domainRejects": {
         "as-of": [
           "Core",
-          "-core"
+          "-core",
+          "2030-1-1",
+          " 2030-01-01",
+          "2030-01-01 10:00:00Z"
         ]
       },
       "fields": [
@@ -95,11 +152,39 @@
         ]
       ]
     },
+    "evidence add": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "approval-at": [
+          "2030-01-01",
+          " 2030-01-01T10:00:00Z",
+          "2030-01-01 10:00:00Z"
+        ],
+        "override-reason": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "summary": [
+          "",
+          " ",
+          "a\tb"
+        ]
+      }
+    },
     "evidence approval-payload": {
       "domainRejects": {
         "approval-at": [
           "Core",
-          "-core"
+          "-core",
+          "2030-01-01",
+          " 2030-01-01T10:00:00Z",
+          "2030-01-01 10:00:00Z",
+          "2030-1-1T10:00:00Z"
         ],
         "approver": [
           "",
@@ -159,11 +244,15 @@
       "domainRejects": {
         "after": [
           "Core",
-          "-core"
+          "-core",
+          "2030-1-1",
+          " 2030-01-01"
         ],
         "before": [
           "Core",
-          "-core"
+          "-core",
+          "2030-01-01 10:00:00Z",
+          "2030-01-01T10:00:00−02:00"
         ]
       },
       "fields": [
@@ -190,6 +279,24 @@
           "--json"
         ]
       ]
+    },
+    "finding add": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "role": [
+          "Core",
+          "-core"
+        ],
+        "summary": [
+          "",
+          " ",
+          "a\tb"
+        ]
+      }
     },
     "finding close": {
       "batchFailsAt": [
@@ -231,6 +338,11 @@
         }
       ],
       "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
         "change": [
           "Core",
           "-core"
@@ -242,6 +354,9 @@
         "role": [
           "Core",
           "-core"
+        ],
+        "round": [
+          "0"
         ],
         "session": [
           "",
@@ -323,6 +438,17 @@
         ]
       ]
     },
+    "init": {
+      "domainRejects": {
+        "providers": [
+          "Claude",
+          "claude,,pi",
+          "claude, pi",
+          "",
+          "none,claude"
+        ]
+      }
+    },
     "ledger compact": {
       "preview": [
         [
@@ -349,6 +475,13 @@
       }
     },
     "purge": {
+      "domainRejects": {
+        "before": [
+          "2030-1-1",
+          " 2030-01-01",
+          "2030-01-01T10:00:00−02:00"
+        ]
+      },
       "preview": [
         [
           "purge",
@@ -369,9 +502,15 @@
           "Core",
           "-core"
         ],
+        "domain": [
+          "Dev",
+          "a_b"
+        ],
         "since": [
           "Core",
-          "-core"
+          "-core",
+          "2030-01-01 10:00:00Z",
+          "+2030-01-01"
         ]
       },
       "fields": [
@@ -427,9 +566,16 @@
     },
     "retrieve": {
       "domainRejects": {
+        "domain": [
+          "Dev",
+          "a_b"
+        ],
         "for-role": [
           "Core",
           "-core"
+        ],
+        "limit": [
+          "0"
         ],
         "regime": [
           "Core",
@@ -453,7 +599,12 @@
       "domainRejects": {
         "providers": [
           "Core",
-          "-core"
+          "-core",
+          "Claude",
+          "claude,,pi",
+          "claude, pi",
+          "",
+          "none,claude"
         ]
       }
     },
@@ -461,7 +612,23 @@
       "domainRejects": {
         "providers": [
           "Core",
-          "-core"
+          "-core",
+          "Claude",
+          "claude,,pi",
+          "claude, pi",
+          "",
+          "none,claude"
+        ]
+      }
+    },
+    "skills install": {
+      "domainRejects": {
+        "providers": [
+          "Claude",
+          "claude,,pi",
+          "claude, pi",
+          "",
+          "none,claude"
         ]
       }
     },
@@ -483,11 +650,46 @@
       "domainRejects": {
         "approval-at": [
           "Core",
-          "-core"
+          "-core",
+          "2030-01-01",
+          " 2030-01-01T10:00:00Z",
+          "2030-01-01 10:00:00Z"
+        ],
+        "approver": [
+          "",
+          " ",
+          "a\tb"
         ],
         "strategy": [
           "Core",
           "-core"
+        ]
+      }
+    },
+    "strategy rollback": {
+      "domainRejects": {
+        "approval-at": [
+          "2030-01-01",
+          " 2030-01-01T10:00:00Z",
+          "2030-01-01T10:00:00−02:00"
+        ]
+      }
+    },
+    "subject new": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "domain": [
+          "Dev",
+          "a--b"
+        ],
+        "summary": [
+          "",
+          " ",
+          "a\tb"
         ]
       }
     },
@@ -517,7 +719,7 @@
       }
     }
   },
-  "contractVersion": "1.4",
+  "contractVersion": "1.5",
   "globalOptions": [
     [
       "--repo",

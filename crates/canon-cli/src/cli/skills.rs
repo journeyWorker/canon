@@ -22,7 +22,7 @@ pub struct SkillsInstallArgs {
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`);
+    /// Providers to project: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item);
     /// also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml
     /// `skills.providers`, else the install lock's providers, else the detected `.claude`,
     /// `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is
@@ -45,7 +45,7 @@ pub struct SkillsCheckArgs {
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
+    /// Providers to inspect: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item). Omitted: as for install.
     #[arg(long, value_name = "LIST")]
     pub providers: Option<String>,
     /// Output JSON instead of the human-readable form
@@ -60,7 +60,7 @@ pub struct SkillsDoctorArgs {
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
+    /// Providers to inspect: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item). Omitted: as for install.
     #[arg(long, value_name = "LIST")]
     pub providers: Option<String>,
     /// Output JSON instead of the human-readable form

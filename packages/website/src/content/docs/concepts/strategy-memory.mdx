@@ -173,7 +173,10 @@ RFC3339 `approved_at`, and `payload_hex`. It never reads a private key or
 sets `verified`. Decode those exact bytes and sign them externally with
 `ssh-keygen -Y sign -n canon-learning-approval-v1`. Put the armored detached
 signature in `PromotionApproval.signature`, set `signer_key` equal to the
-principal, and use `approver_role: human`.
+principal, and use `approver_role: human`. `--approval-at` is an RFC 3339
+date-time (`2026-10-02T12:00:00Z`; a date alone is refused): canon never stamps
+it, so fix it once and give the same value to the signature and to
+`canon strategy rollback`.
 
 The signed canonical JSON is equivalent to:
 

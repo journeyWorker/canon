@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-option-forms",
+    "role": "implementer",
+    "session_id": "s-0-37-option-forms"
+  },
+  "at": "2026-11-05T17:01:36.933524Z",
+  "attachments": [
+    {
+      "case": "atip_codenames_05_schema_error_refuses_each_old_name_as_an_unknown_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    }
+  ],
+  "code_tree": "ce5d39d8e2cbcf751ed225ab10ec4151a41c9b2e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "2a49a90afa4d8c7eb0ab721132b525c2afd01142",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 169,
+  "scenario_id": "atip.codenames.05",
+  "schema": 1,
+  "staging_id": "5446f439",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -28,9 +28,10 @@ const PLACEHOLDERS: &[&str] = &[
 ];
 
 /// A leaf that takes an option's value from a subset of the shared set: (option, leaf).
+/// `finding close --disposition` takes the three that close a finding, not `open` (0.37 `canon-0-37-option-values`: a finding is not reopened).
 /// `search --kind` also takes `brief`, the node kind of a brief section or flow step (0.31 `canon-0-31-search`: a node is a
 /// record of any kind or a brief), so `query` and `export` take a subset of it.
-const DECLARED_SUBSETS: &[(&str, &str)] = &[("kind", "purge"), ("kind", "gate promote"), ("kind", "query"), ("kind", "export")];
+const DECLARED_SUBSETS: &[(&str, &str)] = &[("kind", "purge"), ("kind", "gate promote"), ("kind", "query"), ("kind", "export"), ("disposition", "finding close")];
 
 /// Options that name an act, not a mode; a mode is a flag, never a valued option.
 const VERBS: &[&str] = &["add", "new", "list", "show", "check", "verify", "validate", "approve", "accept", "move", "update", "get", "delete", "remove", "create", "set"];

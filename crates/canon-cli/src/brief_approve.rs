@@ -9,6 +9,13 @@
 //! removed ([`crate::brief::brief_digest`]), so any later edit to the
 //! brief makes every reader say `BRIEF_APPROVAL_STALE`.
 //!
+//! The line also records the code tree of the work tree at that moment (0.37,
+//! `(code tree <id>)` before the digest, outside it, [`crate::brief::approval_tree`]):
+//! the tree an evidence record binds, uncommitted code included. Outside a git
+//! work tree, or with no commit, the line is written without it. Re-approving
+//! records the tree of that moment; a repeat of the same approval over the same
+//! code writes nothing.
+//!
 //! Refused (exit 2) while `canon brief check` has blocker findings, and
 //! for an empty `--approver`/`--note`; exit 1 for an operational error. It takes
 //! one or more change ids (0.31): one name and answer for all, every id checked
@@ -45,11 +52,13 @@ pub enum ApprovedTextError {
 
 /// `text` approved: its `Approved:` lines replaced by one that binds the
 /// result's remaining text. A `relay` (0.32) puts its marker before the
-/// digest, outside it. `Err` when the line would not be read back
-/// (the brief ends inside an open code fence or HTML comment).
-pub fn approved_text(text: &str, by: &str, when: &str, note: &str, relay: Option<&ApprovalRelay>) -> Result<String, ApprovedTextError> {
+/// digest, outside it; a `tree` (0.37, the code tree of the work tree at the
+/// approval) puts `(code tree <id>)` after the relay marker, before the digest
+/// and outside it, so it never changes what the approval binds. `Err` when the
+/// line would not be read back (the brief ends inside an open code fence or HTML comment).
+pub fn approved_text(text: &str, by: &str, when: &str, note: &str, relay: Option<&ApprovalRelay>, tree: Option<&str>) -> Result<String, ApprovedTextError> {
     let body = format!("{}\n\n", without_field(text, "Approved:").trim_end());
-    let value = format!("{by} {when} — \"{note}\"{} (brief {})", relay_part(relay), brief_digest(&body));
+    let value = format!("{by} {when} — \"{note}\"{}{} (brief {})", relay_part(relay), tree_part(tree), brief_digest(&body));
     let approved = format!("{body}Approved: {value}\n");
     if field(&approved, "Approved:") != Some(value.as_str()) || brief_digest(&approved) != brief_digest(&body) {
         return Err(ApprovedTextError::UnreadableLine);
@@ -60,6 +69,11 @@ pub fn approved_text(text: &str, by: &str, when: &str, note: &str, relay: Option
 /// ` (relayed by …)` for a relayed approval, nothing for the human's own.
 fn relay_part(relay: Option<&ApprovalRelay>) -> String {
     relay.map(|r| format!(" {}", crate::relay::marker(r))).unwrap_or_default()
+}
+
+/// ` (code tree <id>)` when the approval recorded the code tree, nothing otherwise.
+fn tree_part(tree: Option<&str>) -> String {
+    tree.map(|tree| format!(" {}", crate::brief::tree_marker(tree))).unwrap_or_default()
 }
 
 /// The digest `brief approve` records for the brief `text`: what `canon brief
@@ -180,13 +194,15 @@ struct Checked {
     text: String,
     /// The brief and the policy already carry this very approval.
     unchanged: bool,
+    /// The code tree the approval records (0.37), when there is one.
+    tree: Option<String>,
 }
 
 /// The checks of one approval, none of which writes: the answer is one line,
 /// the brief exists and reads, `canon brief check` has no blocker, the page's
 /// copy (when there is one) is the file, and an `Approved:` line can be
 /// appended where it will be read.
-fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved: bool, opts: Opts<'_>) -> Result<Checked, CliError> {
+fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved: bool, opts: Opts<'_>, tree: Option<&str>) -> Result<Checked, CliError> {
     let checked = check(repo, item.change)?;
     let path = repo.join(&checked.brief);
     if let Some(shown) = opts.shown {
@@ -214,9 +230,9 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
     }
     // The same approval again, by the same human, on a brief and a policy
     // that already carry it: nothing to write.
-    let unchanged = already_approved_so(&text, by, note, opts.relay) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note), opts.relay).is_some());
+    let unchanged = already_approved_so(&text, by, note, opts.relay, tree) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note), opts.relay).is_some());
     if !unchanged {
-        approved_text(&text, by, "1970-01-01T00:00:00Z", note, opts.relay).map_err(|e| refuse("BRIEF_INVALID", &format!("{}: {e}", checked.brief)).reason("UNAPPROVABLE"))?;
+        approved_text(&text, by, "1970-01-01T00:00:00Z", note, opts.relay, tree).map_err(|e| refuse("BRIEF_INVALID", &format!("{}: {e}", checked.brief)).reason("UNAPPROVABLE"))?;
         // What the approval will write is checked here, with the rest, so an unwritable brief or approval file refuses before any id is written.
         let approval_file = repo.join(canon_model::paths::POLICY_APPROVAL_FILE);
         let targets: Vec<&Path> = if policy_approved { vec![approval_file.as_path(), path.as_path()] } else { vec![path.as_path()] };
@@ -224,7 +240,7 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
             crate::write_mode::check_writable(target).map_err(|e| crate::write_mode::unwritable(target, &e))?;
         }
     }
-    Ok(Checked { change: checked.change, brief: checked.brief, path, text, unchanged })
+    Ok(Checked { change: checked.change, brief: checked.brief, path, text, unchanged, tree: tree.map(str::to_string) })
 }
 
 /// `Err` unless the digest the human was shown for `change` (`shown`) is the
@@ -255,9 +271,9 @@ fn answer(by: &str, note: &str) -> Result<(String, String), CliError> {
     Ok((by.to_string(), note.to_string()))
 }
 
-/// Writes one approved brief (and, first, the policy approval) at `when`.
+/// Writes one approved brief (and, first, the policy approval) at `when`, recording the code tree `checked` saw.
 fn write_one(repo: &Path, checked: Checked, by: &str, note: &str, when: &str, policy_approved: bool, relay: Option<&ApprovalRelay>) -> Result<Approved, CliError> {
-    let approved = approved_text(&checked.text, by, when, note, relay).map_err(|e| refuse("BRIEF_INVALID", &e.to_string()).reason("UNAPPROVABLE"))?;
+    let approved = approved_text(&checked.text, by, when, note, relay, checked.tree.as_deref()).map_err(|e| refuse("BRIEF_INVALID", &e.to_string()).reason("UNAPPROVABLE"))?;
     // Policy first: a failed policy write leaves the brief untouched, and a
     // failed brief write leaves a policy approval that is true on its own.
     if policy_approved {
@@ -286,7 +302,9 @@ pub fn approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, exp
 fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<(Approved, bool), CliError> {
     let (by, note) = answer(by, note)?;
     let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
-    let checked = check_one(repo, Item { change, expected_sha256 }, &by, &note, policy_approved, Opts::default())?;
+    // The code tree of the work tree now (0.37), `None` without a git commit: the approval records the code it saw.
+    let tree = crate::git_rev::code_tree_if_committed(repo)?;
+    let checked = check_one(repo, Item { change, expected_sha256 }, &by, &note, policy_approved, Opts::default(), tree.as_deref())?;
     if checked.unchanged {
         return Ok((already(checked, &by, policy_approved, None), true));
     }
@@ -342,10 +360,11 @@ pub fn approve_all_with(repo: &Path, items: &[Item<'_>], by: &str, note: &str, o
         }
     }
     let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
+    let tree = crate::git_rev::code_tree_if_committed(repo)?;
     let mut checked: Vec<Checked> = Vec::new();
     let mut refused: Vec<(String, CliError)> = Vec::new();
     for item in &distinct {
-        match check_one(repo, *item, &by, &note, policy_approved, opts) {
+        match check_one(repo, *item, &by, &note, policy_approved, opts, tree.as_deref()) {
             Ok(one) => checked.push(one),
             Err(e) => refused.push((item.change.map_or_else(|| "<the only live change>".to_string(), |c| c.as_str().to_string()), e)),
         }
@@ -502,11 +521,13 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
 }
 
 /// Whether `text` already carries an `Approved:` line by `by` with `note`
-/// that binds the brief's current body: the line a repeat of the same
-/// approval would write, up to the time it was written.
-fn already_approved_so(text: &str, by: &str, note: &str, relay: Option<&ApprovalRelay>) -> bool {
+/// that binds the brief's current body and records the code tree `tree`: the
+/// line a repeat of the same approval would write, up to the time it was
+/// written. The same words over other code are a new approval (0.37): it
+/// records the tree it saw.
+fn already_approved_so(text: &str, by: &str, note: &str, relay: Option<&ApprovalRelay>, tree: Option<&str>) -> bool {
     let body = format!("{}\n\n", without_field(text, "Approved:").trim_end());
-    let tail = format!(" — \"{note}\"{} (brief {})", relay_part(relay), brief_digest(&body));
+    let tail = format!(" — \"{note}\"{}{} (brief {})", relay_part(relay), tree_part(tree), brief_digest(&body));
     field(text, "Approved:")
         .and_then(|value| value.strip_prefix(by))
         .and_then(|value| value.strip_prefix(' '))
@@ -520,7 +541,7 @@ mod tests {
 
     #[test]
     fn a_brief_ending_inside_a_fence_is_refused_in_its_old_words() {
-        let error = approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok", None).unwrap_err();
+        let error = approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok", None, None).unwrap_err();
         assert_eq!(error.to_string(), "the brief ends inside an open code fence or HTML comment, so an `Approved:` line appended there would not be read; close it first");
     }
 }

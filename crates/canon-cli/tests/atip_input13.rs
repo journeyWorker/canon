@@ -145,7 +145,7 @@ fn atip_input13_02_an_argument_that_differs_from_the_document_is_input_conflict_
     // The contract names a value at fault in a document by its pointer (10.8), and the checker's L2.input-conflict reads the document pointer.
     let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "2", "--input", document, "--json"]));
     assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "INPUT_CONFLICT", Some("/round")), "{body}");
-    let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "other-change", "--input", &json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "open"}).to_string(), "--json"]));
+    let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "other-change", "--input", &json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition":"fixed"}).to_string(), "--json"]));
     assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "INPUT_CONFLICT", Some("/operands")), "{body}");
     assert_eq!(tree(repo), before, "a refused call writes nothing");
 }
@@ -162,11 +162,11 @@ fn atip_input13_03_a_fault_of_argv_alone_answers_before_the_document_and_a_requi
     let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--disposition", "nope", "--input", document, "--json"]));
     assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "USAGE", Some("--disposition")), "{body}");
     // What neither gives is judged after the merge, with the code a call without a document has: `--seq` is missing.
-    let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--input", r#"{"round":1,"disposition":"open"}"#, "--json"]));
+    let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--input", r#"{"round":1,"disposition":"fixed"}"#, "--json"]));
     assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "USAGE", Some("/seq")), "{body}");
     // The merged call is checked as one call: a value the document gave breaks the rule an argv value would break.
-    let (exit, code, _, _, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--input", r#"{"round":0,"seq":1,"disposition":"open"}"#, "--json"]));
-    let (_, plain_code, _, _, _) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "0", "--seq", "1", "--disposition", "open", "--json"]));
+    let (exit, code, _, _, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--input", r#"{"round":0,"seq":1,"disposition":"fixed"}"#, "--json"]));
+    let (_, plain_code, _, _, _) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "0", "--seq", "1", "--disposition", "fixed", "--json"]));
     assert_eq!((exit, code.as_str()), (Some(2), plain_code.as_str()), "{body}");
     assert_eq!(tree(repo), before, "a refused call writes nothing");
 }
@@ -179,14 +179,14 @@ fn atip_input13_04_a_batch_checks_every_item_before_it_runs_one() {
     let repo = dir.path();
     let before = tree(repo);
     // The last item has the wrong type: the two before it are not run, the answer is exit 2 at `/2/…` with no data.
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(2, "rejected"), json!({"operands": ["add-login"], "round": "x", "seq": 3, "disposition": "open"})]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(2, "rejected"), json!({"operands": ["add-login"], "round": "x", "seq": 3, "disposition":"fixed"})]);
     assert_eq!(exit, Some(2), "{body}");
     assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("INPUT_INVALID"), Some("/2/round")), "{body}");
     assert!(body.get("data").is_none(), "a preflight refusal has no data: {body}");
     assert_eq!(tree(repo), before, "no item ran");
     assert_eq!(dispositions(repo), [(1, "open".to_string()), (2, "open".to_string()), (3, "open".to_string())]);
     // A fault that needs no state in the last item (a conflict with argv) is the same: nothing ran.
-    let doc = Value::Array(vec![close(1, "deferred"), json!({"operands": ["add-login"], "round": 2, "seq": 2, "disposition": "open"})]).to_string();
+    let doc = Value::Array(vec![close(1, "deferred"), json!({"operands": ["add-login"], "round": 2, "seq": 2, "disposition":"fixed"})]).to_string();
     let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "--round", "1", "--input", &doc, "--json"]));
     assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "INPUT_CONFLICT", Some("/1/round")), "{body}");
     assert_eq!(tree(repo), before, "no item ran");
@@ -197,7 +197,7 @@ fn atip_input13_05_the_item_that_fails_when_it_runs_stops_the_batch_and_its_code
     let dir = fixture();
     let repo = dir.path();
     // Item 1 names a finding no ledger has: it passes the checks that read no state and fails when it runs.
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "open"), close(2, "rejected")]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "fixed"), close(2, "rejected")]);
     assert_eq!(exit, Some(1), "{body}");
     assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("BATCH_INCOMPLETE"), Some("/1")), "{body}");
     assert_eq!(statuses(&body), ["written", "failed", "skipped"], "{body}");
@@ -213,14 +213,14 @@ fn atip_input13_05_the_item_that_fails_when_it_runs_stops_the_batch_and_its_code
 fn atip_input13_06_every_item_is_one_entry_of_the_report_in_the_order_submitted() {
     let dir = fixture();
     let repo = dir.path();
-    let submitted = [close(1, "deferred"), close(2, "rejected"), close(3, "open")];
+    let submitted = [close(1, "deferred"), close(2, "rejected"), close(3, "fixed")];
     let (exit, body) = run_batch(repo, &["finding", "close"], &submitted);
     assert_eq!(exit, Some(0), "{body}");
     let items = body["data"]["items"].as_array().unwrap();
     assert_eq!(items.iter().map(|item| item["index"].as_u64().unwrap()).collect::<Vec<_>>(), [0, 1, 2], "{body}");
     assert_eq!(items.iter().map(|item| item["data"]["seq"].as_u64().unwrap()).collect::<Vec<_>>(), [1, 2, 3], "one entry per item, in the order it was submitted: {body}");
     // The same batch with the third item out of order of the ledger fails at its index and still lists all four.
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(3, "deferred"), close(1, "deferred"), close(7, "open"), close(2, "open")]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(3, "deferred"), close(1, "deferred"), close(7, "fixed"), close(2, "fixed")]);
     assert_eq!(exit, Some(1), "{body}");
     assert_eq!(statuses(&body), ["written", "unchanged", "failed", "skipped"], "{body}");
     assert_eq!(body["error"]["field"], "/2", "{body}");
@@ -253,7 +253,7 @@ fn atip_input13_07_the_largest_safe_integer_passes_the_integer_check_and_the_nex
         }
     }
     // In a batch the pointer carries the index.
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "open"), json!({"operands": ["add-login"], "round": 1, "seq": 9007199254740993_u64, "disposition": "open"})]);
+    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "fixed"), json!({"operands": ["add-login"], "round": 1, "seq": 9007199254740993_u64, "disposition":"fixed"})]);
     assert_eq!((exit, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("INPUT_INVALID"), Some("/1/seq")), "{body}");
     assert_eq!(tree(repo), before, "every refusal left the repository as it was");
 }
@@ -439,7 +439,7 @@ fn atip_input13_12_an_empty_array_for_an_option_that_is_not_repeatable_is_refuse
     }
     assert!(checked >= 40, "a key of every leaf that takes a document was tried ({checked})");
     // The operands are refused the same way (they were before).
-    let (exit, code, reason, field, body) = refusal(&canon(repo, &["finding", "close", "--input", r#"{"operands":[],"round":1,"seq":1,"disposition":"open"}"#, "--json"]));
+    let (exit, code, reason, field, body) = refusal(&canon(repo, &["finding", "close", "--input", r#"{"operands":[],"round":1,"seq":1,"disposition":"fixed"}"#, "--json"]));
     assert_eq!((exit, code.as_str(), reason.as_deref(), field.as_deref()), (Some(2), "INPUT_INVALID", Some("INVALID_VALUE"), Some("/operands")), "{body}");
     assert_eq!(tree(repo), before, "every refusal wrote nothing");
 }

@@ -3,36 +3,23 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, ROLE_DESCRIPTION};
+use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, PROVIDERS, ROLE_DESCRIPTION, VIA_DESCRIPTION};
 
 /// `init --language`: trimmed and lowercased (ASCII), then a primary subtag of two or three letters and `-` subtags of one to
 /// eight letters or digits (`ko`, `en-US`, `zh-Hant`).
-const LANGUAGE: &str = concat!("^[", white_space!(), "]*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*[", white_space!(), "]*$");
-
-/// `--providers`: blank or `none` (any case) for no provider, else a comma separated list of `claude`, `codex`, `omp`, `pi` (any
-/// case, white space around each, blank items skipped, at least one name).
-const PROVIDERS: &str = concat!(
-    "^([", white_space!(), "]*",
-    "|[", white_space!(), "]*[Nn][Oo][Nn][Ee][", white_space!(), "]*",
-    "|([", white_space!(), "]*,)*[", white_space!(), "]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[", white_space!(), "]*",
-    "(,[", white_space!(), "]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[", white_space!(), "]*)?)*",
-    ")$"
-);
-
-/// `--regime`: four `/` separated segments, the first three without white space, the last 6 to 64 lowercase hex digits.
-const REGIME_KEY: &str = concat!("^[^/", white_space!(), "]+/[^/", white_space!(), "]+/[^/", white_space!(), "]+/[0-9a-f]{6,64}$");
+const LANGUAGE: &str = concat!("^", white_space!(), "*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*", white_space!(), "*$");
 
 /// A `regime show` segment: at least one character that canonicalizing (trim, white space and `/` to `-`) keeps.
 const REGIME_SEGMENT: &str = concat!("^[", white_space!(), "/]*[^", white_space!(), "/][^\u{0}]*$");
 
 /// The `regime show --hash`: trimmed and lowercased it is 6 to 64 hex digits.
-const REGIME_HASH: &str = concat!("^[", white_space!(), "]*[0-9A-Fa-f]{6,64}[", white_space!(), "]*$");
+const REGIME_HASH: &str = concat!("^", white_space!(), "*[0-9A-Fa-f]{6,64}", white_space!(), "*$");
 
 /// Every kind but the ones a filter of `query` applies to.
 /// What `canon trace` reads an operand as, after trimming (`search/trace.rs`): a review id (26 characters of Crockford base32),
 /// a commit sha (7 to 40 hex digits) or a finding key `<change>_<round>_<seq>` with a non-empty change. It is judged from the text
 /// alone, before any read; a pattern is a necessary condition: it admits some text (` _1_2`) that the parser then calls unrecognised.
-const TRACE_OPERAND: &str = concat!("^[", white_space!(), "]*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|", any_char!(), "+_[0-9]+_[0-9]+)[", white_space!(), "]*$");
+const TRACE_OPERAND: &str = concat!("^", white_space!(), "*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|", any_char!(), "+_[0-9]+_[0-9]+)", white_space!(), "*$");
 
 const NOT_CHANGE_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "subject", "finding"];
 const NOT_STATUS_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
@@ -87,6 +74,12 @@ pub(crate) static TABLES: Tables = Tables {
                     rejects: &["canon migrate --commit --plan-digest abc --relayed-via ask --actor impl --approver alice --note ok"],
                 },
                 Validator {
+                    arguments: &["relayed-via"],
+                    code: "USAGE",
+                    description: VIA_DESCRIPTION,
+                    rejects: &["canon migrate --commit --plan-digest abc --relayed-via \"a b\" --as implementer --actor impl --approver alice --note ok"],
+                },
+                Validator {
                     arguments: &["relayed-via", "actor"],
                     code: "USAGE",
                     description: ACTOR_DESCRIPTION,
@@ -96,10 +89,7 @@ pub(crate) static TABLES: Tables = Tables {
                     arguments: &["relayed-via", "approver", "note"],
                     code: "USAGE",
                     description: ANSWER_RELAYED,
-                    rejects: &[
-                        "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver \" \" --note ok",
-                        "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver alice",
-                    ],
+                    rejects: &["canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver alice"],
                 },
             ],
         ),
@@ -128,8 +118,15 @@ pub(crate) static TABLES: Tables = Tables {
         // The text is not blank once trimmed; the handler refuses it before it opens the index.
         DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_REQUIRED").inside(&["timeout", " a "]).outside(&["", "   "]),
         DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_ARGUMENT_INVALID").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),
-        DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_ARGUMENT_INVALID").inside(&["claude", "none", "NONE", "", " Claude , codex,,pi ", ",omp"]).outside(&[",", "gemini", "none,claude", "claude,gemini", " , "]),
-        DomainRow::new(Scope::Arguments(&["retrieve"], "regime"), Domain::matching(REGIME_KEY), "USAGE").inside(&["reviewer/canon/join-spine/9c93d024b1a2", "reviewer/b/c/abcdef"]).outside(&["reviewer/b/c", "reviewer/b/c/d/abcdef", "reviewer//c/abcdef", "reviewer/b/c/ABCDEF", "reviewer/b/c/abcde", "reviewer/b c/c/abcdef"]),
+        // `init` and the three `skills` commands read one list: the rows say it in the same pattern, each with its own code.
+        DomainRow::new(Scope::Arguments(&["init"], "providers"), Domain::matching(PROVIDERS), "INIT_ARGUMENT_INVALID")
+            .says("is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)")
+            .inside(&["claude", "none", "claude,omp", "omp,omp", "pi,codex,claude"])
+            .outside(&["", " ", "Claude", "NONE", "None", "claude,,pi", "claude,", ",omp", ",", " claude", "claude ", "claude, pi", "none,claude", "claude,none", "gemini", "claude,gemini"]),
+        DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_ARGUMENT_INVALID")
+            .says("is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)")
+            .inside(&["claude", "none", "claude,omp", "omp,omp", "pi,codex,claude"])
+            .outside(&["", " ", "Claude", "NONE", "None", "claude,,pi", "claude,", ",omp", ",", " claude", "claude ", "claude, pi", "none,claude", "claude,none", "gemini", "claude,gemini"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "role-segment"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["reviewer", " a b ", "/x/"]).outside(&["", "  ", "/", " / "]),
         DomainRow::new(Scope::Arguments(&["regime show"], "repo-name"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["my-repo", "A B"]).outside(&["", "  ", "//"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "area"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["api", "a/b"]).outside(&["", "\t", "/ /"]),

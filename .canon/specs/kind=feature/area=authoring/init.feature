@@ -270,8 +270,8 @@ Feature: authoring init
   @authoring.init.93
   Scenario: An explicit empty harness choice is recorded
     Given an empty repository holding a .claude directory
-    When canon init runs with --providers none, or with an empty --providers
-    Then canon.yaml records `providers: []` and nothing is installed
+    When canon init runs with --providers none, and with an empty --providers
+    Then canon.yaml records `providers: []` and nothing is installed for --providers none, and the empty --providers is refused with exit 2 and writes nothing (`canon-0-37-option-forms`: the list is exact)
     And canon skills check exits 0 reporting no providers from canon.yaml
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
@@ -281,7 +281,7 @@ Feature: authoring init
   Scenario: An unknown harness in --providers is refused before anything is written
     Given an empty repository
     When canon init runs with --providers naming a harness canon does not know
-    Then it exits 2 naming the harness and the accepted names
+    Then it exits 2 with INIT_ARGUMENT_INVALID naming --providers and the accepted names (the declared domain of the option, `canon-0-37-option-forms`), and the value is the `received` of the envelope
     And the repository is still empty
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}

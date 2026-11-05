@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-approval-evidence-037",
+    "role": "implementer",
+    "session_id": "s-0-37-approval-evidence"
+  },
+  "at": "2026-11-05T12:00:59.489621Z",
+  "attachments": [
+    {
+      "case": "gate_approval_tree_07_one_changed_file_brings_the_requirement_back_and_an_excluded_one_does_not",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "9cf640b63c2913562fd45bac1dde3f2223b0316bbbe76995a883b02fcb908fa0"
+    }
+  ],
+  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 7,
+  "scenario_id": "gate.approval-tree.07",
+  "schema": 1,
+  "staging_id": "93183f64",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

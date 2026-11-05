@@ -88,7 +88,7 @@
 //! slot, so a derived count still reads such a finding as unsourced; the two
 //! options together are refused. The rule is `add`'s alone: `close` copies
 //! both fields and is never blocked by their absence, so a finding written
-//! by 0.29 still closes and reopens.
+//! by 0.29 still closes.
 //!
 //! # `--review` ties a finding to the review it came out of (0.30)
 //! The id is the ULID `canon review scenario|change` printed. `add` refuses an
@@ -315,6 +315,14 @@ pub fn severity_parser() -> impl clap::builder::TypedValueParser<Value = Finding
 /// `--disposition` for clap, with the accepted values known to it.
 pub fn disposition_parser() -> impl clap::builder::TypedValueParser<Value = FindingDisposition> {
     crate::cli_error::closed_set(DISPOSITION_VALUES, parse_disposition)
+}
+
+/// `canon finding close`'s `--disposition`: the three that close a finding. A finding is not reopened; a defect that came back is a new finding.
+pub const CLOSE_DISPOSITION_VALUES: [&str; 3] = ["fixed", "rejected", "deferred"];
+
+/// `canon finding close`'s `--disposition` for clap, with the accepted values known to it.
+pub fn close_disposition_parser() -> impl clap::builder::TypedValueParser<Value = FindingDisposition> {
+    crate::cli_error::closed_set(CLOSE_DISPOSITION_VALUES, parse_disposition)
 }
 
 /// A `canon finding` value that no parser accepts.
@@ -799,9 +807,8 @@ pub struct FindingCloseArgs {
     pub change_id: ChangeId,
     pub round: u32,
     pub seq: u32,
-    /// Where the finding lands. `open` is legal — a finding reopened
-    /// after a fix that did not hold is a real transition, and refusing
-    /// it would leave the ledger able to record only one direction.
+    /// Where the finding lands: `fixed`, `rejected` or `deferred` ([`CLOSE_DISPOSITION_VALUES`]). A finding is not reopened: a defect that
+    /// came back is a new finding, and the parser refuses `open`.
     pub disposition: FindingDisposition,
     /// `--resolution-rev`; `None` means `HEAD` when the disposition is `fixed`.
     pub resolution_rev: Option<String>,
@@ -986,7 +993,8 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
         (FindingDisposition::Fixed, Some(resolution)) => transitioned.fixed_by(resolution.sha).with_resolution_code(&resolution.code_tree, resolution.worktree_dirty),
         (FindingDisposition::Rejected, _) => transitioned.rejected(),
         (FindingDisposition::Deferred, _) => transitioned.deferred(),
-        (FindingDisposition::Open, _) => transitioned,
+        // Unreachable: the parser takes only the three dispositions that close a finding (`CLOSE_DISPOSITION_VALUES`).
+        (FindingDisposition::Open, _) => unreachable!("`--disposition open` is refused by the parser: a finding is not reopened"),
         // Unreachable: a `fixed` close always binds a commit above.
         (FindingDisposition::Fixed, None) => unreachable!("a fixed close always resolves a commit"),
     };
@@ -1799,21 +1807,17 @@ mod tests {
         assert!(staged_bodies(dir.path()).is_empty());
     }
 
-    /// Reopening is a real transition: a fix that did not hold is a fact
-    /// the ledger must be able to carry, and refusing it would leave the
-    /// corpus able to record only one direction.
+    /// A finding is never reopened: `finding close` takes the three dispositions that close one, and a defect that came back is a new finding.
     #[test]
-    fn a_finding_can_be_reopened() {
-        let (dir, head) = git_repo();
-        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
-        promote_staged(dir.path());
-        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_rev = Some(head.to_string());
-        assert_eq!(run_close(dir.path(), &close), 0);
-        promote_staged(dir.path());
-
-        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Open)), 0);
-        assert_eq!(staged_bodies(dir.path())[0]["disposition"].as_str(), Some("open"));
+    fn close_takes_the_three_closing_dispositions_and_not_open() {
+        use clap::builder::TypedValueParser as _;
+        let command = clap::Command::new("close");
+        let parser = close_disposition_parser();
+        for word in ["fixed", "rejected", "deferred"] {
+            assert!(parser.parse_ref(&command, None, std::ffi::OsStr::new(word)).is_ok(), "{word}");
+        }
+        assert!(parser.parse_ref(&command, None, std::ffi::OsStr::new("open")).is_err(), "`open` closes nothing");
+        assert_eq!(CLOSE_DISPOSITION_VALUES, ["fixed", "rejected", "deferred"]);
     }
 
     /// 1-based, like `add`'s: no finding was ever authored under a 0.

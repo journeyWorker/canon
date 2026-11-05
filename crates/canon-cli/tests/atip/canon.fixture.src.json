@@ -57,10 +57,7 @@
     },
     "divergence list": {
       "domainRejects": {
-        "as-of": [
-          "Core",
-          "-core"
-        ]
+        "as-of": ["Core", "-core", "2030-1-1", " 2030-01-01", "2030-01-01 10:00:00Z"]
       },
       "fields": [
         [
@@ -86,10 +83,7 @@
     },
     "evidence approval-payload": {
       "domainRejects": {
-        "approval-at": [
-          "Core",
-          "-core"
-        ],
+        "approval-at": ["Core", "-core", "2030-01-01", " 2030-01-01T10:00:00Z", "2030-01-01 10:00:00Z", "2030-1-1T10:00:00Z"],
         "approver": [
           "",
           " "
@@ -120,19 +114,13 @@
 
     "ledger compact": {"preview": [["ledger", "compact", "--json"]]},
     "migrate": {"preview": [["migrate", "--json"]]},
-    "purge": {"preview": [["purge", "--kind", "session", "--before", "2030-01-01", "--json"]]},
+    "purge": {"domainRejects": {"before": ["2030-1-1", " 2030-01-01", "2030-01-01T10:00:00\u221202:00"]}, "preview": [["purge", "--kind", "session", "--before", "2030-01-01", "--json"]]},
 
     "tier age": {"preview": [["tier", "age", "--json"]]},
     "export": {
       "domainRejects": {
-        "after": [
-          "Core",
-          "-core"
-        ],
-        "before": [
-          "Core",
-          "-core"
-        ]
+        "after": ["Core", "-core", "2030-1-1", " 2030-01-01"],
+        "before": ["Core", "-core", "2030-01-01 10:00:00Z", "2030-01-01T10:00:00\u221202:00"]
       },
       "fields": [
         [
@@ -165,7 +153,9 @@
     "finding close": {
       "domainRejects": {
         "change": ["Core", "-core"],
+        "actor": ["", " ", "a\tb"],
         "reason": ["", " "],
+        "round": ["0"],
         "role": ["Core", "-core"],
         "session": ["", " x"]
       },
@@ -175,6 +165,16 @@
       "batchFailsAt": [{"input": [{"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "fixed"}, {"operands": ["add-login"], "round": 1, "seq": 9, "disposition": "fixed"}], "index": 1}],
       "batchFailsFirst": [{"input": [{"operands": ["add-login"], "round": 1, "seq": 9, "disposition": "fixed"}], "index": 0}]
     },
+    "finding add": {"domainRejects": {"actor": ["", " ", "a\tb"], "role": ["Core", "-core"], "summary": ["", " ", "a\tb"]}},
+    "evidence add": {"domainRejects": {"actor": ["", " ", "a\tb"], "approval-at": ["2030-01-01", " 2030-01-01T10:00:00Z", "2030-01-01 10:00:00Z"], "override-reason": ["", " ", "a\tb"], "summary": ["", " ", "a\tb"]}},
+    "divergence add": {"domainRejects": {"actor": ["", " ", "a\tb"], "expiry": ["2030-1-1", " 2030-01-01"], "project": ["Core", "a--b"], "reason": ["", " ", "a\tb"], "round": ["0"]}},
+    "dispatch begin": {"domainRejects": {"actor": ["", " ", "a\tb"], "regime": ["a/b/c", "a/b c/d/abcdef"]}},
+    "subject new": {"domainRejects": {"actor": ["", " ", "a\tb"], "domain": ["Dev", "a--b"], "summary": ["", " ", "a\tb"]}},
+    "divergence defer": {"domainRejects": {"expiry": ["2030-1-1", "2030-01-01 10:00:00Z"]}},
+    "divergence accept": {"domainRejects": {"expiry": ["2030-01-1", "+2030-01-01"]}},
+    "strategy rollback": {"domainRejects": {"approval-at": ["2030-01-01", " 2030-01-01T10:00:00Z", "2030-01-01T10:00:00\u221202:00"]}},
+    "init": {"domainRejects": {"providers": ["Claude", "claude,,pi", "claude, pi", "", "none,claude"]}},
+    "skills install": {"domainRejects": {"providers": ["Claude", "claude,,pi", "claude, pi", "", "none,claude"]}},
     "finding list": {
       "domainRejects": {
         "change": [
@@ -219,14 +219,12 @@
     },
     "query": {
       "domainRejects": {
+        "domain": ["Dev", "a_b"],
         "change": [
           "Core",
           "-core"
         ],
-        "since": [
-          "Core",
-          "-core"
-        ]
+        "since": ["Core", "-core", "2030-01-01 10:00:00Z", "+2030-01-01"]
       },
       "fields": [
         [
@@ -282,6 +280,7 @@
     },
     "retrieve": {
       "domainRejects": {
+        "domain": ["Dev", "a_b"],
         "for-role": [
           "Core",
           "-core"
@@ -290,6 +289,7 @@
           "Core",
           "-core"
         ],
+        "limit": ["0"],
         "subject": [
           "Core",
           "-core"
@@ -306,18 +306,12 @@
     },
     "skills check": {
       "domainRejects": {
-        "providers": [
-          "Core",
-          "-core"
-        ]
+        "providers": ["Core", "-core", "Claude", "claude,,pi", "claude, pi", "", "none,claude"]
       }
     },
     "skills doctor": {
       "domainRejects": {
-        "providers": [
-          "Core",
-          "-core"
-        ]
+        "providers": ["Core", "-core", "Claude", "claude,,pi", "claude, pi", "", "none,claude"]
       }
     },
     "status": {
@@ -336,10 +330,8 @@
     },
     "strategy approval-payload": {
       "domainRejects": {
-        "approval-at": [
-          "Core",
-          "-core"
-        ],
+        "approval-at": ["Core", "-core", "2030-01-01", " 2030-01-01T10:00:00Z", "2030-01-01 10:00:00Z"],
+        "approver": ["", " ", "a\tb"],
         "strategy": [
           "Core",
           "-core"
@@ -363,7 +355,7 @@
       }
     }
   },
-  "contractVersion": "1.4",
+  "contractVersion": "1.5",
   "globalOptions": [
     [
       "--repo",

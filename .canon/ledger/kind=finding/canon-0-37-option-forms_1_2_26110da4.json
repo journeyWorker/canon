@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-forms",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-forms-rev"
+  },
+  "at": "2026-11-05T17:23:39.310815Z",
+  "change_id": "canon-0-37-option-forms",
+  "code_tree": "ce5d39d8e2cbcf751ed225ab10ec4151a41c9b2e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/timestamp.rs:70",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "60b8a7668b49253a51c37565ba9e0d4382e761bf",
+  "reviewer": "rev-0-37-option-forms",
+  "round": 1,
+  "scenario_ids": [
+    "atip.optionforms.01"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Spec fidelity pass: a leap second (2030-01-01T23:59:60Z, 1998-12-31T23:59:60Z) is taken by all 12 time places exactly as 0.36.0 took it (chrono parse_from_rfc3339), and the payload then holds timestamp 2030-01-01T23:59:60.000000000Z; fractions past 9 digits are cut to the nanosecond. The brief says only that impossible times (25h) are refused and no value table (atip_optionforms_12, NOT_A_DATE_TIME) names :60, so the behavior is unpinned; real-binary matrix 0.36.0 vs 0.37 shows identical answers, so it is no regression. Blast radius: signature payload bytes for :60 vs the next midnight differ though RFC 3339 places them at one instant. Non-blocking.",
+  "worktree_dirty": false
+}

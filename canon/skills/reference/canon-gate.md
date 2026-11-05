@@ -255,6 +255,17 @@ review of the chore itself (`canon review change <slug>`) before
 `--to shipped`; a changed verdict or case set stales that scenario's
 review as before (and a new `divergence accept`, where the gap remains).
 
+A chore's approval records the code tree of the work tree at that moment, as
+`(code tree <id>)` in its `Approved:` line (outside the brief digest; none
+outside git or with no commit). While that tree is the current code tree the
+chore changed no code since it was approved, so it asks for no evidence at
+all, whatever tree each scenario's latest evidence is on, and `status` says so
+on its line; its change-level review is still asked, and it must be a review of
+this code (the review records the code tree it saw): a brief edited after the
+approval needs a new review, and so does a review of other code, as when the
+same brief is approved again over code that came after the review. An approval
+with no recorded tree (written before 0.37) follows the rule above.
+
 ### Audit records (`canon evidence audit`)
 
 canon never generates or runs an audit. An external evaluator does, and

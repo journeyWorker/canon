@@ -189,7 +189,7 @@ pub(crate) fn run_search(args: SearchArgs) -> ExitCode {
         Err(code) => return code,
     };
     let kinds: Vec<String> = kind.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
-    let found = index.seeds(query, &kinds, limit as usize).and_then(|(seeds, matched)| expand_from(&index, &seeds, expand as usize).map(|(neighbors, edges)| (seeds, matched, neighbors, edges)));
+    let found = index.seeds(query, &kinds, usize::try_from(limit).unwrap_or(usize::MAX)).and_then(|(seeds, matched)| expand_from(&index, &seeds, expand as usize).map(|(neighbors, edges)| (seeds, matched, neighbors, edges)));
     let (seeds, matched, neighbors, edges) = match found {
         Ok(found) => found,
         Err(error) => return index_failed(command, json, &error),

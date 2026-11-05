@@ -23,7 +23,7 @@ pub struct DispatchBeginArgs {
     #[arg(long, value_parser = crate::retrieve::parse_regime, value_name = "KEY")]
     pub regime: RegimeKey,
     /// The dispatching agent's id (recorded as the run's actor)
-    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,

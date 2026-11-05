@@ -1,9 +1,10 @@
-//! `canon-0-36-claim-1-4` (scenarios `atip.claim14.01-16`): canon declares atip/1 1.4 and writes `canon schema` in the 1.4 form, against the built binary.
+//! `canon-0-36-claim-1-4` (scenarios `atip.claim14.01-16`): canon declared atip/1 1.4 and writes `canon schema` in the 1.4 form, against the built binary. `canon-0-37-claim-1-5` moved the declaration to 1.5 and
+//! the form is the same at 1.5 (contract 15.1): these tests hold the declaration to `MINOR`.
 //!
-//! The 1.4 form (contract 5.1, 9, 15.7): every envelope says `contractVersion` `1.4` and the tree `level` `L2`; the tree defines the shared options once
+//! The 1.4 form (contract 5.1, 9, 15.7): every envelope says `contractVersion` `MINOR` (1.5) and the tree `level` `L2`; the tree defines the shared options once
 //! and carries no `path`, no `kind: "command"` and no member at its default; a command document is the call surface only (no `schemas`, `path`,
 //! `input.schemaRef`, `input.option`, `rejects`, no implied option or code); `schema <COMMAND> --schemas` answers the schemas, the derived `Input` and the
-//! `rejects`; every JSON document is compact. The consumers (guides, website, evals, conformance, generated spec) and the CI configuration say 1.4, and the
+//! `rejects`; every JSON document is compact. The consumers (guides, website, evals, conformance, generated spec) and the CI configuration say the declared minor, and the
 //! CHANGELOG entry states the measured sizes.
 //!
 //! The checks that seeded faults must trip are small pure functions over text or `serde_json::Value` in this file (`form_problems`, `whitespace_problems`,
@@ -19,7 +20,8 @@ use std::sync::{LazyLock, Mutex};
 use serde_json::{json, Map, Value};
 use tempfile::TempDir;
 
-const MINOR: &str = "1.4";
+/// The minor canon declares: 1.4 in 0.36 (`canon-0-36-claim-1-4`), 1.5 since `canon-0-37-claim-1-5`. The form of the documents is the 1.4 form at both.
+const MINOR: &str = "1.5";
 
 // ---------------------------------------------------------------------------
 // Running the binary.
@@ -635,7 +637,7 @@ fn compile_problems(name: &str, schemas: &Map<String, Value>) -> Vec<String> {
 // ---------------------------------------------------------------------------
 // The consumers (spec 15.7): what the guides, pages, scripts and expectations say about the declaration and the form.
 
-/// The version spelled right after `needle`'s end in `rest`, past quotes, colons, `=` and the contract's name, when it is `1.0`-`1.3`.
+/// The version spelled right after `needle`'s end in `rest`, past quotes, colons, `=` and the contract's name, when it is `1.0`-`1.4`.
 fn old_minor_after(rest: &str) -> Option<String> {
     let skip = |text: &str| text.trim_start_matches([' ', '`', '"', '\'', ':', '=', '\\']).to_string();
     let mut rest = skip(rest);
@@ -643,11 +645,11 @@ fn old_minor_after(rest: &str) -> Option<String> {
         rest = skip(after);
     }
     let bytes = rest.as_bytes();
-    let is_old = bytes.len() >= 3 && &bytes[..2] == b"1." && (b'0'..=b'3').contains(&bytes[2]) && bytes.get(3).is_none_or(|next| !next.is_ascii_digit());
+    let is_old = bytes.len() >= 3 && &bytes[..2] == b"1." && (b'0'..=b'4').contains(&bytes[2]) && bytes.get(3).is_none_or(|next| !next.is_ascii_digit());
     is_old.then(|| rest[..3].to_string())
 }
 
-/// The versions below 1.4 that `line` spells as the declaration: after `contractVersion`, `--contract`, `claims` and `declares`.
+/// The versions below 1.5 that `line` spells as the declaration: after `contractVersion`, `--contract`, `claims` and `declares`.
 fn old_declarations(line: &str) -> Vec<String> {
     let mut found = Vec::new();
     for needle in ["contractVersion", "--contract", "claims", "declares", "declaring"] {
@@ -693,7 +695,7 @@ fn old_form_member(line: &str) -> Option<&'static str> {
     None
 }
 
-/// Every stale sentence of one text file: a declaration below 1.4, and (in prose, not in data files) a member of the old form stated as current.
+/// Every stale sentence of one text file: a declaration below 1.5, and (in prose, not in data files) a member of the old form stated as current.
 fn consumer_problems(path: &str, text: &str) -> Vec<String> {
     let data_file = path.ends_with(".json") || path.ends_with(".out");
     let mut found = Vec::new();
@@ -908,9 +910,11 @@ fn changelog_problems(text: &str, live: &BTreeMap<String, Vec<usize>>) -> Vec<St
             found.push(format!("the size row `{name}` has no two plain integers: {row}"));
             continue;
         };
+        // The entry states the sizes measured on the 0.36.0 build. The patterns of this build are shorter (`canon-0-37-claim-1-5`), so a live answer is not larger
+        // than the stated size and lies within a tenth of it.
         match live.get(name) {
-            Some(sizes) if sizes.contains(&after) => {}
-            Some(sizes) => found.push(format!("the size row `{name}` states {after} bytes for 1.4, the live measure is {sizes:?}")),
+            Some(sizes) if sizes.iter().any(|size| *size <= after && after - *size <= after / 10) => {}
+            Some(sizes) => found.push(format!("the size row `{name}` states {after} bytes for 1.4 (0.36.0), the live measure is {sizes:?}: it is larger or more than a tenth smaller")),
             None => found.push(format!("no live measure for `{name}`")),
         }
         // A command document is smaller; the tree may grow (it holds the shared options); a sum may grow, with its reason.
@@ -993,7 +997,7 @@ fn complete_entry(live: &BTreeMap<String, Vec<usize>>) -> String {
 // atip.claim14.01 - 02 (F1)
 
 #[test]
-fn atip_claim14_01_every_envelope_says_1_4_and_the_tree_says_l2_with_shared_options() {
+fn atip_claim14_01_every_envelope_says_1_5_and_the_tree_says_l2_with_shared_options() {
     let dir = repo();
     let at = dir.path();
     let calls: [&[&str]; 7] = [
@@ -1402,7 +1406,7 @@ fn atip_claim14_10_the_whitespace_check_finds_formatted_documents_and_accepts_st
 // atip.claim14.11 - 12 (F5)
 
 #[test]
-fn atip_claim14_11_the_consumers_declare_1_4_and_state_no_old_form_member_as_current() {
+fn atip_claim14_11_the_consumers_declare_1_5_and_state_no_old_form_member_as_current() {
     let root = root();
     let mut scanned = 0;
     let mut declared_current = 0;
@@ -1421,17 +1425,17 @@ fn atip_claim14_11_the_consumers_declare_1_4_and_state_no_old_form_member_as_cur
         assert!(seen.contains(needed), "the scan read `{needed}`");
     }
     assert!(seen.iter().any(|path| path.starts_with("canon/skills/")) && seen.iter().any(|path| path.starts_with("evals/")) && seen.iter().any(|path| path.starts_with("conformance/cases/")), "the scan read the guides, the evals and the conformance expectations");
-    assert!(declared_current > 20, "the scan sees the spellings of the declaration as 1.4 ({declared_current})");
+    assert!(declared_current > 20, "the scan sees the spellings of the declaration as {MINOR} ({declared_current})");
     assert!(found.is_empty(), "stale consumer text:\n{}", found.join("\n"));
 }
 
 #[test]
-fn atip_claim14_12_the_consumer_scan_finds_a_declaration_below_1_4_and_a_stated_old_form_member() {
+fn atip_claim14_12_the_consumer_scan_finds_a_declaration_below_1_5_and_a_stated_old_form_member() {
     let stale = [
         ("1.2", "canon declares `\"contractVersion\": \"1.2\"` on every envelope"),
-        ("1.3", "and `just atip-deep` runs `atip check --level L2 --contract 1.3 --deep`"),
+        ("1.4", "and `just atip-deep` runs `atip check --level L2 --contract 1.4 --deep`"),
         ("1.1", "{\"meta\":{\"contractVersion\":\"1.1\"}}"),
-        ("1.2", "canon claims atip/1 1.2 at L2"),
+        ("1.4", "canon claims atip/1 1.4 at L2"),
         ("1.3", "The tree declares contractVersion=1.3."),
     ];
     for (version, line) in stale {
@@ -1439,7 +1443,7 @@ fn atip_claim14_12_the_consumer_scan_finds_a_declaration_below_1_4_and_a_stated_
         assert_found(&format!("the declaration {version} in `{line}`"), &found, "declares");
         assert!(found.iter().any(|problem| problem.contains(version)), "the finding names {version}: {found:?}");
     }
-    for line in ["canon declares `\"contractVersion\": \"1.4\"` on every envelope", "runs `atip check --level L2 --contract 1.4 --deep`", "canon claims atip/1 1.4 at L2", "the schema `1.2` of a report is not the declaration", "{\"schemaVersion\":\"1.2\"}"] {
+    for line in ["canon declares `\"contractVersion\": \"1.5\"` on every envelope", "runs `atip check --level L2 --contract 1.5 --deep`", "canon claims atip/1 1.5 at L2", "the schema `1.2` of a report is not the declaration", "{\"schemaVersion\":\"1.2\"}"] {
         assert_eq!(consumer_problems("guide.md", line), Vec::<String>::new(), "`{line}` is no stale declaration");
     }
     let members = [
@@ -1478,7 +1482,7 @@ fn read(path: &str) -> String {
 const FIXTURE: &str = "crates/canon-cli/tests/atip/canon.fixture.json";
 
 #[test]
-fn atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_on_1_4() {
+fn atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_on_1_5() {
     let workflow = read(".github/workflows/test.yml");
     let justfile = read("justfile");
     let fixture: Value = serde_json::from_str(&read(FIXTURE)).expect("the fixture is JSON");
@@ -1496,25 +1500,25 @@ fn atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_
     // Lowering one of them fails the agreement.
     let one = |value: &str| vec![value.to_string()];
     let lowered = [
-        minor_problems("1.3", &fixture_minor, &ci, &atip, &deep),
-        minor_problems(declared, "1.3", &ci, &atip, &deep),
-        minor_problems(declared, &fixture_minor, &one("1.3"), &atip, &deep),
-        minor_problems(declared, &fixture_minor, &ci, &one("1.3"), &deep),
-        minor_problems(declared, &fixture_minor, &ci, &atip, &one("1.3")),
+        minor_problems("1.4", &fixture_minor, &ci, &atip, &deep),
+        minor_problems(declared, "1.4", &ci, &atip, &deep),
+        minor_problems(declared, &fixture_minor, &one("1.4"), &atip, &deep),
+        minor_problems(declared, &fixture_minor, &ci, &one("1.4"), &deep),
+        minor_problems(declared, &fixture_minor, &ci, &atip, &one("1.4")),
     ];
     let named = ["DECLARED_MINOR", "fixture", "CI job", "`atip`", "`atip-deep`"];
     for (problems, name) in lowered.iter().zip(named) {
-        assert_found(&format!("{name} lowered to 1.3"), problems, name);
+        assert_found(&format!("{name} lowered to 1.4"), problems, name);
         assert_eq!(problems.len(), 1, "only the lowered one is found: {problems:?}");
     }
     assert_found("a missing declaration", &minor_problems(declared, &fixture_minor, &[], &atip, &deep), "gives no minor");
     // The readers of the files find a lowered value too.
-    assert_eq!(contracts_in(&job_block(&workflow.replace("--contract 1.4", "--contract 1.3"), "atip")), vec!["1.3".to_string()]);
-    assert_eq!(contracts_in(&recipe(&justfile.replace("--contract 1.4", "--contract 1.3"), "atip-deep").1), vec!["1.3".to_string()]);
+    assert_eq!(contracts_in(&job_block(&workflow.replace("--contract 1.5", "--contract 1.4"), "atip")), vec!["1.4".to_string()]);
+    assert_eq!(contracts_in(&recipe(&justfile.replace("--contract 1.5", "--contract 1.4"), "atip-deep").1), vec!["1.4".to_string()]);
 }
 
 #[test]
-fn atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_4_with_the_fixture() {
+fn atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fixture() {
     let workflow = read(".github/workflows/test.yml");
     let justfile = read("justfile");
     let job = job_block(&workflow, "atip");
@@ -1531,14 +1535,14 @@ fn atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_4_with_the_fi
         assert!(tokens.join(" ").contains("--bin {{ target }}/debug/canon") || value_after(&tokens, "--bin").is_some_and(|bin| bin.ends_with("debug/canon")), "{what} runs the built canon: {tokens:?}");
     }
     // The checker's tag is the same in the job (install and cache key) and in the recipe that installs it.
-    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.1.4")), "the job installs the checker at atip-check-v0.1.4");
-    assert!(job.iter().any(|line| line.contains("key:") && line.contains("atip-check-v0.1.4")), "the cache key of the checker names its tag");
+    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.2.0")), "the job installs the checker at atip-check-v0.2.0");
+    assert!(job.iter().any(|line| line.contains("key:") && line.contains("atip-check-v0.2.0")), "the cache key of the checker names its tag");
     let (_, install) = recipe(&justfile, "atip-install");
-    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.1.4")), "`just atip-install` installs the checker at atip-check-v0.1.4");
+    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.2.0")), "`just atip-install` installs the checker at atip-check-v0.2.0");
     // `just ci` includes the deep run.
     let (ci_header, _) = recipe(&justfile, "ci");
     assert!(ci_header.split_whitespace().skip(1).any(|dependency| dependency == "atip-deep"), "`just ci` depends on atip-deep: {ci_header}");
-    // The fixture claims 1.4 and is the file the commands name.
+    // The fixture claims the declared minor and is the file the commands name.
     let fixture: Value = serde_json::from_str(&read(FIXTURE)).expect("the fixture is JSON");
     assert_eq!(fixture["contractVersion"], MINOR, "the fixture claims {MINOR}");
     // The fixture holds what the checks read.
@@ -1583,8 +1587,10 @@ fn atip_claim14_16_the_entry_check_fails_when_the_table_a_size_row_or_the_caller
     let no_mention = complete.replace("1.3 schemas", "older schemas");
     assert_found("a callers paragraph that does not mention 1.3", &changelog_problems(&no_mention, &live), "1.3");
     let with_row = |name: &str, before: &str, after: usize| complete.lines().map(|line| if line.starts_with(&format!("| {name} |")) { format!("| {name} | {before} | {after} |") } else { line.to_string() }).collect::<Vec<_>>().join("\n");
-    let wrong = with_row("schema purge", "4,000", live["schema purge"][0] + 1);
-    assert_found("a stated size that is not the live one", &changelog_problems(&wrong, &live), "live measure");
+    let wrong = with_row("schema purge", "4,000", live["schema purge"][0] * 2);
+    assert_found("a stated size far above the live one", &changelog_problems(&wrong, &live), "live measure");
+    let below = with_row("schema purge", "4,000", live["schema purge"][0] - 1);
+    assert_found("a stated size below the live one", &changelog_problems(&below, &live), "live measure");
     let larger = with_row("schema purge", "2,999", live["schema purge"][0]);
     assert_found("a size that is not smaller than the 1.3 size", &changelog_problems(&larger, &live), "not smaller");
     let grown = with_row("schema (tree) + purge", "1", live["schema (tree) + purge"][0]);

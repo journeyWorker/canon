@@ -48,12 +48,12 @@ Feature: finding close
   @subject:finding-lifecycle
   @case:happy
   @finding.close.05
-  Scenario: A fix that did not hold reopens the finding
+  Scenario: A fix that did not hold is a new finding, and closing a finding to open is refused
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a committed finding whose current disposition is fixed
     When it is closed to open
-    Then the transition is admitted
-    And the corpus reports that finding open again
+    Then the command is refused as a usage error naming --disposition and the three dispositions that close a finding
+    And nothing is staged or committed, and the defect that came back is raised as a new finding
 
   @subject:finding-lifecycle
   @case:edge
@@ -179,9 +179,9 @@ Feature: finding close
   @case:happy
   @flow:canon-0-30-record-links.F1
   @finding.close.88
-  Scenario: Closing or reopening a finding copies its review id and its unknown mark
+  Scenario: Closing a finding twice copies its review id and its unknown mark
     Given a committed finding that carries a review id and the unknown mark
-    When it is closed fixed and then reopened
+    When it is closed fixed and then closed rejected
     Then each new version carries the same review id and the same unknown mark
     And promote accepts each as a disposition transition, because neither field is allowed to change in one
 
@@ -190,8 +190,8 @@ Feature: finding close
   @case:edge
   @flow:canon-0-30-record-links.F2
   @finding.close.89
-  Scenario: A blocker written before 0.30 with neither field still closes and reopens
+  Scenario: A blocker written before 0.30 with neither field still closes twice
     Given a committed blocker written by 0.29 with neither `introduced_by` nor the unknown mark
-    When it is closed fixed and then reopened
+    When it is closed fixed and then closed rejected
     Then both transitions succeed
     And the new versions carry neither field

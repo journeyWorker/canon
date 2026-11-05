@@ -110,7 +110,8 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     assert!(out.status.success(), "{}", stderr(&out));
     let brief = std::fs::read_to_string(brief_path(repo)).unwrap();
     let line = brief.lines().find(|l| l.starts_with("Approved:")).expect("the approval line is written");
-    assert!(line.starts_with("Approved: Ana ") && line.contains(" — \"Go. Ship the failure flow too.\" (brief sha256:"), "{line}");
+    assert!(line.starts_with("Approved: Ana ") && line.contains(" — \"Go. Ship the failure flow too.\" (code tree ") && line.contains(") (brief sha256:"), "{line}");
+    assert!(canon_cli::brief::approval_tree(line).is_some(), "0.37: the approval records the code tree of the git repo: {line}");
     assert_eq!(brief.matches("Approved:").count(), 1);
     assert!(repo.join(".canon/policy.approval.json").is_file(), "the policy approval is recorded in the same call");
     assert!(status_text(repo).contains("brief: approved in .canon/changes/add-login/brief.md"), "{}", status_text(repo));

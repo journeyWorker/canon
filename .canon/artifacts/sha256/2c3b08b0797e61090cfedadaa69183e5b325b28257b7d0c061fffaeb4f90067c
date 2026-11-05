@@ -1,0 +1,6 @@
+ Nextest run ID 7e6ba228-ff1f-4a9f-a474-decf71a785af with nextest profile: default
+    Starting 3817 tests across 210 binaries (2 tests skipped)
+     Summary [ 678.072s] 3817 tests run: 3817 passed (23 slow), 2 skipped
+real	11m24.245s
+user	37m25.581s
+sys	9m44.058s

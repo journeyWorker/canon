@@ -88,17 +88,17 @@ live:
 
 # Install the checker canon is held to: the atip repo's `atip check`, at the tag the CI job `atip` installs.
 atip-install:
-    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.1.4 atip-check --locked
+    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.2.0 atip-check --locked
 
-# atip check on the canon binary, interface checks only (seconds): L2, contract 1.4. Needs the checker: `just atip-install`.
+# atip check on the canon binary, interface checks only (seconds): L2, contract 1.5. Needs the checker: `just atip-install`.
 atip:
     cargo build --locked -p canon-cli
-    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.4 --fixture crates/canon-cli/tests/atip/canon.fixture.json
+    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.5 --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # The same with `--deep` (declaration against behaviour, about two minutes): what CI's `atip` job runs; run it once before a release.
 atip-deep:
     cargo build --locked -p canon-cli
-    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.4 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
+    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.5 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # Every CI check that needs no docker.
 ci: release-check lint test gate launcher platformer atip-deep

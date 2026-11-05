@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-claim-1-5",
+    "role": "reviewer",
+    "session_id": "s-0-37-claim15-rev"
+  },
+  "at": "2026-11-05T13:41:26.995994Z",
+  "code_tree": "a50d9de6eec3d1bdba2244a9908f12a31be06ade",
+  "kind": "review",
+  "pin": "64924a3a7cc5f0535e51272b01b53e07f0d5f3da",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claim15_15_the_entry_check_fails_when_the_table_a_length_or_the_callers_paragraph_is_missing"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "1f5aa9c9690b3e4cd363a665478bb6fdef30e7545a26d769ba83c3ebcadadd0c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-37-claim-1-5/brief.md"
+  },
+  "review_id": "01M6NZ2STK1KWC4N4BK5GAG67F",
+  "reviewer": "rev-0-37-claim-1-5",
+  "scenario_id": "atip.claim15.15",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -13,6 +13,11 @@ use harness::{canon_in, fixture, leaf, leaves, options};
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
+/// The minor canon declares, which the crate's checks of a pattern and of a document take.
+fn declared() -> atip::Minor {
+    atip::Minor::parse(canon_cli::json_out::DECLARED_MINOR).expect("the declared minor is one the crate knows")
+}
+
 fn names(rule: &Value) -> Vec<&str> {
     rule["names"].as_array().into_iter().flatten().filter_map(Value::as_str).collect()
 }
@@ -122,7 +127,7 @@ fn atip_constraints_02_a_relation_stated_twice_is_found_and_a_broken_pair_names_
     };
     let options = [flag("a"), flag("b")];
     let twice = [Rule::at_most_one(&["a", "b"]).doc(), Rule::at_most_one(&["b", "a"]).doc()];
-    let problems = document_problems(&options, &[], &twice, &[], &["USAGE".to_string()], &[]);
+    let problems = document_problems(&options, &[], &twice, &[], &["USAGE".to_string()], &[], declared());
     assert!(problems.iter().any(|problem| problem.contains("stated twice")), "{problems:?}");
 }
 
@@ -168,7 +173,7 @@ fn atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults() {
                 "string" => ValueType::String,
                 other => panic!("`{}` --{}: a {other} has a domain", doc["command"], argument["name"]),
             };
-            for problem in atip::domain::profile_problems(value_type, domain) {
+            for problem in atip::domain::profile_problems(value_type, domain, declared()) {
                 problems.push(format!("`{}` {}: {problem}", doc["command"], argument["name"]));
             }
             let defaults: Vec<&Value> = match &argument["default"] {
@@ -201,12 +206,17 @@ fn atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults() {
         domain: Some(domain),
         help: "h".to_string(),
     };
-    let found = |options: &[OptionDoc]| document_problems(options, &[], &[], &[], &["USAGE".to_string()], &[]);
+    let found = |options: &[OptionDoc]| document_problems(options, &[], &[], &[], &["USAGE".to_string()], &[], declared());
     assert!(found(&[option(json!({ "minimum": 1 }), json!(0), ValueType::Integer)]).iter().any(|problem| problem.contains("default")));
     assert!(found(&[option(json!({ "pattern": "^a|b$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("| outside parentheses")));
     assert!(found(&[option(json!({ "pattern": "^\\d+$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("not I-Regexp")));
     assert!(found(&[option(json!({ "minLength": 1 }), Value::Null, ValueType::Integer)]).iter().any(|problem| problem.contains("outside the domain profile")));
     assert!(found(&[option(json!({ "minimum": 9_007_199_254_740_992_i64 }), Value::Null, ValueType::Integer)]).iter().any(|problem| problem.contains("safe integer")));
+    // Canon declares 1.5, where a pattern may use the white space property (Annex V2, spec 15.7): it is no problem. A document that declares 1.4 may not: it is one.
+    assert!(found(&[option(json!({ "pattern": "^\\p{White_Space}$" }), Value::Null, ValueType::String)]).is_empty());
+    let at_1_4 = document_problems(&[option(json!({ "pattern": "^\\p{White_Space}$" }), Value::Null, ValueType::String)], &[], &[], &[], &["USAGE".to_string()], &[], atip::Minor::parse("1.4").expect("the crate knows 1.4"));
+    assert!(at_1_4.iter().any(|problem| problem.contains("{White_Space} is since 1.5") && problem.contains("declares contract 1.4")), "{at_1_4:?}");
+    assert!(found(&[option(json!({ "pattern": "^\\s+$" }), Value::Null, ValueType::String)]).iter().any(|problem| problem.contains("not I-Regexp")), "`\\s` is a problem at the minor canon declares too");
     assert!(found(&[option(json!({ "minimum": 1 }), json!(1), ValueType::Integer)]).is_empty());
 }
 
@@ -221,7 +231,7 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
         ("CHANGE_ID", arg_rules::KEBAB, "abz019-- #.", |s| ChangeId::parse(s).is_ok()),
         ("SUBJECT_ID", arg_rules::KEBAB, "abz019-- #.", |s| SubjectId::parse(s).is_ok()),
         ("ROLE", arg_rules::KEBAB, "abz019-- #.", |s| RoleId::parse(s).is_ok()),
-        ("PROJECT_ID", arg_rules::PROJECT_ID, "abz019-- #.", |s| ProjectId::parse(s).is_ok()),
+        ("PROJECT_ID", arg_rules::KEBAB, "abz019-- #.", |s| ProjectId::parse(s).is_ok()),
         ("SCENARIO_ID", arg_rules::SCENARIO_ID, "abz019-..#_", |s| ScenarioId::parse(s).is_ok()),
         ("TASK_ID", arg_rules::TASK_ID, "abz019-#..", |s| TaskId::parse(s).is_ok()),
         ("RUN_ID", arg_rules::ULID, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefilou", |s| RunId::parse(s).is_ok()),
@@ -237,7 +247,7 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
     };
     let mut problems = Vec::new();
     for (name, pattern, alphabet, accepts) in kinds {
-        assert_eq!(atip::domain::pattern_problem(pattern), None, "{name}");
+        assert_eq!(atip::domain::pattern_problem(pattern, declared()), None, "{name}");
         let alphabet: Vec<char> = alphabet.chars().collect();
         let ulid = matches!(name, "RUN_ID" | "REVIEW_ID");
         let compiled = atip::domain::compile(&json!({ "pattern": pattern })).expect("the pattern compiles");
@@ -255,6 +265,12 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
                 if parsed && !admitted {
                     problems.push(format!("{name}: the parser accepts {candidate:?} and the pattern refuses it"));
                 }
+            } else if name == "PROJECT_ID" {
+                // The option is narrower than the model's grammar of a spec root id (0.37, `canon-0-37-option-values`): the pattern is the kebab slug,
+                // every value it admits the parser accepts, and the parser also takes `a-` and `a--b` (the ids of a `canon.yaml` written before).
+                if admitted && !parsed {
+                    problems.push(format!("{name}: the pattern admits {candidate:?} and the parser refuses it"));
+                }
             } else if parsed != admitted {
                 problems.push(format!("{name}: the parser says {parsed} and the pattern {admitted} for {candidate:?}"));
             }
@@ -264,11 +280,20 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
     assert!(problems.is_empty(), "{} problems, the first ten:\n{}", problems.len(), problems.iter().take(10).cloned().collect::<Vec<_>>().join("\n"));
 }
 
-/// atip.constraints.06: the time pattern admits everything the parser accepts (it states the shape; the calendar is a validator's).
+/// atip.constraints.06: the time patterns are the shape the parsers read (the calendar is a validator's): each pattern admits everything its parser accepts, and
+/// refuses nothing of the parser's but a date or a time that is not on the calendar (0.37: RFC 3339 only).
 #[test]
 fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
-    let pattern = canon_cli::arg_rules::TIMESTAMP;
-    assert_eq!(atip::domain::pattern_problem(pattern), None);
+    for (pattern, parse) in [
+        (canon_cli::arg_rules::TIMESTAMP, canon_cli::timestamp::parse as fn(&str) -> Result<chrono::DateTime<chrono::Utc>, canon_cli::timestamp::TimestampError>),
+        (canon_cli::arg_rules::DATE_TIME, canon_cli::timestamp::parse_date_time),
+    ] {
+        time_pattern_is_the_shape(pattern, parse);
+    }
+}
+
+fn time_pattern_is_the_shape(pattern: &str, parse: fn(&str) -> Result<chrono::DateTime<chrono::Utc>, canon_cli::timestamp::TimestampError>) {
+    assert_eq!(atip::domain::pattern_problem(pattern, declared()), None);
     let alphabet: Vec<char> = "0123456789-:TtZz+ .\u{2212}\u{a0}\n".chars().collect();
     let mut state = 0x9E37_79B9_7F4A_7C15_u64;
     let mut next = move |bound: usize| {
@@ -279,7 +304,7 @@ fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
     };
     let compiled = atip::domain::compile(&json!({ "pattern": pattern })).expect("the pattern compiles");
     let mut problems = Vec::new();
-    let mut seeds: Vec<String> = ["2030-01-01", "2030-1-1", " 2030-01-01", "2030-01-01T10:00:00Z", "2030-01-01t10:00:00z", "2030-01-01 10:00:00+02:00", "2030-01-01T10:00:00.123456789\u{2212}02:00", "0001-01-01T00:00:00+00:00", "2030-01-01T10:00:60Z", "+2030-01-01", "-0001-01-01", "99999-12-31", "2030-01-01T24:00:00Z"].iter().map(ToString::to_string).collect();
+    let mut seeds: Vec<String> = ["2030-01-01", "2030-1-1", " 2030-01-01", "2030-01-01T10:00:00Z", "2030-01-01t10:00:00z", "2030-01-01 10:00:00+02:00", "2030-01-01T10:00:00.123456789\u{2212}02:00", "2030-01-01T10:00:00.123456789-02:00", "0001-01-01T00:00:00+00:00", "2030-01-01T10:00:60Z", "+2030-01-01", "-0001-01-01", "99999-12-31", "2030-01-01T24:00:00Z", "2026-02-30", "2026-02-30T10:00:00Z", "2030-01-01T10:00:00+24:00"].iter().map(ToString::to_string).collect();
     for _ in 0..60_000 {
         let length = 6 + next(26);
         seeds.push((0..length).map(|_| alphabet[next(alphabet.len())]).collect());
@@ -299,10 +324,18 @@ fn atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts() {
     }
     let mut accepted = 0;
     for candidate in seeds {
-        if canon_cli::timestamp::parse(&candidate).is_ok() {
+        let parsed = parse(&candidate);
+        let admitted = compiled.admits(&json!(candidate));
+        if parsed.is_ok() {
             accepted += 1;
-            if !compiled.admits(&json!(candidate)) {
+            if !admitted {
                 problems.push(format!("the parser accepts {candidate:?} and the pattern refuses it"));
+            }
+        }
+        // What the pattern admits and the parser refuses is a date or a time that does not exist, which the calendar's refusal says (it has a cause).
+        if let (true, Err(error)) = (admitted, &parsed) {
+            if std::error::Error::source(error).is_none() {
+                problems.push(format!("the pattern admits {candidate:?} and the parser refuses its spelling"));
             }
         }
     }
@@ -419,7 +452,7 @@ fn atip_constraints_11_a_sixty_four_bit_integer_outside_the_safe_range_is_refuse
         assert_eq!(result.body["error"]["code"], "USAGE", "{}", result.body);
     }
     // Failure path: a domain bound above the safe range is found by the profile check.
-    assert!(!atip::domain::profile_problems(ValueType::Integer, &json!({ "maximum": 9_007_199_254_740_992_i64 })).is_empty());
+    assert!(!atip::domain::profile_problems(ValueType::Integer, &json!({ "maximum": 9_007_199_254_740_992_i64 }), declared()).is_empty());
 }
 
 fn options_of(doc: &Value) -> &Vec<Value> {
@@ -484,12 +517,14 @@ fn atip_constraints_14_a_relayed_approval_is_a_relation_with_its_validators_and_
         // The environment is not "given" for a constraint: `--actor` still requires `--relayed-via` as a rule.
         assert!(rules(doc, "requires").iter().any(|rule| rule["if"]["name"] == "actor" && rule["then"] == json!(["relayed-via"])), "`{command}`: {:?}", doc["constraints"]);
     }
-    // The human's own answer has a code of its own, and no domain claims one code for both paths.
+    // The name of the human has one domain, and the code of the human's own answer is its code on both paths (0.37: a blank name under `--relayed-via` was `USAGE`);
+    // the words, `--note`, have no domain: the code depends on `--relayed-via`, so a validator holds each.
     let brief = leaf("brief approve");
-    assert!(validator_of(brief, &["approver", "note"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
-    assert!(validator_of(leaf("policy approve"), &["approver"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
-    for (command, argument) in [("brief approve", "approver"), ("brief approve", "note"), ("policy approve", "approver")] {
-        assert!(harness::option(leaf(command), argument).expect("the option").get("domain").is_none(), "`{command}` --{argument} has a domain");
+    assert!(validator_of(brief, &["note"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
+    assert!(harness::option(brief, "note").expect("--note").get("domain").is_none(), "`brief approve` --note has a domain");
+    for command in ["brief approve", "policy approve"] {
+        assert!(harness::option(leaf(command), "approver").expect("--approver")["domain"]["pattern"].is_string(), "`{command}` --approver has the domain of a name");
+        assert_eq!(canon_cli::arg_rules::domain_for(command, "approver", Some("NAME")).map(|row| row.code), Some("APPROVAL_INVALID"), "`{command}`");
     }
 }
 
@@ -510,7 +545,8 @@ fn atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refuse
         let base = format!("{command} --approver alice --note ok --relayed-via ask {extra}");
         check(&format!("{base} --actor impl"), &[], "USAGE", "--relayed-via");
         check(&base, &[("CANON_ROLE", "implementer")], "USAGE", "--actor");
-        check(&format!("{base} --as implementer --actor impl --approver \" \""), &[], "USAGE", "--approver");
+        // A blank name is the domain of `--approver` (0.37), whichever path the call is on: the human's own code.
+        check(&format!("{command} --note ok --relayed-via ask {extra} --as implementer --actor impl --approver \" \""), &[], "APPROVAL_INVALID", "--approver");
         check(&format!("{base} --as implementer --actor impl --note \" \""), &[], "USAGE", "--note");
         // The environment is a stateless input: CANON_ACTOR and CANON_ROLE fill them, and the call goes on to the repository (`CONFIG_REQUIRED`).
         let outcome = rule_support::run_empty_with(&words(&base), &[("CANON_ROLE", "implementer"), ("CANON_ACTOR", "impl")]);
@@ -667,11 +703,12 @@ fn atip_constraints_21_a_negative_integer_names_its_option_and_minus_zero_is_zer
         assert_refused(&empty(line, Some("implementer")), "USAGE", field);
     }
     // `-0` is the integer 0: accepted where 0 is, refused for the minimum where it is not.
-    for line in ["canon ingest sessions --interval-secs -0 --dry-run", "canon retrieve --for-role reviewer --domain dev --limit -0", "canon ingest sessions --interval-secs +0 --dry-run"] {
+    for line in ["canon ingest sessions --interval-secs -0 --dry-run", "canon ingest sessions --interval-secs +0 --dry-run"] {
         let outcome = empty(line, Some("implementer"));
         assert_ne!(outcome.code.as_deref(), Some("USAGE"), "{line}: {outcome:?}");
     }
     assert_refused(&empty("canon query --kind change --limit -0", None), "USAGE", "--limit");
+    assert_refused(&empty("canon retrieve --for-role reviewer --domain dev --limit -0", Some("implementer")), "USAGE", "--limit");
     // The edge of the safe range with a space: accepted; one above, refused.
     assert_ne!(empty("canon query --kind change --limit 9007199254740991", None).code.as_deref(), Some("USAGE"));
     assert_refused(&empty("canon query --kind change --limit 9007199254740992", None), "USAGE", "--limit");
@@ -735,7 +772,9 @@ fn atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_
 fn atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and_the_constraints() {
     let implementer = Some("implementer");
     // A broken constraint (the four approval options go together) and an impossible date: the constraint answers.
-    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-30", implementer), "EVIDENCE_APPROVAL_REQUIRED", "--approval-role");
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-30T10:00:00Z", implementer), "EVIDENCE_APPROVAL_REQUIRED", "--approval-role");
+    // A date alone is no date-time: the domain of `--approval-at` refuses it before the constraint (0.37).
+    assert_refused(&empty("canon evidence add --scenario auth.login.01 --class test-run --ref r --approver alice --approval-at 2026-02-01", implementer), "USAGE", "--approval-at");
     // A broken domain (the shape of a time) before the calendar, a calendar when nothing else is broken.
     assert_refused(&empty("canon query --kind change --since tomorrow", None), "USAGE", "--since");
     let shape = empty("canon query --kind change --since tomorrow", None);

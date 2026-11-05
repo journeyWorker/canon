@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-values",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-values-rev"
+  },
+  "at": "2026-11-05T17:34:13.125117Z",
+  "change_id": "canon-0-37-option-values",
+  "code_tree": "965fd3dccd1265f6e584194abb2cb5cd4fbece70",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "kind": "finding",
+  "reason": "fixed in 95c690e47, verified on the real binary at bcdd902d1",
+  "resolution_code_tree": "6c821ebc0206bfdb9c42effe7b848374defa9e37",
+  "resolution_sha": "95c690e4732859ae66b4158c00ca0c0c53ed6c19",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "reviewer": "rev-0-37-option-values",
+  "round": 1,
+  "scenario_ids": [
+    "atip.optionvalues.06"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "The entry for the trimmed values reads 'a rollback signed over a padded reason signs the trimmed one', which hides the consequence. Real binary, strategy rollback with a padded reason: a signature over sha256 of the padded reason is STRATEGY_SIGNATURE_INVALID in 0.37 (it verified in 0.36.0), a signature over the trimmed reason verifies with either spelling, and the recorded reason is the trimmed one. State that a signer hashes the trimmed reason. The same entry also says only the approver of evidence add and evidence approval-payload was refused for white space: 0.36.0 also refused a padded or tab-wrapped evidence add --actor, --summary, --override-reason, finding add --actor and --summary, subject move --reason and --override-reason, and --relayed-via ' ask ' (USAGE), which 0.37 takes trimmed. A loosening, not a break; name it. Also canon_learn::rollback_strategy_authenticated hashes whatever it is given: the trim lives only in the CLI parser.",
+  "worktree_dirty": false
+}

@@ -342,7 +342,9 @@ canon evidence add --input '[{"scenario":"auth.login.01","class":"test-run","ref
    latest evidence was recorded on a different `codeTree` than the current
    code (`code.exclude` in `canon.yaml` decides what is not code; the default
    is `docs/**` and `*.md`). A docs-only chore needs its change-level review
-   alone. When code did change, the shipping refusal, `status` and
+   alone, and so does a chore whose approval recorded the code tree that is
+   still the current one (`(code tree <id>)` in its `Approved:` line; `status`
+   says so): it asks for no evidence at all. When code did change, the shipping refusal, `status` and
    `meta.next` lead with one command over every report, with the real paths
    (`--project <id>` is added only with several spec roots):
    `canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer`.

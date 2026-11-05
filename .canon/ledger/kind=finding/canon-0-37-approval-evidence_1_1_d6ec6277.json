@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-approval-evidence",
+    "role": "reviewer",
+    "session_id": "s-0-37-approval-evidence-rev"
+  },
+  "at": "2026-11-05T12:49:51.598915Z",
+  "change_id": "canon-0-37-approval-evidence",
+  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "kind": "finding",
+  "resolution_code_tree": "c860b5a2a3ec5dd80941f624e1c64bb57dc75dc6",
+  "resolution_sha": "c9810ea62e29f06186591327ebcb2c11a0447f1b",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "reviewer": "rev-0-37-approval-evidence",
+  "round": 1,
+  "scenario_ids": [
+    "gate.approval-tree.12",
+    "gate.approval-tree.04"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "CHANGELOG (and the brief decision it restates) says a re-approval over code that arrived after the approval \"makes the earlier change review stale, so the new review looks at that code\". That holds only when the brief text was edited: the chore review pins the brief digest alone (canon-gate review_gate::change_review_gap), and a re-approval with the same brief keeps the digest. Real-binary repro: approve chore (tree T0), review change signed, commit chore code (tree T1, no evidence), `canon brief approve` again with the brief untouched -> line records T1, gate check clean (0 violations), `subject move --to shipped` succeeds; 0.36 asked for the batch evidence here. The code that landed after the review is neither evidenced nor reviewed. Blast radius: ship, status and gate check share the rule so none flags it; status still prints \"its change-level review is still asked\" over a current review. Fix: either exempt only while the signed change review was recorded at or after the approval (a re-approval over new code then needs a new review), or correct the CHANGELOG and brief claim to say only a brief edit stales the review and put the accepted gap to the human.",
+  "worktree_dirty": false
+}

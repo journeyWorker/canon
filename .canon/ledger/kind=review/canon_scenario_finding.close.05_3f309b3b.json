@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-values",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-values-rev"
+  },
+  "at": "2026-11-05T15:57:09.060247Z",
+  "code_tree": "965fd3dccd1265f6e584194abb2cb5cd4fbece70",
+  "kind": "review",
+  "pin": "a9e724f90dc38cae599a47fc91b67df3f30ef64a",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:finding_close_05_a_fix_that_did_not_hold_is_a_new_finding_and_closing_to_open_is_refused"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ace0f681916d05347eedc1f8b392874c7d57b776811b81bd9e13547fcc32926b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-37-option-values/brief.md"
+  },
+  "review_id": "01M6P6V924QN2Y42SJ18X150YC",
+  "reviewer": "rev-0-37-option-values",
+  "scenario_id": "finding.close.05",
+  "schema": 2,
+  "worktree_dirty": false
+}

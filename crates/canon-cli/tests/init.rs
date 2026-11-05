@@ -688,7 +688,8 @@ fn authoring_init_92_a_bare_repo_installs_nothing_and_names_the_flag() {
 }
 
 /// authoring.init.93: `--providers none` is an explicit empty choice,
-/// recorded as `providers: []`, with nothing installed.
+/// recorded as `providers: []`, with nothing installed; an empty `--providers`
+/// is no list and is refused (0.37 `canon-0-37-option-forms`).
 #[test]
 fn authoring_init_93_an_explicit_empty_choice_is_recorded() {
     let tmp = tempfile::tempdir().unwrap();
@@ -708,8 +709,8 @@ fn authoring_init_93_an_explicit_empty_choice_is_recorded() {
     let empty = tmp.path().join("empty-flag");
     std::fs::create_dir_all(empty.join(".omp")).unwrap();
     let out = init_with_source(&["--providers="], &empty, &source);
-    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
-    assert!(std::fs::read_to_string(empty.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: []\n"));
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    assert!(!empty.join("canon.yaml").exists(), "a refused list writes nothing");
     assert!(projected(&empty).is_empty());
 }
 
@@ -724,7 +725,13 @@ fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
 
     let out = init_with_source(&["--providers", "claude,gemini"], &repo, &source);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    assert_eq!(stderr(&out), "canon: INIT_ARGUMENT_INVALID: invalid provider `gemini`; expected one of: claude, codex, omp, pi, or none\n  hint: `canon schema init` lists the accepted arguments and their forms\n");
+    assert_eq!(
+        stderr(&out),
+        "canon: INIT_ARGUMENT_INVALID: --providers is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)\n  field: --providers\n  hint: a working call: canon init; `canon schema init --json` lists the domain of each argument\n"
+    );
+    let json = init_with_source(&["--providers", "claude,gemini", "--json"], &repo, &source);
+    let document: serde_json::Value = serde_json::from_slice(&json.stdout).expect("one JSON document");
+    assert_eq!((document["error"]["code"].as_str(), document["error"]["field"].as_str(), document["error"]["received"].as_str()), (Some("INIT_ARGUMENT_INVALID"), Some("--providers"), Some("claude,gemini")), "{document}");
     assert_eq!(std::fs::read_dir(&repo).unwrap().count(), 0, "nothing is written");
 }
 

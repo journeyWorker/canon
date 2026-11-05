@@ -178,7 +178,7 @@ pub(crate) fn skills_error(err: &crate::skills::SkillsError) -> CliError {
             .field("--providers")
             .received(value.clone())
             .expected(["claude", "codex", "omp", "pi", "none"])
-            .hint("pass `--providers` any subset of claude, codex, omp, pi (comma-separated), or `none`"),
+            .hint("pass `--providers` `none`, or any of claude, codex, omp, pi in lowercase joined by single commas (no space, no empty item)"),
         SkillsError::Config(_) => CliError::refused("CONFIG_INVALID", err.to_string()).reason("SKILLS").hint("fix the `skills:` section of canon.yaml (`skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none), or pass `--providers`"),
         SkillsError::SourceNotFound(_) | SkillsError::CanonicalSourceMissing(_) => CliError::refused("SKILLS_SOURCE_NOT_FOUND", err.to_string()).field("--skills-source").hint("point `--skills-source` at a directory that holds `SKILL.src.md`, or drop it to use the text built into canon"),
         _ => CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation"),

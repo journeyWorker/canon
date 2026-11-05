@@ -192,7 +192,7 @@ fn atip_inputorder_04_one_problem_has_no_details_and_a_right_document_is_not_ref
     assert!(body["error"].get("details").is_none(), "one problem is the error alone: {body}");
 
     // every key right: no document problem (the invocation then runs)
-    let out = canon(repo, &["finding", "close", "--input", r#"{"operands":["add-login"],"round":1,"seq":1,"disposition":"open"}"#, "--json"]);
+    let out = canon(repo, &["finding", "close", "--input", r#"{"operands":["add-login"],"round":1,"seq":1,"disposition":"fixed"}"#, "--json"]);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(0), "{body}");
 
@@ -217,7 +217,7 @@ fn atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_arg
     let (exit, code, reason, field, body) = refusal(&out);
     assert_eq!((exit, code.as_str(), reason.as_deref(), field.as_deref()), (Some(2), "INPUT_INVALID", Some("INVALID_VALUE"), Some("/disposition")), "{body}");
     let expected: Vec<&str> = body["error"]["expected"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
-    assert_eq!(expected, ["open", "fixed", "rejected", "deferred"], "{body}");
+    assert_eq!(expected, ["fixed", "rejected", "deferred"], "{body}");
 
     let out = canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "nope", "--json"]);
     let (exit, code, _, field, body) = refusal(&out);
@@ -228,7 +228,7 @@ fn atip_inputorder_05_a_value_outside_an_enumeration_is_invalid_input_and_on_arg
     let (_, code, reason, field, body) = refusal(&out);
     assert_eq!((code.as_str(), reason.as_deref(), field.as_deref()), ("INPUT_INVALID", Some("INVALID_VALUE"), Some("/disposition")), "{body}");
     // preflight takes the elements in order: element 0 is whole, element 1 holds the problem
-    let out = canon(repo, &["finding", "close", "--input", r#"[{"operands":["add-login"],"round":1,"seq":1,"disposition":"open"},{"disposition":"nope"}]"#, "--json"]);
+    let out = canon(repo, &["finding", "close", "--input", r#"[{"operands":["add-login"],"round":1,"seq":1,"disposition":"fixed"},{"disposition":"nope"}]"#, "--json"]);
     let (exit, code, reason, field, body) = refusal(&out);
     assert_eq!((exit, code.as_str(), reason.as_deref(), field.as_deref()), (Some(2), "INPUT_INVALID", Some("INVALID_VALUE"), Some("/1/disposition")), "{body}");
 }
@@ -240,7 +240,7 @@ fn atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_co
     let before = tree(repo);
     for (argv, field) in [
         (vec!["finding", "close", "add-login", "--round", "abc", "--input", r#"{"round":1}"#, "--json"], "--round"),
-        (vec!["finding", "close", "add-login", "--disposition", "bogus", "--input", r#"{"disposition":"open"}"#, "--json"], "--disposition"),
+        (vec!["finding", "close", "add-login", "--disposition", "bogus", "--input", r#"{"disposition":"fixed"}"#, "--json"], "--disposition"),
         (vec!["finding", "close", "add-login", "--round", "abc", "--input", r#"[{"round":1}]"#, "--json"], "--round"),
     ] {
         let (exit, code, _, found, body) = refusal(&canon(repo, &argv));
@@ -283,22 +283,22 @@ fn atip_inputorder_06_the_command_line_that_does_not_parse_answers_before_the_co
 fn atip_inputorder_07_a_value_given_two_ways_that_differ_is_a_conflict_at_the_document_pointer() {
     let dir = fixture();
     let repo = dir.path();
-    let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "open", "--input", r#"{"round":2}"#, "--json"]));
+    let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed", "--input", r#"{"round":2}"#, "--json"]));
     assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "INPUT_CONFLICT", Some("/round")), "{body}");
-    let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "open", "--input", r#"{"disposition":"fixed"}"#, "--json"]));
+    let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "rejected", "--input", r#"{"disposition":"fixed"}"#, "--json"]));
     assert_eq!((code.as_str(), field.as_deref()), ("INPUT_CONFLICT", Some("/disposition")), "{body}");
-    let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "open", "--input", r#"[{"round":2}]"#, "--json"]));
+    let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed", "--input", r#"[{"round":2}]"#, "--json"]));
     assert_eq!((code.as_str(), field.as_deref()), ("INPUT_CONFLICT", Some("/0/round")), "{body}");
-    let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "--seq", "1", "--disposition", "open", "--input", r#"{"operands":["other"],"round":1}"#, "--json"]));
+    let (_, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "--seq", "1", "--disposition", "fixed", "--input", r#"{"operands":["other"],"round":1}"#, "--json"]));
     assert_ne!(code, "INPUT_CONFLICT", "{body}");
     let _ = field;
 
     // the same value on both sides, the argv alone and the document alone are not a conflict
-    let out = canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "open", "--input", r#"{"round":1,"disposition":"open"}"#, "--json"]);
+    let out = canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed", "--input", r#"{"round":1,"disposition":"fixed"}"#, "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", json_of(&out));
-    let out = canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "open", "--json"]);
+    let out = canon(repo, &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", json_of(&out));
-    let out = canon(repo, &["finding", "close", "--input", &json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "open"}).to_string(), "--json"]);
+    let out = canon(repo, &["finding", "close", "--input", &json!({"operands": ["add-login"], "round": 1, "seq": 1, "disposition":"fixed"}).to_string(), "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", json_of(&out));
 }
 
@@ -308,20 +308,22 @@ fn atip_inputorder_08_integers_are_compared_by_the_number_they_denote() {
     let repo = dir.path();
     // argv 1 against 1, "1" and "01"-free spellings; `+1` on argv is still accepted and equals 1
     for (argv_round, doc) in [("1", r#"{"round":1}"#), ("1", r#"{"round":"1"}"#), ("+1", r#"{"round":1}"#), ("+1", r#"{"round":"1"}"#)] {
-        let out = canon(repo, &["finding", "close", "add-login", "--round", argv_round, "--seq", "1", "--disposition", "open", "--input", doc, "--json"]);
+        let out = canon(repo, &["finding", "close", "add-login", "--round", argv_round, "--seq", "1", "--disposition", "fixed", "--input", doc, "--json"]);
         assert_eq!(out.status.code(), Some(0), "--round {argv_round} with {doc}: {}", json_of(&out));
     }
-    // zero, which `divergence add --round` takes: -0, "-0", 0 and "0" are one value
-    for doc in [r#"{"round":-0}"#, r#"{"round":"-0"}"#, r#"{"round":0}"#, r#"{"round":"0"}"#] {
-        let out = canon(repo, &["divergence", "add", "auth.login.01", "--actor", "alice", "--role", "reviewer", "--round", "0", "--input", doc, "--json"]);
-        assert_eq!(out.status.code(), Some(0), "--round 0 with {doc}: {}", json_of(&out));
-        let out = canon(repo, &["divergence", "add", "auth.login.01", "--actor", "alice", "--role", "reviewer", "--round", "+0", "--input", doc, "--json"]);
-        assert_eq!(out.status.code(), Some(0), "--round +0 with {doc}: {}", json_of(&out));
+    // zero, which `ingest sessions --interval-secs` takes (`--round` starts at 1): -0, "-0", 0 and "0" are one value
+    for doc in [r#"{"intervalSecs":-0}"#, r#"{"intervalSecs":"-0"}"#, r#"{"intervalSecs":0}"#, r#"{"intervalSecs":"0"}"#] {
+        for argv_zero in ["0", "+0", "-0"] {
+            let out = canon(repo, &["ingest", "sessions", "--dry-run", "--interval-secs", argv_zero, "--input", doc, "--json"]);
+            let body = json_of(&out);
+            assert_ne!(body["error"]["code"], "INPUT_CONFLICT", "--interval-secs {argv_zero} with {doc}: {body}");
+            assert_ne!(body["error"]["code"], "INPUT_INVALID", "--interval-secs {argv_zero} with {doc}: {body}");
+        }
     }
     // a different integer is still a conflict, however it is written
     let (_, code, _, field, body) = refusal(&canon(repo, &["divergence", "add", "auth.login.01", "--actor", "alice", "--role", "reviewer", "--round", "1", "--input", r#"{"round":"2"}"#, "--json"]));
     assert_eq!((code.as_str(), field.as_deref()), ("INPUT_CONFLICT", Some("/round")), "{body}");
-    let (_, code, _, field, body) = refusal(&canon(repo, &["divergence", "add", "auth.login.01", "--actor", "alice", "--role", "reviewer", "--round", "0", "--input", r#"{"round":-1}"#, "--json"]));
+    let (_, code, _, field, body) = refusal(&canon(repo, &["divergence", "add", "auth.login.01", "--actor", "alice", "--role", "reviewer", "--round", "1", "--input", r#"{"round":-1}"#, "--json"]));
     assert_eq!((code.as_str(), field.as_deref()), ("INPUT_CONFLICT", Some("/round")), "{body}");
 }
 
@@ -338,7 +340,7 @@ fn atip_inputorder_09_an_integer_spelling_the_contract_does_not_know_is_invalid_
     // the largest exact integer is a number of the document; the command's own domain (step 6) then speaks, not the input
     let (_, code, _, field, body) = refusal(&canon(repo, &["divergence", "add", "auth.login.01", "--actor", "alice", "--role", "reviewer", "--input", r#"{"round":9007199254740991}"#, "--json"]));
     assert_eq!((code.as_str(), field.as_deref()), ("USAGE", Some("/round")), "{body}");
-    let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "9007199254740992", "--seq", "1", "--disposition", "open", "--json"]));
+    let (exit, code, _, field, body) = refusal(&canon(repo, &["finding", "close", "add-login", "--round", "9007199254740992", "--seq", "1", "--disposition", "fixed", "--json"]));
     assert_eq!((exit, code.as_str(), field.as_deref()), (Some(2), "USAGE", Some("--round")), "{body}");
     // a number is not a string
     let (_, code, reason, field, body) = refusal(&canon(repo, &["subject", "new", "--input", r#"{"operands":["a"],"domain":"dev","title":5}"#, "--json"]));

@@ -16,6 +16,16 @@
 //! (`git_rev::code_tree`) needs no new evidence, so a docs-only chore needs
 //! its change-level review alone.
 //!
+//! A chore whose approval recorded the code tree (0.37,
+//! [`crate::brief::approval_tree`]) asks for no evidence at all while that
+//! tree is the current code tree: the chore changed no code since the human
+//! approved it, whatever tree each scenario's latest evidence is on. The
+//! change-level review is still asked, and it must be of that code
+//! ([`canon_gate::review_gate::change_review_gap`]'s `on_tree`): a review that
+//! saw other code (the same brief approved again over code that came after
+//! the review) does not count. An approval with no recorded tree
+//! (written before 0.37, or with no git commit) keeps the rule above.
+//!
 //! New evidence stales a pinned review, so the re-review follows with no
 //! rule of its own. Every refusal names the scenarios and leads with ONE batch
 //! command, [`canon_gate::review_gate::batch_commands`]: `canon evidence add
@@ -117,11 +127,33 @@ impl Gap {
     }
 }
 
+/// An approved chore change of a subject.
+struct ChoreApproval {
+    change: ChangeId,
+    /// When it was approved.
+    at: DateTime<Utc>,
+    /// The digest of its brief as it reads now.
+    digest: SpecDigest,
+    /// The code tree the approval recorded (0.37); `None` for an approval
+    /// from before 0.37 or one written with no git commit.
+    tree: Option<String>,
+}
+
+impl ChoreApproval {
+    /// Whether the approval saw the code as it is now (0.37): then the chore
+    /// changed no code since, so it asks for no evidence. An approval that
+    /// recorded no tree, or a work tree whose tree cannot be computed, is
+    /// never that: the time rule stands.
+    fn saw(&self, current: Option<&str>) -> bool {
+        matches!((self.tree.as_deref(), current), (Some(then), Some(now)) if then == now)
+    }
+}
+
 /// The approved chore changes among `subject`'s adopted changes, each with
-/// its approval time and the digest of its brief as it reads now. A chore
-/// whose brief is not approved (or whose approval line carries no readable
-/// time) triggers nothing.
-fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(ChangeId, DateTime<Utc>, SpecDigest)> {
+/// its approval time, the code tree the approval recorded and the digest of
+/// its brief as it reads now. A chore whose brief is not approved (or whose
+/// approval line carries no readable time) triggers nothing.
+fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<ChoreApproval> {
     subject_change_ids(ctx, subject)
         .into_iter()
         .filter_map(|change| {
@@ -129,8 +161,9 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(Ch
             if !crate::brief_check::is_chore(&text) || !crate::brief::approval_of(&text).approved() {
                 return None;
             }
-            let at = crate::brief::approved_at(canon_ingest::markdown::field(&text, "Approved:")?)?;
-            Some((change, at, crate::brief::brief_spec_digest(&text)))
+            let line = canon_ingest::markdown::field(&text, "Approved:")?;
+            let at = crate::brief::approved_at(line)?;
+            Some(ChoreApproval { change, at, digest: crate::brief::brief_spec_digest(&text), tree: crate::brief::approval_tree(line).map(str::to_string) })
         })
         .collect()
 }
@@ -158,7 +191,21 @@ impl CodeTreeMemo {
     }
 }
 
-/// Every unmet chore trigger of `subject`.
+/// Whether `change` is an approved chore whose approval recorded the code tree
+/// that is the current code tree (0.37): `canon status` says so on the chore's
+/// line. The tree is computed only for an approval that recorded one.
+pub fn tree_unchanged(repo: &Path, code_tree: &CodeTreeMemo, change: &ChangeId) -> bool {
+    let Some(text) = crate::brief::canon_brief(repo, change).and_then(|path| std::fs::read_to_string(path).ok()) else { return false };
+    if !crate::brief_check::is_chore(&text) || !crate::brief::approval_of(&text).approved() {
+        return false;
+    }
+    let Some(recorded) = canon_ingest::markdown::field(&text, "Approved:").and_then(crate::brief::approval_tree) else { return false };
+    code_tree.get(repo) == Some(recorded)
+}
+
+/// Every unmet chore trigger of `subject`. A chore whose approval recorded
+/// the code tree that is the current one (0.37) triggers nothing: the code is
+/// as the approval saw it, whatever tree the scenarios' evidence is on.
 pub fn chore_gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<Gap> {
     let approvals = chore_approvals(repo, ctx, subject);
     if approvals.is_empty() {
@@ -169,7 +216,8 @@ pub fn chore_gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subj
     let code_tree = code_tree.get(repo);
     approvals
         .into_iter()
-        .filter_map(|(change, since, _)| {
+        .filter(|approval| !approval.saw(code_tree))
+        .filter_map(|ChoreApproval { change, at: since, .. }| {
             let scenarios: Vec<(String, String)> = scenarios_without_evidence_after_on_code(ctx, &subject.subject_id, since, code_tree)
                 .into_iter()
                 .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
@@ -188,13 +236,21 @@ fn multi_root(repo: &Path) -> bool {
 /// The approved chore changes of `subject` that lack a qualifying
 /// change-level review (0.23 D5), each with why. Only when
 /// `require_review` is active and covers `shipped`: a repo with no review
-/// policy asks no one to review.
-pub fn chore_review_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(ChangeId, String)> {
+/// policy asks no one to review. A chore that asks for no evidence because its
+/// approval saw the current code tree (0.37) needs a review of that code
+/// ([`change_review_gap`]'s `on_tree`).
+pub fn chore_review_gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<(ChangeId, String)> {
     let Some((rr, _)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) else { return Vec::new() };
-    chore_approvals(repo, ctx, subject)
+    let approvals = chore_approvals(repo, ctx, subject);
+    // Computed only for an approval that recorded a tree.
+    let current = approvals.iter().any(|approval| approval.tree.is_some()).then(|| code_tree.get(repo)).flatten();
+    approvals
         .into_iter()
-        .filter(|(_, since, _)| !reviewed_scenario_by_scenario_since(ctx, subject, *since))
-        .filter_map(|(change, _, digest)| change_review_gap(ctx, subject, &change, &digest, rr.distinct_actor).map(|why| (change, why)))
+        .filter(|approval| !reviewed_scenario_by_scenario_since(ctx, subject, approval.at))
+        .filter_map(|approval| {
+            let on_tree = if approval.saw(current) { approval.tree.as_deref() } else { None };
+            change_review_gap(ctx, subject, &approval.change, &approval.digest, rr.distinct_actor, on_tree).map(|why| (approval.change.clone(), why))
+        })
         .collect()
 }
 
@@ -248,7 +304,7 @@ pub fn gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &
 /// The `verifying → shipped` violations of the chore trigger: one
 /// `uncovered-cell` per unapproved-by-evidence chore, naming `subject`.
 pub fn chore_violations(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<Violation> {
-    let reviews = chore_review_gaps(repo, ctx, subject).into_iter().map(|(change, why)| {
+    let reviews = chore_review_gaps(repo, ctx, code_tree, subject).into_iter().map(|(change, why)| {
         Violation::new(
             FailureClass::UnreviewedPromotion,
             subject.subject_id.as_str(),
@@ -324,5 +380,5 @@ pub fn batch_commands_of(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMem
 
 /// The chore changes of `subject` whose approval is on record, by slug.
 fn chore_review_commands(repo: &Path, ctx: Option<&GateContext>, subject: &Subject) -> Vec<String> {
-    ctx.map(|ctx| chore_approvals(repo, ctx, subject).into_iter().map(|(change, _, _)| change.as_str().to_string()).collect()).unwrap_or_default()
+    ctx.map(|ctx| chore_approvals(repo, ctx, subject).into_iter().map(|approval| approval.change.as_str().to_string()).collect()).unwrap_or_default()
 }

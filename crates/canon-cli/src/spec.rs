@@ -5,7 +5,7 @@
 //! The documents are the contract's (atip/1 spec 9). [`tree`], [`group`] and [`command`] build the typed model of
 //! them in the full form (every member, `path`, the JSON Schemas its refs name, the `rejects` of each validator): the
 //! one thing the tests, the generators and the human text read. [`described`] hands that model to the contract crate's
-//! serializer, which writes the 1.4 form canon declares (the call surface only, defaults left out, shared options in
+//! serializer, which writes the form canon declares (the 1.4 form, unchanged in 1.5: the call surface only, defaults left out, shared options in
 //! the tree, the schemas in the `--schemas` answer). `canon schema` prints what [`described`] writes and the checked-in
 //! `docs/cli/canon.cli.json` holds it, from the same function, so what the file says of a command and what
 //! `canon schema <COMMAND>` answers are one value.
@@ -111,7 +111,7 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
 }
 
 
-/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.4 --deep`
+/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.5 --deep`
 /// passes on the build: the check runs in CI beside the tests that build these documents (`just atip-deep`, the `atip` job).
 pub const LEVEL: &str = "L2";
 
@@ -124,6 +124,7 @@ pub const HELP_POINTER: &str = "Agents: \"canon schema --json\" describes every 
 /// with a parser of its own and a value name that is not here fails the generation (`tests/schema_doc.rs`
 /// `atip.schemadoc.06`). Every one of canon's today is text that the parser checks the form of, so `string`.
 pub const CUSTOM_PARSERS: &[(&str, ValueType)] = &[
+    ("ACTOR_ID", ValueType::String),
     ("CHANGE_ID", ValueType::String),
     ("FORMAT:PATH", ValueType::String),
     ("KEY", ValueType::String),
@@ -141,6 +142,7 @@ pub const CUSTOM_PARSERS: &[(&str, ValueType)] = &[
     ("SUBJECT_ID", ValueType::String),
     ("SURFACE", ValueType::String),
     ("TASK_ID", ValueType::String),
+    ("TEXT", ValueType::String),
     ("TIMESTAMP", ValueType::String),
 ];
 
@@ -198,6 +200,11 @@ pub type Built<T> = Result<T, String>;
 
 fn built<T>(result: Result<T, atip::project::Problem>) -> Built<T> {
     result.map_err(|problem| problem.to_string())
+}
+
+/// The minor canon declares (`json_out::DECLARED_MINOR`), as the crate's value: what the crate's checks of a document read to decide what that document may say.
+fn declared_minor() -> Built<atip::Minor> {
+    atip::Minor::parse(crate::json_out::DECLARED_MINOR).map_err(|unknown| unknown.to_string())
 }
 
 /// `x-canon` of a command: the roles whose steps use it (empty: humans only).
@@ -398,7 +405,7 @@ fn command_of(node: &Node<'_>) -> Built<CommandDoc> {
     let validators: Vec<ValidatorDoc> = crate::arg_rules::validators_for(path).iter().map(atip::constraint::Validator::doc).collect();
     let examples = examples_of(path)?;
     let errors = errors_of(path, &options, &operands, batch);
-    let problems = atip::constraint::document_problems(&options, &operands, &constraints, &validators, &errors, &examples);
+    let problems = atip::constraint::document_problems(&options, &operands, &constraints, &validators, &errors, &examples, declared_minor()?);
     if !problems.is_empty() {
         return Err(format!("`{path}`: {}", problems.join("; ")));
     }
@@ -459,7 +466,7 @@ pub fn described(root: &Command, role: Option<Role>) -> Built<Described> {
     let tree = tree(root, role)?;
     let commands = commands(root)?;
     let usage = usage_replacements(&commands);
-    let minor = atip::Minor::parse(crate::json_out::DECLARED_MINOR).map_err(|unknown| unknown.to_string())?;
+    let minor = declared_minor()?;
     let groups: Vec<String> = tree.commands.iter().filter(|entry| entry.kind == EntryKind::Group).map(|entry| entry.command.clone()).collect();
     let mut described = Described::new(minor, tree.level.clone(), tree.commands, commands).map_err(|problem| problem.to_string())?.usage_replacements(usage).tree_extensions(tree.extensions);
     if let Some(role) = role {

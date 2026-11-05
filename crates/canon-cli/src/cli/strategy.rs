@@ -48,10 +48,10 @@ pub struct StrategyApprovalPayloadArgs {
     #[arg(long, value_name = "FILE")]
     pub evaluation: PathBuf,
     /// Who approves (the human whose detached signature the payload is for)
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: String,
-    /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only)]
+    /// The approval time that is signed into the payload: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused). Fix it once and give the same value to the signature and to `strategy rollback`
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_date_time)]
     pub approval_at: chrono::DateTime<chrono::Utc>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -66,16 +66,16 @@ pub struct StrategyRollbackArgs {
     #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]
     pub strategy_id: StrategyId,
     /// Why the strategy is rolled back (signed: `strategy:<id>:rollback:<sha256(reason)>`)
-    #[arg(long, value_name = "TEXT")]
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub reason: String,
     /// The approver; must be a policy-pinned approver
-    #[arg(long = "actor", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     /// Detached signature file over the rollback payload
     #[arg(long, value_name = "FILE")]
     pub signature_file: PathBuf,
-    /// When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)
-    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only_string)]
+    /// When the approver signed: an RFC 3339 date-time (`2030-01-01T10:00:00Z`; a date alone is refused), the value the signature was made over
+    #[arg(long, value_name = "TIMESTAMP")]
     pub approval_at: String,
     /// A trajectory that contradicts the strategy (must exist in the trajectory store)
     #[arg(long = "contradicting-trajectory", value_name = "ID")]

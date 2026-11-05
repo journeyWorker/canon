@@ -284,7 +284,7 @@ fn canonical_install_projects_omp_and_pi_stubs_with_sidecars() {
     fs::write(source.join("reference/topic.md"), "# topic\n").unwrap();
     fs::write(source.join("scripts/pre-dispatch.sh"), "#!/bin/sh\n").unwrap();
 
-    let report = skills::install_canonical(Some(&source), &target, Some("pi,OMP"), false).unwrap();
+    let report = skills::install_canonical(Some(&source), &target, Some("pi,omp"), false).unwrap();
 
     assert_eq!(report.providers, vec![skills::Provider::Omp, skills::Provider::Pi]);
     for root in [".omp", ".pi"] {

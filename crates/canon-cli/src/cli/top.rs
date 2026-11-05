@@ -23,7 +23,7 @@ pub struct InitArgs {
     /// Do not write the starter .canon/policy.yaml
     #[arg(long)]
     pub no_policy: bool,
-    /// Harnesses to install the canon skill for, without asking (`claude`, `codex`, `omp`, `pi`, comma-separated; `none` for none)
+    /// Harnesses to install the canon skill for, without asking: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item)
     #[arg(long, value_name = "LIST")]
     pub providers: Option<String>,
     /// Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml
@@ -51,13 +51,13 @@ pub struct MigrateArgs {
     #[arg(long, value_name = "DIR")]
     pub backup: Option<PathBuf>,
     /// With --commit, record the human's answer to a plan that re-binds `Approved:` lines on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may commit such a plan only with it
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long, value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor: Option<String>,
     /// With --relayed-via, who the human is
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: Option<String>,
     /// With --relayed-via, the human's answer as they gave it
     #[arg(long, value_name = "TEXT")]
@@ -120,7 +120,7 @@ pub struct RetrieveArgs {
     #[arg(long = "subject", value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
     pub subject_id: Option<SubjectId>,
     /// Cap on the guidance items returned
-    #[arg(long, value_name = "N", default_value = "5", value_parser = crate::cli::safe_min0_usize)]
+    #[arg(long, value_name = "N", default_value = "5", value_parser = crate::cli::safe_min1_usize)]
     pub limit: Option<usize>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -134,7 +134,7 @@ pub struct QueryArgs {
     /// Record kind to read (e.g. handoff, strategy_item)
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
-    /// Only records with at >= <since> (RFC3339/ISO-8601)
+    /// Only records with at >= <since>: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)
     #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub since: Option<DateTime<Utc>>,
     #[command(flatten)]
@@ -180,8 +180,8 @@ pub struct SearchArgs {
     #[arg(long, value_name = "N", default_value_t = 1)]
     pub expand: u32,
     /// The most hits to list, best first (there is no next page)
-    #[arg(long, value_name = "N", default_value_t = 20, value_parser = clap::value_parser!(u32).range(1..))]
-    pub limit: u32,
+    #[arg(long, value_name = "N", default_value_t = 20, value_parser = crate::cli::safe_min1)]
+    pub limit: u64,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
@@ -206,10 +206,10 @@ pub struct ExportArgs {
     /// The record kind to export
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
-    /// Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)
+    /// Only records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)
     #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub before: Option<DateTime<Utc>>,
-    /// Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)
+    /// Only records at or after this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)
     #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub after: Option<DateTime<Utc>>,
     /// Write the manifest to this file (mode 0600) instead of stdout
@@ -239,7 +239,7 @@ pub struct PurgeArgs {
     /// The record kind to purge (session, run, event or trajectory)
     #[arg(long, value_parser = crate::query::purgeable_kind_parser(), value_name = "KIND")]
     pub kind: RecordKind,
-    /// Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)
+    /// Remove records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)
     #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub before: DateTime<Utc>,
     #[command(flatten)]

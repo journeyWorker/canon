@@ -52,7 +52,11 @@ The production activation path is a signed, paired-evaluation workflow:
    `meta.next` names the human signing step. The `data` contains the evaluation digest, RFC3339 `approved_at`,
    subject `strategy:<strategy_id>`, namespace
    `canon-learning-approval-v1`, and `payload_hex`. `approval-payload` never
-   reads a private key and never sets `verified`.
+   reads a private key and never sets `verified`. `--approval-at` is an RFC 3339
+   date-time (`2026-10-02T12:00:00Z`; a date alone, white space around it and a
+   one-digit month are refused): canon never stamps it, so fix it once and give
+   the same value to the signature and to the record. The bytes hold the instant
+   as UTC to the nanosecond, so one instant written `Z` or `+09:00` is one payload.
 6. Decode `payload_hex` to the exact canonical JSON bytes. The signed object
    is:
 
@@ -190,7 +194,8 @@ canon strategy rollback <strategy_id> --reason "<reason>" --actor alice \
 
 `--signature-file` is an armored SSH detached signature over the
 `canon-learning-approval-v1` payload bound to
-`strategy:<id>:rollback:<sha256(reason)>`, actor, and `--approval-at`.
+`strategy:<id>:rollback:<sha256(reason)>`, actor, and `--approval-at` (the same
+RFC 3339 date-time that was signed; another instant fails the signature).
 `actor` MUST be listed in policy-pinned `approval.allowed_signers`; verification
 uses that file and `ssh-keygen -Y verify`. Successful rollback writes durable
 provenance, sets lifecycle `rolled_back`, and records the optional contradicting

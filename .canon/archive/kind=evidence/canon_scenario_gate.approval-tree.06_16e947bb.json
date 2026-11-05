@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-5",
+    "role": "implementer",
+    "session_id": "s-0-37-claim-1-5"
+  },
+  "at": "2026-11-05T13:19:51.429682Z",
+  "attachments": [
+    {
+      "case": "gate_approval_tree_06_a_code_change_after_the_approval_asks_for_the_scenarios_with_one_batch_command",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    }
+  ],
+  "code_tree": "a50d9de6eec3d1bdba2244a9908f12a31be06ade",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "cargo nextest run --workspace --locked --no-fail-fast (canon-0-37-claim-1-5; 3848 tests passed at 95d68d37f, the atip crate at atip-crate-v0.2.0, canon declares 1.5); just atip, just atip-deep (L2 met: 74 MUST passed, L1.patterns passes), lint, visibility and the docs and conformance bless (no diff) are attached to atip.claim15.01, .10 and .12; the patterns of 0.36.0 against 1.5 to .03 and .04"
+  },
+  "evidence_sha": "95d68d37f5b636526d663887a395ccfe68a2df35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 33,
+  "scenario_id": "gate.approval-tree.06",
+  "schema": 1,
+  "staging_id": "6d90f348",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

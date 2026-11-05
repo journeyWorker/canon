@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-approval-evidence",
+    "role": "reviewer",
+    "session_id": "s-0-37-approval-evidence-rev"
+  },
+  "at": "2026-11-05T12:49:52.242689Z",
+  "change_id": "canon-0-37-approval-evidence",
+  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/status.rs",
+  "introduced_by": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "kind": "finding",
+  "resolution_code_tree": "c860b5a2a3ec5dd80941f624e1c64bb57dc75dc6",
+  "resolution_sha": "c9810ea62e29f06186591327ebcb2c11a0447f1b",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "reviewer": "rev-0-37-approval-evidence",
+  "round": 1,
+  "scenario_ids": [
+    "gate.approval-tree.11"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "The status chore line always ends \"its change-level review is still asked\", also when a signed, current change review exists (repro: approve, review change, re-approve over new code: gate clean, line still says asked). Say it only when change_review_gap is Some. Blast radius: text only, but it is the one line that explains why the chore asks for nothing.",
+  "worktree_dirty": false
+}

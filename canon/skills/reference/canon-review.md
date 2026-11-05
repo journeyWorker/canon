@@ -155,7 +155,7 @@ text in the summary, not a field.
 
 | Disposition | Meaning |
 |---|---|
-| `open` | Raised and not yet dealt with. The default on `finding add`; `finding close --disposition open` reopens. |
+| `open` | Raised and not yet dealt with. The default on `finding add`; `finding close` refuses it (a defect that came back is a new finding). |
 | `fixed` | Fixed by a commit. Carries `--resolution-rev <rev>` (default `HEAD`) naming a commit this repo holds; only `fixed` may carry one. |
 | `rejected` | The reviewer's point was considered and declined. Needs `--reason`. |
 | `deferred` | Accepted, but postponed to later work. Needs `--reason`. |
@@ -164,8 +164,10 @@ text in the summary, not a field.
 
 Every reader takes the **latest version per natural key**
 `(change_id, round, seq)` — the same fold the report's finding panel
-uses. A blocker raised `open` and later closed `fixed` counts as fixed; a
-fixed finding reopened with `--disposition open` counts as open again.
+uses. A blocker raised `open` and later closed `fixed` counts as fixed.
+A finding is not reopened: `finding close` takes `fixed`, `rejected` or
+`deferred` and refuses `--disposition open`; a defect that came back is a new
+`finding add` (the next `--seq`).
 
 ## `canon review scenario`
 

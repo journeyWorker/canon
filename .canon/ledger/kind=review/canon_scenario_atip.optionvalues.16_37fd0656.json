@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-values",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-values-rev"
+  },
+  "at": "2026-11-05T17:34:27.396398Z",
+  "code_tree": "6c821ebc0206bfdb9c42effe7b848374defa9e37",
+  "kind": "review",
+  "pin": "bcdd902d14ea7f88fa627ca50a73160202e00cef",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_optionvalues_16_the_checker_fixture_lists_values_the_new_domains_refuse_and_the_recipes_run_at_1_5"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "5296fc53303e4bd05db14955dfe19e672627fb727c16b6666abb033d91bab5d7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-37-option-values/brief.md"
+  },
+  "review_id": "01M6PCDEJ4H6RMC01MCC89NSKJ",
+  "reviewer": "rev-0-37-option-values",
+  "scenario_id": "atip.optionvalues.16",
+  "schema": 2,
+  "worktree_dirty": false
+}

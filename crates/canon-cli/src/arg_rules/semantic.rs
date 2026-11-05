@@ -28,7 +28,9 @@ pub fn check(root: &Command, matches: &ArgMatches) -> Option<(String, CliError)>
             continue;
         }
         let Some(long) = arg.get_long() else { continue };
-        let judge: fn(&str) -> Result<(), String> = if atip::project::value_name(arg) == "TIMESTAMP" {
+        let judge: fn(&str) -> Result<(), String> = if long == "approval-at" {
+            |text| crate::timestamp::parse_date_time(text).map(|_| ()).map_err(|error| error.to_string())
+        } else if atip::project::value_name(arg) == "TIMESTAMP" {
             |text| crate::timestamp::parse(text).map(|_| ()).map_err(|error| error.to_string())
         } else if long == "surface-ref" {
             |text| crate::evidence::parse_surface_ref(text).map(|_| ()).map_err(|error| error.to_string())

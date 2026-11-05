@@ -292,14 +292,6 @@ pub enum PolicyApprovalError {
     },
 }
 
-/// `canon policy approve --approver` is not blank: refused before any state is read, `APPROVAL_INVALID`.
-pub(crate) fn check_approver(by: &str) -> Result<(), CliError> {
-    if by.trim().is_empty() {
-        return Err(CliError::refused("APPROVAL_INVALID", PolicyApprovalError::BlankApprover.to_string()).hint("pass the human's name: `canon policy approve --approver <name>`").field("--approver"));
-    }
-    Ok(())
-}
-
 /// Writes the policy approval record for `by` under an already-resolved
 /// repo root. `Err` carries the refusal (no policy to approve, an
 /// empty `by`, or a read/write failure). Shared by `canon policy approve`

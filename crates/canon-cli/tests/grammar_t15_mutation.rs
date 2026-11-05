@@ -88,7 +88,7 @@ const MUTATIONS: &[Mutation] = &[
     Mutation {
         name: "give an option name another value name on one leaf",
         file: "crates/canon-cli/src/cli/divergence.rs",
-        apply: |text| replace_once(text, "#[arg(long = \"actor\", value_name = \"ACTOR_ID\")]", "#[arg(long = \"actor\", value_name = \"NAME\")]"),
+        apply: |text| replace_once(text, "#[arg(long = \"actor\", value_name = \"ACTOR_ID\", value_parser = crate::cli::trimmed)]", "#[arg(long = \"actor\", value_name = \"NAME\", value_parser = crate::cli::trimmed)]"),
         catches: ("grammar_t3_options", "one_name_has_one_value_name_arity_and_value_set_on_every_leaf"),
     },
     Mutation {

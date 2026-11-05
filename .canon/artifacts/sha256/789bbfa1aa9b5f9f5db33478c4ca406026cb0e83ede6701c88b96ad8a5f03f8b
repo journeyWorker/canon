@@ -1,0 +1,26 @@
+# canon-0-37-atip-dep: evidence summary
+
+Commit a5f6b6ba0 (tree 58b93acd046099d5de3ea6c368a5025ae51a83a7) on main d0245f33d. Actor impl-atip-dep-037, session s-0-37-atip-dep. Canon declares 1.4 before and after.
+
+## What changed
+- `Cargo.toml`: `atip` at the tag `atip-crate-v0.2.0`; `Cargo.lock` pins c6c1a1d9b478064260bae666064284b85af6ba96 (only the atip package lines moved, no other lock line).
+- `justfile` `atip-install`, `.github/workflows/test.yml` (install step, cache key, comment): the checker at `atip-check-v0.2.0`. `just atip` and `just atip-deep` keep `--contract 1.4`.
+- `README.md`, `ARCHITECTURE.md`, `CHANGELOG.md` (Unreleased), the comments of `atip_check.rs`: the new tag names.
+- Source: `crates/canon-cli/src/spec.rs` passes the declared minor (`json_out::DECLARED_MINOR` as `atip::Minor`) to `atip::constraint::document_problems`, whose signature gained `minor` in the crate 0.2.0. That is the only source change.
+- Tests moved to the new function shapes: `atip_constraints.rs` (`profile_problems`, `pattern_problem`, `document_problems` take the declared minor), `atip_claim14.rs` and `atip_check.rs` (the tag), `atip_crate12.rs` (the crate now knows 1.5: the texts that are no minor are 1.6 instead of 1.5, and 1.5 joins the known minors). One assertion added to the existing test `atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults`: at the declared 1.4, a domain pattern with `\p{White_Space}` is a problem ("{White_Space} is since 1.5 ... declares contract 1.4", contract 15.7). No scenario added.
+- Spec text of three scenarios follows their tests: `atip.claim14.14` (the checker tag), `atip.crate12.13` and `atip.crate12.18` (1.6 is the unknown minor; six known minors).
+
+## Output before and after (battery-hashes-before-and-after.txt)
+- `canon schema --json` b5238c4d6624..., `--errors --json` 9ee9fe891402..., `--warnings --json` 031e6a876d90...: the same sha256 in the installed 0.36.0 binary, the build of main d0245f33d and this change.
+- 713 calls (every command's `schema`, `schema --schemas`, `--help`, `--help --json`, every `schema --error` and `--warning`, `--version`, `--help`): stdout, stderr and exit status identical, one manifest sha256 d22b0a9c29cd... for all three.
+- `just conformance` blessed on this commit: no file under `conformance/` changed. `just docs` (CANON_BLESS_DOCS): no generated block changed. `git status` clean (conformance-docs.log). The fixture `canon.fixture.json` is compared by `atip_check_39`/`_40` in the nextest run.
+
+## Checks
+- `cargo build --locked -p canon-cli`: passes (the lock file pins c6c1a1d).
+- `cargo nextest run --workspace --locked --no-fail-fast` on a clean worktree at a5f6b6ba0: 3817 tests run, 3817 passed, 2 skipped (nextest-summary.log, junit.xml bound below). An earlier run at the commit before the `atip_crate12` fix stopped at that one failure and is not the evidence.
+- `just atip-deep` with the checker `atip-check-v0.2.0` (atip 0.2.0) and `--contract 1.4`: `L2 met: 74 MUST passed, 0 MUST failed, 0 MUST unprovided, 7 not applicable, 1 SHOULD advisories`, 6 min 1 s wall on a busy machine (the 0.36 run took 3 min 3 s) (atip-deep.log). The one advisory is the same SHOULD row as before.
+- Assumption "the checker 0.2.0 judges the 1.4 claim in the same rows as 0.1.4" holds: the checker `atip-check-v0.1.4` on the 0.36.0 build gives `L2 met: 74 MUST passed, 0 MUST failed, 0 MUST unprovided, 7 not applicable, 1 SHOULD advisories`, and the 93 verdict lines (pass/fail/unsupported, with their text) are identical line by line (atip-deep-0.1.4-checker-on-0.36.0-binary.log against atip-deep.log).
+- Assumption "the crate 0.2.0 writes a 1.4 document as 0.1.3 did" holds: the battery above.
+- `just atip` (no --deep): `L2 interface checks passed: 28 MUST passed, 0 MUST failed, 0 MUST unprovided, 2 not applicable, 0 SHOULD advisories`, 17 s (just-atip.log).
+- `just lint` passes (lint.log), `scripts/check_visibility.sh` passes.
+- Search for the old tag names: search.txt. Only three lines of the 0.36.0 release notes in CHANGELOG.md remain (history of a shipped release); nothing else.

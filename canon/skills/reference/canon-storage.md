@@ -192,7 +192,7 @@ section listing them and emits a matching stderr `WARN`.
 
 ## Retention, export, and access audit
 
-`canon purge --kind <kind> --before <RFC3339> [--commit --plan-digest <planDigest>] [--repo <dir>] [--json]`
+`canon purge --kind <kind> --before <RFC3339 date or date-time> [--commit --plan-digest <planDigest>] [--repo <dir>] [--json]`
 is the canonical data-lifecycle boundary: the bare run previews: it prints the removal set and
 its `planDigest` and deletes nothing; `--commit --plan-digest <planDigest>` deletes only if
 the plan recomputed now has the same digest (`PLAN_STALE`, exit 2, when the
@@ -220,7 +220,7 @@ human's review and `--commit --plan-digest`), and an export's page state (`total
 file and answers with `data: { output, kind, recordCount }`; `--dry-run`
 answers with what it would write and writes nothing.
 
-`canon export --kind <kind> [--before <RFC3339>] [--after <RFC3339>]
+`canon export --kind <kind> [--before <RFC3339 date or date-time>] [--after <RFC3339 date or date-time>]
 [--output <file>] [--json] [--limit <n> | --all] [--cursor <c>]` emits a versioned manifest containing source scope,
 counts, digests, and redacted metadata. It does not authorize backend access;
 credentials remain an operator prerequisite. New output files are mode
