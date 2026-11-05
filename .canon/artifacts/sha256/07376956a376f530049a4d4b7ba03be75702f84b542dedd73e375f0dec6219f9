@@ -1,0 +1,4 @@
+canon 0.36.0 (built at ab16057f0) against this change: `canon schema --json` for the tree, every group and every command, and `schema <command> --schemas --json` for every command
+184 answers; 0 byte-identical; 183 identical once `contractVersion`/`schemaVersion` 1.4 -> 1.5 and the text of every `pattern` are set aside; 1 differ otherwise
+answers that differ in more than the declaration and the pattern text: ['status.schemas.json']: the member `treeUnchanged` of the schema `BriefStatus`, which `canon-0-37-approval-evidence` (merged before this change) added; nothing of this change
+184 answers differ from 0.36.0 (every answer that carries the declaration or a pattern)

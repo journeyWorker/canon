@@ -1,0 +1,42 @@
+   Compiling canon-cli v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.30s
+     Running tests/docs_generated.rs (/Volumes/External/build/cargo/canon-Claim15/debug/deps/docs_generated-da83a4bacb3eab3f)
+
+running 2 tests
+test the_files_that_need_blocks_have_them ... ok
+test every_generated_block_is_what_the_spec_renders ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+   Compiling canon-cli v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.52s
+     Running tests/cli_spec.rs (/Volumes/External/build/cargo/canon-Claim15/debug/deps/cli_spec-3e100a515ac1647d)
+
+running 12 tests
+test every_leaf_has_one_facts_row_and_every_row_a_leaf ... ok
+test every_env_var_the_sources_read_is_in_the_spec_or_the_internal_allowlist ... ok
+test a_command_document_says_everything_an_agent_needs ... ok
+test no_embedded_schema_names_its_own_base_uri ... ok
+test every_node_of_the_clap_tree_is_in_the_spec_and_the_reverse ... ok
+test the_relations_the_guides_draw_are_the_constraints_of_the_documents ... ok
+test the_checked_in_spec_is_the_generated_one ... ok
+test the_spec_carries_what_d2_promises ... ok
+test two_generations_are_byte_identical ... ok
+test completion_refuses_a_shell_it_does_not_know_and_needs_no_repo ... ok
+test completion_writes_a_script_for_each_shell ... ok
+test completion_json_is_the_script_in_an_envelope ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.62s
+
+   Compiling canon-cli v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.65s
+     Running tests/conformance.rs (/Volumes/External/build/cargo/canon-Claim15/debug/deps/conformance-e002bfc4c9b91297)
+
+running 4 tests
+test normalization_rules_rewrite_only_the_documented_values ... ok
+test ledger_digest_rule_rewrites_only_ledger_record_paths ... ok
+test mismatch_diff_is_unified_with_context ... ok
+test conformance_corpus_replays_byte_exact ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.24s
+

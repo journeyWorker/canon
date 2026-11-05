@@ -1,0 +1,54 @@
+cargo build --locked -p canon-cli
+   Compiling canon-fmt v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-fmt)
+   Compiling canon-policy v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-policy)
+   Compiling canon-gate v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-gate)
+   Compiling canon-vocab v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-vocab)
+   Compiling canon-learn v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-learn)
+   Compiling canon-cli v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 30.27s
+atip check --bin /Volumes/External/build/cargo/canon-Claim15/debug/canon --level L2 --contract 1.5 --fixture crates/canon-cli/tests/atip/canon.fixture.json
+prepare: git init -q
+prepare: git -c user.name=fixture -c user.email=fixture@example.invalid commit --allow-empty -qm fixture
+prepare: sh -c mkdir -p packages/dashboard/dist && echo '{"name":"@canon-dev/dashboard"}' > packages/dashboard/package.json && echo '<!doctype html><title>stub</title>' > packages/dashboard/dist/index.html
+pass       MUST   L0.version (spec 4.6)
+pass       SHOULD L0.version-format (spec 4.6)
+pass       MUST   L0.unknown-command (spec 4.4, 6.4, 6.6, 6.11, 7.2)
+pass       MUST   L0.unknown-command-text (spec 5.3)
+pass       SHOULD L0.text-error-form (spec 7.4)
+pass       MUST   L0.bare (spec 7.2, 9.2)
+pass       MUST   L0.unknown-option (spec 4.4, 6.6, 9.9)
+pass       MUST   L0.json-mode-preparse (spec 4.4)
+pass       MUST   L0.after-dashdash (spec 4.4)
+pass       MUST   L0.ok-exit (spec 6.2, 6.4, 7.3.2, 7.3.3, 8.1, 8.3.1, 8.4)
+pass       MUST   L0.no-null (spec 6.5)
+pass       MUST   L0.envelope (spec 6.1-6.6)
+pass       MUST   L0.compact (spec 5.4)
+pass       MUST   L0.one-document (spec 5.1) [--deep adds the `ok` invocations of the fixture's commands]
+unsupported SHOULD L0.contract (spec 6.6): the claim is 1.5: L0.contract-version owns the presence of meta.contract
+pass       MUST   L0.contract-version (spec 6.6, 10.1.4, 10.13 rule 16, 15.7, 15.8)
+pass       MUST   L0.stderr-result (spec 5.2)
+pass       SHOULD L0.stderr-quiet (spec 5.2)
+pass       MUST   L0.next (spec 6.8)
+pass       MUST   L0.no-prompt (spec 5.5) [--deep adds the run on a terminal, and the `missingValue` invocations after the first] (not run: dashboard)
+pass       MUST   L0.registry (spec 7.3.4, 7.5, 7.6.2, 17.3) [--deep adds `schema --error <CODE>` and `schema --warning <CODE>` for each code the tool lists]
+unsupported SHOULD L0.usage-hint (spec 7.1.3): no envelope the run saw carries what this check judges
+pass       MUST   L0.hint-form (spec 7.1.2)
+pass       MUST   L1.tree (spec 10.3, 10.13)
+pass       MUST   L1.schemas (spec 9.1.1, 9.8.2, 9.9.3, Annex S2 rules 2, 10, 13) [--deep adds `schema <path> --schemas --json` for every other command, and for a group]
+pass       MUST   L1.help-json (spec 4.4.1) [--deep adds `<command> --help --json`, `nosuch-xyz --help --json` and `nosuch-xyz --version --json`]
+pass       MUST   L1.registry (spec 7.2.1, 7.3) [--deep adds the error codes of each command document]
+pass       MUST   L1.code-names (spec 7.2, Annex S2 rule 14)
+pass       MUST   L1.reasons (spec 7.6.1, 7.6.2) [--deep adds `schema --error <CODE>` for each code the tool lists]
+pass       SHOULD L1.reasons-reserved (spec 7.2.3)
+pass       MUST   L1.warnings (spec 7.5.2, 7.5.3, 10.1) [--deep adds `schema --warning NOSUCH_XYZ`]
+pass       SHOULD L1.depth (spec 9.1)
+pass       MUST   L1.next (spec 6.8) [--deep adds running the `next` entries of read commands] (not run: dashboard)
+pass       MUST   L1.help-line (spec 4.7)
+pass       MUST   L2.help-guide (spec 4.8)
+not run without --deep: L0.no-env-switch, L0.no-env-switch-text, L0.page, L0.refusal-effects, L0.global-on-group, L1.no-state, L1.walk, L1.quoted-path, L1.schema-errors, L1.reserved-applicable, L1.codes-known, L1.groups-not-runnable, L1.grammar, L1.one-meaning, L1.one-meaning-values, L1.examples, L1.example-runs, L1.constraints, L1.domains, L1.patterns, L1.numbers, L1.validators, L1.check-order, L1.output-data, L1.hint-command, L1.defaults, L1.deterministic, L1.paging, L1.fields, L2.input-present, L2.input-example, L2.input-refusals, L2.input-tty, L2.input-usage, L2.input-reasons, L2.input-fragment, L2.input-normalise, L2.input-conflict, L2.input-env, L2.input-pointer, L2.input-dash-values, L2.batch-preflight, L2.batch-incomplete, L2.batch-ok, L2.idempotency, L2.destructive-safety, L2.destructive-preview, L2.destructive-preview-stdin, L2.destructive-stale, L2.destructive-half, L2.destructive-commit, L2.async, L2.operation-key, L2.stream, L2.skills, L2.guide-commands, L2.search, L2.effects
+L2 interface checks passed (--deep for the rest): 28 MUST passed, 0 MUST failed, 0 MUST unprovided, 2 not applicable, 0 SHOULD advisories
+
+real	0m35.987s
+user	0m4.174s
+sys	0m2.110s
+just atip exit 0

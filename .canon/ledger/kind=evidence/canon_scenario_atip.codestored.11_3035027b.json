@@ -1,0 +1,69 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-5",
+    "role": "implementer",
+    "session_id": "s-0-37-claim-1-5"
+  },
+  "at": "2026-11-05T13:19:51.429682Z",
+  "attachments": [
+    {
+      "case": "adapter::tests::atip_codestored_11_a_response_file_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "artifacts::tests::atip_codestored_11_a_canon_yaml_the_artifact_store_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "dispatch::tests::atip_codestored_11_a_manifest_or_plan_document_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "evidence_attach::tests::atip_codestored_11_a_binding_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "read_cause::tests::atip_codestored_11_a_read_the_system_fails_for_a_repeat_to_pass_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "review::tests::atip_codestored_11_a_review_artifact_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    }
+  ],
+  "code_tree": "a50d9de6eec3d1bdba2244a9908f12a31be06ade",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "cargo nextest run --workspace --locked --no-fail-fast (canon-0-37-claim-1-5; 3848 tests passed at 95d68d37f, the atip crate at atip-crate-v0.2.0, canon declares 1.5); just atip, just atip-deep (L2 met: 74 MUST passed, L1.patterns passes), lint, visibility and the docs and conformance bless (no diff) are attached to atip.claim15.01, .10 and .12; the patterns of 0.36.0 against 1.5 to .03 and .04"
+  },
+  "evidence_sha": "95d68d37f5b636526d663887a395ccfe68a2df35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 166,
+  "scenario_id": "atip.codestored.11",
+  "schema": 1,
+  "staging_id": "183fb340",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

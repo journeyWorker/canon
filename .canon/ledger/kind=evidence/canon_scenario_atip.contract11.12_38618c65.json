@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-5",
+    "role": "implementer",
+    "session_id": "s-0-37-claim-1-5"
+  },
+  "at": "2026-11-05T13:20:18.331744Z",
+  "attachments": [
+    {
+      "path": "target/evidence/contract11-12.txt",
+      "sha256": "820d229ce8ceec455f4d3f97c2b7d8106c24d0cb226b97033d62d10a038bc0d9"
+    }
+  ],
+  "code_tree": "a50d9de6eec3d1bdba2244a9908f12a31be06ade",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "bun test packages/dashboard/test/envelope-tolerance.test.ts; bun test packages/cli/test/launcher.test.ts; python3 -m unittest evals.dogfood.test_trace_check"
+  },
+  "evidence_note": {
+    "summary": "4 + 5 + 36 tests pass at 95d68d37f (canon-0-37-claim-1-5)"
+  },
+  "evidence_sha": "95d68d37f5b636526d663887a395ccfe68a2df35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 350,
+  "scenario_id": "atip.contract11.12",
+  "schema": 1,
+  "staging_id": "646dcb6f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

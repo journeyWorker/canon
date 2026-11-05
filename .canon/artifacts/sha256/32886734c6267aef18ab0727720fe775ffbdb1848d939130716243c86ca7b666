@@ -1,0 +1,89 @@
+canon-0-37-claim-1-5: the 17 distinct patterns of 0.36.0 that listed white space by hand, the 59 places that declared them, and the pattern of each place now
+(lengths are characters of the decoded pattern; the values are held equal by atip.claim15.04)
+
+5 places, 25 -> 28 characters
+  places: evidence add --actor, evidence add --summary, evidence audit --actor, evidence audit --summary, finding add --file-ref
+  before: "^[^\\n\\r\u000b\f\u0085\\p{Zl}\\p{Zp}]*$"
+  after:  "^[\\P{White_Space}\\p{Zs}\\t]*$"
+
+2 places, 40 -> 25 characters
+  places: brief approve --relayed-via, policy approve --relayed-via
+  before: "^[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000()\"']+$"
+  after:  "^[^\\p{White_Space}()\"']+$"
+
+7 places, 45 -> 27 characters
+  places: divergence accept --reason, divergence accept --tracking, evidence add --class, evidence add --ref, evidence audit --ref, finding add --introduced-rev, search text
+  before: "^[^\u0000]*[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000][^\u0000]*$"
+  after:  "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
+
+2 places, 51 -> 33 characters
+  places: subject move --override-reason, subject move --reason
+  before: "^[^\\n\\r]*[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000][^\\n\\r]*$"
+  after:  "^[^\\n\\r]*\\P{White_Space}[^\\n\\r]*$"
+
+3 places, 75 -> 45 characters
+  places: regime show --area, regime show --repo-name, regime show --role-segment
+  before: "^[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000/]*[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000/][^\u0000]*$"
+  after:  "^[\\p{White_Space}/]*[^\\p{White_Space}/][^\u0000]*$"
+
+1 places, 79 -> 43 characters
+  places: evidence add --approver
+  before: "^[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]([^\\n\\r]*[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000])?$"
+  after:  "^\\P{White_Space}([^\\n\\r]*\\P{White_Space})?$"
+
+2 places, 80 -> 44 characters
+  places: evidence add --surface-ref, evidence approval-payload --surface-ref
+  before: "^[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]([^\\n\\r\u0000]*[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000])?$"
+  after:  "^\\P{White_Space}([^\\n\\r\u0000]*\\P{White_Space})?$"
+
+4 places, 81 -> 69 characters
+  places: finding add --actor, finding add --summary, finding close --reason, tree --override-reason
+  before: "^[^\\n\\r\u000b\f\u0085\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000][^\\n\\r\u000b\f\u0085\\p{Zl}\\p{Zp}]*$"
+  after:  "^[\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space}[\\P{White_Space}\\p{Zs}\\t]*$"
+
+1 places, 85 -> 51 characters
+  places: regime show --hash
+  before: "^[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*[0-9A-Fa-f]{6,64}[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*$"
+  after:  "^\\p{White_Space}*[0-9A-Fa-f]{6,64}\\p{White_Space}*$"
+
+11 places, 93 -> 63 characters
+  places: divergence accept --session, evidence add --session, evidence audit --session, finding add --session, finding close --session, review change --session, review scenario --session, tree --reviewer-harness, tree --reviewer-model, tree --reviewer-provider, tree --session
+  before: "^[^\\p{Cc} \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]([^\\p{Cc}]*[^\\p{Cc} \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000])?$"
+  after:  "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$"
+
+3 places, 94 -> 61 characters
+  places: evidence approval-payload --approver, evidence audit --evaluator, evidence audit --evaluator-version
+  before: "^[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]([^\\n\\r\u000b\f\u0085\\p{Zl}\\p{Zp}]*[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000])?$"
+  after:  "^\\P{White_Space}([\\P{White_Space}\\p{Zs}\\t]*\\P{White_Space})?$"
+
+1 places, 101 -> 67 characters
+  places: init --language
+  before: "^[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*$"
+  after:  "^\\p{White_Space}*[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*\\p{White_Space}*$"
+
+2 places, 106 -> 57 characters
+  places: brief approve --actor, policy approve --actor
+  before: "^[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*[^ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000()\"']+[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*$"
+  after:  "^\\p{White_Space}*[^\\p{White_Space}()\"']+\\p{White_Space}*$"
+
+1 places, 124 -> 79 characters
+  places: retrieve --regime
+  before: "^[^/ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]+/[^/ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]+/[^/ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]+/[0-9a-f]{6,64}$"
+  after:  "^[^/\\p{White_Space}]+/[^/\\p{White_Space}]+/[^/\\p{White_Space}]+/[0-9a-f]{6,64}$"
+
+1 places, 143 -> 109 characters
+  places: trace id
+  before: "^[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*$"
+  after:  "^\\p{White_Space}*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)\\p{White_Space}*$"
+
+11 places, 234 -> 183 characters
+  places: divergence accept --expiry, divergence add --expiry, divergence defer --expiry, divergence list --as-of, evidence add --approval-at, export --after, export --before, purge --before, query --since, strategy rollback --approval-at, tree --approval-at
+  before: "^([ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*[-+]?[0-9]+-[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*[0-9]{1,2}-[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+\u2212][0-9]{2}:[0-9]{2}))$"
+  after:  "^(\\p{White_Space}*[-+]?[0-9]+-\\p{White_Space}*[0-9]{1,2}-\\p{White_Space}*[0-9]{1,2}|[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+\u2212][0-9]{2}:[0-9]{2}))$"
+
+2 places, 435 -> 299 characters
+  places: skills install --providers, tree --providers
+  before: "^([ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*|[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*[Nn][Oo][Nn][Ee][ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*|([ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*,)*[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*(,[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])[ \\t\\n\u000b\f\\r\u0085\u00a0\u1680\u2000-\u200a\\p{Zl}\\p{Zp}\u202f\u205f\u3000]*)?)*)$"
+  after:  "^(\\p{White_Space}*|\\p{White_Space}*[Nn][Oo][Nn][Ee]\\p{White_Space}*|(\\p{White_Space}*,)*\\p{White_Space}*([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*(,\\p{White_Space}*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])\\p{White_Space}*)?)*)$"
+
+59 declarations: 6824 -> 4894 characters

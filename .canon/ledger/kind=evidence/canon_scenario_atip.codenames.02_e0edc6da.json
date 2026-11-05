@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-claim-1-5",
+    "role": "implementer",
+    "session_id": "s-0-37-claim-1-5"
+  },
+  "at": "2026-11-05T13:19:51.429682Z",
+  "attachments": [
+    {
+      "case": "atip_codenames_02_a_source_that_builds_an_old_name_does_not_match_the_registry",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    },
+    {
+      "case": "atip_codenames_02_an_old_name_is_in_no_registry_view_and_no_command_lists_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "7857d675c3ba2766585862cb633ea6383274ad8df7d27eeb1477b6c8348d76ae"
+    }
+  ],
+  "code_tree": "a50d9de6eec3d1bdba2244a9908f12a31be06ade",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "cargo nextest run --workspace --locked --no-fail-fast (canon-0-37-claim-1-5; 3848 tests passed at 95d68d37f, the atip crate at atip-crate-v0.2.0, canon declares 1.5); just atip, just atip-deep (L2 met: 74 MUST passed, L1.patterns passes), lint, visibility and the docs and conformance bless (no diff) are attached to atip.claim15.01, .10 and .12; the patterns of 0.36.0 against 1.5 to .03 and .04"
+  },
+  "evidence_sha": "95d68d37f5b636526d663887a395ccfe68a2df35",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 148,
+  "scenario_id": "atip.codenames.02",
+  "schema": 1,
+  "staging_id": "f6facd4e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

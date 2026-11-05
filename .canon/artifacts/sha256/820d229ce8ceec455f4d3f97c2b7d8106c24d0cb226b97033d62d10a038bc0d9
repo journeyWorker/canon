@@ -1,0 +1,21 @@
+# canon-0-37-claim-1-5: contract11.12 re-run at 95d68d37f5b636526d663887a395ccfe68a2df35 (tree 49a645bf3f807cc0bd070757f43cea9fea1bd53c)
+$ bun test packages/dashboard/test/envelope-tolerance.test.ts
+bun test v1.4.4 (38afee6c8)
+
+ 4 pass
+ 0 fail
+ 14 expect() calls
+Ran 4 tests across 1 file. [32.00ms]
+$ bun test packages/cli/test/launcher.test.ts
+bun test v1.4.4 (38afee6c8)
+
+ 5 pass
+ 0 fail
+ 7 expect() calls
+Ran 5 tests across 1 file. [854.00ms]
+$ python3 -m unittest evals.dogfood.test_trace_check
+....................................
+----------------------------------------------------------------------
+Ran 36 tests in 0.358s
+
+OK

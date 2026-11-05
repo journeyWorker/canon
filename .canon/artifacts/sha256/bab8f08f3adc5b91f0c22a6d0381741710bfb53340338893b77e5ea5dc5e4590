@@ -1,0 +1,5 @@
+        PASS [   1.608s] (3846/3848) canon-store::e2e_scope_status_duckdb a_declared_covered_evidenced_scenario_resolves_fully_green_in_one_query
+        PASS [   2.074s] (3847/3848) canon-store::e2e_write_age_query_duckdb write_age_query_and_duckdb_views_round_trip_across_all_three_tiers
+        PASS [  30.036s] (3848/3848) canon-store pg_tier::tests::connect_time_outage_classifies_as_tier_unavailable_not_sql
+────────────
+     Summary [ 662.218s] 3848 tests run: 3848 passed (24 slow), 2 skipped

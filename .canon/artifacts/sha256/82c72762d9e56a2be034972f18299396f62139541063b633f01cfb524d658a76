@@ -1,0 +1,31 @@
+cargo clippy --workspace --all-targets --locked -- -D warnings
+    Checking canon-model v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-model)
+   Compiling canon-cli v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-cli)
+    Checking canon-store v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-store)
+    Checking canon-policy v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-policy)
+    Checking canon-fmt v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-fmt)
+    Checking canon-ingest v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-ingest)
+    Checking canon-gate v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-gate)
+    Checking canon-report v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-report)
+    Checking canon-plugin v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-plugin)
+    Checking canon-learn v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-learn)
+    Checking canon-vocab v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-vocab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.34s
+cargo clippy --workspace --lib --bins --locked -- -D warnings -D clippy::unwrap_used
+    Checking canon-model v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-model)
+   Compiling canon-cli v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-cli)
+    Checking canon-store v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-store)
+    Checking canon-fmt v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-fmt)
+    Checking canon-policy v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-policy)
+    Checking canon-ingest v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-ingest)
+    Checking canon-gate v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-gate)
+    Checking canon-report v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-report)
+    Checking canon-plugin v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-plugin)
+    Checking canon-learn v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-learn)
+    Checking canon-vocab v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-vocab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.43s
+cargo clippy -p canon-store --all-targets --features live-pg,live-r2 --locked -- -D warnings
+    Checking canon-model v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-model)
+    Checking canon-store v0.36.0 (/Volumes/External/tmp/claim-1-5/fresh2/crates/canon-store)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.25s
+lint+visibility exit 0
