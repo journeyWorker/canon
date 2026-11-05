@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-values",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-values-rev"
+  },
+  "at": "2026-11-05T15:56:48.195575Z",
+  "change_id": "canon-0-37-option-values",
+  "code_tree": "965fd3dccd1265f6e584194abb2cb5cd4fbece70",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "kind": "finding",
+  "reviewed_sha": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "reviewer": "rev-0-37-option-values",
+  "round": 1,
+  "scenario_ids": [
+    "atip.optionvalues.14"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "The Codes that moved paragraph lacks code moves a real-binary old-vs-new probe shows: divergence accept with a blank relayed --approver USAGE -> DIVERGENCE_ARGUMENT_INVALID (the paragraph names only brief approve and policy approve); evidence add --approver with VT, FF, U+0085, U+2028 or U+2029 inside EVIDENCE_ARGUMENT_INVALID -> EVIDENCE_APPROVAL_INVALID; retrieve --domain with an empty value RETRIEVE_INVALID -> USAGE; strategy rollback --actor with a control character STRATEGY_SIGNER_DENIED -> STRATEGY_ARGUMENT_INVALID; a relayed divergence accept --actor with a tab inside USAGE -> DIVERGENCE_ARGUMENT_INVALID (brief approve, policy approve and migrate keep USAGE). All were refused before and still are, so no table row is missing, but the paragraph says what moved.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-option-values",
+    "role": "reviewer",
+    "session_id": "s-0-37-option-values-rev"
+  },
+  "at": "2026-11-05T15:56:46.203899Z",
+  "change_id": "canon-0-37-option-values",
+  "code_tree": "965fd3dccd1265f6e584194abb2cb5cd4fbece70",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_by": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "kind": "finding",
+  "reviewed_sha": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "reviewer": "rev-0-37-option-values",
+  "round": 1,
+  "scenario_ids": [
+    "atip.optionvalues.14"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "The CHANGELOG Breaking table has no row for the other control characters 0.36.0 accepted and 0.37 refuses: U+0001-0008, U+000E-001A, U+001C-001F, U+007F, U+0080-009F except U+0085 (real-binary old-vs-new: scenario new --actor, finding add --summary, subject move --reason and --override-reason, divergence add --actor all take a\\x7fb and a\\x9fb in 0.36.0 and refuse them now, in all 43 cells of the six options). The class list stops at escape-inside and vt-ff-inside and the golden option_values_0_36.json never measured them, so atip.optionvalues.14 cannot see the gap; brief F7 wants a row for every newly refused value. Add a class (e.g. other-control) to the golden and to the rows of every cell the control rule is new for.",
+  "worktree_dirty": false
+}
