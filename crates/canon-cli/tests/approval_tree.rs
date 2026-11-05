@@ -306,7 +306,8 @@ fn gate_approval_tree_05_without_the_change_review_the_move_is_refused_with_exit
     let out = ship(r);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out.stderr));
     let err = text(&out.stderr);
-    assert!(err.contains("canon review change bump-client"), "the refusal leads with the review command: {err}");
+    let problem = err.lines().find(|l| l.contains(REVIEW_REFUSAL)).unwrap_or_else(|| panic!("the refusal names the missing review: {err}"));
+    assert!(problem.contains("canon review change bump-client"), "the problem line carries the command that records the review: {problem}");
     assert!(!err.contains("evidence add"), "{err}");
     let steps = status_steps(r);
     assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review change bump-client"), "{steps:?}");
@@ -319,6 +320,47 @@ fn gate_approval_tree_05_without_the_change_review_the_move_is_refused_with_exit
     assert_eq!(out.status.code(), Some(2), "{}", text(&out.stderr));
     let err = text(&out.stderr);
     assert!(err.contains("canon review change bump-client") && !err.contains(GAP_REFUSAL), "the edited brief needs a new review and still no evidence: {err}");
+}
+
+/// gate.approval-tree.14: the quire shape. A chore is approved, reviewed, its
+/// code is committed with no evidence, and the same brief is approved again over
+/// that code: the approval records the new tree and asks for no evidence, but the
+/// review saw the code before and no longer counts.
+#[test]
+fn gate_approval_tree_14_a_chore_approved_again_over_code_that_came_after_its_review_asks_for_its_review_again() {
+    let dir = repo();
+    let r = dir.path();
+    approve(r);
+    let review = ["review", "change", "bump-client", "--actor", "reviewer-3", "--role", "reviewer", "--original-spec-ref", ".canon/changes/bump-client/brief.md"];
+    ok(r, &review);
+    let human = ok(r, &["status"]);
+    assert!(human.contains("so it asks for no evidence") && !human.contains("review is still asked"), "a current review of this code: the line does not ask for it: {human}");
+
+    write(r, "src/lib.rs", "pub fn cart() { /* the chore's code, after its review */ }\n");
+    commit_all(r, "the chore's code");
+    let err = text(&ship(r).stderr);
+    assert!(err.contains(GAP_REFUSAL), "before the re-approval the chore's code asks for the evidence: {err}");
+
+    approve(r);
+    assert_eq!(canon_cli::brief::approval_tree(&approval_line(&read(r, CHORE_BRIEF))), Some(code_tree_now(r).as_str()));
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out.stderr));
+    let err = text(&out.stderr);
+    assert!(!err.contains(GAP_REFUSAL), "the chore asks for no evidence: {err}");
+    assert!(err.contains("saw other code than the approval it stands on") && err.contains("canon review change bump-client"), "the review of other code no longer counts: {err}");
+    let gate = gate_review_violations(r);
+    assert!(gate.len() == 1 && gate[0].contains("saw other code"), "gate check names the same review: {gate:?}");
+    assert!(gate_evidence_violations(r).is_empty());
+    let steps = status_steps(r);
+    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review change bump-client"), "{steps:?}");
+    assert!(ok(r, &["status"]).contains("so it asks for no evidence; its change-level review is still asked"));
+
+    ok(r, &review);
+    let human = ok(r, &["status"]);
+    assert!(human.contains("so it asks for no evidence") && !human.contains("review is still asked"), "{human}");
+    let out = ship(r);
+    assert!(out.status.success(), "a review of the new code stands: {}", text(&out.stderr));
+    assert_eq!(subject_status(r), "shipped");
 }
 
 /// gate.approval-tree.06: code changed after the approval: the scenarios and
@@ -501,11 +543,16 @@ fn changelog_problems(section: &str) -> Vec<String> {
         ("the marker of the approval line, `(code tree <id>)`", "(code tree <id>)"),
         ("that the marker is outside the digest", "outside the brief digest"),
         ("that an approval written before 0.37 behaves as it did", "written before 0.37"),
+        ("that a review of other code no longer counts", "review of other code"),
         ("that the change review is still asked", "change-level review"),
     ] {
         if !entry.contains(needle) {
             problems.push(format!("the entry does not say {what} (`{needle}`)"));
         }
+    }
+    let hand_edit = "edited by hand like the approval time";
+    if !changed.contains(hand_edit) {
+        problems.push(format!("`### Changed` does not say that the marker, outside the digest, can be edited by hand like the approval time (`{hand_edit}`)"));
     }
     problems
 }
@@ -522,11 +569,13 @@ fn gate_approval_tree_12_the_changelog_names_the_rule_and_the_new_information_of
 #[test]
 fn gate_approval_tree_13_a_changelog_without_the_entry_is_named_by_the_release_check() {
     let section = unreleased();
-    assert_eq!(changelog_problems("## Unreleased\n\n### Changed\n\n- Something else.\n").len(), 1 + 6, "an empty Changed section names the entry and each piece");
+    assert_eq!(changelog_problems("## Unreleased\n\n### Changed\n\n- Something else.\n").len(), 1 + 7 + 1, "an empty Changed section names the entry, each piece of it and the hand-edit line");
     let without_entry: String = section.lines().filter(|l| !l.contains("canon-0-37-approval-evidence")).collect::<Vec<_>>().join("\n");
     assert!(changelog_problems(&without_entry).iter().any(|p| p.contains("no entry")), "{:?}", changelog_problems(&without_entry));
     let without_marker = section.replace("(code tree <id>)", "the tree marker");
     assert!(changelog_problems(&without_marker).iter().any(|p| p.contains("(code tree <id>)")), "{:?}", changelog_problems(&without_marker));
     let without_old = section.replace("written before 0.37", "written earlier");
     assert!(changelog_problems(&without_old).iter().any(|p| p.contains("written before 0.37")), "{:?}", changelog_problems(&without_old));
+    let without_hand_edit = section.replace("edited by hand like the approval time", "edited");
+    assert!(changelog_problems(&without_hand_edit).iter().any(|p| p.contains("edited by hand like the approval time")), "{:?}", changelog_problems(&without_hand_edit));
 }

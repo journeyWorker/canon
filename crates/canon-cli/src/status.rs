@@ -1025,7 +1025,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         red,
         flow,
         reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, &derived.code_tree, subject) } else { Vec::new() },
-        chore_reviews: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::chore_review_gaps(repo, ctx, subject) } else { Vec::new() },
+        chore_reviews: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::chore_review_gaps(repo, ctx, &derived.code_tree, subject) } else { Vec::new() },
     }
 }
 
@@ -1603,7 +1603,9 @@ pub fn render(report: &StatusReport) -> String {
                     _ => writeln!(out, "      brief{of}: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
                 if brief.tree_unchanged {
-                    let _ = writeln!(out, "      chore{of}: the code tree is the one it was approved on, so it asks for no evidence; its change-level review is still asked");
+                    // The review is named only when the gate asks for it: no current review of this code is on record.
+                    let asked = s.chore_reviews.iter().any(|(change, _)| Some(change.as_str()) == brief.change.as_deref());
+                    let _ = writeln!(out, "      chore{of}: the code tree is the one it was approved on, so it asks for no evidence{}", if asked { "; its change-level review is still asked" } else { "" });
                 }
             }
             if !s.pending_drafts.is_empty() {

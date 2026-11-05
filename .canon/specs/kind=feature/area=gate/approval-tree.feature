@@ -54,8 +54,8 @@ Feature: gate approval-tree
   Scenario: Without the change review the move to shipped is refused with exit 2 and the review command leads
     Given the same subject and an approved chore over unchanged code, with no change-level review
     When the subject is moved to shipped
-    Then it exits 2 and the refusal names the missing review of the chore
-    And the hint leads with `canon review change <chore> …` and no `canon evidence add` command appears
+    Then it exits 2 and the refusal names the missing review of the chore and the `canon review change <chore> …` command that records it
+    And `canon status` leads with that command, and no `canon evidence add` command appears
 
   # canon: {"schema":1,"at":"2026-11-05T10:32:41Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
   @subject:gate-trust-spine
@@ -131,7 +131,7 @@ Feature: gate approval-tree
   Scenario: The CHANGELOG says an unchanged-tree chore approval asks for no evidence and names the new information of the approval line
     Given the CHANGELOG
     When its Unreleased section is read
-    Then a Changed entry says a chore approval over an unchanged code tree asks for no evidence, names the `(code tree <id>)` marker of the approval line, and says an approval written before 0.37 behaves as it did
+    Then a Changed entry says a chore approval over an unchanged code tree asks for no evidence, names the `(code tree <id>)` marker of the approval line, says a review of other code no longer counts, says the marker is outside the digest and can be edited by hand like the approval time, and says an approval written before 0.37 behaves as it did
 
   # canon: {"schema":1,"at":"2026-11-05T10:33:05Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
   @subject:gate-trust-spine
@@ -142,3 +142,15 @@ Feature: gate approval-tree
     Given the CHANGELOG's Unreleased section without that entry, and without the marker or the line about older approvals
     When the release check reads it
     Then it names each missing piece, and the real section has none
+
+  # canon: {"schema":1,"at":"2026-11-05T12:21:16Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @flow:canon-0-37-approval-evidence.F2
+  @gate.approval-tree.14
+  Scenario: A chore approved again over code that came after its review asks for its review again, though it asks for no evidence
+    Given a verifying subject and a chore approved over the code as it is, with a signed change review of that code
+    When the chore's code is committed afterwards, with no evidence recorded for it, and the same brief is approved again over that code
+    Then the approval records the new tree and the chore asks for no evidence, but the earlier review saw other code and no longer counts
+    And the move to shipped is refused with exit 2 naming the review of other code, `gate check` names the same review, and `canon status` leads with `canon review change <chore> …` and says the review is still asked
+    And once a reviewer signs the chore over the new code the move succeeds, and `status` no longer says the review is asked

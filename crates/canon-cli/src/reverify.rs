@@ -20,7 +20,10 @@
 //! [`crate::brief::approval_tree`]) asks for no evidence at all while that
 //! tree is the current code tree: the chore changed no code since the human
 //! approved it, whatever tree each scenario's latest evidence is on. The
-//! change-level review is still asked. An approval with no recorded tree
+//! change-level review is still asked, and it must be of that code
+//! ([`canon_gate::review_gate::change_review_gap`]'s `on_tree`): a review that
+//! saw other code (the same brief approved again over code that came after
+//! the review) does not count. An approval with no recorded tree
 //! (written before 0.37, or with no git commit) keeps the rule above.
 //!
 //! New evidence stales a pinned review, so the re-review follows with no
@@ -233,13 +236,21 @@ fn multi_root(repo: &Path) -> bool {
 /// The approved chore changes of `subject` that lack a qualifying
 /// change-level review (0.23 D5), each with why. Only when
 /// `require_review` is active and covers `shipped`: a repo with no review
-/// policy asks no one to review.
-pub fn chore_review_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(ChangeId, String)> {
+/// policy asks no one to review. A chore that asks for no evidence because its
+/// approval saw the current code tree (0.37) needs a review of that code
+/// ([`change_review_gap`]'s `on_tree`).
+pub fn chore_review_gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<(ChangeId, String)> {
     let Some((rr, _)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) else { return Vec::new() };
-    chore_approvals(repo, ctx, subject)
+    let approvals = chore_approvals(repo, ctx, subject);
+    // Computed only for an approval that recorded a tree.
+    let current = approvals.iter().any(|approval| approval.tree.is_some()).then(|| code_tree.get(repo)).flatten();
+    approvals
         .into_iter()
         .filter(|approval| !reviewed_scenario_by_scenario_since(ctx, subject, approval.at))
-        .filter_map(|ChoreApproval { change, digest, .. }| change_review_gap(ctx, subject, &change, &digest, rr.distinct_actor).map(|why| (change, why)))
+        .filter_map(|approval| {
+            let on_tree = if approval.saw(current) { approval.tree.as_deref() } else { None };
+            change_review_gap(ctx, subject, &approval.change, &approval.digest, rr.distinct_actor, on_tree).map(|why| (approval.change.clone(), why))
+        })
         .collect()
 }
 
@@ -293,7 +304,7 @@ pub fn gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &
 /// The `verifying → shipped` violations of the chore trigger: one
 /// `uncovered-cell` per unapproved-by-evidence chore, naming `subject`.
 pub fn chore_violations(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<Violation> {
-    let reviews = chore_review_gaps(repo, ctx, subject).into_iter().map(|(change, why)| {
+    let reviews = chore_review_gaps(repo, ctx, code_tree, subject).into_iter().map(|(change, why)| {
         Violation::new(
             FailureClass::UnreviewedPromotion,
             subject.subject_id.as_str(),

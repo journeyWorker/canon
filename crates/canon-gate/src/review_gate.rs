@@ -755,7 +755,15 @@ fn fixed_blocker_violation(ctx: &GateContext, fixed: &FixedBlocker<'_>, subjects
 /// attested none of the evidence of `subject`'s scenarios, nor from one of
 /// its sessions. [`crate::freshness`] has no scenario to compare here, so
 /// the pin check is this one comparison.
-pub fn change_review_gap(ctx: &GateContext, subject: &Subject, change: &ChangeId, brief: &SpecDigest, distinct_actor: bool) -> Option<String> {
+///
+/// With `on_tree` (0.37), the code tree a chore's approval recorded and that is
+/// still the current one, the review must also have seen that code
+/// ([`Review::code_tree`]): the chore asks for no evidence because the human
+/// approved it over this code, so the review that stands for it is a review of
+/// this code. A review of other code (the chore's code arrived after it, and the
+/// same brief was approved again) no longer counts, nor does one that recorded
+/// no tree.
+pub fn change_review_gap(ctx: &GateContext, subject: &Subject, change: &ChangeId, brief: &SpecDigest, distinct_actor: bool, on_tree: Option<&str>) -> Option<String> {
     let reviews: Vec<&Review> = ctx.reviews.iter().filter(|r| r.change_id.as_ref() == Some(change)).collect();
     let reviews: Vec<&Review> = latest_by_key(&reviews, |r| r.reviewer.clone()).into_iter().copied().collect();
     if reviews.is_empty() {
@@ -773,6 +781,20 @@ pub fn change_review_gap(ctx: &GateContext, subject: &Subject, change: &ChangeId
         let outcomes = unsigned.iter().map(|r| format!("`{}` {}", r.reviewer, r.outcome.as_str())).collect::<Vec<_>>().join(", ");
         return Some(format!("no signed review of change `{}`: the latest review recorded no sign-off ({outcomes})", change.as_str()));
     }
+    let current: Vec<&Review> = match on_tree {
+        None => current,
+        Some(tree) => {
+            let (on_code, other): (Vec<&Review>, Vec<&Review>) = current.into_iter().partition(|r| r.code_tree.as_deref() == Some(tree));
+            if on_code.is_empty() {
+                let who = other.iter().map(|r| format!("`{}`", r.reviewer)).collect::<Vec<_>>().join(", ");
+                return Some(format!(
+                    "the review of change `{}` by {who} saw other code than the approval it stands on (code tree {tree}): the chore was approved again over code that came after the review; review the chore again",
+                    change.as_str()
+                ));
+            }
+            on_code
+        }
+    };
     if !distinct_actor {
         return None;
     }
