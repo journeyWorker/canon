@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-approval-evidence",
+    "role": "reviewer",
+    "session_id": "s-0-37-approval-evidence-rev"
+  },
+  "at": "2026-11-05T12:17:02.330279Z",
+  "change_id": "canon-0-37-approval-evidence",
+  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief.rs",
+  "introduced_by": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "kind": "finding",
+  "reviewed_sha": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "reviewer": "rev-0-37-approval-evidence",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Consequence of the brief placing the marker outside the digest: anyone who can write the brief can replace the `(code tree <id>)` with the current tree and the approval stays Bound (brief check clean, status approved) while the uncovered-cell violation disappears (repro: approve, edit code, rewrite the marker to the current tree: evidence violations 1 -> 0). Same trust class as editing the approval time, which is also outside the digest, and the brief requires it, so a note: the human sees it only in the diff of brief.md. Blast radius: every reader of the line; nothing compares the marker to anything but the current tree.",
+  "worktree_dirty": false
+}

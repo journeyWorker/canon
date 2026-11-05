@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-approval-evidence",
+    "role": "reviewer",
+    "session_id": "s-0-37-approval-evidence-rev"
+  },
+  "at": "2026-11-05T12:18:05.619361Z",
+  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "kind": "review",
+  "pin": "dd758decc5cf88e1569cd1cd9335fd4307f91b88",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_approval_tree_13_a_changelog_without_the_entry_is_named_by_the_release_check"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f8cefdecf3b9a2193a27684c83adc9ff24129ea3466db2816aa002ce3f0dd03e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-37-approval-evidence/brief.md"
+  },
+  "review_id": "01M6NTA5NK704Z21QV48ZAX0ZT",
+  "reviewer": "rev-0-37-approval-evidence",
+  "scenario_id": "gate.approval-tree.13",
+  "schema": 2,
+  "worktree_dirty": false
+}

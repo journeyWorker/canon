@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-37-approval-evidence",
+    "role": "reviewer",
+    "session_id": "s-0-37-approval-evidence-rev"
+  },
+  "at": "2026-11-05T12:17:00.144995Z",
+  "change_id": "canon-0-37-approval-evidence",
+  "code_tree": "51492c3cde315611b434fcb960e8b2a61be95724",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/approval_tree.rs",
+  "introduced_by": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "kind": "finding",
+  "reviewed_sha": "d3f8ba70e099970aefb390bd23a45c3ab26c6c7b",
+  "reviewer": "rev-0-37-approval-evidence",
+  "round": 1,
+  "scenario_ids": [
+    "gate.approval-tree.05"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Spec fidelity: scenario .05 says the hint leads with `canon review change <chore> ...`. The real refusal prints that command in the message and problem line and status leads with it, but its `hint:` line is the generic \"fix each violation above\". The test asserts on the whole stderr, so it passes. Reword the scenario (the refusal leads with the review command) or assert on the hint.",
+  "worktree_dirty": false
+}
