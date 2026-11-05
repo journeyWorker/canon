@@ -131,3 +131,5 @@ canon은 `meta.contractVersion` 1.4와 L2를 선언한다. `canon schema`가 싣
 - `--approval-at`과 `--providers`(canon-0-37-option-forms).
 - 1.5 밖의 기능, L3 같은 더 높은 수준의 주장.
 - 이름 붙인 "앞뒤 공백 없는 한 줄" 도메인. 계약 1.5는 이를 더하지 않았다.
+
+Approved: Journey Hwang 2026-11-05T10:23:55Z — "승인 (재오픈 없음, 시간 옵션 전부 RFC3339, 문장도 제어 문자 전부 금지, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:e142ed16e3cab51f4bdfa64d9f9324789410ec20ffe2a030daf0e9b962569760)

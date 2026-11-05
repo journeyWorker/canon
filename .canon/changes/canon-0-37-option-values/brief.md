@@ -151,3 +151,5 @@ Source: canon 0.36.0 바이너리의 `canon schema` 옵션 정의를 잰 값, ht
 - `--approval-at`과 `--providers`(canon-0-37-option-forms).
 - 저장된 기록의 이전.
 - 닫힌 finding을 다시 여는 새 명령.
+
+Approved: Journey Hwang 2026-11-05T10:23:55Z — "승인 (재오픈 없음, 시간 옵션 전부 RFC3339, 문장도 제어 문자 전부 금지, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:0e6d2a75add99fc6d8d3be17b6dee3419295d3df6625ff7d8d2e4f92f323515b)

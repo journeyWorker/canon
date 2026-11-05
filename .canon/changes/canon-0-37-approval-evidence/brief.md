@@ -105,3 +105,5 @@ Source: canon issue #130(작은 변경 뒤의 재승인 사례 댓글), canon-0-
 - 코드 트리를 계산하는 규칙(`code.exclude`, spec root) 바꾸기.
 - chore가 아닌 변경의 승인, 증거 기록 방식, 증거 신선도의 다른 규칙.
 - 변경 단위 리뷰의 요구.
+
+Approved: Journey Hwang 2026-11-05T10:23:55Z — "승인 (재오픈 없음, 시간 옵션 전부 RFC3339, 문장도 제어 문자 전부 금지, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:7c9d9bdf4a606faf4ade1ff82ed70236ce862aca449c80dd8a4b239e5814533a)

@@ -42,3 +42,5 @@ dependency
 - 1.5 선언, 선언 패턴 바꾸기(canon-0-37-claim-1-5).
 - 옵션 값 규칙과 시각, 제공자 규칙(canon-0-37-option-values, canon-0-37-option-forms).
 - 크레이트 API를 canon에 맞춰 바꾸는 일. 태그의 API에 canon을 맞춘다.
+
+Approved: Journey Hwang 2026-11-05T10:23:55Z — "승인 (재오픈 없음, 시간 옵션 전부 RFC3339, 문장도 제어 문자 전부 금지, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:abdaf538fa729cbe8d540d91357c0078bf9eeb1a7de6e4e85d93d5d9f1e5d8ab)

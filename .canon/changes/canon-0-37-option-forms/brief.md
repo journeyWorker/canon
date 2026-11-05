@@ -111,3 +111,5 @@ Source: canon 0.36.0 바이너리가 받는 `--approval-at`과 `--providers`의 
 - 시각 옵션이 아닌 옵션의 값 규칙(canon-0-37-option-values).
 - 설정 파일의 제공자 목록.
 - 표준 시간대 이름이나 달력 밖의 시각 표기.
+
+Approved: Journey Hwang 2026-11-05T10:23:55Z — "승인 (재오픈 없음, 시간 옵션 전부 RFC3339, 문장도 제어 문자 전부 금지, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (brief sha256:03c2cf163de366c2077f07508a247ef4de9a705c314fa5b0df8a64990e009c50)
