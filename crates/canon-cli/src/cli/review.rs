@@ -42,8 +42,8 @@ pub struct ReviewOptions {
     /// Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root
     #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
-    /// The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)
-    #[arg(long = "actor", value_name = "ACTOR_ID")]
+    /// The reviewer's id (recorded as the review's author and as its reviewer). One line of text: the white space around it is trimmed; a control character or line break inside it is refused
+    #[arg(long = "actor", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,

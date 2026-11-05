@@ -36,7 +36,7 @@ pub struct ScenarioNewArgs {
     #[arg(long = "change", value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: Option<ChangeId>,
     /// Agent id written into provenance (env: CANON_ACTOR)
-    #[arg(long = "actor", env = "CANON_ACTOR", default_value = "canon-scaffold", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", env = "CANON_ACTOR", default_value = "canon-scaffold", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,

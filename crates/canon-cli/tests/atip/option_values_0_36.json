@@ -1,0 +1,619 @@
+{
+ "_about": "What canon 0.36.0 accepted for the values `canon-0-37-option-values` narrows (`atip.optionvalues.14`): per option and value class, the commands that took a value of that class. Measured on the released 0.36.0 binary, one run per command on a fresh fixture (the rest by reading the 0.36.0 source: `strategy rollback --reason`, `strategy approval-payload --approver`, and the form-feed and vertical-tab values of the sentence options, which the handlers and patterns of 0.36.0 did not look at). `atip.optionvalues.14` holds the CHANGELOG to this file: every value of it that the build refuses now has a row.",
+ "classes": {
+  "empty": "an empty value",
+  "blank": "only white space (spaces, a tab)",
+  "lf-cr": "a line feed or a carriage return inside the value",
+  "tab-inside": "a tab inside the value",
+  "escape-inside": "an escape character inside the value",
+  "vt-ff-inside": "a vertical tab or a form feed inside the value",
+  "nel-ls-ps-inside": "U+0085, U+2028 or U+2029 inside the value",
+  "uppercase": "an uppercase letter",
+  "underscore": "an underscore",
+  "hyphen-end": "a hyphen at the end (`a-`)",
+  "hyphen-start": "a hyphen at the start",
+  "hyphen-twice": "two hyphens in a row",
+  "space-inside": "a space inside",
+  "space-around": "a space around",
+  "zero": "0",
+  "open": "the value `open`"
+ },
+ "accepted": [
+  {
+   "kind": "text",
+   "option": "actor",
+   "class": "blank",
+   "value": "   ",
+   "commands": [
+    "dispatch begin",
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "evidence add",
+    "evidence audit",
+    "feature new",
+    "finding close",
+    "review change",
+    "review scenario",
+    "scenario new",
+    "subject move",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "actor",
+   "class": "empty",
+   "value": "",
+   "commands": [
+    "dispatch begin",
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "evidence add",
+    "evidence audit",
+    "feature new",
+    "finding close",
+    "review change",
+    "review scenario",
+    "scenario new",
+    "subject move",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "actor",
+   "class": "escape-inside",
+   "value": "a\u001bb",
+   "commands": [
+    "brief approve",
+    "dispatch begin",
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "evidence add",
+    "evidence audit",
+    "feature new",
+    "finding add",
+    "finding close",
+    "migrate",
+    "policy approve",
+    "review change",
+    "review scenario",
+    "scenario new",
+    "subject move",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "actor",
+   "class": "lf-cr",
+   "value": "a\nb",
+   "commands": [
+    "dispatch begin",
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "feature new",
+    "finding close",
+    "review change",
+    "review scenario",
+    "scenario new",
+    "subject move",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "actor",
+   "class": "nel-ls-ps-inside",
+   "value": "a\u2028b",
+   "commands": [
+    "dispatch begin",
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "feature new",
+    "finding close",
+    "review change",
+    "review scenario",
+    "scenario new",
+    "subject move",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "actor",
+   "class": "tab-inside",
+   "value": "a\tb",
+   "commands": [
+    "dispatch begin",
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "evidence add",
+    "evidence audit",
+    "feature new",
+    "finding add",
+    "finding close",
+    "review change",
+    "review scenario",
+    "scenario new",
+    "subject move",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "actor",
+   "class": "vt-ff-inside",
+   "value": "a\u000bb",
+   "commands": [
+    "dispatch begin",
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "feature new",
+    "finding close",
+    "review change",
+    "review scenario",
+    "scenario new",
+    "subject move",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "approver",
+   "class": "blank",
+   "value": "   ",
+   "commands": [
+    "strategy approval-payload"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "approver",
+   "class": "empty",
+   "value": "",
+   "commands": [
+    "strategy approval-payload"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "approver",
+   "class": "escape-inside",
+   "value": "a\u001bb",
+   "commands": [
+    "brief approve",
+    "divergence accept",
+    "evidence add",
+    "evidence approval-payload",
+    "migrate",
+    "policy approve",
+    "strategy approval-payload"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "approver",
+   "class": "lf-cr",
+   "value": "a\nb",
+   "commands": [
+    "divergence accept",
+    "migrate",
+    "policy approve",
+    "strategy approval-payload"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "approver",
+   "class": "nel-ls-ps-inside",
+   "value": "a\u2028b",
+   "commands": [
+    "brief approve",
+    "divergence accept",
+    "migrate",
+    "policy approve",
+    "strategy approval-payload"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "approver",
+   "class": "tab-inside",
+   "value": "a\tb",
+   "commands": [
+    "brief approve",
+    "divergence accept",
+    "evidence add",
+    "evidence approval-payload",
+    "migrate",
+    "policy approve",
+    "strategy approval-payload"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "approver",
+   "class": "vt-ff-inside",
+   "value": "a\u000bb",
+   "commands": [
+    "brief approve",
+    "divergence accept",
+    "migrate",
+    "policy approve",
+    "strategy approval-payload"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "override-reason",
+   "class": "escape-inside",
+   "value": "a\u001bb",
+   "commands": [
+    "evidence add",
+    "evidence audit",
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "override-reason",
+   "class": "nel-ls-ps-inside",
+   "value": "a\u2028b",
+   "commands": [
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "override-reason",
+   "class": "tab-inside",
+   "value": "a\tb",
+   "commands": [
+    "evidence add",
+    "evidence audit",
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "override-reason",
+   "class": "vt-ff-inside",
+   "value": "a\u000bb",
+   "commands": [
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "reason",
+   "class": "blank",
+   "value": "   ",
+   "commands": [
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "reason",
+   "class": "empty",
+   "value": "",
+   "commands": [
+    "divergence add",
+    "divergence defer"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "reason",
+   "class": "escape-inside",
+   "value": "a\u001bb",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "finding close",
+    "strategy rollback",
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "reason",
+   "class": "lf-cr",
+   "value": "a\nb",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "strategy rollback"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "reason",
+   "class": "nel-ls-ps-inside",
+   "value": "a\u2028b",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "strategy rollback",
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "reason",
+   "class": "tab-inside",
+   "value": "a\tb",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "finding close",
+    "strategy rollback",
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "reason",
+   "class": "vt-ff-inside",
+   "value": "a\u000bb",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "strategy rollback",
+    "subject move"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "relayed-via",
+   "class": "escape-inside",
+   "value": "a\u001bb",
+   "commands": [
+    "brief approve",
+    "divergence accept",
+    "migrate",
+    "policy approve"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "summary",
+   "class": "blank",
+   "value": "   ",
+   "commands": [
+    "evidence add",
+    "evidence audit",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "summary",
+   "class": "empty",
+   "value": "",
+   "commands": [
+    "evidence add",
+    "evidence audit",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "summary",
+   "class": "escape-inside",
+   "value": "a\u001bb",
+   "commands": [
+    "evidence add",
+    "evidence audit",
+    "finding add",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "summary",
+   "class": "lf-cr",
+   "value": "a\nb",
+   "commands": [
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "summary",
+   "class": "nel-ls-ps-inside",
+   "value": "a\u2028b",
+   "commands": [
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "summary",
+   "class": "tab-inside",
+   "value": "a\tb",
+   "commands": [
+    "evidence add",
+    "evidence audit",
+    "finding add",
+    "subject new"
+   ]
+  },
+  {
+   "kind": "text",
+   "option": "summary",
+   "class": "vt-ff-inside",
+   "value": "a\u000bb",
+   "commands": [
+    "subject new"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "domain",
+   "class": "empty",
+   "value": "",
+   "commands": [
+    "query"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "domain",
+   "class": "hyphen-end",
+   "value": "a-",
+   "commands": [
+    "query",
+    "retrieve"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "domain",
+   "class": "hyphen-start",
+   "value": "-a",
+   "commands": [
+    "query",
+    "retrieve"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "domain",
+   "class": "hyphen-twice",
+   "value": "a--b",
+   "commands": [
+    "query",
+    "retrieve"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "domain",
+   "class": "space-around",
+   "value": " a ",
+   "commands": [
+    "query",
+    "retrieve"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "domain",
+   "class": "space-inside",
+   "value": "a b",
+   "commands": [
+    "query",
+    "retrieve"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "domain",
+   "class": "underscore",
+   "value": "a_b",
+   "commands": [
+    "query",
+    "retrieve"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "domain",
+   "class": "uppercase",
+   "value": "A",
+   "commands": [
+    "query",
+    "retrieve"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "project",
+   "class": "hyphen-end",
+   "value": "a-",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "evidence add",
+    "evidence approval-payload",
+    "evidence audit",
+    "feature new",
+    "review change",
+    "review scenario",
+    "scenario new"
+   ]
+  },
+  {
+   "kind": "id",
+   "option": "project",
+   "class": "hyphen-twice",
+   "value": "a--b",
+   "commands": [
+    "divergence accept",
+    "divergence add",
+    "divergence defer",
+    "divergence resolve",
+    "evidence add",
+    "evidence approval-payload",
+    "evidence audit",
+    "feature new",
+    "review change",
+    "review scenario",
+    "scenario new"
+   ]
+  },
+  {
+   "kind": "enum",
+   "option": "disposition",
+   "class": "open",
+   "value": "open",
+   "commands": [
+    "finding close"
+   ]
+  },
+  {
+   "kind": "number",
+   "option": "limit",
+   "class": "zero",
+   "value": "0",
+   "commands": [
+    "retrieve"
+   ]
+  },
+  {
+   "kind": "number",
+   "option": "round",
+   "class": "zero",
+   "value": "0",
+   "commands": [
+    "divergence add",
+    "divergence defer",
+    "divergence resolve"
+   ]
+  }
+ ]
+}

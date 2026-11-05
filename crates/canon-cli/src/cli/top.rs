@@ -51,13 +51,13 @@ pub struct MigrateArgs {
     #[arg(long, value_name = "DIR")]
     pub backup: Option<PathBuf>,
     /// With --commit, record the human's answer to a plan that re-binds `Approved:` lines on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may commit such a plan only with it
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long, value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor: Option<String>,
     /// With --relayed-via, who the human is
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: Option<String>,
     /// With --relayed-via, the human's answer as they gave it
     #[arg(long, value_name = "TEXT")]
@@ -120,7 +120,7 @@ pub struct RetrieveArgs {
     #[arg(long = "subject", value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
     pub subject_id: Option<SubjectId>,
     /// Cap on the guidance items returned
-    #[arg(long, value_name = "N", default_value = "5", value_parser = crate::cli::safe_min0_usize)]
+    #[arg(long, value_name = "N", default_value = "5", value_parser = crate::cli::safe_min1_usize)]
     pub limit: Option<usize>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -180,8 +180,8 @@ pub struct SearchArgs {
     #[arg(long, value_name = "N", default_value_t = 1)]
     pub expand: u32,
     /// The most hits to list, best first (there is no next page)
-    #[arg(long, value_name = "N", default_value_t = 20, value_parser = clap::value_parser!(u32).range(1..))]
-    pub limit: u32,
+    #[arg(long, value_name = "N", default_value_t = 20, value_parser = crate::cli::safe_min1)]
+    pub limit: u64,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form

@@ -159,6 +159,26 @@ fn golden() -> Vec<(String, Vec<String>)> {
     file["patterns"].as_array().expect("patterns").iter().map(|entry| (entry["pattern"].as_str().expect("a pattern").to_string(), entry["at"].as_array().expect("places").iter().map(|place| place.as_str().expect("a place").to_string()).collect())).collect()
 }
 
+/// The name and sentence options that `canon-0-37-option-values` gave one domain. A place of the golden file that holds one has a pattern that deliberately takes other
+/// values than in 0.36.0 (the white space around it is the parser's to trim, a control character is refused in every command), so it is not held to the old pattern;
+/// `white_space_0_36.json` names the same list under `changedBy037`.
+const OPTION_VALUES_OPTIONS: [&str; 6] = ["actor", "approver", "relayed-via", "reason", "summary", "override-reason"];
+
+/// How many of the 59 places of the golden file hold one of those options, how many distinct patterns of the unchanged places are compared with their new spelling,
+/// and how many distinct patterns that name white space the build declares now.
+const CHANGED_PLACES: usize = 17;
+const DISTINCT_COMPARED: usize = 12;
+const DISTINCT_NOW: usize = 13;
+
+fn changed_by_option_values(place: &str) -> bool {
+    place.rsplit_once(" --").is_some_and(|(_, option)| OPTION_VALUES_OPTIONS.contains(&option))
+}
+
+/// The places that had no pattern with white space in 0.36.0 and have the text pattern or the regime key now.
+fn new_in_option_values(place: &str) -> bool {
+    changed_by_option_values(place) || place == "dispatch begin --regime"
+}
+
 fn assert_found(what: &str, problems: &[String], needle: &str) {
     assert!(problems.iter().any(|problem| problem.contains(needle)), "{what}: no problem names `{needle}`: {problems:#?}");
 }
@@ -443,14 +463,19 @@ fn atip_claim15_03_no_declared_pattern_lists_white_space_and_each_says_it_as_the
     }
     assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
 
-    // The places 0.36.0 listed white space are the places that say the property now, and no place gained or lost one.
+    // The places 0.36.0 listed white space are the places that say the property now, and no place gained or lost one; the places of the six name and sentence options
+    // (`canon-0-37-option-values`) say the one text pattern, and they and the regime key of `dispatch begin` are the only places that gained one.
     let golden = golden();
-    let before: BTreeSet<&String> = golden.iter().flat_map(|(_, places)| places).collect();
-    let after: BTreeSet<&String> = declared.iter().filter(|(_, pattern)| pattern.contains("White_Space")).map(|(place, _)| place).collect();
+    let before: BTreeSet<&String> = golden.iter().flat_map(|(_, places)| places).filter(|place| !changed_by_option_values(place)).collect();
+    let after: BTreeSet<&String> = declared.iter().filter(|(place, pattern)| pattern.contains("White_Space") && !new_in_option_values(place)).map(|(place, _)| place).collect();
     assert_eq!(before, after, "the declarations that name white space are the ones that did");
-    assert_eq!((before.len(), golden.len()), (59, 17), "59 declarations, 17 distinct patterns of 0.36.0");
+    assert_eq!((golden.iter().map(|(_, places)| places.len()).sum::<usize>(), golden.len()), (59, 17), "59 declarations, 17 distinct patterns of 0.36.0");
+    assert_eq!(golden.iter().flat_map(|(_, places)| places).filter(|place| changed_by_option_values(place)).count(), CHANGED_PLACES);
+    for (place, pattern) in declared.iter().filter(|(place, _)| changed_by_option_values(place)) {
+        assert!(pattern.contains("[^\\p{Cc}\\p{Zl}\\p{Zp}]"), "`{place}` declares the one text pattern of 0.37: {pattern}");
+    }
     let distinct: BTreeSet<&String> = declared.iter().filter(|(_, pattern)| pattern.contains("White_Space")).map(|(_, pattern)| pattern).collect();
-    assert_eq!(distinct.len(), 17, "17 distinct patterns now: {distinct:#?}");
+    assert_eq!(distinct.len(), DISTINCT_NOW, "the distinct patterns now: {distinct:#?}");
     // The one-line pattern of Annex V2 is the pattern of the places that want a trimmed line.
     let session = &declared["finding add --session"];
     assert_eq!(session, "^[^\\p{Cc}\\p{White_Space}]([^\\p{Cc}]*[^\\p{Cc}\\p{White_Space}])?$");
@@ -472,7 +497,7 @@ fn atip_claim15_04_each_pattern_takes_and_refuses_the_values_it_did_in_0_36() {
     let mut compared = BTreeSet::new();
     let mut places = 0;
     for (old, at) in &golden {
-        for place in at {
+        for place in at.iter().filter(|place| !changed_by_option_values(place)) {
             let new = declared.get(place).unwrap_or_else(|| panic!("`{place}` is declared"));
             places += 1;
             if !compared.insert((old.clone(), new.clone())) {
@@ -484,8 +509,8 @@ fn atip_claim15_04_each_pattern_takes_and_refuses_the_values_it_did_in_0_36() {
             }
         }
     }
-    assert_eq!(places, 59);
-    assert_eq!(compared.len(), 17, "each of the 17 patterns was compared with its new spelling");
+    assert_eq!(places, 59 - CHANGED_PLACES, "the places that kept their values were compared");
+    assert_eq!(compared.len(), DISTINCT_COMPARED, "each pattern of a place that kept its values was compared with its new spelling");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 
     // The corpus reaches both sides of every pattern: each takes some and refuses some.
@@ -499,8 +524,8 @@ fn atip_claim15_04_each_pattern_takes_and_refuses_the_values_it_did_in_0_36() {
 /// The property says what the standard library says white space is, over every scalar value.
 #[test]
 fn atip_claim15_04_the_property_is_the_white_space_of_the_old_lists_over_every_scalar_value() {
-    let token = &DECLARED["brief approve --relayed-via"];
-    assert_eq!(token, "^[^\\p{White_Space}()\"']+$");
+    // The new spelling of the old one-word token, which `canon-0-37-option-values` moved from the domain of `--relayed-via` to the validator beside it.
+    let token = "^[^\\p{White_Space}()\"']+$";
     let compiled = atip::domain::compile(&json!({ "pattern": token })).expect("compiles");
     let old = golden().into_iter().find(|(_, at)| at.iter().any(|place| place == "brief approve --relayed-via")).expect("the golden has it").0;
     let hand = atip::domain::compile(&json!({ "pattern": old })).expect("compiles");
@@ -540,7 +565,7 @@ fn atip_claim15_05_the_checks_find_a_listed_class_a_shorthand_an_alias_and_a_val
     assert!(!alias_problems("^\\p{Z}$").is_empty());
     // A value that changes sides is found: a class that lost one member, and a pattern that gained one.
     let old = golden().into_iter().find(|(_, at)| at.iter().any(|place| place == "brief approve --relayed-via")).expect("golden").0;
-    let new = &DECLARED["brief approve --relayed-via"];
+    let new = "^[^\\p{White_Space}()\"']+$";
     assert!(differences(&old, new, &CORPUS).is_empty());
     let lost = old.replace('\u{a0}', "");
     let found = differences(&lost, new, &CORPUS);
@@ -652,12 +677,12 @@ fn atip_claim15_07_a_formatted_document_and_a_member_at_its_default_fail_the_che
 fn atip_claim15_08_a_1_4_profile_reads_the_property_as_a_problem_and_a_compile_only_caller_takes_the_same_values() {
     let declared = &*DECLARED;
     let distinct: BTreeSet<&String> = declared.values().filter(|pattern| pattern.contains("White_Space")).collect();
-    assert_eq!(distinct.len(), 17);
+    assert_eq!(distinct.len(), DISTINCT_NOW);
     let golden = golden();
     let sample: Vec<String> = CORPUS.iter().step_by(4).cloned().collect();
     let mut by_new: BTreeMap<&String, &String> = BTreeMap::new();
     for (old, at) in &golden {
-        for place in at {
+        for place in at.iter().filter(|place| !changed_by_option_values(place)) {
             by_new.insert(&declared[place], old);
         }
     }
@@ -668,8 +693,9 @@ fn atip_claim15_08_a_1_4_profile_reads_the_property_as_a_problem_and_a_compile_o
         assert_eq!(atip::domain::pattern_problem(pattern, minor("1.5")), None, "{pattern}");
         // A caller that only compiles it (as ECMAScript with `u` or Rust `regex` do) gets a pattern that takes the values 0.36.0 took.
         assert!(atip::domain::compile(&json!({ "pattern": pattern })).is_ok(), "{pattern} compiles");
-        let old = by_new[pattern];
-        assert!(differences(old, pattern, &sample).is_empty(), "{pattern}");
+        if let Some(old) = by_new.get(pattern) {
+            assert!(differences(old, pattern, &sample).is_empty(), "{pattern}");
+        }
     }
     // The profile of 1.4 still accepts what it did: every pattern of 0.36.0.
     for (old, _) in &golden {
@@ -881,7 +907,8 @@ fn consumer_problems(path: &str, text: &str) -> Vec<String> {
         for declared in old_declarations(line) {
             found.push(format!("{path}:{}: declares {declared}: {shown}", number + 1));
         }
-        if line.contains("\\p{Zl}") && line.contains("\\p{Zp}") && !line.contains("\\p{Cc}\\p{Zl}\\p{Zp}") {
+        // The class `[^\p{Cc}\p{Zl}\p{Zp}]` of a name or a sentence (`canon-0-37-option-values`) names the two separators beside the controls: it is no list of white space, as written in a document and as escaped in JSON.
+        if line.contains("\\p{Zl}") && line.contains("\\p{Zp}") && !line.contains("\\p{Cc}\\p{Zl}\\p{Zp}") && !line.contains("\\\\p{Cc}\\\\p{Zl}\\\\p{Zp}") {
             found.push(format!("{path}:{}: shows a list of white space: {shown}", number + 1));
         }
     }

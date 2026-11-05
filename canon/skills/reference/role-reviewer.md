@@ -87,7 +87,7 @@ canon finding add --change add-login --round 1 --seq 2 --severity should-fix --i
 ```
 ```text
 # Move an already-committed finding's disposition
-usage: canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition <open|fixed|rejected|deferred> [--resolution-rev <REV>] [--reason <TEXT>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--promote | --no-promote] [--input]
+usage: canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition <fixed|rejected|deferred> [--resolution-rev <REV>] [--reason <TEXT>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--promote | --no-promote] [--input]
 ```
 ```bash
 canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed" --json

@@ -366,6 +366,23 @@ pub struct AcceptArgs {
     pub json: bool,
 }
 
+/// The refusal of a role that is not the reviewer step: accepting a divergence is a reviewer's.
+fn not_reviewer(role: &RoleId) -> CliError {
+    CliError::refused("DIVERGENCE_DENIED", format!("accepting a divergence is a reviewer step, not `{}`", role.as_str()))
+        .reason("NOT_REVIEWER")
+        .field("--role")
+        .hint("pass --role reviewer (or declare --as reviewer)")
+}
+
+/// `canon divergence accept --role`, when it is given, names the reviewer step (the validator of the command, before any state is read). A role that is
+/// only declared (`--as`, `CANON_ROLE`) is judged by [`run_accept`], after the repository is read.
+pub(crate) fn check_role(role: Option<&RoleId>) -> Result<(), CliError> {
+    match role {
+        Some(role) if role.as_str() != "reviewer" => Err(not_reviewer(role)),
+        _ => Ok(()),
+    }
+}
+
 /// `canon divergence accept` (0.22 D1, [`canon_gate::acceptance`]): a
 /// reviewer accepts each named scenario's `divergent` latest evidence as a
 /// tracked known gap. Each acceptance pins the evidence it saw, so new
@@ -383,11 +400,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
             .emit(CMD, args.json)
     };
     if args.role.as_str() != "reviewer" {
-        return CliError::refused("DIVERGENCE_DENIED", format!("accepting a divergence is a reviewer step, not `{}`", args.role.as_str()))
-            .reason("NOT_REVIEWER")
-            .field("--role")
-            .hint("pass --role reviewer (or declare --as reviewer)")
-            .emit(CMD, args.json);
+        return not_reviewer(&args.role).emit(CMD, args.json);
     }
     if args.tracking.trim().is_empty() {
         return invalid("--tracking is empty: name where the gap is tracked (an issue URL or reference)".to_string(), "--tracking");

@@ -165,7 +165,9 @@
     "finding close": {
       "domainRejects": {
         "change": ["Core", "-core"],
+        "actor": ["", " ", "a\tb"],
         "reason": ["", " "],
+        "round": ["0"],
         "role": ["Core", "-core"],
         "session": ["", " x"]
       },
@@ -175,6 +177,11 @@
       "batchFailsAt": [{"input": [{"operands": ["add-login"], "round": 1, "seq": 1, "disposition": "fixed"}, {"operands": ["add-login"], "round": 1, "seq": 9, "disposition": "fixed"}], "index": 1}],
       "batchFailsFirst": [{"input": [{"operands": ["add-login"], "round": 1, "seq": 9, "disposition": "fixed"}], "index": 0}]
     },
+    "finding add": {"domainRejects": {"actor": ["", " ", "a\tb"], "role": ["Core", "-core"], "summary": ["", " ", "a\tb"]}},
+    "evidence add": {"domainRejects": {"actor": ["", " ", "a\tb"], "override-reason": ["", " ", "a\tb"], "summary": ["", " ", "a\tb"]}},
+    "divergence add": {"domainRejects": {"actor": ["", " ", "a\tb"], "project": ["Core", "a--b"], "reason": ["", " ", "a\tb"], "round": ["0"]}},
+    "dispatch begin": {"domainRejects": {"actor": ["", " ", "a\tb"], "regime": ["a/b/c", "a/b c/d/abcdef"]}},
+    "subject new": {"domainRejects": {"actor": ["", " ", "a\tb"], "domain": ["Dev", "a--b"], "summary": ["", " ", "a\tb"]}},
     "finding list": {
       "domainRejects": {
         "change": [
@@ -219,6 +226,7 @@
     },
     "query": {
       "domainRejects": {
+        "domain": ["Dev", "a_b"],
         "change": [
           "Core",
           "-core"
@@ -282,6 +290,7 @@
     },
     "retrieve": {
       "domainRejects": {
+        "domain": ["Dev", "a_b"],
         "for-role": [
           "Core",
           "-core"
@@ -290,6 +299,7 @@
           "Core",
           "-core"
         ],
+        "limit": ["0"],
         "subject": [
           "Core",
           "-core"
@@ -340,6 +350,7 @@
           "Core",
           "-core"
         ],
+        "approver": ["", " ", "a\tb"],
         "strategy": [
           "Core",
           "-core"

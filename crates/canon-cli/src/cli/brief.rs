@@ -49,16 +49,16 @@ pub struct BriefCheckArgs {
 #[derive(Debug, Args)]
 pub struct BriefApproveArgs {
     /// Who approved (the human, not the agent)
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: String,
     /// The human's own words
     #[arg(long, value_name = "TEXT")]
     pub note: String,
     /// Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub relayed_via: Option<String>,
     /// With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long, value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor: Option<String>,
     /// With --relayed-via, the digest `canon brief show --body` showed the human, as `<change>=<sha256:digest>`, once per change; a brief whose digest differs is refused
     #[arg(long = "digest", value_name = "DIGEST")]

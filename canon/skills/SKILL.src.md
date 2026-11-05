@@ -231,6 +231,13 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   gives the JSON Schema of each report in `schemas`, `Input` (the schema of one `--input`
   document) and `rejects` (what each validator refuses, in order); `#/schemas/<Name>` in
   the command document resolves there. The first line of every `--help` points at it.
+- An option of the same name takes the same value in every command that has it, and `canon schema` declares it once. An id
+  (`--project`, `--role`, `--domain`) is a kebab slug: lowercase letters and digits, single hyphens between them. A name
+  (`--actor`, `--approver`, `--relayed-via`) and a sentence (`--reason`, `--summary`, `--override-reason`) are one line of text:
+  the white space around it is trimmed (what is recorded, and what a signature is made of, is the trimmed text), and a value
+  that is empty once trimmed, or has a control character (a tab, an escape) or a line break inside it, is refused with the
+  command's own argument code. `--round` and `--limit` start at 1, and `--regime` is the four-part key `retrieve` and
+  `dispatch begin` both take. `finding close` takes `fixed`, `rejected` or `deferred`, never `open`.
 - Pass `--json` and read stdout as one document, nothing on stderr. Success is
   `{"ok":true,"data":…,"meta":…}`; failure is
   `{"ok":false,"error":{…},"meta":…}` (a check that fails keeps its report in

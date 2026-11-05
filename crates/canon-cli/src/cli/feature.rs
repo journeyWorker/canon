@@ -19,7 +19,7 @@ pub struct FeatureNewArgs {
     #[arg(long, value_name = "TEXT")]
     pub title: String,
     /// Agent id written into provenance (env: CANON_ACTOR)
-    #[arg(long = "actor", env = "CANON_ACTOR", default_value = "canon-scaffold", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", env = "CANON_ACTOR", default_value = "canon-scaffold", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,

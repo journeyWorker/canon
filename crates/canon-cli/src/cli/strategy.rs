@@ -48,7 +48,7 @@ pub struct StrategyApprovalPayloadArgs {
     #[arg(long, value_name = "FILE")]
     pub evaluation: PathBuf,
     /// Who approves (the human whose detached signature the payload is for)
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: String,
     /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
     #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::shape_only)]
@@ -66,10 +66,10 @@ pub struct StrategyRollbackArgs {
     #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]
     pub strategy_id: StrategyId,
     /// Why the strategy is rolled back (signed: `strategy:<id>:rollback:<sha256(reason)>`)
-    #[arg(long, value_name = "TEXT")]
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub reason: String,
     /// The approver; must be a policy-pinned approver
-    #[arg(long = "actor", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     /// Detached signature file over the rollback payload
     #[arg(long, value_name = "FILE")]

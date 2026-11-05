@@ -141,8 +141,10 @@ fn says_for(domain: &Domain) -> String {
     let breaks = pattern.contains(super::LINE_CHAR) || pattern.contains("[^\\n\\r");
     let without_line = pattern.replace(super::LINE_CHAR, "");
     let blank = without_line.contains("\\P{White_Space}") || without_line.contains("[^\\p{White_Space}");
-    if *pattern == super::KEBAB || *pattern == super::PROJECT_ID {
+    if *pattern == super::KEBAB {
         "must be a kebab-case slug: lowercase letters and digits, single hyphens between them".to_string()
+    } else if *pattern == super::LINE_TEXT {
+        "must be one non-empty line of text: it is blank, or has a control character, a line separator or a paragraph separator inside it".to_string()
     } else if breaks && blank {
         "must be one non-empty line: it is blank or carries a line separator".to_string()
     } else if breaks {
@@ -267,11 +269,17 @@ mod tests {
         let golden: serde_json::Value = serde_json::from_str(include_str!("../../tests/atip/white_space_0_36.json")).expect("the golden patterns are JSON");
         let model = crate::spec::model();
         let mut compared = 0;
+        let mut changed = 0;
         for entry in golden["patterns"].as_array().expect("patterns") {
             let old = entry["pattern"].as_str().expect("a pattern");
             for place in entry["at"].as_array().expect("places") {
                 let place = place.as_str().expect("a place");
                 let (owner, name) = place.rsplit_once(' ').expect("a place names its owner and its argument");
+                // The six name and sentence options have one text domain since 0.37 (`canon-0-37-option-values`) and say what it says, which is its own sentence.
+                if ["--actor", "--approver", "--relayed-via", "--reason", "--summary", "--override-reason"].contains(&name) {
+                    changed += 1;
+                    continue;
+                }
                 let name = name.trim_start_matches("--");
                 let argument = model["commands"]
                     .as_array()
@@ -291,7 +299,7 @@ mod tests {
                 compared += 1;
             }
         }
-        assert_eq!(compared, 59, "the 59 places that listed white space");
+        assert_eq!((compared, changed), (42, 17), "the 59 places that listed white space: 42 keep their wording, 17 hold a name or a sentence option");
     }
 
     /// atip.checkorder.16: a domain judges the argument object (the value given, else the environment's, else the default), a constraint

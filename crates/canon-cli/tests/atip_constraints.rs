@@ -231,7 +231,7 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
         ("CHANGE_ID", arg_rules::KEBAB, "abz019-- #.", |s| ChangeId::parse(s).is_ok()),
         ("SUBJECT_ID", arg_rules::KEBAB, "abz019-- #.", |s| SubjectId::parse(s).is_ok()),
         ("ROLE", arg_rules::KEBAB, "abz019-- #.", |s| RoleId::parse(s).is_ok()),
-        ("PROJECT_ID", arg_rules::PROJECT_ID, "abz019-- #.", |s| ProjectId::parse(s).is_ok()),
+        ("PROJECT_ID", arg_rules::KEBAB, "abz019-- #.", |s| ProjectId::parse(s).is_ok()),
         ("SCENARIO_ID", arg_rules::SCENARIO_ID, "abz019-..#_", |s| ScenarioId::parse(s).is_ok()),
         ("TASK_ID", arg_rules::TASK_ID, "abz019-#..", |s| TaskId::parse(s).is_ok()),
         ("RUN_ID", arg_rules::ULID, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefilou", |s| RunId::parse(s).is_ok()),
@@ -264,6 +264,12 @@ fn atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers() {
                 // The session pattern is a necessary condition only when the parser accepts; equality is not claimed for exotic scalars.
                 if parsed && !admitted {
                     problems.push(format!("{name}: the parser accepts {candidate:?} and the pattern refuses it"));
+                }
+            } else if name == "PROJECT_ID" {
+                // The option is narrower than the model's grammar of a spec root id (0.37, `canon-0-37-option-values`): the pattern is the kebab slug,
+                // every value it admits the parser accepts, and the parser also takes `a-` and `a--b` (the ids of a `canon.yaml` written before).
+                if admitted && !parsed {
+                    problems.push(format!("{name}: the pattern admits {candidate:?} and the parser refuses it"));
                 }
             } else if parsed != admitted {
                 problems.push(format!("{name}: the parser says {parsed} and the pattern {admitted} for {candidate:?}"));
@@ -494,12 +500,14 @@ fn atip_constraints_14_a_relayed_approval_is_a_relation_with_its_validators_and_
         // The environment is not "given" for a constraint: `--actor` still requires `--relayed-via` as a rule.
         assert!(rules(doc, "requires").iter().any(|rule| rule["if"]["name"] == "actor" && rule["then"] == json!(["relayed-via"])), "`{command}`: {:?}", doc["constraints"]);
     }
-    // The human's own answer has a code of its own, and no domain claims one code for both paths.
+    // The name of the human has one domain, and the code of the human's own answer is its code on both paths (0.37: a blank name under `--relayed-via` was `USAGE`);
+    // the words, `--note`, have no domain: the code depends on `--relayed-via`, so a validator holds each.
     let brief = leaf("brief approve");
-    assert!(validator_of(brief, &["approver", "note"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
-    assert!(validator_of(leaf("policy approve"), &["approver"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
-    for (command, argument) in [("brief approve", "approver"), ("brief approve", "note"), ("policy approve", "approver")] {
-        assert!(harness::option(leaf(command), argument).expect("the option").get("domain").is_none(), "`{command}` --{argument} has a domain");
+    assert!(validator_of(brief, &["note"]).is_some_and(|validator| validator["code"] == "APPROVAL_INVALID"));
+    assert!(harness::option(brief, "note").expect("--note").get("domain").is_none(), "`brief approve` --note has a domain");
+    for command in ["brief approve", "policy approve"] {
+        assert!(harness::option(leaf(command), "approver").expect("--approver")["domain"]["pattern"].is_string(), "`{command}` --approver has the domain of a name");
+        assert_eq!(canon_cli::arg_rules::domain_for(command, "approver", Some("NAME")).map(|row| row.code), Some("APPROVAL_INVALID"), "`{command}`");
     }
 }
 
@@ -520,7 +528,8 @@ fn atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refuse
         let base = format!("{command} --approver alice --note ok --relayed-via ask {extra}");
         check(&format!("{base} --actor impl"), &[], "USAGE", "--relayed-via");
         check(&base, &[("CANON_ROLE", "implementer")], "USAGE", "--actor");
-        check(&format!("{base} --as implementer --actor impl --approver \" \""), &[], "USAGE", "--approver");
+        // A blank name is the domain of `--approver` (0.37), whichever path the call is on: the human's own code.
+        check(&format!("{command} --note ok --relayed-via ask {extra} --as implementer --actor impl --approver \" \""), &[], "APPROVAL_INVALID", "--approver");
         check(&format!("{base} --as implementer --actor impl --note \" \""), &[], "USAGE", "--note");
         // The environment is a stateless input: CANON_ACTOR and CANON_ROLE fill them, and the call goes on to the repository (`CONFIG_REQUIRED`).
         let outcome = rule_support::run_empty_with(&words(&base), &[("CANON_ROLE", "implementer"), ("CANON_ACTOR", "impl")]);
@@ -677,11 +686,12 @@ fn atip_constraints_21_a_negative_integer_names_its_option_and_minus_zero_is_zer
         assert_refused(&empty(line, Some("implementer")), "USAGE", field);
     }
     // `-0` is the integer 0: accepted where 0 is, refused for the minimum where it is not.
-    for line in ["canon ingest sessions --interval-secs -0 --dry-run", "canon retrieve --for-role reviewer --domain dev --limit -0", "canon ingest sessions --interval-secs +0 --dry-run"] {
+    for line in ["canon ingest sessions --interval-secs -0 --dry-run", "canon ingest sessions --interval-secs +0 --dry-run"] {
         let outcome = empty(line, Some("implementer"));
         assert_ne!(outcome.code.as_deref(), Some("USAGE"), "{line}: {outcome:?}");
     }
     assert_refused(&empty("canon query --kind change --limit -0", None), "USAGE", "--limit");
+    assert_refused(&empty("canon retrieve --for-role reviewer --domain dev --limit -0", Some("implementer")), "USAGE", "--limit");
     // The edge of the safe range with a space: accepted; one above, refused.
     assert_ne!(empty("canon query --kind change --limit 9007199254740991", None).code.as_deref(), Some("USAGE"));
     assert_refused(&empty("canon query --kind change --limit 9007199254740992", None), "USAGE", "--limit");

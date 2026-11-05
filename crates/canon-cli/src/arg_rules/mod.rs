@@ -84,8 +84,8 @@ pub(crate) struct Tables {
 }
 
 /// Every group's tables, and the rows shared by all.
-pub(crate) fn groups() -> [&'static Tables; 4] {
-    [&SHARED, &evidence::TABLES, &authoring::TABLES, &reads::TABLES]
+pub(crate) fn groups() -> [&'static Tables; 5] {
+    [&SHARED, &evidence::TABLES, &authoring::TABLES, &reads::TABLES, &values::TABLES]
 }
 
 /// The rules of the command `path` that its tables state themselves, in the order the tables list them.
@@ -206,11 +206,10 @@ pub mod semantic;
 mod authoring;
 mod evidence;
 mod reads;
+mod values;
 
 /// A kebab-case slug: `[a-z0-9]+(-[a-z0-9]+)*` (change, subject and role ids, a domain, a lane).
 pub const KEBAB: &str = "^[a-z0-9]+(-[a-z0-9]+)*$";
-/// A spec corpus id: `[a-z0-9][a-z0-9-]*`.
-pub const PROJECT_ID: &str = "^[a-z0-9][a-z0-9-]*$";
 /// `<area>.<surface>.<nn>`: two `[a-z0-9-]+` words and two or more digits.
 pub const SCENARIO_ID: &str = "^[a-z0-9-]+\\.[a-z0-9-]+\\.[0-9]{2,}$";
 /// `<change>#<n>(.<n>)*`.
@@ -231,8 +230,13 @@ pub const TIMESTAMP: &str = concat!(
 pub const NOT_BLANK: &str = concat!("^", any_char!(), "*", not_white_space!(), any_char!(), "*$");
 /// One line (no line separator), possibly empty.
 pub const ONE_LINE: &str = concat!("^", line_char!(), "*$");
-/// One line with at least one character that is not white space.
-pub const ONE_LINE_NOT_BLANK: &str = concat!("^", line_char!(), "*", not_white_space!(), line_char!(), "*$");
+/// A name or a sentence (`--actor`, `--approver`, `--relayed-via`, `--reason`, `--summary`, `--override-reason`): one line of text that is taken
+/// with the white space around it (the parser trims it, and a value that is nothing but white space is refused), with no control
+/// character, line separator or paragraph separator inside it. The inner class is `[^\p{Cc}\p{Zl}\p{Zp}]` (a space and a no-break space are
+/// in it, a tab, an escape and a line break are not); the first and the last character are not white space.
+pub const LINE_TEXT: &str = concat!("^", white_space!(), "*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}", white_space!(), "])", white_space!(), "*$");
+/// A regime key: four `/` separated segments, the first three without white space, the last 6 to 64 lowercase hex digits (`retrieve --regime`, `dispatch begin --regime`).
+pub const REGIME_KEY: &str = concat!("^[^/", white_space!(), "]+/[^/", white_space!(), "]+/[^/", white_space!(), "]+/[0-9a-f]{6,64}$");
 /// One line that neither starts nor ends with white space, and is not empty.
 pub const TRIMMED_ONE_LINE: &str = concat!("^", not_white_space!(), "(", line_char!(), "*", not_white_space!(), ")?$");
 /// A lowercase hex sha-256: 64 digits.
@@ -255,7 +259,7 @@ static SHARED: Tables = Tables {
         DomainRow::new(Scope::ValueName("CHANGE_ID"), Domain::matching(KEBAB), "USAGE").inside(&["add-login", "a", "a1-b2"]).outside(&["Add-login", "add_login", "-a", "a-", "a--b", ""]),
         DomainRow::new(Scope::ValueName("SUBJECT_ID"), Domain::matching(KEBAB), "USAGE").inside(&["demo", "a-1"]).outside(&["Demo", "de mo", "a--b"]),
         DomainRow::new(Scope::ValueName("ROLE"), Domain::matching(KEBAB), "USAGE").inside(&["reviewer", "x-y"]).outside(&["Reviewer", "x_y", "-x"]),
-        DomainRow::new(Scope::ValueName("PROJECT_ID"), Domain::matching(PROJECT_ID), "USAGE").inside(&["root", "a--b", "a-"]).outside(&["-a", "Root", "a_b"]),
+        DomainRow::new(Scope::ValueName("PROJECT_ID"), Domain::matching(KEBAB), "USAGE").inside(&["root", "a-1"]).outside(&["-a", "Root", "a_b", "a-", "a--b"]),
         DomainRow::new(Scope::ValueName("SCENARIO_ID"), Domain::matching(SCENARIO_ID), "USAGE").inside(&["auth.login.01", "a-.-b.123"]).outside(&["auth.login.1", "Auth.login.01", "auth.login", "a.b.c.01"]),
         DomainRow::new(Scope::ValueName("TASK_ID"), Domain::matching(TASK_ID), "USAGE").inside(&["add-login#1", "add-login#1.2.3", "a#007"]).outside(&["Add#1", "add-login", "add-login#", "add-login#1.", "add-login#a"]),
         DomainRow::new(Scope::ValueName("RUN_ID"), Domain::matching(ULID), "USAGE").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "01arz3ndektsv4rrffq69g5fav"]).outside(&["01ARZ3NDEKTSV4RRFFQ69G5FA", "01ARZ3NDEKTSV4RRFFQ69G5FAI", "01ARZ3NDEKTSV4RRFFQ69G5FAVV"]),
@@ -264,7 +268,7 @@ static SHARED: Tables = Tables {
         DomainRow::new(Scope::ValueName("SESSION_ID"), Domain::matching(SESSION_ID), "USAGE").inside(&["s-1", "a b", "a\u{a0}b", "a\u{feff}"]).outside(&[" s", "s ", "a\tb", "\u{a0}s", "s\u{3000}", "\u{2003}s"]),
         DomainRow::new(Scope::ValueName("TIMESTAMP"), Domain::matching(TIMESTAMP), "USAGE").says("is an invalid timestamp: an RFC 3339 time (`2030-01-01T10:00:00Z`) or a date (`2030-01-01`) is expected").inside(&["2030-01-01", "2030-01-01T00:00:00Z", "2030-1-1", "2030-01-01 10:00:00+02:00"]).outside(&["tomorrow", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "01/02/2030"]),
         // The most records or hits per page, and the size limit of a bound file: at least 1 (clap's `range(1..)`).
-        DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search"], "limit"), Domain::at_least(1), "USAGE"),
+        DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search", "retrieve"], "limit"), Domain::at_least(1), "USAGE"),
         DomainRow::new(Scope::Everywhere("max-artifact-mib"), Domain::at_least(1), "USAGE"),
     ],
 };
@@ -277,6 +281,8 @@ pub const CALENDAR: &str = "Reads the value as RFC 3339 (`2030-01-01T10:00:00Z`)
 /// a stateless input (spec 11.7), so the role and the actor the variables fill are read here, not by a precondition.
 pub const ROLE_DESCRIPTION: &str = "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable.";
 pub const ACTOR_DESCRIPTION: &str = "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word.";
+/// The tool of a relayed approval is one word, the same on the four commands that take `--relayed-via`.
+pub const VIA_DESCRIPTION: &str = "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`).";
 pub const ANSWER_RELAYED: &str = "A relayed approval carries the human's own name and answer word for word: with `--relayed-via`, `--approver` and `--note` are not blank.";
 
 /// `--commit` and `--plan-digest` go together (0.28 D6): the bare run is the preview.

@@ -3,7 +3,7 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, ROLE_DESCRIPTION};
+use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, ROLE_DESCRIPTION, VIA_DESCRIPTION};
 
 /// `init --language`: trimmed and lowercased (ASCII), then a primary subtag of two or three letters and `-` subtags of one to
 /// eight letters or digits (`ko`, `en-US`, `zh-Hant`).
@@ -18,9 +18,6 @@ const PROVIDERS: &str = concat!(
     "(,", white_space!(), "*(([Cc][Ll][Aa][Uu][Dd][Ee]|[Cc][Oo][Dd][Ee][Xx]|[Oo][Mm][Pp]|[Pp][Ii])", white_space!(), "*)?)*",
     ")$"
 );
-
-/// `--regime`: four `/` separated segments, the first three without white space, the last 6 to 64 lowercase hex digits.
-const REGIME_KEY: &str = concat!("^[^/", white_space!(), "]+/[^/", white_space!(), "]+/[^/", white_space!(), "]+/[0-9a-f]{6,64}$");
 
 /// A `regime show` segment: at least one character that canonicalizing (trim, white space and `/` to `-`) keeps.
 const REGIME_SEGMENT: &str = concat!("^[", white_space!(), "/]*[^", white_space!(), "/][^\u{0}]*$");
@@ -87,6 +84,12 @@ pub(crate) static TABLES: Tables = Tables {
                     rejects: &["canon migrate --commit --plan-digest abc --relayed-via ask --actor impl --approver alice --note ok"],
                 },
                 Validator {
+                    arguments: &["relayed-via"],
+                    code: "USAGE",
+                    description: VIA_DESCRIPTION,
+                    rejects: &["canon migrate --commit --plan-digest abc --relayed-via \"a b\" --as implementer --actor impl --approver alice --note ok"],
+                },
+                Validator {
                     arguments: &["relayed-via", "actor"],
                     code: "USAGE",
                     description: ACTOR_DESCRIPTION,
@@ -96,10 +99,7 @@ pub(crate) static TABLES: Tables = Tables {
                     arguments: &["relayed-via", "approver", "note"],
                     code: "USAGE",
                     description: ANSWER_RELAYED,
-                    rejects: &[
-                        "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver \" \" --note ok",
-                        "canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver alice",
-                    ],
+                    rejects: &["canon migrate --commit --plan-digest abc --relayed-via ask --as implementer --actor impl --approver alice"],
                 },
             ],
         ),
@@ -129,7 +129,6 @@ pub(crate) static TABLES: Tables = Tables {
         DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_REQUIRED").inside(&["timeout", " a "]).outside(&["", "   "]),
         DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_ARGUMENT_INVALID").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),
         DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_ARGUMENT_INVALID").inside(&["claude", "none", "NONE", "", " Claude , codex,,pi ", ",omp"]).outside(&[",", "gemini", "none,claude", "claude,gemini", " , "]),
-        DomainRow::new(Scope::Arguments(&["retrieve"], "regime"), Domain::matching(REGIME_KEY), "USAGE").inside(&["reviewer/canon/join-spine/9c93d024b1a2", "reviewer/b/c/abcdef"]).outside(&["reviewer/b/c", "reviewer/b/c/d/abcdef", "reviewer//c/abcdef", "reviewer/b/c/ABCDEF", "reviewer/b/c/abcde", "reviewer/b c/c/abcdef"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "role-segment"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["reviewer", " a b ", "/x/"]).outside(&["", "  ", "/", " / "]),
         DomainRow::new(Scope::Arguments(&["regime show"], "repo-name"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["my-repo", "A B"]).outside(&["", "  ", "//"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "area"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["api", "a/b"]).outside(&["", "\t", "/ /"]),

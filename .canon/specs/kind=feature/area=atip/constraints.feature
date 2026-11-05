@@ -139,7 +139,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A relayed approval is a relation: its role, its actor and its answer are validators over --relayed-via, the environment is declared on --as and --actor, and the human's blank answer has its own code
     Given a built canon
     When canon schema brief approve, policy approve, divergence accept and migrate run
-    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver and --note of brief approve and policy approve have no domain and a validator each with APPROVAL_INVALID
+    Then each lists a validator over --relayed-via and --as and one over --relayed-via, --approver and --note, all USAGE; brief approve, policy approve and migrate list one over --relayed-via and --actor, and --as and --actor carry env CANON_ROLE and CANON_ACTOR; --approver of brief approve and policy approve declares the one domain of a name with APPROVAL_INVALID, and --note has no domain and a validator with APPROVAL_INVALID
 
   # canon: {"schema":1,"at":"2026-11-01T14:23:12Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
   @subject:atip-schema

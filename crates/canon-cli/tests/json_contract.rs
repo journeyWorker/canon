@@ -90,7 +90,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         "round" | "seq" => "1",
         "severity" => "should-fix",
         "version" => "v1",
-        "disposition" => "open",
+        "disposition" => "fixed",
         "root" => ".canon/specs",
         "task" => "add-login#1",
         "plugin" => "no-such-plugin",

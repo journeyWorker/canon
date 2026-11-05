@@ -20,7 +20,7 @@ pub struct DivergenceAddArgs {
     #[arg(long, value_name = "STATE", default_value = "open", value_parser = clap::builder::PossibleValuesParser::new(["open", "still-divergent", "resolved", "deferred"]))]
     pub state: String,
     /// Why the divergence is recorded; required with `--state deferred`
-    #[arg(long, value_name = "TEXT")]
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub reason: Option<String>,
     /// When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`
     #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
@@ -29,7 +29,7 @@ pub struct DivergenceAddArgs {
     #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long = "actor", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
@@ -78,7 +78,7 @@ pub struct DivergenceResolveArgs {
     #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long = "actor", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
@@ -111,12 +111,12 @@ pub struct DivergenceDeferArgs {
     #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long = "actor", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
     /// Why the divergence is deferred
-    #[arg(long, value_name = "TEXT")]
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub reason: String,
     /// When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)
     #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
@@ -142,7 +142,7 @@ pub struct DivergenceAcceptArgs {
     #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// Why the gap is accepted
-    #[arg(long, value_name = "TEXT")]
+    #[arg(long, value_name = "TEXT", value_parser = crate::cli::trimmed)]
     pub reason: String,
     /// Where the gap is tracked: an issue URL or reference
     #[arg(long, value_name = "TEXT")]
@@ -151,7 +151,7 @@ pub struct DivergenceAcceptArgs {
     #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub expiry: Option<DateTime<Utc>>,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long = "actor", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
     /// Must be reviewer (default: the declared role, --as / CANON_ROLE; required when none is declared)
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
@@ -160,10 +160,10 @@ pub struct DivergenceAcceptArgs {
     #[arg(long = "session", value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     /// Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it, and then --approver and --note are required
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub relayed_via: Option<String>,
     /// With --relayed-via, who the human is
-    #[arg(long, value_name = "NAME")]
+    #[arg(long, value_name = "NAME", value_parser = crate::cli::trimmed)]
     pub approver: Option<String>,
     /// With --relayed-via, the human's answer as they gave it
     #[arg(long, value_name = "TEXT")]

@@ -124,6 +124,7 @@ pub const HELP_POINTER: &str = "Agents: \"canon schema --json\" describes every 
 /// with a parser of its own and a value name that is not here fails the generation (`tests/schema_doc.rs`
 /// `atip.schemadoc.06`). Every one of canon's today is text that the parser checks the form of, so `string`.
 pub const CUSTOM_PARSERS: &[(&str, ValueType)] = &[
+    ("ACTOR_ID", ValueType::String),
     ("CHANGE_ID", ValueType::String),
     ("FORMAT:PATH", ValueType::String),
     ("KEY", ValueType::String),
@@ -141,6 +142,7 @@ pub const CUSTOM_PARSERS: &[(&str, ValueType)] = &[
     ("SUBJECT_ID", ValueType::String),
     ("SURFACE", ValueType::String),
     ("TASK_ID", ValueType::String),
+    ("TEXT", ValueType::String),
     ("TIMESTAMP", ValueType::String),
 ];
 

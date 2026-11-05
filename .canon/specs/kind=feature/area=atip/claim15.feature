@@ -32,7 +32,7 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   Scenario: No declared pattern lists white space by hand, each of the 59 declarations says it as the property, and none uses a shorthand or an alias
     Given every pattern of the tree and of every command document of canon schema, and the 59 places the 0.36.0 build declared a list of white space
     When each pattern is read for a class that lists three or more white-space members, for a shorthand and for a property that is not named
-    Then no pattern lists white space by hand, none has a shorthand or an alias, the crate finds none outside the 1.5 form, the 59 places say the property now and the distinct patterns that do are 17
+    Then no pattern lists white space by hand, none has a shorthand or an alias, the crate finds none outside the 1.5 form, the 42 places that kept their values say the property now, the 17 places of the six name and sentence options and the places that had no pattern say the one text pattern of 0.37 (`atip.optionvalues.03`), and the distinct patterns that name white space are 13
 
   # canon: {"schema":1,"at":"2026-11-05T12:08:49Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -40,10 +40,10 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @case:happy
   @flow:canon-0-37-claim-1-5.F2
   @atip.claim15.04
-  Scenario: Each of the 17 new patterns takes and refuses the values its pattern of 0.36.0 did, over every scalar value and the near misses of the bases
-    Given the 17 patterns of 0.36.0 as canon schema printed them, the new pattern of each of the 59 places and the words of its refusal, every scalar value up to U+3100 with a sample of the rest, and the near misses of the bases built from the controls and the white space and their neighbours
-    When each old and new pattern decides each value, and the pattern for --relayed-via decides every scalar value against the white space of the standard library
-    Then no value changes sides, each pattern takes some values and refuses some, the property is exactly the 25 code points of White_Space, and the refusal of each of the 59 places says what it said in 0.36.0 (where it quotes its pattern it quotes the one declared now)
+  Scenario: Each new pattern of a place that kept its values takes and refuses the values its pattern of 0.36.0 did, over every scalar value and the near misses of the bases
+    Given the 17 patterns of 0.36.0 as canon schema printed them, the new pattern of each of the 42 places that kept their values (the 17 places of the six name and sentence options are held to the text rule of `atip.optionvalues`) and the words of its refusal, every scalar value up to U+3100 with a sample of the rest, and the near misses of the bases built from the controls and the white space and their neighbours
+    When each old and new pattern decides each value, and the one-word token pattern that --relayed-via declared decides every scalar value against the white space of the standard library
+    Then no value changes sides, each pattern takes some values and refuses some, the property is exactly the 25 code points of White_Space, and the refusal of each of the 42 places says what it said in 0.36.0 (where it quotes its pattern it quotes the one declared now)
 
   # canon: {"schema":1,"at":"2026-11-05T12:08:54Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -85,9 +85,9 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @flow:canon-0-37-claim-1-5.F4
   @atip.claim15.08
   Scenario: A caller of the 1.4 profile reads the property as a problem and a caller that only compiles the pattern takes and refuses the same values
-    Given each of the 17 distinct property patterns of canon, the crate's profile of 1.4 and of 1.5, and the pattern compiled by the Rust regex crate
+    Given each of the 13 distinct property patterns of canon, the crate's profile of 1.4 and of 1.5, and the pattern compiled by the Rust regex crate
     When the profile of each minor reads the pattern and the compiler takes and refuses the corpus of values
-    Then the profile of 1.4 reads each as a problem that names White_Space and 1.5, the profile of 1.5 reads none, each compiles and takes and refuses the values its 0.36.0 pattern did, and every pattern of 0.36.0 is still read as none by the profile of 1.4
+    Then the profile of 1.4 reads each as a problem that names White_Space and 1.5, the profile of 1.5 reads none, each compiles and, where it has a 0.36.0 pattern, takes and refuses the values it did, and every pattern of 0.36.0 is still read as none by the profile of 1.4
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:18Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-contract

@@ -270,7 +270,7 @@ fn finding_add_40_the_id_of_a_review_that_moved_to_the_archive_is_still_accepted
 }
 
 #[test]
-fn finding_close_88_closing_or_reopening_a_finding_copies_its_review_id_and_its_unknown_mark() {
+fn finding_close_88_closing_a_finding_twice_copies_its_review_id_and_its_unknown_mark() {
     let dir = fixture();
     let repo = dir.path();
     let id = review_ids(&review(repo, &["cart.add.01"]))[0].1.clone();
@@ -295,13 +295,15 @@ fn finding_close_88_closing_or_reopening_a_finding_copies_its_review_id_and_its_
                 "1",
                 "--disposition",
                 disposition,
+                "--reason",
+                "closed in the follow-up",
                 "--promote",
             ],
             repo,
         )
     };
     assert!(close("fixed").status.success());
-    assert!(close("open").status.success());
+    assert!(close("rejected").status.success());
     let versions: Vec<Value> = ledger(repo, "finding").into_iter().chain(archive(repo, "finding")).map(|(_, v)| v).collect();
     assert_eq!(versions.len(), 3, "{versions:?}");
     assert!(versions.iter().all(|v| v["review_id"] == id.as_str() && v["introduced_unknown"] == true), "{versions:?}");
@@ -346,7 +348,7 @@ fn finding_add_43_an_introducing_commit_together_with_the_unknown_mark_is_refuse
 }
 
 #[test]
-fn finding_close_89_a_blocker_written_before_0_30_with_neither_field_still_closes_and_reopens() {
+fn finding_close_89_a_blocker_written_before_0_30_with_neither_field_still_closes_twice() {
     use canon_model::RawRecord;
     use canon_store::git_tier::GitTier;
     use canon_store::tier::{RawWrite, Tier};
@@ -357,8 +359,8 @@ fn finding_close_89_a_blocker_written_before_0_30_with_neither_field_still_close
         "change_id": "kept", "round": 1, "seq": 1, "severity": "blocker", "disposition": "open", "reviewer": "old", "summary": "from 0.29"
     });
     GitTier::new(repo.join(".canon/ledger")).write(&RawWrite(RawRecord(body))).unwrap();
-    for disposition in ["fixed", "open"] {
-        let out = canon(&["finding", "close", "kept", "--round", "1", "--seq", "1", "--disposition", disposition, "--promote"], repo);
+    for disposition in ["fixed", "rejected"] {
+        let out = canon(&["finding", "close", "kept", "--round", "1", "--seq", "1", "--disposition", disposition, "--reason", "closed in the follow-up", "--promote"], repo);
         assert!(out.status.success(), "{}", text(&out));
     }
     let versions: Vec<Value> = ledger(repo, "finding").into_iter().chain(archive(repo, "finding")).map(|(_, v)| v).collect();

@@ -354,9 +354,17 @@ pub fn safe_min0(text: &str) -> Result<u64, String> {
     safe_uint(text, 0)
 }
 
-/// An integer from 0 to 2^53-1 that counts items (`retrieve --limit`).
-pub fn safe_min0_usize(text: &str) -> Result<usize, String> {
-    safe_uint(text, 0).map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+/// An integer from 1 to 2^53-1 that counts items (`retrieve --limit`).
+pub fn safe_min1_usize(text: &str) -> Result<usize, String> {
+    safe_uint(text, 1).map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+}
+
+/// The value of a name or a sentence option (`--actor`, `--approver`, `--relayed-via`, `--reason`, `--summary`, `--override-reason`) without the white
+/// space around it (Unicode `White_Space`, what `str::trim` and the `\p{White_Space}` of the option's domain say). What the command records, and what a
+/// signature is made of, is this value; the domain has already refused a value that is blank once trimmed and one with a control or line
+/// separator character inside it.
+pub fn trimmed(text: &str) -> Result<String, String> {
+    Ok(text.trim().to_string())
 }
 
 /// `--promote`/`--no-promote`, flattened into every staged write

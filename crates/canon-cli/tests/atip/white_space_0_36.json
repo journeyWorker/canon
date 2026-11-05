@@ -1,5 +1,5 @@
 {
-  "_about": "The 17 distinct domain patterns of canon 0.36.0 (atip/1 1.4) that listed white space by hand, as `canon schema` printed them, with the 59 places that declared them. canon-0-37-claim-1-5 (`atip.claim15.04`) holds the 1.5 patterns of those places to these: the same values in and out.",
+  "_about": "The 17 distinct domain patterns of canon 0.36.0 (atip/1 1.4) that listed white space by hand, as `canon schema` printed them, with the 59 places that declared them. canon-0-37-claim-1-5 (`atip.claim15.04`) holds the 1.5 patterns of those places to these: the same values in and out. `canon-0-37-option-values` re-baselined it in one way: the 17 places of `changedBy037` (the six name and sentence options) are held to the text rule of that change (`atip.optionvalues.*`), not to these patterns, because that change deliberately narrows what they accept (a control character or a line break inside, an empty or blank value) and widens what the parser takes (the white space around). The patterns and places stay here as the record of what 0.36.0 took, and `atip/option_values_0_36.json` lists the values per class.",
   "patterns": [
     {
       "pattern": "^[^\\n\\r\u000b\f\u0085\\p{Zl}\\p{Zp}]*$",
@@ -145,5 +145,35 @@
         "tree --providers"
       ]
     }
-  ]
+  ],
+  "changedBy037": {
+    "change": "canon-0-37-option-values",
+    "options": [
+      "actor",
+      "approver",
+      "relayed-via",
+      "reason",
+      "summary",
+      "override-reason"
+    ],
+    "places": [
+      "brief approve --actor",
+      "brief approve --relayed-via",
+      "divergence accept --reason",
+      "evidence add --actor",
+      "evidence add --approver",
+      "evidence add --summary",
+      "evidence approval-payload --approver",
+      "evidence audit --actor",
+      "evidence audit --summary",
+      "finding add --actor",
+      "finding add --summary",
+      "finding close --reason",
+      "policy approve --actor",
+      "policy approve --relayed-via",
+      "subject move --override-reason",
+      "subject move --reason",
+      "tree --override-reason"
+    ]
+  }
 }

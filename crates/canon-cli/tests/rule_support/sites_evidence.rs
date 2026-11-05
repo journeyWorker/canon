@@ -43,9 +43,9 @@ pub const SITES: &[Site] = &[
     site("finding.rs:run_close:FINDING_REASON_REQUIRED#3", Kind::Domain { command: "finding close", argument: "reason" }),
     // --------------------------------------------------------------------------------------- divergence.rs
     site("divergence.rs:run_accept:DIVERGENCE_ARGUMENT_INVALID#1", Kind::Domain { command: "divergence accept", argument: "tracking" }),
-    site("divergence.rs:run_accept:DIVERGENCE_DENIED#1", Kind::Domain { command: "divergence accept", argument: "role" }),
+    site("divergence.rs:not_reviewer:DIVERGENCE_DENIED#1", Kind::Validator { command: "divergence accept", arguments: &["role"] }),
     site("divergence.rs:run_accept:DIVERGENCE_ARGUMENT_INVALID#2", Kind::Precondition("reads the scenario index: a scenario the index does not know")),
-    site("divergence.rs:run_accept:DIVERGENCE_DENIED#2", Kind::Precondition("reads the scenario's latest evidence and the actors and sessions that attested it")),
+    site("divergence.rs:run_accept:DIVERGENCE_DENIED#1", Kind::Precondition("reads the scenario's latest evidence and the actors and sessions that attested it")),
     // ------------------------------------------------------------------------------------------ review.rs
     site("review.rs:run_add:REVIEW_ARGUMENT_INVALID#1", Kind::Unreachable("clap's `provenance` ArgGroup (exactly one of `--upstream-ref`, `--original-spec-ref`) refuses first; declared as the `exactlyOne` rule")),
     site("review.rs:run_add:REVIEW_ARGUMENT_INVALID#2", Kind::Unreachable("clap's `provenance` ArgGroup refuses the pair first; declared as the `exactlyOne` rule")),

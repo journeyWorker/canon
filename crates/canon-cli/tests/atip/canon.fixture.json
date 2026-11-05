@@ -66,6 +66,40 @@
         ]
       ]
     },
+    "dispatch begin": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "regime": [
+          "a/b/c",
+          "a/b c/d/abcdef"
+        ]
+      }
+    },
+    "divergence add": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "project": [
+          "Core",
+          "a--b"
+        ],
+        "reason": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "round": [
+          "0"
+        ]
+      }
+    },
     "divergence list": {
       "domainRejects": {
         "as-of": [
@@ -94,6 +128,25 @@
           "--json"
         ]
       ]
+    },
+    "evidence add": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "override-reason": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "summary": [
+          "",
+          " ",
+          "a\tb"
+        ]
+      }
     },
     "evidence approval-payload": {
       "domainRejects": {
@@ -191,6 +244,24 @@
         ]
       ]
     },
+    "finding add": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "role": [
+          "Core",
+          "-core"
+        ],
+        "summary": [
+          "",
+          " ",
+          "a\tb"
+        ]
+      }
+    },
     "finding close": {
       "batchFailsAt": [
         {
@@ -231,6 +302,11 @@
         }
       ],
       "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
         "change": [
           "Core",
           "-core"
@@ -242,6 +318,9 @@
         "role": [
           "Core",
           "-core"
+        ],
+        "round": [
+          "0"
         ],
         "session": [
           "",
@@ -369,6 +448,10 @@
           "Core",
           "-core"
         ],
+        "domain": [
+          "Dev",
+          "a_b"
+        ],
         "since": [
           "Core",
           "-core"
@@ -427,9 +510,16 @@
     },
     "retrieve": {
       "domainRejects": {
+        "domain": [
+          "Dev",
+          "a_b"
+        ],
         "for-role": [
           "Core",
           "-core"
+        ],
+        "limit": [
+          "0"
         ],
         "regime": [
           "Core",
@@ -485,9 +575,32 @@
           "Core",
           "-core"
         ],
+        "approver": [
+          "",
+          " ",
+          "a\tb"
+        ],
         "strategy": [
           "Core",
           "-core"
+        ]
+      }
+    },
+    "subject new": {
+      "domainRejects": {
+        "actor": [
+          "",
+          " ",
+          "a\tb"
+        ],
+        "domain": [
+          "Dev",
+          "a--b"
+        ],
+        "summary": [
+          "",
+          " ",
+          "a\tb"
         ]
       }
     },
