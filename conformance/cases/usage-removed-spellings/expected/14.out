@@ -27,8 +27,10 @@ Examples:
 Several ids take one name, one answer and one timestamp. Every id is checked
 first; one refused id refuses the call (the first refused id's code, with a
 detail for each) and nothing is
-written. Writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the
-brief (the digest covers the brief without its `Approved:` lines) and records
+written. Writes `Approved: <who> <when> — "<words>" (code tree <id>) (brief sha256:<digest>)` into the
+brief (the digest covers the brief without its `Approved:` lines; the code tree is the work
+tree's as it is now, uncommitted code included, and is left out outside git or with no commit: a
+chore whose approval saw the code tree that is still the current one asks for no evidence) and records
 `canon policy approve` in the same call. Edit the brief afterwards and it reads as
 not approved (BRIEF_APPROVAL_STALE) until a human answers again and this
 runs again. Run it only from the human's answer, with their words as --note.

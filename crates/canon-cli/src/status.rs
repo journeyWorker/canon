@@ -996,6 +996,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         .filter_map(|(change, reason)| {
             let mut brief = one(change)?;
             brief.reason = Some(*reason);
+            brief.tree_unchanged = crate::reverify::tree_unchanged(repo, &derived.code_tree, change);
             Some(brief)
         })
         .collect();
@@ -1601,6 +1602,9 @@ pub fn render(report: &StatusReport) -> String {
                     (_, None, Some(change)) => writeln!(out, "      brief{of}: not approved (change `{change}` has no brief; advisory, nothing to approve yet)"),
                     _ => writeln!(out, "      brief{of}: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
+                if brief.tree_unchanged {
+                    let _ = writeln!(out, "      chore{of}: the code tree is the one it was approved on, so it asks for no evidence; its change-level review is still asked");
+                }
             }
             if !s.pending_drafts.is_empty() {
                 let names = s.pending_drafts.iter().map(|d| format!("`{d}`")).collect::<Vec<_>>().join(", ");

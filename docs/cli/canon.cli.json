@@ -33059,6 +33059,10 @@
             "status": {
               "$ref": "#/schemas/BriefState",
               "description": "`approved`, `unapproved` or `changed` (edited after its approval)."
+            },
+            "treeUnchanged": {
+              "description": "An approved chore whose approval recorded the code tree that is the\ncurrent code tree (0.37): it asks for no evidence, only its\nchange-level review. Set by `canon status` for a chore entry.",
+              "type": "boolean"
             }
           },
           "required": [

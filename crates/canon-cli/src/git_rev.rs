@@ -134,6 +134,21 @@ pub fn bind(repo: &Path, rev: &str) -> Result<Bound, CliError> {
     Ok(Bound { sha, code_tree: tree, worktree_dirty: dirty })
 }
 
+/// The code tree of the working tree as it is now, for a record that carries
+/// one only when there is one (an approval, 0.37): `None` outside a git work
+/// tree and in one with no commit, where [`bind`] refuses with
+/// `COMMIT_REQUIRED`; any other failure (a malformed `canon.yaml`) stays an error.
+pub fn code_tree_if_committed(repo: &Path) -> Result<Option<String>, CliError> {
+    if resolve_rev(repo, DEFAULT_REV).is_err() {
+        return Ok(None);
+    }
+    match code_tree(repo, None) {
+        Ok(code) => Ok(Some(code.tree)),
+        Err(e) if e.code == "COMMIT_REQUIRED" => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
 /// The `code.exclude` globs of `<repo>/canon.yaml` ([`DEFAULT_EXCLUDE`] when
 /// the file or the key is absent). A malformed file or glob is `CONFIG_INVALID`.
 pub fn code_exclude(repo: &Path) -> Result<Vec<String>, CliError> {

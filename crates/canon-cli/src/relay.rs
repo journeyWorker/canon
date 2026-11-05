@@ -10,8 +10,9 @@
 //! whole guarantee, and they are what a reader later tells a relayed approval
 //! from the human's own by.
 //!
-//! The marker in an `Approved:` line sits before the digest and outside it:
-//! `Approved: <who> <when> — "<words>" (relayed by <role> <actor> via <tool>) (brief sha256:<digest>)`.
+//! The marker in an `Approved:` line sits before the digest and outside it,
+//! and before the code tree marker (0.37) when the line has one:
+//! `Approved: <who> <when> — "<words>" (relayed by <role> <actor> via <tool>) (code tree <id>) (brief sha256:<digest>)`.
 //! A line without it is the human's own and reads as before.
 //!
 //! `canon.yaml` turns relaying off with `approval: { relay: deny }`; absent or
@@ -74,6 +75,7 @@ pub fn parse_marker(line: &str) -> Option<ApprovalRelay> {
         Some((head, digest)) if digest.ends_with(')') => head.trim_end(),
         _ => line,
     };
+    let without_digest = crate::brief::split_tree_marker(without_digest).map_or(without_digest, |(head, _)| head);
     let inner = without_digest.strip_suffix(')')?;
     let (_, relayed) = inner.rsplit_once("(relayed by ")?;
     let mut words = relayed.split(' ');

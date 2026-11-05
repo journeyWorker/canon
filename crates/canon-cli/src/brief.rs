@@ -43,6 +43,14 @@
 //! digest, outside it, and [`BriefStatus::relay`] reads it back. A line
 //! without the marker is the human's own.
 //!
+//! # The code tree of an approval (0.37)
+//! `canon brief approve` also records the code tree of the work tree at that
+//! moment ([`crate::git_rev::code_tree`], the tree an evidence record binds):
+//! `(code tree <git tree id>)` before the digest and after the relay marker,
+//! outside the digest. A chore whose recorded tree is the current tree asks
+//! for no evidence ([`crate::reverify`]). No marker (a line from before 0.37,
+//! or an approval with no git commit) reads as it always did.
+//!
 //! # Canon never writes into an external plan (0.17 D3)
 //! The approval is read only from that canon `brief.md`. A change
 //! `canon change new` wrote has its brief there already. A change
@@ -130,13 +138,43 @@ impl Approval {
     }
 }
 
+/// The `(brief sha256:<64 hex>)` an `Approved:` line ends with, split off:
+/// the line without it and the digest, `None` when the line carries none.
+fn split_digest(line: &str) -> Option<(&str, &str)> {
+    let inner = line.trim_end().strip_suffix(')')?;
+    let (head, digest) = inner.rsplit_once("(brief ")?;
+    let hex = digest.strip_prefix("sha256:")?;
+    (hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())).then_some((head, digest))
+}
+
 /// The digest an `Approved:` line carries: its trailing
 /// `(brief sha256:<64 hex>)`.
 fn recorded_digest(line: &str) -> Option<&str> {
-    let inner = line.trim_end().strip_suffix(')')?;
-    let (_, digest) = inner.rsplit_once("(brief ")?;
-    let hex = digest.strip_prefix("sha256:")?;
-    (hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())).then_some(digest)
+    split_digest(line).map(|(_, digest)| digest)
+}
+
+/// The marker an approval writes for the code tree it saw (0.37):
+/// `(code tree <git tree id>)`, between the relay marker and the digest.
+pub fn tree_marker(tree: &str) -> String {
+    format!("{TREE_OPEN}{tree})")
+}
+
+const TREE_OPEN: &str = "(code tree ";
+
+/// `head` (an `Approved:` value without its digest) split at a `(code tree <id>)`
+/// marker that ends it: what is before the marker and the tree id. `None` when
+/// no such marker closes `head` (a note that quotes one ends in `"`, so it
+/// never reads as a marker).
+pub fn split_tree_marker(head: &str) -> Option<(&str, &str)> {
+    let (before, tree) = head.trim_end().strip_suffix(')')?.rsplit_once(TREE_OPEN)?;
+    let valid = matches!(tree.len(), 40 | 64) && tree.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
+    valid.then_some((before.trim_end(), tree))
+}
+
+/// The code tree an `Approved:` line recorded when it was written (0.37),
+/// `None` for a line written before (or where no git commit existed).
+pub fn approval_tree(line: &str) -> Option<&str> {
+    split_tree_marker(split_digest(line)?.0).map(|(_, tree)| tree)
 }
 
 /// Reads the approval of the brief `text` (module doc). The first
@@ -227,6 +265,11 @@ pub struct BriefStatus {
     /// advises re-approving it so it binds to the brief's text.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub legacy_approval: bool,
+    /// An approved chore whose approval recorded the code tree that is the
+    /// current code tree (0.37): it asks for no evidence, only its
+    /// change-level review. Set by `canon status` for a chore entry.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub tree_unchanged: bool,
     /// What `canon brief check` found in the brief's text (0.19 D2):
     /// filled by `canon status` only, for a brief in the PRD format.
     /// Omitted for a pre-0.19 brief, which is read as before.
@@ -340,6 +383,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             relay: None,
             changed: false,
             legacy_approval: false,
+            tree_unchanged: false,
             findings: None,
             advisory_rules: Vec::new(),
             old_format: None,
@@ -366,6 +410,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 approval,
                 changed: matches!(verdict, Approval::Changed { .. }),
                 legacy_approval: matches!(verdict, Approval::Unbound { .. }),
+                tree_unchanged: false,
                 findings: None,
                 advisory_rules: Vec::new(),
                 old_format,
@@ -385,6 +430,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 relay: None,
                 changed: false,
                 legacy_approval: false,
+                tree_unchanged: false,
                 findings: None,
                 advisory_rules: Vec::new(),
                 old_format: None,
@@ -403,6 +449,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 relay: None,
                 changed: false,
                 legacy_approval: false,
+                tree_unchanged: false,
                 findings: None,
                 advisory_rules: Vec::new(),
                 old_format: None,

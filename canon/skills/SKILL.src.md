@@ -127,7 +127,11 @@ tree, or in a repo with no commits, a command that needs a commit refuses
 After a chore approval or a reopen, a scenario whose latest evidence was
 recorded on the current `codeTree` needs nothing new: a docs-only chore then
 needs its change-level review alone. What counts as code is `code.exclude` in
-`canon.yaml` (globs, default `docs/**` and `*.md`). When code did change,
+`canon.yaml` (globs, default `docs/**` and `*.md`). A chore approved over the
+code as it still is (the `(code tree <id>)` of its `Approved:` line is the
+current tree) asks for no evidence at all, whatever tree the evidence is on, and
+`status` says so; an approval with no recorded tree follows the rule above.
+When code did change,
 `canon status`, `meta.next` and the refusal hint lead with one batch over
 every report, for example
 `canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer`

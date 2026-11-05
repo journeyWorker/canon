@@ -178,7 +178,7 @@ fn subject_lifecycle_52_a_relayed_approval_of_two_briefs_marks_both_lines_and_st
     let marker = "(relayed by planner plan-1 via AskUserQuestion)";
     for change in ["a", "b"] {
         let line = approved_line(r, change);
-        assert!(line.contains(&format!(" — \"Yes, approve both.\" {marker} (brief sha256:")), "{line}");
+        assert!(line.contains(&format!(" — \"Yes, approve both.\" {marker} (code tree ")) && line.contains(") (brief sha256:"), "the relay marker comes before the tree marker (0.37): {line}");
         // The marker sits outside the digest: the same text approved by a human binds to the same digest.
         let human_line = approved_line(h, change);
         let strip = |l: &str| -> String { l.split_whitespace().enumerate().filter(|(i, _)| *i != 2).map(|(_, w)| w).collect::<Vec<_>>().join(" ") };
