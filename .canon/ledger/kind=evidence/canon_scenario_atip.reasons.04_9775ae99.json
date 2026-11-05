@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-option-forms",
+    "role": "implementer",
+    "session_id": "s-0-37-option-forms"
+  },
+  "at": "2026-11-05T17:01:36.933524Z",
+  "attachments": [
+    {
+      "case": "atip_reasons_04_each_gate_violation_kind_has_the_code_and_the_reason_the_audit_says",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_04_the_audit_refuses_a_code_with_several_next_actions_and_no_reasons_and_one_action_under_two_reasons",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    },
+    {
+      "case": "atip_reasons_04_the_audit_table_and_the_registry_list_the_same_reasons_for_every_code_and_the_schema_says_them",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "bdfff8ce2539bcc1fb152da54bf12ad8cab7284e1ac0069ab7d6432569a572eb"
+    }
+  ],
+  "code_tree": "ce5d39d8e2cbcf751ed225ab10ec4151a41c9b2e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "2a49a90afa4d8c7eb0ab721132b525c2afd01142",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 130,
+  "scenario_id": "atip.reasons.04",
+  "schema": 1,
+  "staging_id": "f5180515",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

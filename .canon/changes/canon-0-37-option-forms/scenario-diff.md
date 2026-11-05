@@ -2,7 +2,7 @@
 
 The scenarios of the specs whose title, Given, When or Then differ between `main` at a9e724f90 and this change. Their ids, tags and flows are unchanged. A review of one of them was pinned to the old sentence and is stale; a reviewer other than the author reads the table and signs again. The new scenarios `atip.optionforms.01-16` (`area=atip/optionforms.feature`) are not in the table.
 
-Scenarios changed: 7
+Scenarios changed: 8
 
 | scenario | file | what changed |
 |---|---|---|
@@ -12,6 +12,7 @@ Scenarios changed: 7
 | @atip.claim15.04 (two scenarios) | area=atip/claim15.feature | the comparison with the patterns of 0.36.0 covers the 29 places that kept their values (the 13 places of the time options and the provider list are held to `atip.optionforms`) |
 | @atip.claim15.08 | area=atip/claim15.feature | 11 distinct property patterns (13 before) |
 | @atip.constraints.07 | area=atip/constraints.feature | `--approval-at` takes a date-time, so the impossible date it is given is `2026-02-30T10:00:00Z`; the five date options are still given `2026-02-30`; the 12 time options are named by the calendar validator of their command as before |
+| @authoring.init.94 | area=authoring/init.feature | an unknown harness is refused naming `--providers` (the `field`) with the accepted names, the words of the declared domain, and the value as `received` |
 | @authoring.init.93 | area=authoring/init.feature | an empty `--providers` was an explicit empty choice; it is refused with exit 2 now (`--providers none` is the explicit empty choice) and nothing is written |
 
 `crates/canon-cli/tests/atip/white_space_0_36.json` is re-baselined in one way: the 13 places of the seven options of this change are listed under `changedBy037Forms` and are held to the patterns of `atip.optionforms.11`. The patterns and places of 0.36.0 stay in the file as the record.
