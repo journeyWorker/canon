@@ -522,7 +522,7 @@ fn gate_approval_tree_11_status_says_why_a_chore_asks_for_nothing_and_not_over_c
 
 fn unreleased() -> String {
     let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).expect("the CHANGELOG");
-    let start = changelog.find("\n## Unreleased").or_else(|| changelog.find("\n## 0.37.0")).expect("the CHANGELOG has an Unreleased section");
+    let start = changelog.find("\n## 0.37.0").expect("the CHANGELOG has a 0.37.0 section");
     let end = changelog[start + 1..].find("\n## ").map_or(changelog.len(), |at| start + 1 + at);
     changelog[start..end].to_string()
 }

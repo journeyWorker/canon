@@ -638,7 +638,7 @@ fn refused_now(entries: &[Entry]) -> BTreeSet<(String, String, String)> {
 
 /// The `### Breaking` table of the `Unreleased` entry: its rows, split into cells.
 fn breaking_rows(changelog: &str) -> Vec<Vec<String>> {
-    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("0.37.0")).unwrap_or_default();
     let breaking = unreleased.split("\n### ").find(|part| part.starts_with("Breaking")).unwrap_or_default();
     breaking
         .lines()
@@ -667,7 +667,7 @@ fn changelog_problems(changelog: &str, refused: &BTreeSet<(String, String, Strin
             problems.push(format!("a row has no 0.37 answer or no way to move: {row:?}"));
         }
     }
-    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("0.37.0")).unwrap_or_default();
     if !unreleased.contains("recorded without the white space around") {
         problems.push("no entry says that a value is recorded without the white space around it".to_string());
     }

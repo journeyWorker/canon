@@ -1045,12 +1045,12 @@ fn cells(row: &str) -> Vec<String> {
 fn changelog_problems(text: &str, before: usize, after: usize) -> Vec<String> {
     let mut found = Vec::new();
     let lines: Vec<&str> = text.lines().collect();
-    let Some(start) = lines.iter().position(|line| line.starts_with("## Unreleased")) else { return vec!["there is no `## Unreleased` section".to_string()] };
+    let Some(start) = lines.iter().position(|line| line.starts_with("## 0.37.0")) else { return vec!["there is no `## 0.37.0` section".to_string()] };
     let end = lines.iter().enumerate().skip(start + 1).find(|(_, line)| line.starts_with("## ")).map_or(lines.len(), |(index, _)| index);
     let section = &lines[start + 1..end];
     let headings: Vec<usize> = section.iter().enumerate().filter(|(_, line)| (line.starts_with('#') || line.starts_with("**")) && line.contains(ENTRY_HEADING)).map(|(index, _)| index).collect();
     if headings.len() != 1 {
-        return vec![format!("`Unreleased` holds {} headings that name `{ENTRY_HEADING}`, not one", headings.len())];
+        return vec![format!("`0.37.0` holds {} headings that name `{ENTRY_HEADING}`, not one", headings.len())];
     }
     let heading = headings[0];
     let level = if section[heading].starts_with('#') { heading_level(section[heading]) } else { 3 };
@@ -1107,7 +1107,7 @@ fn measured() -> (usize, usize) {
 
 fn complete_entry(before: usize, after: usize) -> String {
     format!(
-        "## Unreleased\n\n### Changed\n\n**{ENTRY_HEADING} and writes white space in its patterns as `\\p{{White_Space}}`** (`canon-0-37-claim-1-5`).\n\n| | 0.36 (declares 1.4) | 0.37 (declares 1.5) |\n|---|---|---|\n| the declaration | `1.4` | `1.5` |\n| white space in a pattern | a list of 25 code points | `\\p{{White_Space}}` |\n| pattern length of `--session`, characters | {before} | {after} |\n\n**Callers:** a 1.4 caller that checks patterns by its profile refuses the escape; one that only compiles the pattern is unchanged.\n\n### Contributors\n\nx\n\n## 0.36.0\n"
+        "## 0.37.0\n\n### Changed\n\n**{ENTRY_HEADING} and writes white space in its patterns as `\\p{{White_Space}}`** (`canon-0-37-claim-1-5`).\n\n| | 0.36 (declares 1.4) | 0.37 (declares 1.5) |\n|---|---|---|\n| the declaration | `1.4` | `1.5` |\n| white space in a pattern | a list of 25 code points | `\\p{{White_Space}}` |\n| pattern length of `--session`, characters | {before} | {after} |\n\n**Callers:** a 1.4 caller that checks patterns by its profile refuses the escape; one that only compiles the pattern is unchanged.\n\n### Contributors\n\nx\n\n## 0.36.0\n"
     )
 }
 
@@ -1132,6 +1132,6 @@ fn atip_claim15_15_the_entry_check_fails_when_the_table_a_length_or_the_callers_
     assert_found("a wrong length", &changelog_problems(&complete.replace(&format!("| {after} |"), "| 70 |"), before, after), "length row says");
     assert_found("a callers paragraph without the profile", &changelog_problems(&complete.replace("by its profile", "somehow"), before, after), "profile");
     assert_found("no entry", &changelog_problems(&complete.replace(ENTRY_HEADING, "canon declares something"), before, after), "not one");
-    assert_found("no section", &changelog_problems("# Changelog\n", before, after), "no `## Unreleased`");
+    assert_found("no section", &changelog_problems("# Changelog\n", before, after), "no `## 0.37.0`");
     assert_found("a longer pattern", &changelog_problems(&complete_entry(60, 93), 60, 93), "not shorter");
 }
