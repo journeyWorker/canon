@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-option-values",
+    "role": "implementer",
+    "session_id": "s-0-37-option-values"
+  },
+  "at": "2026-11-05T15:25:08.405528Z",
+  "attachments": [
+    {
+      "case": "search_query_02_a_finding_summary_written_in_korean_is_found_by_a_two_character_word_and_by_a_word_of_three_or_more_characters",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3c07b00179b92c311b2d141e0b1c9db321cf3887dcc37a73b70b6a40542398a8"
+    }
+  ],
+  "code_tree": "965fd3dccd1265f6e584194abb2cb5cd4fbece70",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 245,
+  "scenario_id": "search.query.02",
+  "schema": 1,
+  "staging_id": "991da399",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,66 @@
+{
+  "actor": {
+    "agent_id": "impl-option-values",
+    "role": "implementer",
+    "session_id": "s-0-37-option-values"
+  },
+  "at": "2026-11-05T15:25:08.405528Z",
+  "attachments": [
+    {
+      "case": "adapter::tests::atip_codestored_11_a_response_file_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3c07b00179b92c311b2d141e0b1c9db321cf3887dcc37a73b70b6a40542398a8"
+    },
+    {
+      "case": "artifacts::tests::atip_codestored_11_a_canon_yaml_the_artifact_store_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3c07b00179b92c311b2d141e0b1c9db321cf3887dcc37a73b70b6a40542398a8"
+    },
+    {
+      "case": "dispatch::tests::atip_codestored_11_a_manifest_or_plan_document_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3c07b00179b92c311b2d141e0b1c9db321cf3887dcc37a73b70b6a40542398a8"
+    },
+    {
+      "case": "evidence_attach::tests::atip_codestored_11_a_binding_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3c07b00179b92c311b2d141e0b1c9db321cf3887dcc37a73b70b6a40542398a8"
+    },
+    {
+      "case": "read_cause::tests::atip_codestored_11_a_read_the_system_fails_for_a_repeat_to_pass_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3c07b00179b92c311b2d141e0b1c9db321cf3887dcc37a73b70b6a40542398a8"
+    },
+    {
+      "case": "review::tests::atip_codestored_11_a_review_artifact_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3c07b00179b92c311b2d141e0b1c9db321cf3887dcc37a73b70b6a40542398a8"
+    }
+  ],
+  "code_tree": "965fd3dccd1265f6e584194abb2cb5cd4fbece70",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "524c1688bb7fadaf4b5ae38ec529d433d40ffa3c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 180,
+  "scenario_id": "atip.codestored.11",
+  "schema": 1,
+  "staging_id": "b7cae80e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
