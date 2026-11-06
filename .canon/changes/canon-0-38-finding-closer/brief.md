@@ -97,3 +97,5 @@ Source: 0.37 릴리스 중 릴리스 에이전트가 역할 없이 `canon findin
 - `finding add`와 리뷰, 증거 명령의 역할 규칙.
 - 0.37까지 닫힌 기록의 역할을 고치는 일.
 - 닫은 사람이 발견을 낸 리뷰어와 같은지 따지는 규칙.
+
+Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:526b8ec920409777a1b61a04eece5596c95ece0d720291859907b75c62ca581c)

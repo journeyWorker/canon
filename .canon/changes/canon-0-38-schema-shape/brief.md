@@ -101,3 +101,5 @@ Source: canon 이슈 #141의 둘째 항목, ATIP 태그 v1.5.0 annex-schema S1 3
 - 일반 값 이름(`NAME`, `TEXT`, `FILE`).
 - 스키마의 다른 크기 절감.
 - 역할을 강제하는 일.
+
+Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:e95a2f4c5c74fb1b4e9887dced24e28f881cdfd7b651690f4f15c459aea53e87)

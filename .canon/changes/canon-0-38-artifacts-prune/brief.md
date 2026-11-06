@@ -102,3 +102,5 @@ Source: canon 이슈 #138의 첫 항목(GC)과 소유자 댓글, `canon artifact
 - 스크린샷과 영상의 변환, 별도 계층 경로 지정, 보고서 추출본 저장.
 - git 기록 축소와 LFS 설정.
 - 정해진 주기로 자동 실행하는 일.
+
+Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:8783da327b5ef5d04faac3a622e5d51f44e79f55b99f11abb3782c7570f6e238)

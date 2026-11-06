@@ -78,3 +78,5 @@ Source: 리뷰 발견 canon-0-37-option-forms_1_1과 canon-0-37-option-forms_1_2
 - 윤초를 달력대로 처리하는 일과 시간대 이름.
 - 기간 값과 `--after`, `--before` 순서 검사.
 - 다른 옵션의 값 규칙.
+
+Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:a6704b550d6828f01d24b981b925e8771865b2586dc45b17001d24885d59fa98)

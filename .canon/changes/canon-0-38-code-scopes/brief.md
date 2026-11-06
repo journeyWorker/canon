@@ -102,3 +102,5 @@ Source: canon 이슈 #130의 첫 본문(0.37이 닫은 것은 그 댓글 사례)
 - 시험이나 커버리지에서 범위를 자동으로 알아내는 일.
 - 코드 트리를 계산하는 규칙과 chore가 아닌 변경의 승인.
 - 증거 신선도의 다른 규칙과 블로커 발견 뒤 재검증.
+
+Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:d021c4bb75aa7efc07a7582c187920cad2fd600c7f93479a0a57fd1e43a1efe6)

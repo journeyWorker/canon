@@ -129,3 +129,5 @@ Source: canon 이슈 #141의 첫째 항목(ATIP 저자의 요청), ATIP 태그 v
 - 다른 옵션의 이름, 값 이름, 도메인(canon-0-38-schema-shape).
 - 목록을 한 값으로 받는 열거 도메인.
 - 옛 철자를 오래 살려 두는 별칭.
+
+Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:58968cadb280dbb7a055d0c3d2eca0d6931bfe5664ee7e6dc082eed8757723be)

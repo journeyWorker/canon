@@ -37,3 +37,5 @@ refactor
 - 시험의 실행 시간과 부하 아래의 타임아웃.
 - 관찰되지 않은 다른 불안정 시험.
 - 시험 실행기 설정을 바꿔 환경을 지우는 방법.
+
+Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:70e25a2e613943db5dbd57e2eb6ad5cb0534478ec5913ee1fe592e51902c5183)
