@@ -1,16 +1,18 @@
 //! `canon schema` (0.20 D1) through the built binary, run from a directory
 //! that is not a canon repo.
 
-use std::process::{Command, Output};
+#[path = "support/hermetic.rs"]
+mod hermetic;
+use std::process::Output;
 
 fn canon(args: &[&str]) -> Output {
     let dir = tempfile::tempdir().expect("tempdir");
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir.path()).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir.path()).output().expect("spawn canon binary")
 }
 
 fn canon_env(args: &[&str], role: &str) -> Output {
     let dir = tempfile::tempdir().expect("tempdir");
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ROLE", role).current_dir(dir.path()).output().expect("spawn canon binary")
+    hermetic::canon().args(args).env("CANON_ROLE", role).current_dir(dir.path()).output().expect("spawn canon binary")
 }
 
 fn listing_len(out: &Output) -> usize {

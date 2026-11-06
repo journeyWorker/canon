@@ -4,6 +4,8 @@
 //! anywhere, and no `plans:` entry, since `.canon/changes` is canon's own
 //! plan source.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -20,7 +22,7 @@ fn git_seed(repo: &Path) {
 }
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).output().expect("spawn canon binary")
 }
 
 fn stdout(o: &Output) -> String {

@@ -6,9 +6,10 @@
 //! the sources honest (no warning site names an unregistered code), and one
 //! status run shows the codes reaching the envelope.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde_json::Value;
 
@@ -107,9 +108,9 @@ fn atip_l0_13_every_warning_the_status_report_produces_has_a_registered_code() {
 #[test]
 fn atip_l0_13_status_json_carries_coded_warnings_in_meta_and_plain_lines_in_data() {
     let dir = tempfile::TempDir::new().unwrap();
-    let init = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--providers", "none", "--no-policy"]).current_dir(dir.path()).output().expect("spawn canon binary");
+    let init = hermetic::canon().args(["init", "--providers", "none", "--no-policy"]).current_dir(dir.path()).output().expect("spawn canon binary");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["status", "--json"]).current_dir(dir.path()).output().expect("spawn canon binary");
+    let out = hermetic::canon().args(["status", "--json"]).current_dir(dir.path()).output().expect("spawn canon binary");
     let document: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {}", String::from_utf8_lossy(&out.stdout)));
     let warnings = document["meta"]["warnings"].as_array().unwrap_or_else(|| panic!("no meta.warnings: {document}"));
     assert!(!warnings.is_empty(), "{document}");

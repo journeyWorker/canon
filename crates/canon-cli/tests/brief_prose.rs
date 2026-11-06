@@ -5,8 +5,10 @@
 //! (invented products; the Korean ones are written in the style the
 //! mechanisms were measured on).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -14,7 +16,7 @@ use tempfile::TempDir;
 const NEW_RULES: [&str; 6] = ["prose.code-citation", "prose.parenthetical", "prose.decision-history", "prose.ai-vocabulary", "prose.ko-ending", "prose.length"];
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).output().expect("spawn canon binary")
 }
 
 fn stdout(o: &Output) -> String {

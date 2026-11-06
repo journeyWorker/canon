@@ -8,6 +8,8 @@
 //! The checker is a function over (command path, flags, `--kind` values), so
 //! its own test can feed it a synthetic split and prove it would catch one.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -96,7 +98,7 @@ fn context_capability_58_the_checker_reports_an_id_option_and_a_concept_spelled_
 // ── the real tree ────────────────────────────────────────────────────────
 
 fn canon_in(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(dir).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(dir).output().expect("spawn canon")
 }
 
 fn stdout(out: &Output) -> String {

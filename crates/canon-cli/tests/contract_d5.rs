@@ -2,6 +2,8 @@
 //! `divergence status` and `context`; `field`/`expected` on refusals; retry
 //! safety of `evidence add` and `review add`; the exit-code exceptions.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -9,7 +11,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn run(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ACTOR", "contract-d5").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env("CANON_ACTOR", "contract-d5").output().expect("spawn canon binary")
 }
 
 fn ok(dir: &Path, args: &[&str]) {

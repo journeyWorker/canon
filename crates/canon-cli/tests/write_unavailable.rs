@@ -40,6 +40,8 @@
 //!
 //! Tests are named by scenario id (`atip_l0_24_…` proves `atip.l0.24`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod support;
 
 use std::collections::BTreeMap;
@@ -52,7 +54,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "write-unavailable").env("CANON_R2_LOCAL_ROOT", dir.join("r2-local")).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "write-unavailable").env("CANON_R2_LOCAL_ROOT", dir.join("r2-local")).output().expect("spawn canon binary")
 }
 
 fn json(output: &Output) -> Value {

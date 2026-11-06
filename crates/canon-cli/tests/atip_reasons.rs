@@ -7,6 +7,8 @@
 //!
 //! Tests are named by scenario id (`atip_reasons_01_…` proves `atip.reasons.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,7 +21,7 @@ use tempfile::TempDir;
 // ── The binary and the fixtures ──
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
+    hermetic::canon().args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
 }
 
 fn body(out: &Output) -> Value {
@@ -65,7 +67,7 @@ fn assert_refusal(out: &Output, code: &str, reason: Option<&str>) -> Value {
 
 /// `canon schema --error <CODE> --json`: the `reasons` of the registry's view of a code.
 fn schema_reasons(code: &str) -> Vec<Value> {
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["schema", "--error", code, "--json"]).output().expect("spawn canon");
+    let out = hermetic::canon().args(["schema", "--error", code, "--json"]).output().expect("spawn canon");
     assert!(out.status.success(), "canon schema --error {code}: {}", String::from_utf8_lossy(&out.stdout));
     body(&out)["data"]["error"]["reasons"].as_array().cloned().unwrap_or_default()
 }
@@ -695,6 +697,6 @@ fn atip_reasons_09_the_changelog_table_is_the_registry_and_stopped_midway_and_it
     }
     assert!(code_info("STOPPED_MIDWAY").is_none(), "STOPPED_MIDWAY is a code of 0.35");
     assert!(all_codes().iter().all(|info| info.reasons.iter().all(|r| r.reason != "SKILLS_INVALID_ARGUMENT")), "SKILLS_INVALID_ARGUMENT is a reason of 0.35");
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["schema", "--errors", "--json"]).output().unwrap();
+    let out = hermetic::canon().args(["schema", "--errors", "--json"]).output().unwrap();
     assert!(!String::from_utf8_lossy(&out.stdout).contains("STOPPED_MIDWAY"), "the registry view names STOPPED_MIDWAY");
 }

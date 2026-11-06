@@ -2,6 +2,8 @@
 //! work tree and `.canon/` hold the bytes they held. Each refusal here is provoked for real, against the built `canon` binary, from the
 //! recipe the command's own tests use; the registry (`canon_cli::cli_error::all_codes()`) says the `retryable` of each.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -12,7 +14,7 @@ use tempfile::TempDir;
 // ── The binary, the registry, the snapshot ──
 
 fn canon_with(dir: &Path, args: &[&str], role: Option<&str>, path: Option<&Path>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
     if let Some(role) = role {
         command.env("CANON_ROLE", role);

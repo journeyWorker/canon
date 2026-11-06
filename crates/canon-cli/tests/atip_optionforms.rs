@@ -10,6 +10,8 @@
 //! found, and no sweep is vacuous. Tests are named by scenario id (`atip_optionforms_05_…` proves `atip.optionforms.05`). The rollback of a strategy is in
 //! `spec030_reads.rs`, which holds the strategy fixture (`atip_optionforms_05_…`, `atip_optionforms_06_…`, `atip_optionforms_01_…`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::{BTreeMap, BTreeSet};

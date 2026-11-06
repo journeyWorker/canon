@@ -3,14 +3,16 @@
 //!
 //! Drives the built binary only.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .args(args)
         .current_dir(dir)
         .env("CANON_ACTOR", "context-flags")

@@ -5,6 +5,8 @@
 //!
 //! Tests are named by scenario id (`atip_batchpointers_01_…` proves `atip.batchpointers.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
@@ -13,7 +15,7 @@ use serde_json::{json, Value};
 use tempfile::TempDir;
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-batchpointers").stdin(Stdio::null()).output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-batchpointers").stdin(Stdio::null()).output().expect("spawn canon")
 }
 
 fn json_of(output: &Output) -> Value {

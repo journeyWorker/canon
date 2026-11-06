@@ -12,6 +12,8 @@
 
 #![cfg(debug_assertions)]
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -23,7 +25,7 @@ use tempfile::TempDir;
 // ── The binary ──
 
 fn run(dir: &Path, glob: Option<&str>, envs: &[(&str, &str)], args: &[&str]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").env_remove("CANON_TEST_EIO").env_remove("CANON_PG_DSN");
     if let Some(glob) = glob {
         command.env("CANON_TEST_EIO", glob);
@@ -53,7 +55,7 @@ fn schema_lists(command: &[&str], code: &str) -> bool {
     let mut args = vec!["schema"];
     args.extend_from_slice(command);
     args.push("--json");
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(&args).output().expect("spawn canon");
+    let out = hermetic::canon().args(&args).output().expect("spawn canon");
     assert!(out.status.success(), "{args:?}: {}", String::from_utf8_lossy(&out.stdout));
     body(&out)["data"]["errors"].as_array().unwrap_or_else(|| panic!("{args:?} has no errors")).iter().any(|listed| listed == code)
 }

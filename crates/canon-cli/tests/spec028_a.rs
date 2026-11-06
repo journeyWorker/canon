@@ -3,6 +3,8 @@
 //! no earlier test proves. Exit codes, JSON fields, records written and trees
 //! left unchanged; no help text and no wording.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -35,7 +37,7 @@ impl Fixture {
 }
 
 fn run(repo: &Path, home: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .args(args)
         .current_dir(repo)
         .env("CANON_ACTOR", "spec028-a")

@@ -34,6 +34,8 @@
 //! independent invocations against unchanged input — precisely the
 //! property `--check`'s byte-diff gate depends on.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -44,7 +46,7 @@ use chrono::Utc;
 use serde::Deserialize;
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {

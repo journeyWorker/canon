@@ -7,6 +7,8 @@
 //! Each test names the scenario it proves. They assert exit codes, JSON fields
 //! and the tree left behind, never help or message wording.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -16,7 +18,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon binary")
 }
 
 fn json_of(out: &Output) -> Value {

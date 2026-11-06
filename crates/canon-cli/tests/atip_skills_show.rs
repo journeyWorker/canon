@@ -3,6 +3,8 @@
 //! `--help` points at `skills show` too, and every command line a guide shows parses (`guide_commands_parse`). Tests are named by scenario
 //! id (`atip.skillsshow.NN`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 mod rule_support;
 
@@ -13,7 +15,7 @@ use rule_support::{document_problems, run_empty_with, sample};
 use serde_json::{json, Value};
 
 fn canon_in(dir: &Path, args: &[&str]) -> std::process::Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_clear().env("PATH", std::env::var_os("PATH").unwrap_or_default()).env("HOME", dir).output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(dir).env_clear().env("PATH", std::env::var_os("PATH").unwrap_or_default()).env("HOME", dir).output().expect("spawn canon")
 }
 
 fn json_of(output: &std::process::Output) -> Value {

@@ -11,6 +11,10 @@
 //! proves the script's LOGIC where those tools exist, it does not make
 //! `cargo test -p canon-cli` depend on them being present everywhere.
 
+#[expect(dead_code, reason = "this test only scrubs its own commands")]
+#[path = "support/hermetic.rs"]
+mod hermetic;
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
@@ -56,10 +60,7 @@ fn run_hook(repo: &Path, stdin_json: &str) -> Output {
     let existing_path = std::env::var("PATH").unwrap_or_default();
     let path = format!("{}:{existing_path}", canon_bin_dir.display());
 
-    let mut child = Command::new("sh")
-        .arg(script_path())
-        .current_dir(repo)
-        .env("PATH", path)
+    let mut child = hermetic::scrub(Command::new("sh").arg(script_path()).current_dir(repo).env("PATH", path))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

@@ -10,12 +10,12 @@
 //! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.2.0`) and canon runs it once, in the
 //! CI job `atip` and in `just atip-deep`: `atip check --level L2 --contract 1.5 --deep` on the canon binary and this fixture (`just atip` runs it without `--deep`). No test of canon runs the checker.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde_json::{json, Value};
 
-const CANON: &str = env!("CARGO_BIN_EXE_canon");
 
 /// The command the CI job and the just recipe run, with the binary's directory spelled `target/debug`.
 const COMMAND: &str = "atip check --bin target/debug/canon --level L2 --contract 1.5 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json";
@@ -59,7 +59,7 @@ fn warning_codes(answer: &Value) -> Vec<Value> {
 /// The answer of `canon <args> --json` in an empty directory.
 fn answer(args: &[&str]) -> Value {
     let dir = tempfile::tempdir().expect("tempdir");
-    let output = Command::new(CANON).args(args).arg("--json").current_dir(dir.path()).output().expect("run canon");
+    let output = hermetic::canon().args(args).arg("--json").current_dir(dir.path()).output().expect("run canon");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     serde_json::from_slice(&output.stdout).expect("the answer is JSON")
 }

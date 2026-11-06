@@ -2,6 +2,8 @@
 //! window (0.34 `canon-0-34-atip-constraints`, atip/1 spec 10.7.4, 10.7.5, 10.8). Tests are named by scenario id
 //! (`atip.constraints.NN`); the sweeps that hold every declaration to the real parser are in `tests/arg_rules.rs`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 mod rule_support;
 

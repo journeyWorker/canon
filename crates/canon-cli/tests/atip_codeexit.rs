@@ -2,6 +2,8 @@
 //! its code and no `data`; several causes are `error.details[]`; the check commands' negative answers are exit 1 `*_FAILED` with their result
 //! in `data`; the commands that cannot start answer exit 2. Against the built `canon` binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -12,7 +14,7 @@ use tempfile::TempDir;
 mod old_codes;
 
 fn canon(dir: &Path, args: &[&str], role: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
     if let Some(role) = role {
         command.env("CANON_ROLE", role);
@@ -240,7 +242,7 @@ fn atip_codeexit_08_a_command_that_cannot_start_is_exit_2_with_its_code_and_writ
     std::fs::write(p.join("m.json"), r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":["doc.md"],"examples":[],"toolSchemas":[],"injectedGuidance":[]}"#).unwrap();
     let before = snapshot(p);
     let no_git = TempDir::new().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["context-pack", "add", "--manifest", "m.json", "--json"]).current_dir(p).env("PATH", no_git.path()).env_remove("CANON_ROLE").output().unwrap();
+    let out = hermetic::canon().args(["context-pack", "add", "--manifest", "m.json", "--json"]).current_dir(p).env("PATH", no_git.path()).env_remove("CANON_ROLE").output().unwrap();
     let b = body(&out);
     assert_eq!((out.status.code(), b["error"]["code"].as_str(), b["error"]["retryable"].as_bool()), (Some(2), Some("CONTEXT_GIT_REQUIRED"), Some(false)), "{b}");
     assert!(b.get("data").is_none(), "{b}");

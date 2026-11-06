@@ -4,6 +4,8 @@
 //! files (`tests/fixtures/v0_27/`, taken from the v0.27.0 tag): its skill sources, retrieve
 //! hook script and the settings files `canon gate install-hooks` wrote.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -16,7 +18,7 @@ const PROJECTIONS: [&str; 2] = [".claude/skills/canon", ".agents/skills/canon"];
 const HOOK_COPY: &str = ".claude/hooks/canon-retrieve-pre-dispatch.sh";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").env_remove("CANON_SKILLS_SOURCE").output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(repo).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").env_remove("CANON_SKILLS_SOURCE").output().expect("spawn canon")
 }
 
 fn ok(repo: &Path, args: &[&str]) -> Output {

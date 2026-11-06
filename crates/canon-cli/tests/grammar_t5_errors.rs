@@ -9,6 +9,8 @@
 //! - every `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` exits 2 (D4);
 //! - every code and exit a leaf lists is a registered code and a row of the exit table.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::BTreeSet;

@@ -2,8 +2,10 @@
 //! (0.22 D4), against the built binary on a copy of the
 //! `subject-ship-allowed` conformance repo.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -12,7 +14,7 @@ const POLICY_WITH_REVIEW: &str = "spec_coverage:\n  require_cases: [failure]\n  
 const POLICY_WEAKENED: &str = "spec_coverage:\n  require_cases: []\n";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env("CANON_ACTOR", "agent-a").env_remove("CANON_ROLE").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).env("CANON_ACTOR", "agent-a").env_remove("CANON_ROLE").output().expect("spawn canon binary")
 }
 
 fn copy_dir(from: &Path, to: &Path) {
@@ -140,7 +142,7 @@ fn a_fresh_change_is_the_planners_step_until_its_brief_is_clean() {
     assert_eq!(step["command"], "canon brief check add-login --json");
 
     // The planner sees it under its own role; nothing waits on the human yet.
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["status", "--json"]).current_dir(repo).env("CANON_ROLE", "planner").env("CANON_ACTOR", "p").output().unwrap();
+    let out = hermetic::canon().args(["status", "--json"]).current_dir(repo).env("CANON_ROLE", "planner").env("CANON_ACTOR", "p").output().unwrap();
     let report: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert!(report["meta"]["next"].as_array().unwrap().iter().any(|s| s["command"] == "canon brief check add-login --json"), "{report}");
     assert!(report["meta"]["waitingOn"].get("human").is_none(), "{report}");

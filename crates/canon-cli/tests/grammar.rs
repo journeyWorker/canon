@@ -4,13 +4,15 @@
 //! (`CANON_ROLE` / `--as`) narrows `schema` and defaults `--role` on
 //! `evidence add`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
 use serde_json::{json, Value};
 
 fn canon_with(repo: &Path, args: &[&str], env: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo);
     for (key, value) in env {
         command.env(key, value);

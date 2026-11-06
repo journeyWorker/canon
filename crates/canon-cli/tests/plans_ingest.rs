@@ -4,8 +4,10 @@
 //! (`env!("CARGO_BIN_EXE_canon")`) against offline openspec-change-dir
 //! fixtures — zero network, no credentials.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, RecordKind, RoleId, TaskId};
 use canon_store::git_tier::GitTier;
@@ -41,7 +43,7 @@ fn failure_text(output: &Output) -> String {
 }
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env_remove("CANON_PG_DSN_S17_TEST_UNSET").current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).env_remove("CANON_PG_DSN_S17_TEST_UNSET").current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -392,7 +394,7 @@ fn a_present_dsn_with_a_malformed_pg_schema_fails_loud_not_a_silent_unwritten_de
     std::fs::create_dir_all(&src).unwrap();
     write_change_dir(&src, "add-widget", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done", "- [ ] 1.2 ship it"]);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["ingest", "plans", "--json"])
         .env("CANON_PG_DSN_S17_TEST_MALFORMED_SCHEMA", "postgres://unused-because-schema-validation-fails-first/db")
         .current_dir(dir.path())
@@ -426,7 +428,7 @@ fn an_unset_dsn_with_a_malformed_pg_schema_also_fails_loud_never_masked_by_the_d
     write_change_dir(&src, "add-widget", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done", "- [ ] 1.2 ship it"]);
 
     // Deliberately leave CANON_PG_DSN_S17_TEST_UNSET_MALFORMED unset.
-    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["ingest", "plans", "--json"])
         .env_remove("CANON_PG_DSN_S17_TEST_UNSET_MALFORMED")
         .current_dir(dir.path())

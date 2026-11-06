@@ -9,6 +9,8 @@
 //! test copies it into a fresh tempdir first, so `cargo test` stays
 //! side-effect-free against the repo tree.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -511,7 +513,7 @@ fn canonical_check_and_doctor_report_legacy_codex_remnant_with_fix() {
     assert!(line.contains("canon skills install --providers=claude,codex"), "the remnant line names its fix: {line}");
     assert!(!doctor.iter().any(|line| line == "status: healthy"));
 
-    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["skills", "check", "--providers", "claude,codex", "--skills-source"])
         .arg(&source)
         .arg("--repo")
@@ -534,7 +536,7 @@ const LOOP_STEPS: [&str; 8] =
 
 /// The text of `canon skills show <args>`: the guide the binary carries.
 fn show(args: &[&str]) -> String {
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "show"]).args(args).output().unwrap();
+    let out = hermetic::canon().args(["skills", "show"]).args(args).output().unwrap();
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
     String::from_utf8(out.stdout).unwrap()
 }
@@ -579,7 +581,7 @@ fn skills_install_11_the_stub_claims_build_work_and_the_guide_opens_with_the_loo
     assert_eq!(skill_steps, LOOP_STEPS, "the guide's loop steps");
 
     let tmp = tempfile::tempdir().unwrap();
-    let init = Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
+    let init = hermetic::canon().arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     let agents = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
     let block_steps: Vec<&str> = agents
@@ -615,7 +617,7 @@ fn set_lock_version(target: &Path, version: Option<&str>) {
 }
 
 fn canon(args: &[&str], source: &Path, target: &Path) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--skills-source").arg(source).arg("--repo").arg(target).output().unwrap()
+    hermetic::canon().args(args).arg("--skills-source").arg(source).arg("--repo").arg(target).output().unwrap()
 }
 
 /// skills.install.55: a `--skills-source` directory that does not exist is an invalid argument too: exit 2 from install, check and doctor, nothing written.
@@ -939,7 +941,7 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
         assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "{section:?}: nothing is written");
         assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), config);
 
-        let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--check", "--repo"]).arg(&target).output().unwrap();
+        let check = hermetic::canon().args(["init", "--check", "--repo"]).arg(&target).output().unwrap();
         let out = String::from_utf8_lossy(&check.stdout);
         assert_eq!(check.status.code(), Some(1), "{out}");
         assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ") && line.contains(needle)), "{out}");

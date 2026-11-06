@@ -6,9 +6,11 @@
 //!
 //! Tests are named by scenario id (`atip_l0_23_…` proves `atip.l0.23`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_cli::cli_error::{all_codes, code_info};
 use serde_json::Value;
@@ -197,7 +199,7 @@ fn atip_l0_25_every_split_gives_each_exit_its_own_code() {
 }
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
 }
 
 fn json(output: &Output) -> Value {

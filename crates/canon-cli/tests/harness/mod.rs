@@ -6,6 +6,8 @@
 //! Each test binary uses a subset, so dead-code warnings are expected here.
 #![expect(dead_code, reason = "each test binary that includes this module uses a subset")]
 
+use crate::hermetic;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -220,11 +222,10 @@ pub fn vocabulary() -> &'static Vec<VocabRow> {
 
 /// `canon <args>` in `dir` with a fixed environment (`HOME` is `home`; no ambient `CANON_*`).
 pub fn canon_in(dir: &Path, home: &Path, args: &[String], envs: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command
         .args(args)
         .current_dir(dir)
-        .env_remove("CANON_ROLE")
         .env("CANON_ACTOR", "grammar-tests")
         .env("HOME", home)
         .env("CANON_SKILLS_SOURCE", repo_root().join("canon/skills"));

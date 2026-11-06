@@ -5,6 +5,8 @@
 //!
 //! Tests are named by scenario id (`atip_l0_01_…` proves `atip.l0.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
@@ -20,11 +22,11 @@ use old_codes::{gone_codes, word_in};
 const META_MEMBERS: &[&str] = &["schemaVersion", "tool", "toolVersion", "command", "contract", "contractVersion", "output", "context", "next", "warnings", "coverage", "page", "fields", "truncated", "x-canon"];
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
 }
 
 fn canon_as(dir: &Path, role: &str, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ROLE", role).env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env("CANON_ROLE", role).env("CANON_ACTOR", "atip-l0").output().expect("spawn canon binary")
 }
 
 fn json(output: &Output) -> Value {
@@ -299,7 +301,7 @@ fn atip_l0_12_next_entries_are_runnable_with_reason_and_json() {
 fn atip_l0_13_a_warning_is_a_coded_object_with_a_registered_code() {
     let repo = scratch_repo();
     // An unknown CANON_ROLE is ignored where the role does not matter, with a warning.
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["context", "--json"]).current_dir(repo.path()).env("CANON_ROLE", "bogus-role").output().unwrap();
+    let out = hermetic::canon().args(["context", "--json"]).current_dir(repo.path()).env("CANON_ROLE", "bogus-role").output().unwrap();
     let document = json(&out);
     let warnings = document["meta"]["warnings"].as_array().expect("a warning in meta.warnings");
     assert!(!warnings.is_empty());
@@ -476,7 +478,7 @@ fn atip_l0_20_a_panic_answers_internal_with_exit_one_never_101() {
         return;
     }
     let dir = TempDir::new().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["status", "--json"]).current_dir(dir.path()).env("CANON_TEST_PANIC", "1").output().unwrap();
+    let out = hermetic::canon().args(["status", "--json"]).current_dir(dir.path()).env("CANON_TEST_PANIC", "1").output().unwrap();
     assert_eq!(out.status.code(), Some(1), "{}", String::from_utf8_lossy(&out.stderr));
     assert!(out.stderr.is_empty(), "JSON mode keeps stderr empty: {}", String::from_utf8_lossy(&out.stderr));
     let document = json(&out);
@@ -485,7 +487,7 @@ fn atip_l0_20_a_panic_answers_internal_with_exit_one_never_101() {
     let hint = document["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("report"), "{hint}");
     assert!(atip::envelope_problems(&document).is_empty());
-    let text = Command::new(env!("CARGO_BIN_EXE_canon")).args(["status"]).current_dir(dir.path()).env("CANON_TEST_PANIC", "1").output().unwrap();
+    let text = hermetic::canon().args(["status"]).current_dir(dir.path()).env("CANON_TEST_PANIC", "1").output().unwrap();
     assert_eq!(text.status.code(), Some(1));
     assert!(text.stdout.is_empty());
     assert!(String::from_utf8_lossy(&text.stderr).starts_with("canon: INTERNAL: "));
@@ -498,7 +500,7 @@ fn atip_l0_21_a_closed_stdout_is_a_signal_exit_outside_the_registry() {
     let (reader, writer) = std::io::pipe().expect("pipe");
     drop(reader);
     let repo = scratch_repo();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["query", "--kind", "subject", "--all", "--json"]).current_dir(repo.path()).stdout(Stdio::from(writer)).stderr(Stdio::piped()).output().unwrap();
+    let out = hermetic::canon().args(["query", "--kind", "subject", "--all", "--json"]).current_dir(repo.path()).stdout(Stdio::from(writer)).stderr(Stdio::piped()).output().unwrap();
     assert_eq!(out.status.signal(), Some(13), "a signal exit, not a registry code: {:?}", out.status);
     assert_eq!(out.status.code(), None);
     assert!(out.stderr.is_empty(), "{}", String::from_utf8_lossy(&out.stderr));
@@ -509,6 +511,7 @@ fn atip_l0_21_a_closed_stdout_is_a_signal_exit_outside_the_registry() {
 fn canon_on_a_terminal(dir: &Path, args: &[&str]) -> Option<String> {
     let exe = env!("CARGO_BIN_EXE_canon");
     let mut command = Command::new("script");
+    hermetic::scrub(&mut command);
     if cfg!(target_os = "macos") {
         command.args(["-q", "/dev/null", exe]).args(args);
     } else {
@@ -524,7 +527,7 @@ fn canon_on_a_terminal(dir: &Path, args: &[&str]) -> Option<String> {
 fn atip_l0_22_input_dash_beside_another_stdin_reader_is_usage_and_on_a_terminal_input_invalid() {
     use std::io::Write;
     let repo = scratch_repo();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let mut child = hermetic::canon()
         .args(["evidence", "add", "--input", "-", "--report", "junit:-", "--json"])
         .current_dir(repo.path())
         .env_remove("CANON_ROLE")

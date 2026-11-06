@@ -12,6 +12,8 @@
 //!   same thing everywhere;
 //! - every conflict and requirement the rule tables declare ([`relations_of`]) is enforced after the command line is parsed.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::{BTreeMap, BTreeSet};

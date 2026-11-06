@@ -10,6 +10,8 @@
 //! (digest idempotence) — plus the bare run's "preview only, never
 //! writes" contract.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod support;
 
 use chrono::{Duration, Utc};

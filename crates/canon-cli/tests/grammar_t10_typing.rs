@@ -8,6 +8,8 @@
 //!   `true` or `{}`, a property with no type, or an object with no properties is
 //!   named in [`OPAQUE`] with the reason it keeps its own schema.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::path::Path;

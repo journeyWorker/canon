@@ -1,3 +1,5 @@
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,7 +17,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").env("CANON_ACTOR", "spec030-reads").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").env("CANON_ACTOR", "spec030-reads").output().expect("spawn canon binary")
 }
 
 fn json(out: &Output) -> Value {

@@ -9,8 +9,10 @@
 //! real-process boundary — exit codes and stdout/stderr against a
 //! seeded-on-disk store the binary itself never wrote.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_cli::retrieve::derive_candidates;
 use canon_learn::{ParquetStrategyStore, StrategyId, StrategyItem, StrategyItemFields, StrategyStore, TrajectoryId};
@@ -18,7 +20,7 @@ use canon_model::ids::{RegimeKey, RoleId, SubjectId, regime_key};
 use chrono::Utc;
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {

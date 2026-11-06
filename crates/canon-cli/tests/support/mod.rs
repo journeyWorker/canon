@@ -12,8 +12,10 @@
 //! with calls it doesn't otherwise need.
 #![expect(dead_code, reason = "each test binary that includes this module uses a subset")]
 
+use crate::hermetic;
+
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::handoff::{DomainId, Handoff, HandoffBody, HandoffFields};
@@ -174,11 +176,10 @@ impl Fixture {
     /// "trajectory"]`); `--repo` is a per-subcommand option, so it is
     /// appended after the subcommand path, never before it.
     pub fn run_canon(&self, subcommand_args: &[&str]) -> Output {
-        let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
         let mut args: Vec<String> = subcommand_args.iter().map(std::string::ToString::to_string).collect();
         args.push("--repo".to_string());
         args.push(self.root.path().display().to_string());
-        Command::new(bin).args(&args).env("CANON_R2_LOCAL_ROOT", self.r2_root()).output().expect("spawning the built `canon` binary")
+        hermetic::canon().args(&args).env("CANON_R2_LOCAL_ROOT", self.r2_root()).output().expect("spawning the built `canon` binary")
     }
 }
 

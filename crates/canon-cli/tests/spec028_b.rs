@@ -2,6 +2,8 @@
 //! lifecycle): behaviour through the built `canon` binary (exit codes, JSON
 //! fields, what is and is not written). Each test names the scenario it proves.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -10,7 +12,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").output().expect("spawn canon binary")
 }
 
 fn text(out: &Output) -> String {

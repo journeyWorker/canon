@@ -12,8 +12,9 @@
 //!   after demotion a fresh `retrieve_guidance` drops the strategy, yet
 //!   the already-written manifest still carries it.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::Command;
 
 use canon_learn::{
     demote_strategy, manifest_guidance_for_replay, DemotionPolicy, ParquetStrategyStore, StrategyId, StrategyItem, StrategyItemFields,
@@ -39,7 +40,7 @@ fn seed(repo: &Path, content: &str) -> StrategyId {
 }
 
 fn dispatch_begin(repo: &Path) -> serde_json::Value {
-    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["dispatch", "begin", "--role", "dev", "--regime", REGIME, "--json", "--repo"])
         .arg(repo)
         .output()
@@ -59,7 +60,7 @@ fn a_consumer_reads_the_run_id_from_data_and_closes_that_run() {
     let begun = dispatch_begin(dir.path());
     let run_id = begun["runId"].as_str().expect("`.data.run_id` is the run id a hook closes later").to_string();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["dispatch", "end", &run_id, "--run-outcome", "succeeded", "--json", "--repo"])
         .arg(dir.path())
         .output()
@@ -107,7 +108,7 @@ fn a_recorded_manifest_replays_verbatim_even_after_the_source_is_demoted() {
 
     // Before the demotion the CLI retrieval returns the strategy.
     let retrieve = |repo: &Path| -> Vec<serde_json::Value> {
-        let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+        let output = hermetic::canon()
             .args(["retrieve", "--for-role", "dev", "--regime", REGIME, "--json", "--repo"])
             .arg(repo)
             .output()
@@ -141,7 +142,7 @@ fn a_recorded_manifest_replays_verbatim_even_after_the_source_is_demoted() {
 #[test]
 fn a_role_regime_mismatch_is_a_usage_error() {
     let dir = tempfile::tempdir().unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["dispatch", "begin", "--role", "reviewer", "--regime", REGIME, "--repo"])
         .arg(dir.path())
         .output()

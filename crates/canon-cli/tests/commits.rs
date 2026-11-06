@@ -3,6 +3,8 @@
 //! full sha, records `code_tree` and `worktree_dirty` for the code it saw,
 //! refuses nothing for uncommitted code, and refuses `COMMIT_REQUIRED` outside git.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -15,7 +17,7 @@ const SCENARIO: &str = "shop.cart.01";
 const CHORE_BRIEF: &str = "---\nkind: chore\n---\n\n# Bump the client\n\n## Intent\n\nBump the client\n\nApproved: Journey 2026-10-12T00:00:00Z — \"go\"\n";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
 }
 
 fn text(bytes: &[u8]) -> String {

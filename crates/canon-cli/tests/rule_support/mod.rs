@@ -13,6 +13,8 @@
 
 #![expect(dead_code, reason = "each test binary that includes this module uses a subset")]
 
+use crate::hermetic;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -645,7 +647,7 @@ pub fn run_empty_with(words: &[String], envs: &[(&str, &str)]) -> Outcome {
     let mut argv = words.to_vec();
     argv.push("--json".to_string());
     // No ambient `CANON_*` at all: the environment is an input of a validator (spec 11.7), and the checker's own is empty.
-    let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(&argv).current_dir(scratch.path()).env_clear().env("HOME", home.path()).env("PATH", std::env::var_os("PATH").unwrap_or_default());
     for (key, value) in envs {
         command.env(key, value);

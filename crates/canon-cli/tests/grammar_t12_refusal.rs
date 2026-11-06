@@ -24,6 +24,8 @@
 //!   (`demo review`, `dispatch begin`, `divergence accept|defer|resolve`) add
 //!   a record per run by contract: there is nothing to hold them to.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::BTreeSet;

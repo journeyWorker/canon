@@ -2,6 +2,8 @@
 //! empty template sections), the old-format detection of the readers and writers, and `canon migrate` rewriting the
 //! briefs of a repo (preview, commit, revert, interruption), through the real binary. One test per scenario, named by its id.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,7 +13,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon_as(repo: &Path, role: Option<&str>, args: &[&str]) -> Output {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut cmd = hermetic::canon();
     cmd.args(args).env("CANON_ACTOR", "bf-tests").current_dir(repo);
     match role {
         Some(role) => cmd.env("CANON_ROLE", role),

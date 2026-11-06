@@ -4,12 +4,14 @@
 //! fresh repo's report was empty. These tests drive the actually-built
 //! `canon` binary through the loop a fresh repo runs.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).env("CANON_ACTOR", "canon").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).env("CANON_ACTOR", "canon").output().expect("spawn canon binary")
 }
 
 fn stderr(output: &Output) -> String {

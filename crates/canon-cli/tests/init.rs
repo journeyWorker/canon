@@ -17,11 +17,13 @@
 //! section while still reporting the other two PASS; `check-config`
 //! treats an absent `plans:` key as "not configured", not FAIL.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -548,7 +550,7 @@ fn init_then_ingest_sessions_writes_the_sqlite_hot_tier_with_zero_env_or_service
     assert!(!dir.path().join(".canon/hot.db").exists(), "canon init itself must not eagerly create the hot tier's db file");
 
     let home = tempfile::tempdir().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let out = hermetic::canon()
         .args(["ingest", "sessions", "--home", &home.path().display().to_string()])
         .current_dir(dir.path())
         .env_remove("CODEX_HOME")
@@ -575,7 +577,7 @@ fn skill_source(dir: &Path) -> std::path::PathBuf {
 /// `canon init` in `repo` (piped stdin, so never a terminal) with the
 /// default skill source at `source`.
 fn init_with_source(args: &[&str], repo: &Path, source: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").args(args).current_dir(repo).env("CANON_SKILLS_SOURCE", source).output().expect("spawn canon binary")
+    hermetic::canon().arg("init").args(args).current_dir(repo).env("CANON_SKILLS_SOURCE", source).output().expect("spawn canon binary")
 }
 
 const PROJECTIONS: [&str; 4] = [".claude/skills/canon", ".agents/skills/canon", ".omp/skills/canon", ".pi/skills/canon"];
@@ -605,7 +607,7 @@ fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records
 
     let check = run_canon(&["init", "--check"], &repo);
     assert!(stdout(&check).contains("[PASS] skills (providers: omp)\n"), "{}", stdout(&check));
-    let doctor = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "doctor"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
+    let doctor = hermetic::canon().args(["skills", "doctor"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
     assert_eq!(stdout(&doctor), format!("providers: omp (from canon.yaml skills.providers)\nstatus: healthy\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp]).join("\n")));
 }
 
@@ -622,6 +624,7 @@ fn authoring_init_96_on_a_terminal_init_asks_nothing_and_takes_the_detected_harn
     std::fs::create_dir_all(repo.join(".omp")).unwrap();
     let exe = env!("CARGO_BIN_EXE_canon");
     let mut command = Command::new("script");
+    hermetic::scrub(&mut command);
     if cfg!(target_os = "macos") {
         command.args(["-q", "/dev/null", exe, "init"]);
     } else {
@@ -702,7 +705,7 @@ fn authoring_init_93_an_explicit_empty_choice_is_recorded() {
     assert!(without_next(&stdout(&out)).ends_with("canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`\n"), "{}", stdout(&out));
     assert!(projected(&repo).is_empty());
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: []\n"));
-    let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "check"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
+    let check = hermetic::canon().args(["skills", "check"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
     assert_eq!(check.status.code(), Some(0), "{}", stdout(&check));
     assert_eq!(stdout(&check), "providers: none (from canon.yaml skills.providers)\n");
 
@@ -752,7 +755,7 @@ fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry(
     assert!(projected(&repo).is_empty());
 
     // Without the override directory the retry installs the stub the binary carries.
-    let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install"]).current_dir(&repo).env_remove("CANON_SKILLS_SOURCE").output().unwrap();
+    let retry = hermetic::canon().args(["skills", "install"]).current_dir(&repo).env_remove("CANON_SKILLS_SOURCE").output().unwrap();
     assert_eq!(retry.status.code(), Some(0), "{}", stderr(&retry));
     assert_eq!(projected(&repo), vec![".pi/skills/canon"]);
 }

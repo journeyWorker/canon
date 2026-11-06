@@ -2,6 +2,8 @@
 //! scenario in `dispatch/manifest.feature` (08-28) and `authoring/demo.feature`
 //! (01-04), each pinning today's behaviour through the built `canon` binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -14,7 +16,7 @@ const ZERO_PACK: &str = "sha256:000000000000000000000000000000000000000000000000
 const REGIME: &str = "dev/canon/join-spine/9c93d024b1a2";
 
 fn run(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").output().expect("spawn canon")
+    hermetic::canon().args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").output().expect("spawn canon")
 }
 
 fn body(out: &Output) -> Value {

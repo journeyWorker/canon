@@ -2,13 +2,15 @@
 //! custom role, so an unknown role runs and warns with the closest known role;
 //! it is never refused. Against the built `canon` binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
 use serde_json::Value;
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
 }
 
 fn git(repo: &Path, args: &[&str]) {

@@ -3,15 +3,17 @@
 //! named, and the tool-wide options after a group word. Tests are named after the scenario they prove
 //! (`atip.contract11.NN`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_cli::cli_error::{CliError, CliErrorExt as _};
 use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-contract11").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-contract11").output().expect("spawn canon binary")
 }
 
 fn json(output: &Output) -> Value {

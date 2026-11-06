@@ -3,6 +3,8 @@
 //! Behaviour through the built `canon` binary (exit codes, JSON, what is and is not written). Each test names the scenario
 //! it proves (`atip.planjcs.NN`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod support;
 
 use std::collections::BTreeMap;
@@ -64,7 +66,7 @@ fn tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
 }
 
 fn canon_in(root: &Path, args: &[String], env: &[(String, String)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(root).env_remove("CANON_ROLE").env_remove("CANON_TEST_REPO_LOCK_WAIT_MS").env_remove("CANON_TEST_HOLD_AFTER_RUN_MS").env("CANON_ACTOR", "canon");
     for (key, value) in env {
         command.env(key, value);
@@ -424,7 +426,7 @@ fn wait_until_held(root: &Path, child: &mut Child) {
 }
 
 fn spawn(root: &Path, args: &[String], env: &[(&str, &str)]) -> Child {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(root).env_remove("CANON_ROLE").env_remove("CANON_TEST_REPO_LOCK_WAIT_MS").env_remove("CANON_TEST_HOLD_AFTER_RUN_MS").env("CANON_ACTOR", "canon").stdout(Stdio::piped()).stderr(Stdio::piped());
     for (key, value) in env {
         command.env(key, value);
@@ -871,7 +873,7 @@ fn atip_planjcs_13_the_report_schemas_hold_the_preview_and_their_minor_is_raised
 /// `canon` run with `args` and `stdin` as its standard input, in `root`.
 fn canon_with_stdin(root: &Path, args: &[String], env: &[(String, String)], stdin: &str) -> Output {
     use std::io::Write as _;
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(root).env_remove("CANON_ROLE").env("CANON_ACTOR", "canon").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     for (key, value) in env {
         command.env(key, value);

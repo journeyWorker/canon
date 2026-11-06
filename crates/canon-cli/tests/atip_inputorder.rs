@@ -5,6 +5,8 @@
 //!
 //! Tests are named by scenario id (`atip_inputorder_01_…` proves `atip.inputorder.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::io::Write as _;
 use std::path::Path;
@@ -14,7 +16,7 @@ use serde_json::{json, Value};
 use tempfile::TempDir;
 
 fn canon_with(dir: &Path, args: &[&str], stdin: Option<&str>, env: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-inputorder").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     for (name, value) in env {
         command.env(name, value);

@@ -1,15 +1,17 @@
 //! The guide comes from the binary (0.28 D10): `canon skills show`, the stub `skills install`
 //! writes, `init` without a `canon/skills` tree, and `skills check` on an older lock.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 
 const SKILLS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../canon/skills");
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_SKILLS_SOURCE").output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_SKILLS_SOURCE").output().expect("spawn canon")
 }
 
 fn json(out: &Output) -> Value {
@@ -87,7 +89,7 @@ fn the_guide_names_are_the_schema_possible_values() {
 fn skills_show_ignores_the_declared_role() {
     let empty = tempfile::tempdir().unwrap();
     for role in ["bogus", "planner", "implementer", "reviewer", "orchestrator"] {
-        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "show", "canon"]).current_dir(empty.path()).env("CANON_ROLE", role).output().unwrap();
+        let out = hermetic::canon().args(["skills", "show", "canon"]).current_dir(empty.path()).env("CANON_ROLE", role).output().unwrap();
         assert_eq!(out.status.code(), Some(0), "CANON_ROLE={role}");
         assert_eq!(out.stdout, source("SKILL.src.md"));
     }

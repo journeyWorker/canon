@@ -9,6 +9,8 @@
 //! The only writes a leaf may make are the paths its `effectNote` names, and
 //! only when they are a cache the user never commits.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -65,7 +67,7 @@ const EXTRA_INVOCATIONS: &[&str] = &[
 
 
 fn canon(dir: &Path, home: &Path, args: &[String]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .args(args)
         .current_dir(dir)
         .env("CANON_ACTOR", "read-effects")

@@ -15,11 +15,13 @@
 //! never needs to build a fixture corpus of its own to exercise the
 //! CLI-arm wiring (repo resolution, exit codes, file placement).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stderr(output: &Output) -> String {
@@ -123,7 +125,7 @@ fn report_check_over_empty_sources_reports_no_drift_creates_nothing_and_leaves_n
 
     // A private temp dir for the child: whatever scratch the run makes lands here.
     let scratch = tempfile::tempdir().unwrap();
-    let check = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let check = hermetic::canon()
         .args(["report", "check", "--repo", "."])
         .current_dir(dir.path())
         .env("TMPDIR", scratch.path())

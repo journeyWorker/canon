@@ -29,13 +29,15 @@
 //! entry that stops failing must be removed (this test says so), and phase B
 //! of S8 empties the list.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
+
 #[expect(dead_code, reason = "this test uses only the lint half of the generator")]
 mod doc_gen;
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use clap::error::ErrorKind;
 use serde_json::Value;
@@ -434,7 +436,7 @@ fn registry_commands(spec: &Value, root: &clap::Command) -> Vec<Cmd> {
 }
 
 fn run(dir: &Path, home: &Path, args: &[String]) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ACTOR", "docs-lint").env("HOME", home).env("CANON_SKILLS_SOURCE", concat!(env!("CARGO_MANIFEST_DIR"), "/../../canon/skills")).output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(dir).env("CANON_ACTOR", "docs-lint").env("HOME", home).env("CANON_SKILLS_SOURCE", concat!(env!("CARGO_MANIFEST_DIR"), "/../../canon/skills")).output().expect("spawn canon")
 }
 
 fn ok(dir: &Path, home: &Path, args: &[&str]) {

@@ -10,6 +10,8 @@
 //! The checks that seeded faults must trip are small pure functions in this file (`sweep_problems`, `changelog_problems`): each real input passes them, each seeded
 //! fault is found, and no sweep is vacuous. Tests are named by scenario id (`atip_optionvalues_05_…` proves `atip.optionvalues.05`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::{BTreeMap, BTreeSet};

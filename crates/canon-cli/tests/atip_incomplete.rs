@@ -4,6 +4,8 @@
 //! need a step to fail after its predecessors really wrote use the debug seam `CANON_TEST_STOP_AT=<step>` (`incomplete::injected_stop`).
 //! Each test names the scenario it proves (`atip.midway.NN` and `atip.incomplete.NN`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod old_codes;
 mod support;
 
@@ -20,7 +22,7 @@ use serde_json::Value;
 // ------------------------------------------------------------------ helpers
 
 fn canon_env(dir: &Path, args: &[&str], source: Option<&Path>, env: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command
         .args(args)
         .current_dir(dir)
@@ -1379,7 +1381,7 @@ fn atip_midway_12_a_half_written_adoption_keeps_change_adoption_incomplete_and_i
     )
     .expect("canon.yaml");
     let run = |args: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_canon"))
+        hermetic::canon()
             .args(args)
             .current_dir(dir.path())
             .env_remove("CANON_ROLE")

@@ -13,6 +13,8 @@
 //! What no declaration covers is found the other way: the survey of the sources lists every place a handler refuses an argument and
 //! fails when one is not classified.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 mod rule_support;
 

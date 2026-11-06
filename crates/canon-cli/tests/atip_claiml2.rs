@@ -4,6 +4,8 @@
 //! on the committed fixture, which `just atip-deep` and the job `atip` run (`just atip` runs it without `--deep`), and which no test of canon runs. The CHANGELOG holds the release entry and the list of tests that
 //! stand for the obligations of contract 17.2 that a green checker run does not prove; the last four tests read it.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -25,7 +27,7 @@ fn read(path: &Path) -> String {
 
 /// The exit status and the one JSON document of `canon <args>` run in `dir`.
 fn canon_out(dir: &Path, args: &[&str]) -> (Option<i32>, Value) {
-    let output = Command::new(CANON).args(args).current_dir(dir).env_remove("CANON_ROLE").output().expect("spawn canon");
+    let output = hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").output().expect("spawn canon");
     let document = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{args:?}: {error}: {}", String::from_utf8_lossy(&output.stdout)));
     (output.status.code(), document)
 }
@@ -39,7 +41,7 @@ fn atip_claiml2_01_every_envelope_declares_1_5_and_the_schema_tree_says_l2() {
     let dir = tempfile::tempdir().expect("tempdir");
     assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.5");
     assert_eq!(canon_cli::spec::LEVEL, "L2");
-    let init = Command::new(CANON).args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
+    let init = hermetic::canon().args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     for args in [&["status", "--json"][..], &["nosuch", "--json"], &["schema", "--json"], &["schema", "--errors", "--json"], &["schema", "--warnings", "--json"]] {
         let document = canon_in(dir.path(), args);
@@ -87,7 +89,7 @@ fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_an_earlier_minor() {
 #[test]
 fn atip_claiml2_06_input_too_large_names_the_field_input() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let init = Command::new(CANON).args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
+    let init = hermetic::canon().args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     let big = dir.path().join("big.json");
     std::fs::write(&big, vec![b' '; 8 * 1024 * 1024 + 1]).expect("write");
@@ -523,7 +525,7 @@ fn atip_claiml2_17_a_known_secret_of_the_environment_reaches_no_output_and_no_fi
                     git(&["init", "-q"]);
                     git(&["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-qm", "fixture"]);
                     std::fs::write(dir.path().join("canon.yaml"), CANON_YAML).expect("write canon.yaml");
-                    let mut command = Command::new(CANON);
+                    let mut command = hermetic::canon();
                     command.args(call).current_dir(dir.path()).env_remove("CANON_ROLE").env_remove("CANON_R2_LOCAL_ROOT");
                     if json_mode {
                         command.arg("--json");
@@ -600,6 +602,7 @@ fn atip_claiml2_18_no_command_of_canon_reads_a_terminal_for_input_and_init_asks_
     let dir = tempfile::tempdir().expect("tempdir");
     std::fs::create_dir(dir.path().join(".claude")).expect("mkdir");
     let mut command = Command::new("script");
+    hermetic::scrub(&mut command);
     if cfg!(target_os = "macos") {
         command.args(["-q", "/dev/null", CANON, "init"]);
     } else {

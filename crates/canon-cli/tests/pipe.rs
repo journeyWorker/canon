@@ -6,15 +6,17 @@
 //! before the first write.
 #![cfg(unix)]
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::os::unix::process::ExitStatusExt;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 #[test]
 fn atip_l0_21_a_closed_stdout_ends_canon_by_sigpipe_not_a_panic() {
     let (reader, writer) = std::io::pipe().expect("pipe");
     drop(reader);
     let dir = tempfile::tempdir().expect("tempdir");
-    let out = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let out = hermetic::canon()
         .args(["schema", "--errors"])
         .current_dir(dir.path())
         .stdout(Stdio::from(writer))

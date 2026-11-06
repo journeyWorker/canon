@@ -5,6 +5,8 @@
 //! or a `stream`; each names a schema of the spec and its version. A leaf with no
 //! output would need a stated reason, and none has one ([`NO_OUTPUT`]).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::BTreeSet;

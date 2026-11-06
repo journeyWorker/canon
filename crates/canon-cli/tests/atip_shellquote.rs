@@ -5,6 +5,8 @@
 //! The values come from `--repo`: a repository directory may have any name, and the first page of a listing carries `--repo=<name>` into its
 //! next call. Every test runs the built binary. Tests are named by scenario id (`atip_shellquote_01_…` proves `atip.shellquote.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -29,7 +31,7 @@ const NAMES: [(&str, &str); 12] = [
 ];
 
 fn canon_in(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-shellquote").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-shellquote").output().expect("spawn canon binary")
 }
 
 fn json(output: &Output) -> Value {
@@ -145,7 +147,7 @@ fn atip_shellquote_02_the_command_splits_into_the_tool_and_the_argv_and_a_shell_
     ok(&repo, &["inventory", "sync"]);
     let mut seen = 0;
     for role in ["implementer", "planner", "reviewer", "orchestrator"] {
-        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["status", "--json"]).current_dir(&repo).env("CANON_ROLE", role).env("CANON_ACTOR", "atip-shellquote").output().expect("spawn canon binary");
+        let out = hermetic::canon().args(["status", "--json"]).current_dir(&repo).env("CANON_ROLE", role).env("CANON_ACTOR", "atip-shellquote").output().expect("spawn canon binary");
         for step in json(&out)["meta"]["next"].as_array().into_iter().flatten() {
             seen += 1;
             let mut want = vec!["canon".to_string()];

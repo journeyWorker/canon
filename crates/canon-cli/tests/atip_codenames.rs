@@ -3,6 +3,8 @@
 //! registry view and are refused by `schema --error`, and the CHANGELOG carries the replacement row of every code that left the registry.
 //! Against the built `canon` binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -70,7 +72,7 @@ const RENAMED: &[(&str, &str)] = &[
 ];
 
 fn canon(dir: &Path, args: &[&str], role: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
     if let Some(role) = role {
         command.env("CANON_ROLE", role);

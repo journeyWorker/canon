@@ -10,6 +10,8 @@
 //! `minor_problems`, `consumer_problems`, `changelog_problems`): each real input passes them, each seeded fault is found, and no sweep is vacuous.
 //! Tests are named by scenario id (`atip_claim15_05_…` proves `atip.claim15.05`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -30,7 +32,7 @@ const GOLDEN: &str = "crates/canon-cli/tests/atip/white_space_0_36.json";
 // Running the binary.
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-claim15").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("canon runs")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-claim15").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("canon runs")
 }
 
 fn stdout(output: &Output) -> String {

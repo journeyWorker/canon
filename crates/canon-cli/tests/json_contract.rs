@@ -3,9 +3,11 @@
 //! exactly one JSON value to stdout (a refusal counts), and a non-zero exit
 //! carries a registered `error.code`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -18,7 +20,7 @@ const ULID: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
 
 fn canon(dir: &Path, args: &[String]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ACTOR", "json-contract").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env("CANON_ACTOR", "json-contract").output().expect("spawn canon binary")
 }
 
 fn run(dir: &Path, args: &[&str]) -> Output {

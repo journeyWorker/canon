@@ -6,6 +6,8 @@
 //! Every expected name is spelled out here from the design's component table
 //! and escape rule, never computed by the code under test.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -482,7 +484,7 @@ fn ledger_naming_09_an_archive_with_other_bytes_refuses_the_ledger_write() {
 // ── a repo on the 0.30 layout, built by the binary ───────────────────────
 
 fn canon_in(dir: &Path, args: &[&str], envs: &[(&str, &Path)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "ln-tests").env("HOME", dir);
     for (key, value) in envs {
         command.env(key, value);
@@ -1124,7 +1126,7 @@ fn ledger_naming_21_promotion_breaks_ties_by_components_then_digest() {
 fn ledger_naming_22_a_canon_yaml_key_spelled_evidence_record_sends_the_user_to_migrate() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
-    let canon = |args: &[&str]| Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").output().unwrap();
+    let canon = |args: &[&str]| hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").output().unwrap();
     let git = |args: &[&str]| assert!(Command::new("git").args(args).current_dir(repo).output().unwrap().status.success());
     git(&["init", "-q"]);
     assert!(canon(&["init", "--repo", ".", "--no-policy"]).status.success());

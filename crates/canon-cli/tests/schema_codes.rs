@@ -14,6 +14,8 @@
 //! a new error site cannot be missing from `canon schema`.
 //! `CANON_BLESS_SCHEMA_CODES=1` rewrites the table.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -256,7 +258,7 @@ fn needs_config_leaves() -> Vec<&'static str> {
             let mut args: Vec<&str> = vec!["schema"];
             args.extend(path.split(' '));
             args.push("--json");
-            let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(&args).output().expect("spawn canon");
+            let out = hermetic::canon().args(&args).output().expect("spawn canon");
             let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("schema is JSON");
             // `--repo` is the tree's shared option: a 1.4 document names it (a string) unless it defines its own.
             body["data"]["options"].as_array().expect("options").iter().any(|o| o == "repo" || o["name"] == "repo")

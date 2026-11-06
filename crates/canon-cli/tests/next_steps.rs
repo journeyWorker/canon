@@ -6,6 +6,8 @@
 //! and one scenario is carried from its brief to `shipped` by running only
 //! what `meta.next` says.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -22,7 +24,7 @@ fn git_seed(repo: &Path) {
 }
 
 fn canon(repo: &Path, args: &[&str], role: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(repo).env("CANON_ACTOR", "agent-a").env_remove("CANON_ROLE");
     if let Some(role) = role {
         command.env("CANON_ROLE", role);

@@ -17,16 +17,18 @@
 //! carries no reference to the plugin-specific names `porting`/
 //! `porting.coverage`/`scan_namespaced_kind`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 
 const PORTING_YAML: &str = "id: porting\nnamespace: porting\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: scenario\n      join_key: [project_id, scenario_id]\n    fields:\n      - name: covered\n        type: bool\n      - name: surface_ref\n        type: { list: string }\n";
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -345,7 +347,7 @@ fn atip_incomplete_08_a_plugin_sync_that_could_not_write_a_candidate_is_incomple
     let dir = tempfile::tempdir().unwrap();
     write_repo(dir.path());
     sync_inventory(dir.path());
-    let stopped = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let stopped = hermetic::canon()
         .args(["plugin", "sync", "porting", "--repo", ".", "--json"])
         .env("CANON_TEST_STOP_AT", "plugin-second-candidate")
         .current_dir(dir.path())
@@ -393,7 +395,7 @@ fn atip_incomplete_08_a_plugin_sync_that_could_not_write_a_candidate_is_incomple
         "the candidate it wrote stays"
     );
 
-    let again = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let again = hermetic::canon()
         .args(["plugin", "sync", "porting", "--repo", ".", "--json"])
         .current_dir(dir.path())
         .output()
@@ -425,7 +427,7 @@ fn atip_incomplete_08_a_plugin_sync_that_wrote_nothing_is_not_incomplete_and_a_p
     let dir = tempfile::tempdir().unwrap();
     write_repo(dir.path());
     sync_inventory(dir.path());
-    let run = |extra: &[&str], stop: &str| Command::new(env!("CARGO_BIN_EXE_canon")).args(["plugin", "sync", "porting", "--repo", ".", "--json"]).args(extra).env("CANON_TEST_STOP_AT", stop).current_dir(dir.path()).output().expect("spawn canon binary");
+    let run = |extra: &[&str], stop: &str| hermetic::canon().args(["plugin", "sync", "porting", "--repo", ".", "--json"]).args(extra).env("CANON_TEST_STOP_AT", stop).current_dir(dir.path()).output().expect("spawn canon binary");
     let failed = run(&[], "plugin-every-candidate");
     let body: Value = serde_json::from_slice(&failed.stdout).expect("one JSON document");
     assert_eq!(failed.status.code(), Some(1), "{body}");

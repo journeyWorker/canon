@@ -2,6 +2,8 @@
 //! them, runs a leaf exactly as its flags would. Every test drives the built
 //! `canon` binary; none reads source text or help text.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -13,7 +15,7 @@ use tempfile::TempDir;
 // ---------------------------------------------------------------- harness
 
 fn canon(dir: &Path, home: &Path, args: &[&str], stdin: Option<&str>) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let mut child = hermetic::canon()
         .args(args)
         .current_dir(dir)
         .env("CANON_ACTOR", "input-test")
@@ -87,8 +89,9 @@ fn copy_dir(from: &Path, to: &Path) {
     }
 }
 
-/// `text` with every RFC 3339 timestamp, ULID and long hex digest replaced, so two runs that
-/// minted different times and ids compare equal when they wrote the same thing.
+/// `text` with every RFC 3339 timestamp, ULID and lower-case hex digest (8, 12 or 40 and more characters as a whole word, with a digit
+/// or without: `cfcaaadc` and `abcdefab` are digests too) replaced, so two runs that minted different times and ids compare equal when
+/// they wrote the same thing. Masking only widens what is replaced; two different contents stay different.
 fn normalized(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len());
@@ -114,7 +117,7 @@ fn normalized(text: &str) -> String {
             i += 26;
             continue;
         }
-        if boundary && (word >= 40 || word == 12 || word == 8) && rest[..word].iter().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()) && rest[..word].iter().any(char::is_ascii_digit) {
+        if boundary && (word >= 40 || word == 12 || word == 8) && rest[..word].iter().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()) {
             out.push_str("<hex>");
             i += word;
             continue;
@@ -156,7 +159,17 @@ fn tree(root: &Path) -> BTreeMap<String, String> {
 
 /// [`tree`] with the timestamps, ids and digests of two runs made alike.
 fn normalized_tree(root: &Path) -> BTreeMap<String, String> {
-    tree(root).into_iter().map(|(path, body)| (normalized(&path), normalized(&body))).collect()
+    normalize_tree(tree(root))
+}
+
+/// A tree's names and bodies with [`normalized`] applied.
+fn normalize_tree(raw: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    raw.into_iter().map(|(path, body)| (normalized(&path), normalized(&body))).collect()
+}
+
+/// The names whose normalized file differs between two trees, in either tree.
+fn tree_differences<'a>(a: &'a BTreeMap<String, String>, b: &'a BTreeMap<String, String>) -> Vec<&'a String> {
+    a.keys().chain(b.keys()).filter(|k| a.get(*k) != b.get(*k)).collect()
 }
 
 fn scratch_copy(base: &Path) -> (TempDir, PathBuf) {
@@ -352,8 +365,8 @@ fn example_problems(leaf: &str, base: &Path, home: &Path) -> Vec<String> {
         let code = |r: &(Option<i32>, Value, BTreeMap<String, String>)| r.1["error"]["code"].as_str().unwrap_or("").to_string();
         if got.0 != by_flags.0 || code(got) != code(&by_flags) || got.1["ok"] != by_flags.1["ok"] {
             problems.push(format!("{leaf}: --input {how} exited {:?} ({}), the flags {:?} ({})", got.0, code(got), by_flags.0, code(&by_flags)));
-        } else if got.2 != by_flags.2 {
-            let differing: Vec<&String> = got.2.keys().chain(by_flags.2.keys()).filter(|k| got.2.get(*k) != by_flags.2.get(*k)).collect();
+        } else if !tree_differences(&got.2, &by_flags.2).is_empty() {
+            let differing = tree_differences(&got.2, &by_flags.2);
             problems.push(format!("{leaf}: --input {how} wrote different records than the flags: {differing:?}"));
         }
     }
@@ -780,4 +793,45 @@ fn removed_scenario_new_from_names_input() {
     let body = json_of(&out);
     assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("USAGE")), "{body}");
     assert!(body["error"]["expected"].as_array().unwrap().iter().any(|v| v.as_str().unwrap().contains("--input")), "{body}");
+}
+
+// ---------------------------------------------------------------- the masking of values that differ between two runs
+
+/// One file as a tree of one file: `(name, body)`.
+fn one_file(name: &str, body: &str) -> BTreeMap<String, String> {
+    BTreeMap::from([(name.to_string(), body.to_string())])
+}
+
+/// Two runs' records compare equal exactly when they differ only in a time, a ULID or a digest, whatever letters the digest happens to
+/// hold: `cfcaaadc` and `abcdefab` have no digit and are masked like `1a2b3c4d`. A different content stays different.
+#[test]
+fn a_digest_is_masked_whether_or_not_it_holds_a_digit_and_a_different_content_is_not() {
+    // (first run's file, second run's file, whether the two runs wrote the same thing)
+    type Row<'a> = ((&'a str, &'a str), (&'a str, &'a str), bool);
+    let table: &[Row] = &[
+        // all-letter digests in the name and in the body
+        (("kind=change/add-login_cfcaaadc.json", r#"{"digest":"cfcaaadc"}"#), ("kind=change/add-login_abcdefab.json", r#"{"digest":"abcdefab"}"#), true),
+        // a digest with digits against one without
+        (("kind=change/add-login_cfcaaadc.json", r#"{"digest":"cfcaaadc"}"#), ("kind=change/add-login_1a2b3c4d.json", r#"{"digest":"1a2b3c4d"}"#), true),
+        // the 12-character and 40-character digests, with and without digits
+        (("a.json", r#"{"d":"abcdefabcdef"}"#), ("a.json", r#"{"d":"0123456789ab"}"#), true),
+        (("a.json", &format!(r#"{{"d":"{}"}}"#, "a".repeat(40))), ("a.json", &format!(r#"{{"d":"{}"}}"#, "f1".repeat(20))), true),
+        // a time and a ULID still mask
+        (("a.json", r#"{"at":"2030-01-01T00:00:00Z","id":"01ARZ3NDEKTSV4RRFFQ69G5FAV"}"#), ("a.json", r#"{"at":"2031-02-02T10:11:12.5Z","id":"01BX5ZZKBKACTAV9WEVGEMMVRY"}"#), true),
+        // two runs that write different content differ, digests or not
+        (("a_cfcaaadc.json", r#"{"title":"one","digest":"cfcaaadc"}"#), ("a_abcdefab.json", r#"{"title":"two","digest":"abcdefab"}"#), false),
+        // a different name differs
+        (("a_cfcaaadc.json", "{}"), ("b_cfcaaadc.json", "{}"), false),
+        // a word that is not a digest is not masked: one letter outside a-f, a 9-character run, an upper-case run
+        (("a.json", r#"{"d":"cfcaaadz"}"#), ("a.json", r#"{"d":"abcdefab"}"#), false),
+        (("a.json", r#"{"d":"abcdefabc"}"#), ("a.json", r#"{"d":"cfcaaadcb"}"#), false),
+        (("a.json", r#"{"d":"ABCDEFAB"}"#), ("a.json", r#"{"d":"CFCAAADC"}"#), false),
+        // a file in only one run differs
+        (("a_cfcaaadc.json", "{}"), ("b.json", "{}"), false),
+    ];
+    for ((first_name, first_body), (second_name, second_body), same) in table {
+        let (first, second) = (normalize_tree(one_file(first_name, first_body)), normalize_tree(one_file(second_name, second_body)));
+        assert_eq!(tree_differences(&first, &second).is_empty(), *same, "{first_name} {first_body} against {second_name} {second_body}");
+    }
+    assert_eq!(normalized("x_cfcaaadc.json abcdefab"), "x_<hex>.json <hex>");
 }

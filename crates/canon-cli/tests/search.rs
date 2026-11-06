@@ -2,6 +2,8 @@
 //! `search.trace.*`, `search.graph.*`), through the real binary. Each test name starts with its scenario id
 //! (`search.index.01` → `search_index_01_…`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
@@ -11,7 +13,7 @@ use tempfile::TempDir;
 // ── harness ──────────────────────────────────────────────────────────────
 
 fn canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).env_remove("CANON_ROLE").env("CANON_ACTOR", "search-test").output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(cwd).env_remove("CANON_ROLE").env("CANON_ACTOR", "search-test").output().expect("spawn canon")
 }
 
 fn json_of(output: &Output) -> Value {
@@ -419,7 +421,7 @@ fn search_index_09_the_read_leaves_name_the_cache_in_their_effect_note_init_igno
     let r = dir.path();
     std::fs::write(r.join(".gitignore"), ".canon/hot.db*\n").unwrap();
     let home = tempfile::tempdir().unwrap();
-    let with_home = |args: &[&str]| Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(r).env_remove("CANON_ROLE").env("HOME", home.path()).output().unwrap();
+    let with_home = |args: &[&str]| hermetic::canon().args(args).current_dir(r).env_remove("CANON_ROLE").env("HOME", home.path()).output().unwrap();
 
     let before = with_home(&["search", "loop", "--json"]);
     assert!(before.status.success(), "{}", text(&before));
@@ -447,7 +449,7 @@ fn search_index_10_searches_that_run_at_the_same_time_on_a_stale_index_all_succe
     let dir = repo();
     let r = dir.path();
     finding(r, "1", "1", "Token is logged", &[]);
-    let children: Vec<_> = (0..8).map(|_| Command::new(env!("CARGO_BIN_EXE_canon")).args(["search", "token", "--json"]).current_dir(r).env_remove("CANON_ROLE").stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap()).collect();
+    let children: Vec<_> = (0..8).map(|_| hermetic::canon().args(["search", "token", "--json"]).current_dir(r).env_remove("CANON_ROLE").stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap()).collect();
     let outputs: Vec<Output> = children.into_iter().map(|c| c.wait_with_output().unwrap()).collect();
     for out in &outputs {
         assert!(out.status.success(), "{}", text(out));

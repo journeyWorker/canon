@@ -6,6 +6,8 @@
 //! fixtures (`divergence_accept.rs`, `brief_format.rs`); the dashboard leg in
 //! `dashboard_briefs.rs`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -20,7 +22,7 @@ fn git_seed(repo: &Path) {
 }
 
 fn run_as(repo: &Path, role: Option<&str>, args: &[&str]) -> Output {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut cmd = hermetic::canon();
     cmd.args(args).current_dir(repo).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
     if let Some(role) = role {
         cmd.env("CANON_ROLE", role);
@@ -275,7 +277,7 @@ fn subject_lifecycle_54_a_relayed_approval_without_name_answer_actor_or_role_is_
     assert_eq!(code(&no_role), "USAGE");
     assert!(json(&no_role)["error"]["message"].as_str().unwrap().contains("no agent role"), "{}", text(&no_role));
     let env_actor = {
-        let mut cmd = Command::new(env!("CARGO_BIN_EXE_canon"));
+        let mut cmd = hermetic::canon();
         cmd.args(["brief", "approve", "a", "--relayed-via", "ask", "--approver", "Ana", "--note", "ok", "--digest", &a]).current_dir(r).env("CANON_ROLE", "planner").env("CANON_ACTOR", "from-env");
         cmd.output().unwrap()
     };

@@ -11,6 +11,8 @@
 //! `consumer_problems`, `minor_problems`, `changelog_problems`): each real document passes them, each seeded fault is found, and no sweep is vacuous.
 //! Tests are named by scenario id (`atip_claim14_05_…` proves `atip.claim14.05`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -27,7 +29,7 @@ const MINOR: &str = "1.5";
 // Running the binary.
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-claim14").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("canon runs")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-claim14").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("canon runs")
 }
 
 fn stdout(output: &Output) -> String {
@@ -1044,7 +1046,7 @@ fn atip_claim14_02_schema_answers_the_same_bytes_without_a_repository_and_the_fo
     let one = TempDir::new().unwrap();
     let two = TempDir::new().unwrap();
     let bare = |dir: &Path, args: &[&str]| {
-        let output = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_clear().stdin(Stdio::null()).output().expect("canon runs");
+        let output = hermetic::canon().args(args).current_dir(dir).env_clear().stdin(Stdio::null()).output().expect("canon runs");
         assert!(output.status.success() && output.stderr.is_empty(), "canon {args:?} answers with an empty environment: {}{}", stdout(&output), stderr(&output));
         output.stdout
     };

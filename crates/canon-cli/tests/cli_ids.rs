@@ -6,6 +6,8 @@
 //! [`context_capability_47_every_id_option_is_the_bare_noun_and_writes_the_record_the_old_spelling_wrote`] replaying it
 //! with the bare spelling. The conformance corpus (`conformance/cases`) was re-blessed the same way.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -19,7 +21,7 @@ mod harness;
 const NOUNS: [&str; 14] = ["actor", "session", "project", "change", "run", "task", "subject", "scenario", "skill", "parent-run", "evaluator", "review", "plugin", "contradicting-trajectory"];
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
 }
 
 fn stdout(out: &Output) -> String {
@@ -863,7 +865,7 @@ fn context_capability_59_the_spec_corpus_names_no_id_option_spelling_and_format_
             let old = old_spellings(&std::fs::read_to_string(file).unwrap());
             assert!(old.is_empty(), "{} spells {old:?}", file.display());
         }
-        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["format", &root.join(corpus).to_string_lossy()]).env_remove("CANON_ROLE").current_dir(&root).output().expect("spawn canon");
+        let out = hermetic::canon().args(["format", &root.join(corpus).to_string_lossy()]).env_remove("CANON_ROLE").current_dir(&root).output().expect("spawn canon");
         assert!(out.status.success(), "canon format {corpus}: {}{}", stdout(&out), stderr(&out));
     }
 }

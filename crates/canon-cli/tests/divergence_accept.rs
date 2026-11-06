@@ -5,8 +5,10 @@
 //! as `tests/subject.rs` does, so the evidence's actor and session are the
 //! test's to choose.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Subject, SubjectId, SubjectStatus};
 use canon_store::git_tier::GitTier;
@@ -32,7 +34,7 @@ const SCENARIO: &str = "world.demo.01";
 const TRACKING: &str = "https://example.com/engine/issues/118";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).output().expect("spawn canon binary")
 }
 
 fn out(o: &Output) -> String {
@@ -274,7 +276,7 @@ fn accept_as(repo: &Path, role: &str, overrides: &[(&str, &str)]) -> Output {
     for (flag, value) in &flags {
         args.extend([*flag, *value]);
     }
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env("CANON_ROLE", role).env_remove("CANON_ACTOR").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).env("CANON_ROLE", role).env_remove("CANON_ACTOR").output().expect("spawn canon binary")
 }
 
 /// The accepted divergence records on the ledger, as JSON.

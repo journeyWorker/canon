@@ -4,9 +4,11 @@
 //! the same documents. Tests are named by scenario id (`atip.schemadoc.NN`); every sweep is over the documents the
 //! generator builds, and the answers of the built binary are held equal to them.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 use std::sync::LazyLock;
 
 use jsonschema::{Registry, Resource};
@@ -17,7 +19,7 @@ fn repo_root() -> PathBuf {
 }
 
 fn run(args: &[&str], dir: &Path, role: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(dir).env_remove("CANON_ROLE");
     if let Some(role) = role {
         command.env("CANON_ROLE", role);
@@ -498,7 +500,7 @@ fn atip_schemadoc_02_schema_answers_outside_a_repo_with_no_environment_and_write
     let dir = tempfile::tempdir().expect("tempdir");
     let home = tempfile::tempdir().expect("home");
     for args in [&["schema", "--json"][..], &["schema", "finding", "--json"], &["schema", "finding", "close", "--json"], &["schema", "--errors", "--json"]] {
-        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir.path()).env_clear().env("HOME", home.path()).output().expect("spawn canon");
+        let out = hermetic::canon().args(args).current_dir(dir.path()).env_clear().env("HOME", home.path()).output().expect("spawn canon");
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
         assert!(out.stderr.is_empty(), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
         let document: Value = serde_json::from_slice(&out.stdout).expect("JSON");

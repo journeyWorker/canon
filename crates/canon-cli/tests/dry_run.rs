@@ -8,8 +8,10 @@
 //! fixture really reaches a write) and a bad invocation (same exit code and
 //! `error.code` as the real run, tree unchanged).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_model::HandoffFields;
 use canon_model::{
@@ -23,7 +25,7 @@ use sha2::{Digest, Sha256};
 mod support;
 
 fn run(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .args(args)
         .current_dir(cwd)
         .env_remove("CODEX_HOME")

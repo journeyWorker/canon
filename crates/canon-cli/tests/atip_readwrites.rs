@@ -7,6 +7,8 @@
 //!
 //! Tests are named by scenario id (`atip_readwrites_01_…` proves `atip.readwrites.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -31,7 +33,7 @@ impl World {
     }
 
     fn canon_in(&self, dir: &Path, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_canon"))
+        hermetic::canon()
             .args(args)
             .current_dir(dir)
             .env_remove("CANON_ROLE")

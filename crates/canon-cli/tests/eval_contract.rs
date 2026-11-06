@@ -6,9 +6,10 @@
 //! fixtures, not production records; no generated IDs, timestamps, or paths
 //! are part of the assertions.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::process::Command;
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -56,13 +57,13 @@ fn write_skill_source(root: &Path) {
 #[test]
 fn context_json_is_byte_stable_and_has_the_public_capability_shape() {
     let repo = tempfile::tempdir().unwrap();
-    let first = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let first = hermetic::canon()
         .args(["context", "--repo"])
         .arg(repo.path())
         .arg("--json")
         .output()
         .expect("spawn canon context");
-    let second = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let second = hermetic::canon()
         .args(["context", "--repo"])
         .arg(repo.path())
         .arg("--json")
@@ -108,7 +109,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
     let target = fixture.path().join("target");
     write_skill_source(&source);
 
-    let first = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let first = hermetic::canon()
         .args(["skills", "install", "--skills-source"])
         .arg(&source)
         .args(["--repo"])
@@ -153,7 +154,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         );
     }
 
-    let second = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let second = hermetic::canon()
         .args(["skills", "install", "--skills-source"])
         .arg(&source)
         .args(["--repo"])
@@ -162,7 +163,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .output()
         .expect("spawn canon skills install");
     assert!(second.status.success(), "stderr: {}", String::from_utf8_lossy(&second.stderr));
-    let again = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let again = hermetic::canon()
         .args(["skills", "install", "--json", "--skills-source"])
         .arg(&source)
         .args(["--repo"])
@@ -177,7 +178,7 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
 #[test]
 fn dispatch_refuses_a_role_regime_mismatch_as_a_stable_usage_error() {
     let repo = tempfile::tempdir().unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["dispatch", "begin", "--role", "reviewer", "--regime", REGIME, "--repo"])
         .arg(repo.path())
         .output()

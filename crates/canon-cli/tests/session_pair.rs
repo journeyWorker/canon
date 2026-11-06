@@ -2,13 +2,15 @@
 //! `--session`, and the session lands in the record as `actor.session_id`. Against the built
 //! `canon` binary, reading what the leaves wrote.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::Command;
 
 use serde_json::Value;
 
 fn canon(repo: &Path, args: &[&str]) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
 }
 
 fn ok(repo: &Path, args: &[&str]) -> Value {

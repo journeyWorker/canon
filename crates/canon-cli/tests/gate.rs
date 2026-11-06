@@ -7,6 +7,8 @@
 //! boundary; pure logic is already unit-tested inside `canon-gate`
 //! itself and `crates/canon-cli/src/gate.rs`'s own formatting helpers).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -19,7 +21,7 @@ use canon_store::tier::{RawWrite, Tier};
 use chrono::{Duration, Utc};
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {

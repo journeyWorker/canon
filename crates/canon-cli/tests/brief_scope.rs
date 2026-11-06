@@ -4,6 +4,8 @@
 //! the scenarios an approved scope already covers; `canon subject unadopt`
 //! takes an unapproved adoption back.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -20,7 +22,7 @@ fn git_seed(repo: &Path) {
 }
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .args(args)
         .current_dir(repo)
         .env_remove("CANON_ROLE")
@@ -369,7 +371,7 @@ fn warnings(out: &Output) -> Vec<Value> {
 /// `{actor, command, why}` (the human's step has no `canon` command, so the JSON
 /// form's `meta.next` does not carry it, nor any step holding a `<placeholder>`).
 fn status_steps(repo: &Path, role: Option<&str>) -> Vec<Value> {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(["status"]).current_dir(repo).env_remove("CANON_ROLE");
     if let Some(role) = role {
         command.env("CANON_ROLE", role);

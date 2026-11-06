@@ -2,8 +2,10 @@
 //! `divergence accept` refuse every agent role, however it is declared, and no
 //! flag grants them. Against the built `canon` binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 
@@ -16,7 +18,7 @@ const LEAVES: [(&str, &[&str]); 3] = [
 ];
 
 fn run(repo: &Path, args: &[&str], role_flag: Option<&str>, role_env: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).arg("--json").current_dir(repo).env_remove("CANON_ROLE");
     if let Some(role) = role_flag {
         command.args(["--as", role]);
@@ -84,7 +86,7 @@ fn without_a_declared_role_the_leaf_runs() {
 
 #[test]
 fn the_code_is_registered_non_retryable() {
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["schema", "--error", "ACTOR_DENIED", "--json"]).output().unwrap();
+    let out = hermetic::canon().args(["schema", "--error", "ACTOR_DENIED", "--json"]).output().unwrap();
     assert_eq!(out.status.code(), Some(0));
     let body: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(body["data"]["error"]["retryable"], Value::Bool(false));
