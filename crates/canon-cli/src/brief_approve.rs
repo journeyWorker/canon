@@ -93,6 +93,9 @@ pub struct Approved {
     pub digest: String,
     pub approved_by: String,
     pub policy_approved: bool,
+    /// The `code_scopes` keys that differ from the last approved policy (0.38): the policy approval was not recorded, so it stays stale until a human runs `canon policy approve`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_held: Option<Vec<String>>,
     /// Set when an agent recorded the approval for the human (0.32).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relay: Option<ApprovalRelay>,
@@ -137,6 +140,9 @@ pub struct ApprovalEntry {
 pub struct ApprovedMany {
     pub approved_by: String,
     pub policy_approved: bool,
+    /// The `code_scopes` keys held back from the policy approval (see [`Approved::policy_held`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_held: Option<Vec<String>>,
     /// Set when an agent recorded the approvals for the human (0.32).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relay: Option<ApprovalRelay>,
@@ -280,11 +286,11 @@ fn write_one(repo: &Path, checked: Checked, by: &str, note: &str, when: &str, po
         crate::policy_approval::record_at(repo, by, Some(note), when, relay).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e.to_string()))?;
     }
     std::fs::write(&checked.path, &approved).map_err(|e| refuse("BRIEF_WRITE_FAILED", &format!("cannot write `{}`: {e}", checked.brief)))?;
-    Ok(Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved, relay: relay.cloned() })
+    Ok(Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved, policy_held: None, relay: relay.cloned() })
 }
 
 fn already(checked: Checked, by: &str, policy_approved: bool, relay: Option<&ApprovalRelay>) -> Approved {
-    Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&checked.text), approved_by: by.to_string(), policy_approved, relay: relay.cloned() }
+    Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&checked.text), approved_by: by.to_string(), policy_approved, policy_held: None, relay: relay.cloned() }
 }
 
 /// The one approval: used by `canon brief approve` and by the dashboard's
@@ -301,15 +307,15 @@ pub fn approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, exp
 /// this very approval, in which case nothing was written.
 fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<(Approved, bool), CliError> {
     let (by, note) = answer(by, note)?;
-    let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
+    let (policy_approved, held) = policy_plan(repo);
     // The code tree of the work tree now (0.37), `None` without a git commit: the approval records the code it saw.
     let tree = crate::git_rev::code_tree_if_committed(repo)?;
     let checked = check_one(repo, Item { change, expected_sha256 }, &by, &note, policy_approved, Opts::default(), tree.as_deref())?;
     if checked.unchanged {
-        return Ok((already(checked, &by, policy_approved, None), true));
+        return Ok((Approved { policy_held: held, ..already(checked, &by, policy_approved, None) }, true));
     }
     let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    write_one(repo, checked, &by, &note, &when, policy_approved, None).map(|approved| (approved, false))
+    write_one(repo, checked, &by, &note, &when, policy_approved, None).map(|approved| (Approved { policy_held: held, ..approved }, false))
 }
 
 /// The error of a call with several ids when any is refused (0.31): the first refused id's own code and reason, with an
@@ -333,6 +339,7 @@ fn refused_many(refused: Vec<(String, CliError)>) -> CliError {
 pub struct Many {
     pub approved_by: String,
     pub policy_approved: bool,
+    pub policy_held: Option<Vec<String>>,
     pub relay: Option<ApprovalRelay>,
     pub entries: Vec<(ApprovalEntry, Option<Approved>)>,
     /// The first write failure, when one stopped the call.
@@ -359,7 +366,7 @@ pub fn approve_all_with(repo: &Path, items: &[Item<'_>], by: &str, note: &str, o
             distinct.push(*item);
         }
     }
-    let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
+    let (policy_approved, held) = policy_plan(repo);
     let tree = crate::git_rev::code_tree_if_committed(repo)?;
     let mut checked: Vec<Checked> = Vec::new();
     let mut refused: Vec<(String, CliError)> = Vec::new();
@@ -386,20 +393,39 @@ pub fn approve_all_with(repo: &Path, items: &[Item<'_>], by: &str, note: &str, o
             continue;
         }
         if one.unchanged {
-            let done = already(one, &by, policy_approved, opts.relay);
+            let done = Approved { policy_held: held.clone(), ..already(one, &by, policy_approved, opts.relay) };
             entries.push((ApprovalEntry { change, outcome: Outcome::Unchanged, brief: Some(done.brief.clone()), digest: Some(done.digest.clone()), error: None }, Some(done)));
             continue;
         }
         let brief = one.brief.clone();
         match write_one(repo, one, &by, &note, &when, policy_approved, opts.relay) {
-            Ok(done) => entries.push((ApprovalEntry { change, outcome: Outcome::Written, brief: Some(done.brief.clone()), digest: Some(done.digest.clone()), error: None }, Some(done))),
+            Ok(done) => {
+                let done = Approved { policy_held: held.clone(), ..done };
+                entries.push((ApprovalEntry { change, outcome: Outcome::Written, brief: Some(done.brief.clone()), digest: Some(done.digest.clone()), error: None }, Some(done)));
+            }
             Err(e) => {
                 entries.push((ApprovalEntry { change, outcome: Outcome::Failed, brief: Some(brief), digest: None, error: Some(e.message.clone()) }, None));
                 failure = Some(e);
             }
         }
     }
-    Ok(Many { approved_by: by, policy_approved, relay: opts.relay.cloned(), entries, failure })
+    Ok(Many { approved_by: by, policy_approved, policy_held: held, relay: opts.relay.cloned(), entries, failure })
+}
+
+/// Whether the call records the policy's approval, and the `code_scopes` keys that keep it from doing so (0.38). A policy
+/// whose `code_scopes` is not the last approved policy's is not approved by the approval of a brief: a human re-approves it
+/// with `canon policy approve`, having been shown the scopes, so an agent cannot widen them with its next brief approval.
+fn policy_plan(repo: &Path) -> (bool, Option<Vec<String>>) {
+    if let Some(keys) = crate::code_scopes::changed_since_approval(repo) {
+        return (false, Some(keys));
+    }
+    (!matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy), None)
+}
+
+/// What the output says when the policy approval was held back ([`policy_plan`]).
+fn held_note(keys: &[String]) -> String {
+    let named = keys.iter().map(|k| format!("`{k}`")).collect::<Vec<_>>().join(", ");
+    format!("; the policy approval was NOT recorded: `code_scopes` differs from the last approved policy ({named}), so the policy stays unapproved and the gate fails closed until a human reads the scopes and runs `canon policy approve --approver <human> --note \"<words>\"`")
 }
 
 /// The findings that stop an approval: blockers, coverage rules excluded.
@@ -471,7 +497,11 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
             crate::json_out::mark_unchanged();
         }
         if !json {
-            let policy = if approved.policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
+            let policy = match (&approved.policy_held, approved.policy_approved) {
+                (Some(keys), _) => held_note(keys),
+                (None, true) => "; policy approval recorded too".to_string(),
+                (None, false) => "; no policy file, so no policy approval".to_string(),
+            };
             let verb = if unchanged { "already approved, unchanged" } else { "approved" };
             let via = approved.relay.as_ref().map(|r| format!(" ({})", crate::relay::describe(r))).unwrap_or_default();
             println!("canon brief approve: {} {verb} by `{}`{via} ({}){policy}", approved.brief, approved.approved_by, approved.digest);
@@ -486,12 +516,14 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
     if all_unchanged {
         crate::json_out::mark_unchanged();
     }
-    let report = ApprovedMany { approved_by: many.approved_by.clone(), policy_approved: many.policy_approved, relay: many.relay.clone(), approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
+    let report = ApprovedMany { approved_by: many.approved_by.clone(), policy_approved: many.policy_approved, policy_held: many.policy_held.clone(), relay: many.relay.clone(), approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
     if !json {
-        let policy = match (report.policy_approved, &many.failure) {
-            (true, None) => "; policy approval recorded too",
-            (true, Some(_)) => "; the policy approval may not be recorded (see the error)",
-            (false, _) => "; no policy file, so no policy approval" };
+        let policy = match (&report.policy_held, report.policy_approved, &many.failure) {
+            (Some(keys), _, _) => held_note(keys),
+            (None, true, None) => "; policy approval recorded too".to_string(),
+            (None, true, Some(_)) => "; the policy approval may not be recorded (see the error)".to_string(),
+            (None, false, _) => "; no policy file, so no policy approval".to_string(),
+        };
         for entry in &report.approvals {
             let what = match entry.outcome {
                 Outcome::Written => "approved",

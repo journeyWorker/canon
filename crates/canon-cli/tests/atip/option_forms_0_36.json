@@ -1,5 +1,5 @@
 {
- "_about": "What canon 0.36.0 accepted for the values `canon-0-37-option-forms` narrows (`atip.optionforms.13`): per option and value class, the commands whose argument stage (the value parser, the declared domain and the validators, which run before any state is read) took a value of that class. Measured on the released 0.36.0 binary (`canon 0.36.0`), one run per command and value on a copy of the story repository (`init` in a new git directory), a value counting as taken when the call was not refused with `--<option>` as its field (`init` names no field: `INIT_ARGUMENT_INVALID` counts as a refusal of `--providers`). `strategy approval-payload` and `strategy rollback` were run on a strategy id the repository does not hold, so only the argument stage was measured, not the later reads. `refused` lists the values 0.36.0 turned away already, so a class that 0.37 refuses and 0.36.0 refused too is not a row of the CHANGELOG. `atip.optionforms.13` holds the CHANGELOG to this file: every value of `accepted` that the build refuses now has a row.",
+ "_about": "What canon 0.36.0 accepted for the values `canon-0-37-option-forms` narrows (`atip.optionforms.13`): per option and value class, the commands whose argument stage (the value parser, the declared domain and the validators, which run before any state is read) took a value of that class. Measured on the released 0.36.0 binary (`canon 0.36.0`), one run per command and value on a copy of the story repository (`init` in a new git directory), a value counting as taken when the call was not refused with `--<option>` as its field (`init` names no field: `INIT_ARGUMENT_INVALID` counts as a refusal of `--providers`). `strategy approval-payload` and `strategy rollback` were run on a strategy id the repository does not hold, so only the argument stage was measured, not the later reads. `refused` lists the values 0.36.0 turned away already, so a class that 0.37 refuses and 0.36.0 refused too is not a row of the CHANGELOG. `atip.optionforms.13` holds the CHANGELOG to this file: every value of `accepted` that the build refuses now has a row. `canon-0-38-provider-option` re-baselined it in one way: the entries of `--providers`, which is not an option any more, are under `supersededBy038` and no longer read by `atip.optionforms.*`; the six other options are as they were.",
  "classes": {
   "date-only": "a date with no time (`2030-01-01`)",
   "leading-space": "white space before the value",
@@ -16,16 +16,7 @@
   "trailing-space": "white space after the value",
   "no-seconds": "a time without seconds (`10:00`)",
   "no-offset": "a time without an offset",
-  "offset-without-colon": "an offset without its colon (`+0200`)",
-  "valid": "a list RFC-exact: `claude`, `claude,omp`, `none` (0.37 takes it)",
-  "empty": "an empty value (0.36.0: no provider)",
-  "blank": "only white space (0.36.0: no provider)",
-  "uppercase": "an uppercase letter in a name or in `none` (`Claude`, `NONE`)",
-  "empty-item": "an empty item (`claude,,pi`, `claude,`, `,omp`)",
-  "space-around": "white space around the value or an item (` claude`, `claude, pi`)",
-  "none-with-names": "`none` beside a name (`none,claude`)",
-  "unknown": "a name that is no provider (`gemini`)",
-  "duplicate": "one name twice (`claude,claude`; 0.37 takes it: the brief does not refuse it)"
+  "offset-without-colon": "an offset without its colon (`+0200`)"
  },
  "accepted": [
   {
@@ -1049,234 +1040,6 @@
    ]
   },
   {
-   "kind": "providers",
-   "option": "providers",
-   "class": "blank",
-   "value": "\t",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "blank",
-   "value": "  ",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "duplicate",
-   "value": "claude,claude",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "empty",
-   "value": "",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "empty-item",
-   "value": ",omp",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "empty-item",
-   "value": "claude,",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "empty-item",
-   "value": "claude,,pi",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "space-around",
-   "value": " claude",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "space-around",
-   "value": " none",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "space-around",
-   "value": "claude ",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "space-around",
-   "value": "claude ,pi",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "space-around",
-   "value": "claude, pi",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "space-around",
-   "value": "none ",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "uppercase",
-   "value": "Claude",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "uppercase",
-   "value": "NONE",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "uppercase",
-   "value": "None",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "valid",
-   "value": "claude",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "valid",
-   "value": "claude,omp",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "valid",
-   "value": "none",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
    "kind": "time",
    "option": "since",
    "class": "date-only",
@@ -1816,66 +1579,6 @@
    ]
   },
   {
-   "kind": "providers",
-   "option": "providers",
-   "class": "empty-item",
-   "value": ",",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "none-with-names",
-   "value": "claude,none",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "none-with-names",
-   "value": "none,claude",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "unknown",
-   "value": "claude,gemini",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
-   "kind": "providers",
-   "option": "providers",
-   "class": "unknown",
-   "value": "gemini",
-   "commands": [
-    "init",
-    "skills check",
-    "skills doctor",
-    "skills install"
-   ]
-  },
-  {
    "kind": "time",
    "option": "since",
    "class": "leading-space",
@@ -1938,5 +1641,313 @@
     "query"
    ]
   }
- ]
+ ],
+ "supersededBy038": {
+  "change": "canon-0-38-provider-option",
+  "option": "providers",
+  "about": "`--providers` is not an option of any command in 0.38: `canon-0-38-provider-option` made the provider list the repeatable `--harness` and `--no-harness`, and `--providers` is refused with `USAGE` whatever its value. What 0.36.0 accepted and refused for it stays here as the record: the 0.37 CHANGELOG still has a row for each value 0.37 refused, and the 0.38 CHANGELOG has a row for each shape of the old value (`atip.provideroption.14`). `atip.optionforms.13` and `.16` read the options that are still declared (`accepted` and `refused` above), not these.",
+  "classes": {
+   "valid": "a list RFC-exact: `claude`, `claude,omp`, `none` (0.37 takes it)",
+   "empty": "an empty value (0.36.0: no provider)",
+   "blank": "only white space (0.36.0: no provider)",
+   "uppercase": "an uppercase letter in a name or in `none` (`Claude`, `NONE`)",
+   "empty-item": "an empty item (`claude,,pi`, `claude,`, `,omp`)",
+   "space-around": "white space around the value or an item (` claude`, `claude, pi`)",
+   "none-with-names": "`none` beside a name (`none,claude`)",
+   "unknown": "a name that is no provider (`gemini`)",
+   "duplicate": "one name twice (`claude,claude`; 0.37 takes it: the brief does not refuse it)"
+  },
+  "accepted": [
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "blank",
+    "value": "\t",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "blank",
+    "value": "  ",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "duplicate",
+    "value": "claude,claude",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "empty",
+    "value": "",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "empty-item",
+    "value": ",omp",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "empty-item",
+    "value": "claude,",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "empty-item",
+    "value": "claude,,pi",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "space-around",
+    "value": " claude",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "space-around",
+    "value": " none",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "space-around",
+    "value": "claude ",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "space-around",
+    "value": "claude ,pi",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "space-around",
+    "value": "claude, pi",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "space-around",
+    "value": "none ",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "uppercase",
+    "value": "Claude",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "uppercase",
+    "value": "NONE",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "uppercase",
+    "value": "None",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "valid",
+    "value": "claude",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "valid",
+    "value": "claude,omp",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "valid",
+    "value": "none",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   }
+  ],
+  "refused": [
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "empty-item",
+    "value": ",",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "none-with-names",
+    "value": "claude,none",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "none-with-names",
+    "value": "none,claude",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "unknown",
+    "value": "claude,gemini",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   },
+   {
+    "kind": "providers",
+    "option": "providers",
+    "class": "unknown",
+    "value": "gemini",
+    "commands": [
+     "init",
+     "skills check",
+     "skills doctor",
+     "skills install"
+    ]
+   }
+  ]
+ }
 }

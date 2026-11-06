@@ -1,6 +1,8 @@
 //! Bounded listings, field projection and plan-then-confirm purge (0.20 D4,
 //! D5), against the actually-built `canon` binary and an offline fixture.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod support;
 
 use chrono::{Duration, Utc};

@@ -17,11 +17,13 @@
 //! section while still reporting the other two PASS; `check-config`
 //! treats an absent `plans:` key as "not configured", not FAIL.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -548,7 +550,7 @@ fn init_then_ingest_sessions_writes_the_sqlite_hot_tier_with_zero_env_or_service
     assert!(!dir.path().join(".canon/hot.db").exists(), "canon init itself must not eagerly create the hot tier's db file");
 
     let home = tempfile::tempdir().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let out = hermetic::canon()
         .args(["ingest", "sessions", "--home", &home.path().display().to_string()])
         .current_dir(dir.path())
         .env_remove("CODEX_HOME")
@@ -575,7 +577,7 @@ fn skill_source(dir: &Path) -> std::path::PathBuf {
 /// `canon init` in `repo` (piped stdin, so never a terminal) with the
 /// default skill source at `source`.
 fn init_with_source(args: &[&str], repo: &Path, source: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").args(args).current_dir(repo).env("CANON_SKILLS_SOURCE", source).output().expect("spawn canon binary")
+    hermetic::canon().arg("init").args(args).current_dir(repo).env("CANON_SKILLS_SOURCE", source).output().expect("spawn canon binary")
 }
 
 const PROJECTIONS: [&str; 4] = [".claude/skills/canon", ".agents/skills/canon", ".omp/skills/canon", ".pi/skills/canon"];
@@ -584,7 +586,7 @@ fn projected(repo: &Path) -> Vec<&'static str> {
     PROJECTIONS.into_iter().filter(|dir| repo.join(dir).join("SKILL.md").is_file()).collect()
 }
 
-/// authoring.init.90: without a terminal or `--providers`, init installs
+/// authoring.init.90: without a terminal or `--harness`, init installs
 /// for the detected harnesses only and records them.
 #[test]
 fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records_it() {
@@ -605,11 +607,11 @@ fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records
 
     let check = run_canon(&["init", "--check"], &repo);
     assert!(stdout(&check).contains("[PASS] skills (providers: omp)\n"), "{}", stdout(&check));
-    let doctor = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "doctor"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
+    let doctor = hermetic::canon().args(["skills", "doctor"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
     assert_eq!(stdout(&doctor), format!("providers: omp (from canon.yaml skills.providers)\nstatus: healthy\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp]).join("\n")));
 }
 
-/// authoring.init.96: with a terminal on stdin and stderr (a pty from `script`) and no `--providers`, init prints no question, waits for no answer
+/// authoring.init.96: with a terminal on stdin and stderr (a pty from `script`) and no `--harness`, init prints no question, waits for no answer
 /// and takes the detected harnesses, as it does off a terminal (spec 5.5: a tool never prompts).
 #[cfg(unix)]
 #[test]
@@ -622,6 +624,7 @@ fn authoring_init_96_on_a_terminal_init_asks_nothing_and_takes_the_detected_harn
     std::fs::create_dir_all(repo.join(".omp")).unwrap();
     let exe = env!("CARGO_BIN_EXE_canon");
     let mut command = Command::new("script");
+    hermetic::scrub(&mut command);
     if cfg!(target_os = "macos") {
         command.args(["-q", "/dev/null", exe, "init"]);
     } else {
@@ -640,7 +643,7 @@ fn authoring_init_96_on_a_terminal_init_asks_nothing_and_takes_the_detected_harn
     assert!(config.ends_with("skills:\n  providers: [claude, omp]\n"), "{config}");
 }
 
-/// authoring.init.91: `--providers codex` answers without a prompt and
+/// authoring.init.91: `--harness codex` answers without a prompt and
 /// installs only `.agents/skills/canon`, whatever markers exist.
 #[test]
 fn authoring_init_91_providers_codex_installs_only_the_agents_projection() {
@@ -649,17 +652,17 @@ fn authoring_init_91_providers_codex_installs_only_the_agents_projection() {
     let repo = tmp.path().join("repo");
     std::fs::create_dir_all(repo.join(".claude")).unwrap();
 
-    let out = init_with_source(&["--providers", "codex"], &repo, &source);
+    let out = init_with_source(&["--harness", "codex"], &repo, &source);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert_eq!(projected(&repo), vec![".agents/skills/canon"]);
     assert!(!repo.join(".codex").exists() && !repo.join(".claude/skills").exists());
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: [codex]\n"));
     assert!(repo.join("AGENTS.md").is_file() && repo.join(".canon/policy.yaml").is_file(), "the other writes still happen");
 
-    // A rerun keeps canon.yaml and says --providers is not applied there.
-    let rerun = init_with_source(&["--providers", "claude"], &repo, &source);
+    // A rerun keeps canon.yaml and says --harness is not applied there.
+    let rerun = init_with_source(&["--harness", "claude"], &repo, &source);
     assert_eq!(rerun.status.code(), Some(0), "{}", stderr(&rerun));
-    assert!(stdout(&rerun).contains("--providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`"), "{}", stdout(&rerun));
+    assert!(stdout(&rerun).contains("--harness and --no-harness are not applied to an existing canon.yaml; run `canon skills install` with them, which records the list in skills.providers"), "{}", stdout(&rerun));
     assert_eq!(projected(&repo), vec![".agents/skills/canon"]);
 }
 
@@ -675,7 +678,7 @@ fn authoring_init_92_a_bare_repo_installs_nothing_and_names_the_flag() {
     let out = init_with_source(&[], &repo, &source);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert!(
-        without_next(&stdout(&out)).ends_with("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)\n"),
+        without_next(&stdout(&out)).ends_with("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; choose with `canon skills install --harness claude` (once for each of claude, codex, omp, pi) or `canon skills install --no-harness`\n"),
         "{}",
         stdout(&out)
     );
@@ -687,9 +690,9 @@ fn authoring_init_92_a_bare_repo_installs_nothing_and_names_the_flag() {
     assert!(stdout(&check).contains("[not configured] skills"), "{}", stdout(&check));
 }
 
-/// authoring.init.93: `--providers none` is an explicit empty choice,
-/// recorded as `providers: []`, with nothing installed; an empty `--providers`
-/// is no list and is refused (0.37 `canon-0-37-option-forms`).
+/// authoring.init.93: `--no-harness` is an explicit empty choice,
+/// recorded as `providers: []`, with nothing installed; an empty `--harness=`
+/// names no provider and is refused (0.38 `canon-0-38-provider-option`).
 #[test]
 fn authoring_init_93_an_explicit_empty_choice_is_recorded() {
     let tmp = tempfile::tempdir().unwrap();
@@ -697,25 +700,25 @@ fn authoring_init_93_an_explicit_empty_choice_is_recorded() {
     let repo = tmp.path().join("repo");
     std::fs::create_dir_all(repo.join(".claude")).unwrap();
 
-    let out = init_with_source(&["--providers", "none"], &repo, &source);
+    let out = init_with_source(&["--no-harness"], &repo, &source);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
-    assert!(without_next(&stdout(&out)).ends_with("canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`\n"), "{}", stdout(&out));
+    assert!(without_next(&stdout(&out)).ends_with("canon init: skills.providers is [] — no canon skill installed; choose with `canon skills install --harness claude` (once for each of claude, codex, omp, pi) or `canon skills install --no-harness`\n"), "{}", stdout(&out));
     assert!(projected(&repo).is_empty());
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: []\n"));
-    let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "check"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
+    let check = hermetic::canon().args(["skills", "check"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
     assert_eq!(check.status.code(), Some(0), "{}", stdout(&check));
     assert_eq!(stdout(&check), "providers: none (from canon.yaml skills.providers)\n");
 
     let empty = tmp.path().join("empty-flag");
     std::fs::create_dir_all(empty.join(".omp")).unwrap();
-    let out = init_with_source(&["--providers="], &empty, &source);
+    let out = init_with_source(&["--harness="], &empty, &source);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(!empty.join("canon.yaml").exists(), "a refused list writes nothing");
     assert!(projected(&empty).is_empty());
 }
 
-/// authoring.init.94: an unknown `--providers` name is refused before
-/// anything is written.
+/// authoring.init.94: an unknown `--harness` name is refused before
+/// anything is written, as `USAGE` naming the four names.
 #[test]
 fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
     let tmp = tempfile::tempdir().unwrap();
@@ -723,15 +726,16 @@ fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
     let repo = tmp.path().join("repo");
     std::fs::create_dir_all(&repo).unwrap();
 
-    let out = init_with_source(&["--providers", "claude,gemini"], &repo, &source);
+    let out = init_with_source(&["--harness", "claude", "--harness", "gemini"], &repo, &source);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert_eq!(
         stderr(&out),
-        "canon: INIT_ARGUMENT_INVALID: --providers is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)\n  field: --providers\n  hint: a working call: canon init; `canon schema init --json` lists the domain of each argument\n"
+        "canon: USAGE: invalid value 'gemini' for '--harness <NAME>'\n  field: --harness\n  expected: claude, codex, omp, pi\n  hint: a working call: canon init; `canon schema init --json` lists every argument\n"
     );
-    let json = init_with_source(&["--providers", "claude,gemini", "--json"], &repo, &source);
+    let json = init_with_source(&["--harness", "claude", "--harness", "gemini", "--json"], &repo, &source);
     let document: serde_json::Value = serde_json::from_slice(&json.stdout).expect("one JSON document");
-    assert_eq!((document["error"]["code"].as_str(), document["error"]["field"].as_str(), document["error"]["received"].as_str()), (Some("INIT_ARGUMENT_INVALID"), Some("--providers"), Some("claude,gemini")), "{document}");
+    assert_eq!((document["error"]["code"].as_str(), document["error"]["field"].as_str(), document["error"]["received"].as_str()), (Some("USAGE"), Some("--harness"), Some("gemini")), "{document}");
+    assert_eq!(document["error"]["expected"], serde_json::json!(["claude", "codex", "omp", "pi"]), "{document}");
     assert_eq!(std::fs::read_dir(&repo).unwrap().count(), 0, "nothing is written");
 }
 
@@ -752,7 +756,7 @@ fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry(
     assert!(projected(&repo).is_empty());
 
     // Without the override directory the retry installs the stub the binary carries.
-    let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install"]).current_dir(&repo).env_remove("CANON_SKILLS_SOURCE").output().unwrap();
+    let retry = hermetic::canon().args(["skills", "install"]).current_dir(&repo).env_remove("CANON_SKILLS_SOURCE").output().unwrap();
     assert_eq!(retry.status.code(), Some(0), "{}", stderr(&retry));
     assert_eq!(projected(&repo), vec![".pi/skills/canon"]);
 }

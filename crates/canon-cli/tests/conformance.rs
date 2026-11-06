@@ -20,6 +20,8 @@
 //! Exit codes are never blessed: they live in the hand-authored
 //! `case.yaml`, and a mismatch fails in bless mode too.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -27,7 +29,6 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-const BIN: &str = env!("CARGO_BIN_EXE_canon");
 const BLESS_ENV: &str = "CANON_CONFORMANCE_BLESS";
 const BLESS_COMMAND: &str = "conformance/regenerate.sh";
 /// The D6 live-stamp case: `canon --version` pinned to the workspace version.
@@ -495,7 +496,7 @@ fn run_case(case: &Case, bless: bool) -> Result<(), String> {
     let mut failures = String::new();
     for (index, step) in case.spec.steps.iter().enumerate() {
         let n = index + 1;
-        let output = Command::new(BIN)
+        let output = hermetic::canon()
             .args(&step.args)
             .current_dir(&repo)
             .env_clear()

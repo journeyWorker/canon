@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-finding-closer",
+    "role": "reviewer",
+    "session_id": "s-0-38-closer-rev"
+  },
+  "at": "2026-11-06T10:35:48.808288Z",
+  "change_id": "canon-0-38-finding-closer",
+  "code_tree": "c4ef23f7b5b96fc70b34813f62a80c9d50be26c2",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-gate/src/review_gate.rs",
+  "introduced_by": "79815f634e539e6bc9813d9abd405a99d70c023d",
+  "kind": "finding",
+  "resolution_code_tree": "9c64b4a2f7d31d0c55aa4ea9c83e6773ba07694c",
+  "resolution_sha": "67b6996578b827fa988ae1f629a874ec20a859a9",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0c7b545787be08b98d24c28f0b990bf38139dc3d",
+  "reviewer": "rev-0-38-finding-closer",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "The gate's open-blocker violation (review_gate.rs open_blocker_violation) still tells whoever reads 'canon gate check' to 'fix it and finding close ... --disposition fixed, or close it as rejected or deferred', with no word on who. An implementer or orchestrator that follows it gets FINDING_ROLE_DENIED (verified: CANON_ROLE=implementer finding close --disposition rejected on the gate's blocker). Say 'a reviewer closes it rejected or deferred' there. Blast radius: the same text is in every gate check, status and ship refusal that lists an open blocker; the refusal's own hint (leave it to a reviewer, run it with --as reviewer) is right.",
+  "worktree_dirty": false
+}

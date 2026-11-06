@@ -211,7 +211,7 @@ Feature: skills install
     Given a canonical skill source and a target with no .claude, .codex, .omp or .pi directory, no canon.yaml skills list and no install lock
     When canon skills install runs with no provider named
     Then it selects no provider, writes no projection and no install lock, and adds no undetected default
-    And it says nothing was installed and names `canon skills install --providers=<list>`
+    And it says nothing was installed and names `canon skills install --harness claude` and `--no-harness`
     And the read-only check exits 0 naming the same flag, and the doctor reports no-providers instead of healthy
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
@@ -220,10 +220,10 @@ Feature: skills install
   @skills.install.52
   Scenario: An explicit provider list is written to canon.yaml and later runs follow it
     Given a target with a canon.yaml that has comments and no skills section, and a .claude directory
-    When canon skills install runs with --providers codex,omp
+    When canon skills install runs with --harness codex and --harness omp
     Then it projects Codex and OMP only and appends `skills: { providers: [codex, omp] }` to canon.yaml, keeping every other byte
     And install, check and doctor with no provider named follow that list and say it came from canon.yaml
-    And a later --providers replaces the section in place, a flow-style section in the middle of the file included, and --providers none records an empty list
+    And a later --harness replaces the section in place, a flow-style section in the middle of the file included, and --no-harness records an empty list
     And a target without canon.yaml gets no canon.yaml
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
@@ -241,11 +241,11 @@ Feature: skills install
   @subject:skills-install
   @case:failure
   @skills.install.54
-  Scenario: Doctor names a canon projection left for a provider that is not selected
+  Scenario: Doctor names a canon projection left for a harness that is not selected
     Given a target whose canon.yaml selects Claude and that still holds canon's Codex projection from an earlier install
     When canon skills check and canon skills doctor run
     Then the check exits 0 and does not mention the Codex projection
-    And the doctor still reports healthy and adds a stray line naming the directory, saying codex is not a selected provider and canon no longer updates it, with `rm -r <dir>` to remove it and the install command that selects it
+    And the doctor still reports healthy and adds a stray line naming the directory, saying codex is not a selected harness and canon no longer updates it, with `rm -r <dir>` to remove it and the install command that selects it
     And the projection is left on disk
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
@@ -254,8 +254,8 @@ Feature: skills install
   @skills.install.55
   Scenario: A malformed skills section in canon.yaml fails loud
     Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know, and a clean canon.yaml
-    When canon skills install, check and doctor run with no provider named, and with --providers naming an unknown provider
-    Then each canon.yaml section is refused with exit 2 as CONFIG_INVALID with the reason SKILLS (a provider canon.yaml names is the section's fault), naming the expected shape or the unknown provider, and the unknown provider on the --providers flag of the clean canon.yaml is SKILLS_ARGUMENT_INVALID
+    When canon skills install, check and doctor run with no harness named, and with --harness naming an unknown harness
+    Then each canon.yaml section is refused with exit 2 as CONFIG_INVALID with the reason SKILLS (a provider canon.yaml names is the section's fault), naming the expected shape or the unknown provider, and the unknown provider on the --harness option of the clean canon.yaml is USAGE, refused by the enumeration of the option before any section is read
     And nothing is projected and canon.yaml is byte-identical
     And a --skills-source directory that does not exist is refused the same way, exit 2 naming the option
     And canon init --check exits 1 reporting the skills section as FAIL with the same reason
@@ -389,7 +389,7 @@ Feature: skills install
   @skills.install.67
   Scenario: Install writes a stub that points at the guide and no reference files
     Given an empty repository and no canon/skills tree
-    When canon init --providers claude,codex runs, and then canon skills install
+    When canon init --harness claude --harness codex runs, and then canon skills install
     Then each projected SKILL.md is a short stub with the skill's frontmatter, this canon's version, and pointers to canon skills show canon and canon schema
     And no reference directory is projected and the install lock lists no reference file, while the retrieve script is projected from the binary
     And the AGENTS.md block points at canon skills show canon, canon skills check exits 0 and a second install changes nothing

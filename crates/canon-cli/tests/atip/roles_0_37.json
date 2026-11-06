@@ -1,0 +1,287 @@
+{
+ "_about": "x-canon.roles of every command in canon schema --json of 0.37.0, as that binary printed it (canon-0-38-schema-shape). A command of all four roles was the four names; 0.38 prints all.",
+ "commands": {
+  "adapter authorize": [
+   "orchestrator"
+  ],
+  "adapter validate": [
+   "orchestrator"
+  ],
+  "artifacts move": [
+   "orchestrator"
+  ],
+  "artifacts store": [
+   "orchestrator"
+  ],
+  "artifacts verify": [
+   "orchestrator"
+  ],
+  "brief approve": [],
+  "brief check": [
+   "planner",
+   "reviewer"
+  ],
+  "brief show": [
+   "planner",
+   "reviewer"
+  ],
+  "change new": [
+   "planner"
+  ],
+  "completion": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "context": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "context-pack add": [
+   "orchestrator",
+   "implementer"
+  ],
+  "context-pack show": [
+   "orchestrator",
+   "implementer"
+  ],
+  "context-pack verify": [
+   "orchestrator",
+   "implementer"
+  ],
+  "dashboard": [
+   "orchestrator"
+  ],
+  "demo init": [
+   "orchestrator"
+  ],
+  "demo review": [
+   "orchestrator"
+  ],
+  "dispatch begin": [
+   "orchestrator"
+  ],
+  "dispatch diff": [
+   "orchestrator"
+  ],
+  "dispatch end": [
+   "orchestrator"
+  ],
+  "divergence accept": [],
+  "divergence add": [
+   "implementer",
+   "reviewer"
+  ],
+  "divergence defer": [
+   "implementer",
+   "reviewer"
+  ],
+  "divergence list": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "divergence resolve": [
+   "implementer",
+   "reviewer"
+  ],
+  "evidence add": [
+   "implementer"
+  ],
+  "evidence approval-payload": [
+   "implementer",
+   "orchestrator"
+  ],
+  "evidence audit": [
+   "implementer"
+  ],
+  "export": [
+   "orchestrator"
+  ],
+  "feature new": [
+   "planner",
+   "implementer"
+  ],
+  "finding add": [
+   "reviewer"
+  ],
+  "finding close": [
+   "reviewer"
+  ],
+  "finding list": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "format": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "gate check": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "gate install-hooks": [
+   "orchestrator"
+  ],
+  "gate promote": [
+   "implementer"
+  ],
+  "ingest plans": [
+   "orchestrator"
+  ],
+  "ingest records": [
+   "orchestrator"
+  ],
+  "ingest sessions": [
+   "orchestrator"
+  ],
+  "init": [
+   "orchestrator"
+  ],
+  "inventory sync": [
+   "implementer",
+   "orchestrator"
+  ],
+  "ledger compact": [
+   "orchestrator"
+  ],
+  "migrate": [
+   "orchestrator"
+  ],
+  "plugin sync": [
+   "orchestrator"
+  ],
+  "policy approve": [],
+  "policy show": [
+   "orchestrator"
+  ],
+  "prompt add": [
+   "orchestrator"
+  ],
+  "prompt show": [
+   "orchestrator"
+  ],
+  "purge": [
+   "orchestrator"
+  ],
+  "query": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "regime show": [
+   "orchestrator"
+  ],
+  "report build": [
+   "orchestrator"
+  ],
+  "report check": [
+   "orchestrator"
+  ],
+  "report snapshot": [
+   "orchestrator"
+  ],
+  "retrieve": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "review change": [
+   "reviewer"
+  ],
+  "review scenario": [
+   "reviewer"
+  ],
+  "scenario new": [
+   "planner",
+   "implementer"
+  ],
+  "schema": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "search": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "selftest": [
+   "orchestrator"
+  ],
+  "skills check": [
+   "orchestrator"
+  ],
+  "skills doctor": [
+   "orchestrator"
+  ],
+  "skills install": [
+   "orchestrator"
+  ],
+  "skills show": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "status": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ],
+  "strategy approval-payload": [
+   "orchestrator"
+  ],
+  "strategy promote": [
+   "orchestrator"
+  ],
+  "strategy rollback": [
+   "orchestrator"
+  ],
+  "subject adopt": [
+   "planner",
+   "orchestrator"
+  ],
+  "subject move": [
+   "orchestrator"
+  ],
+  "subject new": [
+   "planner",
+   "orchestrator"
+  ],
+  "subject show": [
+   "orchestrator"
+  ],
+  "subject unadopt": [
+   "planner",
+   "orchestrator"
+  ],
+  "task done": [
+   "implementer"
+  ],
+  "tier age": [
+   "orchestrator"
+  ],
+  "trace": [
+   "planner",
+   "implementer",
+   "reviewer",
+   "orchestrator"
+  ]
+ }
+}

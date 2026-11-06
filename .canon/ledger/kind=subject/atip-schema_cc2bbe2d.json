@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-06T18:40:02.150102Z",
+  "change_ids": [
+    "canon-0-34-atip-schema-doc",
+    "canon-0-34-atip-constraints",
+    "canon-0-35-canon-cursor-1-2",
+    "canon-0-35-canon-check-order",
+    "canon-0-35-claim-l2",
+    "canon-0-36-claim-1-4",
+    "canon-0-36-help-json",
+    "canon-0-37-claim-1-5",
+    "canon-0-37-option-values",
+    "canon-0-37-option-forms",
+    "canon-0-38-provider-option",
+    "canon-0-38-schema-shape",
+    "canon-0-38-date-refusals"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-38-orch"
+    },
+    "reason": "0.38: every change reviewed, gate clean, every brief check clean"
+  },
+  "subject_id": "atip-schema",
+  "summary": "schema tree, group and command documents with value types, typed defaults, constraints, domains, validators and output schemas",
+  "title": "ATIP: canon's atip/1 L1 self-description (schema)"
+}

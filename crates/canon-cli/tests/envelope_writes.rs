@@ -3,6 +3,8 @@
 //! (`purge`, `dispatch`, `ingest` are covered where their other behavior is).
 //! A write names what follows in `meta.next` (absent when nothing follows).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,7 +22,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env("CANON_ACTOR", "envelope-writes").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).env("CANON_ACTOR", "envelope-writes").output().expect("spawn canon binary")
 }
 
 fn body(out: &Output) -> Value {
@@ -32,7 +34,7 @@ fn body(out: &Output) -> Value {
 fn export_json_is_the_manifest_as_data_with_its_page_in_meta_and_a_next_step() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
-    for args in [&["init", "--providers", "none"][..], &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..]] {
+    for args in [&["init", "--no-harness"][..], &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..]] {
         assert!(canon(repo, args).status.success());
     }
     let out = canon(repo, &["export", "--kind", "evidence", "--json"]);

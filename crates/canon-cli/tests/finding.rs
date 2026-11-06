@@ -16,11 +16,13 @@
 //! Before s43 that sequence was unrunnable, and a review round's
 //! findings evaporated with its transcript.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -1285,9 +1287,9 @@ fn finding_list_prints_each_committed_finding_at_its_latest_version() {
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert_eq!(
         stdout(&out),
-        "round  seq  severity    disposition  reviewer  summary\n\
-         1      1    blocker     rejected     rev-a     teardown races HMR [reason: by design]\n\
-         1      2    should-fix  open         rev-b     the count was typed by hand\n"
+        "round  seq  severity    disposition  reviewer  closed by  summary\n\
+         1      1    blocker     rejected     rev-a     canon      teardown races HMR [reason: by design]\n\
+         1      2    should-fix  open         rev-b     -          the count was typed by hand\n"
     );
     assert_eq!(
         stderr(&out),
@@ -1302,11 +1304,11 @@ fn finding_list_open_keeps_only_currently_open_findings() {
     let dir = listed_repo();
     let out = run_canon(&["finding", "list", "--change", "s43-findings-are-records", "--open"], dir.path());
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
-    assert_eq!(stdout(&out), "round  seq  severity    disposition  reviewer  summary\n1      2    should-fix  open         rev-b     the count was typed by hand\n");
+    assert_eq!(stdout(&out), "round  seq  severity    disposition  reviewer  closed by  summary\n1      2    should-fix  open         rev-b     -          the count was typed by hand\n");
 
     let none = run_canon(&["finding", "list", "--change", "other-change", "--open"], dir.path());
     assert_eq!(none.status.code(), Some(0));
-    assert_eq!(stdout(&none), "round  seq  severity  disposition  reviewer  summary\n1      1    note      open         rev-c     elsewhere\n");
+    assert_eq!(stdout(&none), "round  seq  severity  disposition  reviewer  closed by  summary\n1      1    note      open         rev-c     -          elsewhere\n");
     let closed = run_canon(&["finding", "list", "--change", "closed-only", "--open"], dir.path());
     assert_eq!(closed.status.code(), Some(0), "{}", stderr(&closed));
     assert_eq!(stdout(&closed), "canon finding list: no committed open findings on change `closed-only`\n", "a change whose findings are all closed has none open");
@@ -1335,8 +1337,8 @@ fn finding_list_json_carries_the_same_rows() {
         serde_json::json!({
             "changeId": "s43-findings-are-records",
             "findings": [
-                {"round": 1, "seq": 1, "severity": "blocker", "disposition": "rejected", "reviewer": "rev-a", "summary": "teardown races HMR", "resolutionSha": null, "fileRef": null, "reason": "by design"},
-                {"round": 1, "seq": 2, "severity": "should-fix", "disposition": "open", "reviewer": "rev-b", "summary": "the count was typed by hand", "resolutionSha": null, "fileRef": null, "reason": null},
+                {"round": 1, "seq": 1, "severity": "blocker", "disposition": "rejected", "reviewer": "rev-a", "summary": "teardown races HMR", "resolutionSha": null, "fileRef": null, "reason": "by design", "closedBy": "canon", "closedRole": null},
+                {"round": 1, "seq": 2, "severity": "should-fix", "disposition": "open", "reviewer": "rev-b", "summary": "the count was typed by hand", "resolutionSha": null, "fileRef": null, "reason": null, "closedBy": null, "closedRole": null},
             ]
         })
     );

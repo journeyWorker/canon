@@ -11,6 +11,15 @@
         ]
       ]
     },
+    "artifacts prune": {
+      "preview": [
+        [
+          "artifacts",
+          "prune",
+          "--json"
+        ]
+      ]
+    },
     "brief check": {
       "domainRejects": {
         "change": [
@@ -43,7 +52,7 @@
     },
     "context-pack show": {
       "domainRejects": {
-        "id": [
+        "pack": [
           "Core",
           "-core"
         ]
@@ -51,7 +60,7 @@
     },
     "context-pack verify": {
       "domainRejects": {
-        "id": [
+        "pack": [
           "Core",
           "-core"
         ]
@@ -438,17 +447,6 @@
         ]
       ]
     },
-    "init": {
-      "domainRejects": {
-        "providers": [
-          "Claude",
-          "claude,,pi",
-          "claude, pi",
-          "",
-          "none,claude"
-        ]
-      }
-    },
     "ledger compact": {
       "preview": [
         [
@@ -595,43 +593,6 @@
         ]
       }
     },
-    "skills check": {
-      "domainRejects": {
-        "providers": [
-          "Core",
-          "-core",
-          "Claude",
-          "claude,,pi",
-          "claude, pi",
-          "",
-          "none,claude"
-        ]
-      }
-    },
-    "skills doctor": {
-      "domainRejects": {
-        "providers": [
-          "Core",
-          "-core",
-          "Claude",
-          "claude,,pi",
-          "claude, pi",
-          "",
-          "none,claude"
-        ]
-      }
-    },
-    "skills install": {
-      "domainRejects": {
-        "providers": [
-          "Claude",
-          "claude,,pi",
-          "claude, pi",
-          "",
-          "none,claude"
-        ]
-      }
-    },
     "status": {
       "fields": [
         [
@@ -695,7 +656,7 @@
     },
     "subject show": {
       "domainRejects": {
-        "id": [
+        "subject": [
           "Core",
           "-core"
         ]
@@ -712,7 +673,7 @@
     },
     "trace": {
       "domainRejects": {
-        "id": [
+        "trace": [
           "Core",
           "-core"
         ]
@@ -750,6 +711,11 @@
       "sh",
       "-c",
       "mkdir -p packages/dashboard/dist && echo '{\"name\":\"@canon-dev/dashboard\"}' > packages/dashboard/package.json && echo '<!doctype html><title>stub</title>' > packages/dashboard/dist/index.html"
+    ],
+    [
+      "sh",
+      "-c",
+      "mkdir -p .canon/artifacts/sha256 && printf x > .canon/artifacts/sha256/2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
     ]
   ],
   "probe": "status",
@@ -818,6 +784,15 @@
         "ARTIFACTS_STORE_INVALID",
         "ARTIFACTS_STORE_REQUIRED",
         "ARTIFACTS_STORE_UNAVAILABLE"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_PRUNE_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "ARTIFACTS_STORE_FAILED",
+        "WRITE_FAILED"
       ],
       "retryable": false
     },
@@ -1323,6 +1298,11 @@
       "retryable": false
     },
     {
+      "code": "FINDING_ROLE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "FORMAT_CHECK_FAILED",
       "exit": 1,
       "retryable": false
@@ -1385,7 +1365,6 @@
       "exit": 1,
       "reasons": [
         "CONFIG_INVALID",
-        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_SOURCE_NOT_FOUND"
       ],
       "retryable": false
@@ -2180,6 +2159,7 @@
     "BRIEF_DRAFT_PENDING",
     "BRIEF_OVERRIDE_ON_RECORD",
     "BRIEF_UNAPPROVED_NOT_ENFORCED",
+    "CODE_SCOPES_UNMATCHED",
     "CONFIG_MISSING",
     "CONFIG_UNREADABLE",
     "DASHBOARD_SNAPSHOT_UNAVAILABLE",

@@ -1,0 +1,4 @@
+canon: USAGE: `--harness`, `--no-harness` are exclusive: at most one may be given
+  field: --harness
+  expected: claude, codex, omp, pi
+  hint: a working call: canon skills check; `canon schema skills check --json` lists the constraints of the command

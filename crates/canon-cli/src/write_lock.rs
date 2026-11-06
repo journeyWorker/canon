@@ -75,6 +75,7 @@ const RECORD_WRITER: &str = "appends records to the ledger, which `purge`, `tier
 /// The reasons are what the CHANGELOG of 0.35 lists.
 pub const POLICY: &[(&str, Holds, &str)] = &[
     ("artifacts move", Holds::OnCommit, "a destructive commit: uploads, rewrites canon.yaml and .gitignore, removes the local blobs"),
+    ("artifacts prune", Holds::OnCommit, "a destructive commit: deletes the local blobs and the objects of the tier that no record binds"),
     ("artifacts store", Holds::Always, "writes blobs into the artifact store that `artifacts move` hashes and removes, and refreshes the scenario index"),
     ("brief approve", Holds::Always, "rewrites the `Approved:` line of a brief, a file `migrate` rewrites and re-binds"),
     ("change new", Holds::Always, "writes a Change record and its brief: a record `migrate` renames and a file it moves"),

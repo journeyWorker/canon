@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-artifacts-prune",
+    "role": "implementer",
+    "session_id": "s-0-38-artifacts-prune"
+  },
+  "at": "2026-11-06T10:00:30.953431Z",
+  "attachments": [
+    {
+      "case": "artifacts_prune_12_a_plan_whose_records_changed_since_its_preview_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "060b80809b11513726471b839e7ae355d83f3c00c97894f0c42510ed8d9f7d81"
+    }
+  ],
+  "code_tree": "b1b13a6bfb598c90bbfdac7343e28faab213ac6c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "3328e7aeccdb4880a3f069c6df67b72a86237961",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 26,
+  "scenario_id": "artifacts.prune.12",
+  "schema": 1,
+  "staging_id": "11a2dfec",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

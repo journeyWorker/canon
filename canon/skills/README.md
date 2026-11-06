@@ -33,9 +33,9 @@ internal Rust modules.
 ## Materialization
 
 ```bash
-canon init --providers=claude,codex               # or answer init's prompt; records skills.providers
+canon init --harness claude --harness codex     # records skills.providers; `init` never asks
 canon skills install                              # follows canon.yaml skills.providers
-canon skills install --providers=claude,codex,omp,pi   # any subset or none; rewrites skills.providers
+canon skills install --harness claude --harness codex --harness omp --harness pi   # any subset; rewrites skills.providers
 canon skills check                                # read-only drift check
 canon skills doctor                               # diagnostics, no deletion
 ```
@@ -63,16 +63,17 @@ rest.
 
 OMP/Pi projections are project-local passive bundles. The
 `canon-retrieve-pre-dispatch.sh` script is provided only as a sidecar; no OMP
-or Pi native hook is installed. Provider selection is `claude`, `codex`, `omp`,
-and/or `pi` (or `none`); invalid names fail before any write. Without
-`--providers`, the commands serve `canon.yaml`'s `skills: { providers: [...] }`
-(0.17); a repo without that key uses the providers its install lock records;
-with neither, each provider whose marker directory (`.claude`, `.codex`,
+or Pi native hook is installed. Harness selection is `--harness` once for each of `claude`, `codex`, `omp`
+and `pi` (a name twice counts once), or `--no-harness` for none; the two together, and a name
+that is none of the four, fail before any write. Without
+either, the commands serve `canon.yaml`'s `skills: { providers: [...] }`
+(0.17); a repo without that key uses the harnesses its install lock records;
+with neither, each harness whose marker directory (`.claude`, `.codex`,
 `.omp`, `.pi`) exists. `.agents` alone does not select Codex: other tools use
 it too. With nothing detected, nothing is installed and the command names
-`canon skills install --providers=<list>`. An explicit `--providers` on
+`canon skills install --harness claude` and `--no-harness`. An explicit `--harness` or `--no-harness` on
 install rewrites `skills.providers` in an existing `canon.yaml`, keeping
-every other byte. `canon init` never asks: it takes `--providers`, or the
+every other byte. `canon init` never asks: it takes `--harness` or `--no-harness`, or the
 detected harnesses, records the list and installs.
 
 The source checkout is never modified by a canonical install. The target owns
@@ -88,7 +89,7 @@ provider is not selected. Canon no longer updates it; the line is advisory,
 `check` ignores it, and `doctor` still reports healthy:
 
 ```
-stray: ./.agents/skills/canon — codex is not a selected provider (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r ./.agents/skills/canon`, or select it with `canon skills install --providers=claude,codex`
+stray: ./.agents/skills/canon — codex is not a selected harness (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r ./.agents/skills/canon`, or select it with `canon skills install --harness claude --harness codex`
 ```
 
 The lock also records `canon_version`, the canon that wrote it, and
@@ -99,8 +100,8 @@ that leaves the bundle unchanged does not rewrite the lock. When the lock's
 `doctor` (as an `outdated:` line) say so:
 
 ```
-<lock> — outdated (installed by canon 0.15.0, this canon is 0.16.0 — run `canon skills install --providers=claude,codex`)
-outdated: <lock> installed by an unknown canon version (the lock predates 0.16), this canon is 0.16.0 — run `canon skills install --providers=claude,codex`
+<lock> — outdated (installed by canon 0.15.0, this canon is 0.16.0 — run `canon skills install --harness claude --harness codex`)
+outdated: <lock> installed by an unknown canon version (the lock predates 0.16), this canon is 0.16.0 — run `canon skills install --harness claude --harness codex`
 ```
 
 A lock written before 0.16 has no `canon_version`, so it is reported as
@@ -142,7 +143,7 @@ bytes still match the recorded hash, keeps any edited or unrecorded file
 (including user files under `.codex/skills`), and removes `.codex/skills` only
 when it ends up empty. `check` (exit 1) and `doctor` report a leftover legacy
 Codex projection as a `legacy-remnant` together with the fix command,
-`canon skills install --providers=<selected>`.
+`canon skills install --harness claude --harness codex` (the selected harnesses, one `--harness` each).
 
 ## Developer-only legacy source
 

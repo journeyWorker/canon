@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-date-refusals",
+    "role": "implementer",
+    "session_id": "s-0-38-date-refusals"
+  },
+  "at": "2026-11-06T17:14:50.983708Z",
+  "attachments": [
+    {
+      "case": "atip_optionforms_12_the_table_of_values_inside_and_outside_each_domain_agrees_with_the_real_parser",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "377b2855faeda9d36881a00eec524f6de3675f17bfc4c7db71ba687fa98eb6db"
+    }
+  ],
+  "code_tree": "ca57826d766b036bf5441d11c4f7f646f7454fb5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 54,
+  "scenario_id": "atip.optionforms.12",
+  "schema": 1,
+  "staging_id": "3e4c4755",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

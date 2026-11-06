@@ -18,15 +18,17 @@
 //! already-existing file is rejected loud (nonzero exit, the file's
 //! bytes unchanged); and neither command writes any ledger record.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 
 const CANON_YAML: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n";
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -154,7 +156,7 @@ fn scenario_new_emits_leading_provenance_subject_lane_and_actor() {
 fn scenario_new_uses_canon_actor_environment_when_flag_is_absent() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path());
-    let out = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let out = hermetic::canon()
         .args(["scenario", "new", "world.checkout.01", "--title", "Start checkout"])
         .env("CANON_ACTOR", "env-agent")
         .current_dir(dir.path())
@@ -168,7 +170,7 @@ fn scenario_new_uses_canon_actor_environment_when_flag_is_absent() {
     // With neither flag nor environment the actor is the scaffold's own fixed id.
     let bare = tempfile::tempdir().unwrap();
     write_canon_yaml(bare.path());
-    let out = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let out = hermetic::canon()
         .args(["scenario", "new", "world.checkout.01", "--title", "Start checkout"])
         .env_remove("CANON_ACTOR")
         .current_dir(bare.path())

@@ -1,0 +1,18 @@
+description: "0.38: the providers are chosen with `--harness` once for each name and `--no-harness`; the removed `--providers` is a usage error (exit 2, code USAGE) whose hint is the typed line with the options corrected when the value was a list 0.37 took (a comma list, `none`), and only the new option names when it was not; a name that is not one of the four, and `--harness` beside `--no-harness`, are usage errors too; `--no-harness` selects nothing in the read commands"
+steps:
+  - args: [init, --no-agents-md, --no-policy, --no-harness]
+    exit: 0
+  - args: [skills, check, --providers, "claude,omp"]
+    exit: 2
+  - args: [skills, doctor, "--providers=none", --json]
+    exit: 2
+  - args: [init, --providers, Claude]
+    exit: 2
+  - args: [skills, check, --harness, gemini]
+    exit: 2
+  - args: [skills, check, --harness, claude, --no-harness]
+    exit: 2
+  - args: [skills, check, --no-harness]
+    exit: 0
+  - args: [skills, doctor, --no-harness]
+    exit: 0

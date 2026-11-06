@@ -75,6 +75,7 @@ pub fn path(cmd: &Command) -> &'static str {
             ArtifactsCommand::Verify(_) => "artifacts verify",
             ArtifactsCommand::Store(_) => "artifacts store",
             ArtifactsCommand::Move(_) => "artifacts move",
+            ArtifactsCommand::Prune(_) => "artifacts prune",
         },
         Command::Finding { action } => match action {
             FindingCommand::Add(_) => "finding add",

@@ -2,6 +2,8 @@
 //! migrate touched back byte for byte (moves undone, `hot.db` restored, files the migrate wrote removed), and the git
 //! index with them. Through the real binary on a 0.29 ledger fixture and on a 0.16 spec/openspec layout.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -10,7 +12,7 @@ use std::process::{Command, Output};
 use serde_json::Value;
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
 }
 
 fn text(out: &Output) -> String {

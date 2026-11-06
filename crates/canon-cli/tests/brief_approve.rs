@@ -3,6 +3,8 @@
 //! `canon brief show`) refuses a brief changed after it. Against the
 //! actually-built `canon` binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -19,7 +21,7 @@ fn git_seed(repo: &Path) {
 }
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).output().expect("spawn canon binary")
 }
 
 fn stdout(o: &Output) -> String {
@@ -46,7 +48,7 @@ fn repo_with_clean_brief() -> TempDir {
     let dir = TempDir::new().unwrap();
     git_seed(dir.path());
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     std::fs::write(brief_path(repo), en_brief("")).unwrap();

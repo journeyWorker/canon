@@ -1,11 +1,11 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-05T10:23:55Z",
-  "note": "승인 (재오픈 없음, 시간 옵션 전부 RFC3339, 문장도 제어 문자 전부 금지, 나머지 플래너 기본안)",
+  "approved_at": "2026-11-06T17:37:41Z",
+  "note": "승인 위임(2026-11-01 대화) 하의 사실 정정: 윤초 안내는 직전 초의 다음 초",
   "relay": {
     "role": "orchestrator",
     "actor": "orchestrator-main",
-    "tool": "ask"
+    "tool": "chat"
   }
 }

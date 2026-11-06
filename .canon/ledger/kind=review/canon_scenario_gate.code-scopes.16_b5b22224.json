@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-code-scopes",
+    "role": "reviewer",
+    "session_id": "s-0-38-scopes-rev"
+  },
+  "at": "2026-11-06T10:14:58.766108Z",
+  "code_tree": "49feaf5b29688ae566a123f9d8e79515099dc637",
+  "kind": "review",
+  "pin": "ce16ffaaaf2a9338b7610a370cd48b5a59d23836",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_code_scopes_16_a_brief_approval_leaves_the_policy_approval_stale_when_the_scopes_changed"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "117c6846a62643710a1529da1b1c66eb7af91a07089096f64778ed3cc78b28ef",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-code-scopes/brief.md"
+  },
+  "review_id": "01M6R5NEYE12B9R27MGM8R94FR",
+  "reviewer": "rev-0-38-code-scopes",
+  "scenario_id": "gate.code-scopes.16",
+  "schema": 2,
+  "worktree_dirty": false
+}

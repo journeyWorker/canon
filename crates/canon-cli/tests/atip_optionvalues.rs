@@ -10,6 +10,8 @@
 //! The checks that seeded faults must trip are small pure functions in this file (`sweep_problems`, `changelog_problems`): each real input passes them, each seeded
 //! fault is found, and no sweep is vacuous. Tests are named by scenario id (`atip_optionvalues_05_…` proves `atip.optionvalues.05`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -27,6 +29,7 @@ const GOLDEN: &str = "crates/canon-cli/tests/atip/option_values_0_36.json";
 const ALLOWED: &[(&str, &str)] = &[("kind", "the set of values differs by command (the contract's L1.one-meaning-values asks for one meaning, as a SHOULD; a change of its own)")];
 
 /// The options of `canon-0-37-option-forms`: the rows of the CHANGELOG table that name them are held to that change's own golden file (`atip_optionforms.rs`), not to this one.
+/// `--providers` is no option since `canon-0-38-provider-option`, but its 0.37 rows stay in that release's table as history.
 const OPTION_FORMS: &[&str] = &["--approval-at", "--expiry", "--as-of", "--before", "--after", "--since", "--providers"];
 
 // ---------------------------------------------------------------------------
@@ -574,7 +577,7 @@ fn atip_optionvalues_13_a_command_that_declares_another_domain_for_the_same_name
     option["possibleValues"] = json!(["fixed", "reopened"]);
     let refs: Vec<&Value> = seeded.iter().collect();
     assert!(sweep_problems(&refs, &[]).iter().any(|problem| problem.contains("`--disposition` has closed sets that are not nested")));
-    // The allowed names are the allowed ones: every name has one domain in the real documents (`--providers` too, since `canon-0-37-option-forms`), and a seeded fault is found by name.
+    // The allowed names are the allowed ones: every name has one domain in the real documents (`--harness` too, since `canon-0-38-provider-option`), and a seeded fault is found by name.
     let refs: Vec<&Value> = real.iter().collect();
     assert!(sweep_problems(&refs, &[]).is_empty(), "{:?}", sweep_problems(&refs, &[]));
     // `--kind` has closed sets that are nested today; a set that is not nested is found, and the allowed name skips it.

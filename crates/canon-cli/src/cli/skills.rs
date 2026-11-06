@@ -9,7 +9,7 @@ pub enum SkillsCommand {
     Install(SkillsInstallArgs),
     /// Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote.
     Check(SkillsCheckArgs),
-    /// Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits.
+    /// Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a harness that is not selected, and other skills whose description claims build work; reports only, never edits.
     Doctor(SkillsDoctorArgs),
     /// Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here.
     Show(SkillsShowArgs),
@@ -22,13 +22,16 @@ pub struct SkillsInstallArgs {
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Providers to project: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item);
-    /// also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml
+    /// A harness to project (repeatable, once per name): `claude`, `codex`, `omp` or `pi`;
+    /// also rewrites `skills.providers` in the target's canon.yaml. Omitted, and no `--no-harness`: canon.yaml
     /// `skills.providers`, else the install lock's providers, else the detected `.claude`,
     /// `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is
     /// projected to `.agents/skills/canon/`.
-    #[arg(long, value_name = "LIST")]
-    pub providers: Option<String>,
+    #[arg(long, value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::skills::harness_option_names()))]
+    pub harness: Vec<String>,
+    /// Project no harness: records an empty `skills.providers` in the target's canon.yaml and installs nothing
+    #[arg(long)]
+    pub no_harness: bool,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
@@ -45,9 +48,12 @@ pub struct SkillsCheckArgs {
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Providers to inspect: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item). Omitted: as for install.
-    #[arg(long, value_name = "LIST")]
-    pub providers: Option<String>,
+    /// A harness to inspect (repeatable, once per name): `claude`, `codex`, `omp` or `pi`. Omitted, and no `--no-harness`: as for install.
+    #[arg(long, value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::skills::harness_option_names()))]
+    pub harness: Vec<String>,
+    /// Inspect no harness: the selection is an empty list
+    #[arg(long)]
+    pub no_harness: bool,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -60,9 +66,12 @@ pub struct SkillsDoctorArgs {
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Providers to inspect: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item). Omitted: as for install.
-    #[arg(long, value_name = "LIST")]
-    pub providers: Option<String>,
+    /// A harness to inspect (repeatable, once per name): `claude`, `codex`, `omp` or `pi`. Omitted, and no `--no-harness`: as for install.
+    #[arg(long, value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::skills::harness_option_names()))]
+    pub harness: Vec<String>,
+    /// Inspect no harness: the selection is an empty list
+    #[arg(long)]
+    pub no_harness: bool,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

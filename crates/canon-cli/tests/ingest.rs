@@ -9,10 +9,12 @@
 //! DEFAULT — no `--json` flag required — so the only copy of the
 //! normalized output is never silently discarded.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod support;
 
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 
@@ -38,12 +40,11 @@ fn write_omp_fixture_home(home: &std::path::Path) {
 /// thing scanned, matching how `fixture.run_canon` isolates
 /// `CANON_R2_LOCAL_ROOT` for the tier layer.
 fn run_canon_ingest(fixture: &support::Fixture, extra_args: &[&str]) -> Output {
-    let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
     let mut args: Vec<String> = vec!["ingest".to_string(), "sessions".to_string()];
     args.extend(extra_args.iter().map(std::string::ToString::to_string));
     args.push("--repo".to_string());
     args.push(fixture.canon_yaml_path().parent().unwrap().display().to_string());
-    Command::new(bin)
+    hermetic::canon()
         .args(&args)
         .env("CANON_R2_LOCAL_ROOT", fixture.r2_root())
         .env_remove("CODEX_HOME")
@@ -118,8 +119,7 @@ fn privacy_opt_in_toggle_rescans_unchanged_source_bytes() {
 
 #[test]
 fn help_shows_all_workspaces_flag_and_no_stale_wave_text() {
-    let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
-    let output = Command::new(bin).args(["ingest", "sessions", "--help"]).output().expect("spawning the built `canon` binary");
+    let output = hermetic::canon().args(["ingest", "sessions", "--help"]).output().expect("spawning the built `canon` binary");
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
 
     let text = support::stdout(&output);

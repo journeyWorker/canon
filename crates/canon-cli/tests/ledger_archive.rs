@@ -4,8 +4,10 @@
 //! the archive, and `canon ledger compact` brings a ledger written before 0.23
 //! to the same state without changing what the gate or `status` say.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Subject, SubjectId, SubjectStatus};
 use canon_store::git_tier::GitTier;
@@ -31,7 +33,7 @@ routing:
 const SCENARIO: &str = "world.demo.01";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).output().expect("spawn canon binary")
 }
 
 fn out(o: &Output) -> String {

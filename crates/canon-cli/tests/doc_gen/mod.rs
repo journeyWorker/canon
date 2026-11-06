@@ -285,7 +285,11 @@ fn gist(about: &str) -> &str {
 /// The **Commands** block of a role's reference: every leaf of the role with its full
 /// syntax (each option, value names, closed sets) and one runnable example.
 pub fn role_commands(spec: &Value, role: &str) -> String {
-    let mut mine: Vec<&Value> = leaves(spec).filter(|l| l["x-canon"]["roles"].as_array().is_some_and(|r| r.iter().any(|x| x == role))).collect();
+    let mut mine: Vec<&Value> = leaves(spec).filter(|l| match &l["x-canon"]["roles"] {
+        Value::String(all) => all == "all",
+        Value::Array(roles) => roles.iter().any(|x| x == role),
+        other => panic!("`roles` is `all` or an array of role names, not {other}"),
+    }).collect();
     mine.sort_by_key(|l| l["command"].as_str().unwrap_or_default());
     let no_repo: Vec<String> = mine.iter().filter(|l| find_option(l, "repo").is_none()).map(|l| format!("`{}`", l["command"].as_str().unwrap_or_default())).collect();
     let mut out = String::from("Every leaf takes `--as <ROLE>` and `--json`");

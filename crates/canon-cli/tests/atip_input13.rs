@@ -6,6 +6,8 @@
 //!
 //! Tests are named by scenario id (`atip_input13_01_…` proves `atip.input13.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
@@ -14,7 +16,7 @@ use serde_json::{json, Value};
 use tempfile::TempDir;
 
 fn canon_in(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-input13").stdin(Stdio::null());
     for (name, value) in env {
         command.env(name, value);
@@ -44,7 +46,7 @@ fn fixture() -> TempDir {
         assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
     };
     git(&["init", "-q"]);
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     git(&["add", "-A"]);
     git(&["commit", "-q", "-m", "fixture"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);

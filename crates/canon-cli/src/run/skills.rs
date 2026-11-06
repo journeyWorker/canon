@@ -6,14 +6,18 @@ use std::process::ExitCode;
 
 pub fn run(cmd: SkillsCommand) -> ExitCode {
     match cmd {
-        SkillsCommand::Install(SkillsInstallArgs { skills_source, repo, providers, dry_run, json, .. }) => run_skills_install(skills_source.as_deref(), &repo, providers.as_deref(), dry_run.dry_run, json),
-        SkillsCommand::Check(SkillsCheckArgs { skills_source, repo, providers, json }) => run_skills_check(skills_source.as_deref(), &repo, providers.as_deref(), json),
-        SkillsCommand::Doctor(SkillsDoctorArgs { skills_source, repo, providers, json }) => run_skills_doctor(skills_source.as_deref(), &repo, providers.as_deref(), json),
+        SkillsCommand::Install(SkillsInstallArgs { skills_source, repo, harness, no_harness, dry_run, json, .. }) => run_skills_install(skills_source.as_deref(), &repo, &harness, no_harness, dry_run.dry_run, json),
+        SkillsCommand::Check(SkillsCheckArgs { skills_source, repo, harness, no_harness, json }) => run_skills_check(skills_source.as_deref(), &repo, &harness, no_harness, json),
+        SkillsCommand::Doctor(SkillsDoctorArgs { skills_source, repo, harness, no_harness, json }) => run_skills_doctor(skills_source.as_deref(), &repo, &harness, no_harness, json),
         SkillsCommand::Show(SkillsShowArgs { name, full, json }) => run_skills_show(name.as_deref().unwrap_or(crate::guide::CORE), full, json),
     }
 }
 
-fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, dry_run: bool, json: bool) -> ExitCode {
+fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path, harness: &[String], no_harness: bool, dry_run: bool, json: bool) -> ExitCode {
+    let providers = match crate::skills::harness_flags(harness, no_harness) {
+        Ok(providers) => providers,
+        Err(err) => return ExitCode::from(skills_error(&err).emit("canon skills install", json)),
+    };
     let source = crate::skills::resolve_source(source);
     if let Some(dir) = source.as_deref().filter(|dir| !dir.join("SKILL.src.md").is_file()) {
         return match crate::skills::install(dir, target, dry_run) {
@@ -38,7 +42,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             Err(err) => ExitCode::from(skills_error(&err).emit("canon skills install", json)),
         };
     }
-    match crate::skills::install_canonical(source.as_deref(), target, providers, dry_run) {
+    match crate::skills::install_canonical(source.as_deref(), target, providers.as_deref(), dry_run) {
         Ok(report) => {
             if !dry_run && !report.changed && report.config_written.is_none() {
                 crate::json_out::mark_unchanged();
@@ -56,7 +60,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                     (true, true) => "; install lock would be rewritten",
                     (false, _) => "",
                 };
-                crate::say!(json, "canon v1 — nothing installed: no provider selected ({}){lock}{hint}", selection.describe());
+                crate::say!(json, "canon v1 — nothing installed: no harness selected ({}){lock}{hint}", selection.describe());
             } else if report.origin == crate::skills::ProviderOrigin::Flag {
                 crate::say!(json, "canon v1 — {status} ({})", selection.names());
             } else {
@@ -94,9 +98,13 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
     }
 }
 
-fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, json: bool) -> ExitCode {
+fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, harness: &[String], no_harness: bool, json: bool) -> ExitCode {
+    let providers = match crate::skills::harness_flags(harness, no_harness) {
+        Ok(providers) => providers,
+        Err(err) => return ExitCode::from(skills_error(&err).emit("canon skills check", json)),
+    };
     let source = crate::skills::resolve_source(source);
-    match crate::skills::check(source.as_deref(), target, providers) {
+    match crate::skills::check(source.as_deref(), target, providers.as_deref()) {
         Ok(report) => {
             let selection = crate::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
             if report.origin != crate::skills::ProviderOrigin::Flag {
@@ -137,9 +145,13 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
     }
 }
 
-fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, json: bool) -> ExitCode {
+fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path, harness: &[String], no_harness: bool, json: bool) -> ExitCode {
+    let providers = match crate::skills::harness_flags(harness, no_harness) {
+        Ok(providers) => providers,
+        Err(err) => return ExitCode::from(skills_error(&err).emit("canon skills doctor", json)),
+    };
     let source = crate::skills::resolve_source(source);
-    match crate::skills::doctor(source.as_deref(), target, providers) {
+    match crate::skills::doctor(source.as_deref(), target, providers.as_deref()) {
         Ok(lines) => {
             for line in &lines { crate::say!(json, "{line}"); }
             if json {
@@ -169,17 +181,13 @@ fn run_skills_show(name: &str, full: bool, json: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// A failed skills command. An unknown provider, a malformed `skills:` section or a `--skills-source` directory that does not exist is an invalid argument, a refusal (exit 2, D4); anything else is an operational failure (exit 1).
+/// A failed skills command. An install lock that names a harness canon does not know, a malformed `skills:` section or a `--skills-source` directory that does not exist is an invalid argument, a refusal (exit 2, D4); anything else is an operational failure (exit 1).
 pub(crate) fn skills_error(err: &crate::skills::SkillsError) -> CliError {
     use crate::skills::SkillsError;
     match err {
         SkillsError::Unavailable(error) => error.clone(),
-        SkillsError::InvalidProvider(value) => CliError::refused("SKILLS_ARGUMENT_INVALID", err.to_string())
-            .field("--providers")
-            .received(value.clone())
-            .expected(["claude", "codex", "omp", "pi", "none"])
-            .hint("pass `--providers` `none`, or any of claude, codex, omp, pi in lowercase joined by single commas (no space, no empty item)"),
-        SkillsError::Config(_) => CliError::refused("CONFIG_INVALID", err.to_string()).reason("SKILLS").hint("fix the `skills:` section of canon.yaml (`skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none), or pass `--providers`"),
+        SkillsError::InvalidProvider(value) => CliError::refused("SKILLS_ARGUMENT_INVALID", err.to_string()).received(value.clone()).expected(["claude", "codex", "omp", "pi"]).hint(format!("the install lock names a harness this canon does not ship for; {}", crate::skills::CHOOSE_PROVIDERS)),
+        SkillsError::Config(_) => CliError::refused("CONFIG_INVALID", err.to_string()).reason("SKILLS").hint("fix the `skills:` section of canon.yaml (`skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none), or pass `--harness` once for each provider, or `--no-harness`"),
         SkillsError::SourceNotFound(_) | SkillsError::CanonicalSourceMissing(_) => CliError::refused("SKILLS_SOURCE_NOT_FOUND", err.to_string()).field("--skills-source").hint("point `--skills-source` at a directory that holds `SKILL.src.md`, or drop it to use the text built into canon"),
         _ => CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation"),
     }

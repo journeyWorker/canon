@@ -2,6 +2,8 @@
 //! `divergence status` and `context`; `field`/`expected` on refusals; retry
 //! safety of `evidence add` and `review add`; the exit-code exceptions.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -9,7 +11,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn run(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ACTOR", "contract-d5").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env("CANON_ACTOR", "contract-d5").output().expect("spawn canon binary")
 }
 
 fn ok(dir: &Path, args: &[&str]) {
@@ -32,7 +34,7 @@ fn unchanged(answer: &Value) -> Option<bool> {
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let r = dir.path();
-    ok(r, &["init", "--providers", "none"]);
+    ok(r, &["init", "--no-harness"]);
     ok(r, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(r, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(r, &["feature", "new", "auth.login", "--title", "Login"]);
@@ -380,7 +382,7 @@ fn an_identical_repeat_of_a_write_leaf_is_unchanged_and_writes_nothing() {
     let home_dir = home.path().to_str().unwrap();
     for args in [
         &["inventory", "sync"][..],
-        &["init", "--providers", "none"],
+        &["init", "--no-harness"],
         &["gate", "install-hooks"],
         &["gate", "promote"],
         &["report", "build"],

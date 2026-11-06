@@ -160,7 +160,15 @@ an object-store tier, in which case `evidence add`, `review scenario`, `review c
 `canon artifacts verify` (`--full` re-hashes every blob) ask the store and
 refuse, never pass, when it cannot be reached. Moving an existing store with
 `canon artifacts move --tier <tier>` is the repo owner's decision, not a step
-of the loop.
+of the loop. So is `canon artifacts prune`, which deletes the blobs no record
+binds any more (the store only grows: a report written anew on every run adds a
+blob per run). A blob stays while the latest evidence or a current review binds
+it (what the gate and `artifacts verify` read), while a record not promoted yet
+binds it, and, with `--keep-days N`, while any evidence or review of the last
+`N` days binds it; the bare run previews the blobs it deletes and why the rest
+stay, and `--commit --plan-digest` deletes. A deleted local blob stays in git
+history (shrinking that history is the repo owner's call, not the command's); a
+deleted object of an object-store tier is gone for good.
 
 ### Search and trace
 
@@ -215,8 +223,11 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   your complete command set, every option of every leaf included. Run `canon schema <command> --json` only for a
   command it does not list, or after a `USAGE` refusal (read `error.field`
   and `error.expected` first). `canon schema --json` is the tree of every group and command
-  with its `effect` and `x-canon.roles` (`--as <role>` lists one role's, and `x-canon.as` names it);
-  its `options` define once the options that two or more commands share (`--repo`, `--as`, `--actor`, …)
+  with its `effect` and `x-canon.roles` (`--as <role>` lists one role's, and `x-canon.as` names it).
+  `x-canon.roles` is the string `all` for a command all four roles use, else an array of
+  role names (empty: only a human runs it), so read it as `roles == "all"` or a name in the array;
+  the root's `x-canon.rolesForm` says so once. The tree's
+  `options` define once the options that two or more commands share (`--repo`, `--as`, `--actor`, …)
   and a command names them. `canon schema <group> --json` lists a group's
   commands; `canon schema <command> --json` is the call surface of one command and nothing
   else: `options` (each name of a tree option, or an object with `valueType`, a typed
@@ -316,9 +327,9 @@ leaves below take one object only.
 
 ### Preview, then `--commit`
 
-The five commands that delete or rewrite existing data (`canon purge`,
+The six commands that delete or rewrite existing data (`canon purge`,
 `canon tier age`, `canon ledger compact`, `canon artifacts move`,
-`canon migrate`) act in two steps. The bare run previews: it writes nothing,
+`canon artifacts prune`, `canon migrate`) act in two steps. The bare run previews: it writes nothing,
 exits 0 and prints the effects and a `planDigest`. Read the effects, then act
 with `--commit --plan-digest <planDigest>`. It refuses (`PLAN_STALE`) when
 the plan differs from the one you previewed, so run the preview again. Appends
@@ -353,15 +364,15 @@ and `canon context` warn when the repo holds 0.27-era state and put
 ```bash
 # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
 canon init
-# harnesses for the canon skill; without it init takes the detected .claude/.codex/.omp/.pi (it never asks)
-canon init --providers=claude,codex
+# harnesses for the canon skill, one --harness each (--no-harness for none); without them init takes the detected .claude/.codex/.omp/.pi (it never asks)
+canon init --harness claude --harness codex
 # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing); prunes projected files the bundle no longer ships when their bytes match the lock, keeps a modified one and reports `kept:`
 canon skills install
-# any subset or none; rewrites skills.providers
-canon skills install --providers=claude,codex,omp,pi
+# any subset; rewrites skills.providers (--no-harness records none)
+canon skills install --harness claude --harness codex --harness omp --harness pi
 # read-only drift check; exit 1 (SKILLS_CHECK_FAILED) names each orphan, a projected file the bundle no longer ships
 canon skills check
-# diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
+# diagnostics, incl. a stray canon projection for an unselected harness and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
 canon skills doctor
 ```
 
@@ -372,7 +383,7 @@ Claude gets `.claude/skills/canon/`, Codex `.agents/skills/canon/`, OMP
 `.omp/skills/canon/`, Pi `.pi/skills/canon/` (the retrieve script is a sidecar,
 not an installed hook). `check` reports a stub written by another canon
 version; `install` rewrites it. The harness list lives in `canon.yaml` as
-`skills: { providers: [...] }`; change it with `canon skills install --providers=<list>`,
+`skills: { providers: [...] }`; change it with `canon skills install --harness <name>` once for each name (or `--no-harness`),
 never by assuming a default.
 
 `install` and `doctor` end with `owned-paths:`, the globs of every path

@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T06:59:05.557667Z",
+  "attachments": [
+    {
+      "case": "atip_claim15_10_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fixture_and_the_deep_report_binds",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    }
+  ],
+  "code_tree": "343ae09e077298bd79ea2fccffff72977da2da07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "5b4b203bc0f8c5745f15e055fcbc054cc649d085",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 70,
+  "scenario_id": "atip.claim15.10",
+  "schema": 1,
+  "staging_id": "0fe1e3be",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

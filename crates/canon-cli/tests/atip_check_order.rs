@@ -8,6 +8,8 @@
 //! alone (or, for two constraints, to the first rule the document lists that the call breaks). Every call runs in an empty directory with
 //! an empty environment: the stateless stage answers before any state is read.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 mod rule_support;
 

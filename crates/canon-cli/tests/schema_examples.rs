@@ -4,6 +4,8 @@
 //! documents. The examples that cannot exit 0 there are named below with the
 //! state they need, so an example that rots (or starts to work) fails here.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -40,7 +42,7 @@ const NEEDS_STATE: &[(&str, &str)] = &[
 const SKIPPED: &[(&str, &str)] = &[("dashboard", "binds a port and serves until the process is stopped")];
 
 fn canon(dir: &Path, home: &Path, args: &[String]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ACTOR", "schema-examples").env("HOME", home).env("CANON_SKILLS_SOURCE", concat!(env!("CARGO_MANIFEST_DIR"), "/../../canon/skills")).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env("CANON_ACTOR", "schema-examples").env("HOME", home).env("CANON_SKILLS_SOURCE", concat!(env!("CARGO_MANIFEST_DIR"), "/../../canon/skills")).output().expect("spawn canon binary")
 }
 
 fn ok(dir: &Path, home: &Path, args: &[&str]) {
@@ -57,7 +59,7 @@ fn fixture(home: &Path) -> TempDir {
         let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
         assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
     }
-    ok(repo, home, &["init", "--providers", "none"]);
+    ok(repo, home, &["init", "--no-harness"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);

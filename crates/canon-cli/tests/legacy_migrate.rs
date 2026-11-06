@@ -4,6 +4,8 @@
 //! files (`tests/fixtures/v0_27/`, taken from the v0.27.0 tag): its skill sources, retrieve
 //! hook script and the settings files `canon gate install-hooks` wrote.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -16,7 +18,7 @@ const PROJECTIONS: [&str; 2] = [".claude/skills/canon", ".agents/skills/canon"];
 const HOOK_COPY: &str = ".claude/hooks/canon-retrieve-pre-dispatch.sh";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").env_remove("CANON_SKILLS_SOURCE").output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(repo).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").env_remove("CANON_SKILLS_SOURCE").output().expect("spawn canon")
 }
 
 fn ok(repo: &Path, args: &[&str]) -> Output {
@@ -76,7 +78,7 @@ fn repo_027() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     git(repo, &["init", "-q"]);
-    ok(repo, &["init", "--providers", "claude,codex", "--no-agents-md", "--no-policy"]);
+    ok(repo, &["init", "--harness", "claude", "--harness", "codex", "--no-agents-md", "--no-policy"]);
     for projection in PROJECTIONS {
         std::fs::remove_dir_all(repo.join(projection)).unwrap();
     }
@@ -259,7 +261,7 @@ fn migrate_detection_a_gate_task_hook_entry_alone_is_detected_and_rewritten() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     git(repo, &["init", "-q"]);
-    ok(repo, &["init", "--providers", "none", "--no-agents-md", "--no-policy"]);
+    ok(repo, &["init", "--no-harness", "--no-agents-md", "--no-policy"]);
     let clean = json(&ok(repo, &["status", "--json"]));
     assert!(clean["meta"]["next"].as_array().is_none_or(|next| next.iter().all(|step| !step["command"].as_str().unwrap().starts_with("canon migrate"))));
     put(repo, ".codex/hooks.json", &fixture("repo/.codex/hooks.json"));
@@ -313,7 +315,7 @@ fn an_old_agents_block_alone_is_detected_and_migrated() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     git(repo, &["init", "-q"]);
-    ok(repo, &["init", "--providers", "none", "--no-agents-md", "--no-policy"]);
+    ok(repo, &["init", "--no-harness", "--no-agents-md", "--no-policy"]);
     put(repo, "AGENTS.md", &fixture("repo/AGENTS.md"));
     let status = json(&canon(repo, &["status", "--json"]));
     assert_eq!(status["meta"]["next"][0]["argv"], serde_json::json!(["migrate", "--json"]), "{}", status["meta"]);

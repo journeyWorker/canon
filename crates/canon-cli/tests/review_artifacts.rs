@@ -5,13 +5,15 @@
 //! and `canon gate check` re-checks the files of every current in-effect
 //! review by the evidence rule.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use sha2::{Digest, Sha256};
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
 }
 
 fn text(output: &Output) -> String {

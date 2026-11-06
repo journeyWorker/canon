@@ -1,0 +1,42 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T04:52:00.445165Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-fixes",
+    "canon-0-31-brief-format",
+    "canon-0-31-cli-ids",
+    "canon-0-33-atip-l0",
+    "canon-0-38-test-determinism"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-38-orch"
+    },
+    "change": "canon-0-38-test-determinism",
+    "reason": "0.38 briefs approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-38-orch"
+    },
+    "reason": "0.38 briefs approved"
+  },
+  "subject_id": "authoring-scaffold",
+  "summary": "",
+  "title": "Authoring: feature and scenario scaffolding"
+}

@@ -8,6 +8,8 @@
 //! report's version, with stderr empty. The validator is also shown to reject a
 //! document that breaks each rule, so a passing run is not vacuous.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use harness::*;

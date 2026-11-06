@@ -2,6 +2,8 @@
 //! of its condition (atip/1 spec 7.2.2), and a reason names what differs inside one condition. Against the built `canon` binary; the codes
 //! of the other scenarios the split changed are asserted by the tests of those scenarios.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -18,7 +20,7 @@ use tempfile::TempDir;
 const REGIME: &str = "dev/canon/join-spine/9c93d024b1a2";
 
 fn run(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
+    hermetic::canon().args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
 }
 
 fn body(out: &Output) -> Value {
@@ -69,13 +71,13 @@ fn repo() -> TempDir {
         let out = Command::new("git").args(args).current_dir(dir.path()).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
     }
-    ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-harness"]);
     dir
 }
 
 /// `run` with extra environment variables.
 fn run_env(dir: &Path, args: &[&str], env: &[(&str, &Path)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
     for (key, value) in env {
         command.env(key, value);
@@ -137,7 +139,7 @@ fn atip_codesplit_01_a_task_that_names_no_task_is_task_not_found_for_the_payload
     let dir = repo();
     let d = dir.path();
     let planner = |args: &[&str]| {
-        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--json").current_dir(d).env("CANON_ROLE", "planner").env_remove("CANON_ACTOR").output().unwrap();
+        let out = hermetic::canon().args(args).arg("--json").current_dir(d).env("CANON_ROLE", "planner").env_remove("CANON_ACTOR").output().unwrap();
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", String::from_utf8_lossy(&out.stdout));
     };
     planner(&["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
@@ -230,13 +232,13 @@ fn atip_codesplit_03_ending_a_run_twice_is_a_conflict_with_the_reason_already_en
 }
 
 /// atip.codesplit.04: a malformed `skills:` or `specs:` section is `CONFIG_INVALID` with the reason `SKILLS` or `SPECS`, an unknown provider is
-/// `SKILLS_ARGUMENT_INVALID`, a missing `--skills-source` is `SKILLS_SOURCE_NOT_FOUND`; each exits 2 and writes nothing.
+/// `USAGE` (the enumeration of `--harness` refuses it, since `canon-0-38-provider-option`), a missing `--skills-source` is `SKILLS_SOURCE_NOT_FOUND`; each exits 2 and writes nothing.
 #[test]
 fn atip_codesplit_04_a_broken_section_and_a_bad_provider_answer_with_their_condition_and_reason() {
     let dir = repo();
     let d = dir.path();
     let yaml = std::fs::read_to_string(d.join("canon.yaml")).unwrap();
-    refused(d, &["skills", "install", "--providers", "bogus"], "SKILLS_ARGUMENT_INVALID", None);
+    refused(d, &["skills", "install", "--harness", "bogus"], "USAGE", None);
     refused(d, &["skills", "install", "--skills-source", "no-such-dir"], "SKILLS_SOURCE_NOT_FOUND", None);
     std::fs::write(d.join("canon.yaml"), format!("{yaml}\nskills: [claude]\n")).unwrap();
     let before = tree(d);
@@ -266,7 +268,7 @@ fn atip_codesplit_05_no_brief_and_a_named_change_without_one_answer_with_their_o
     let d = dir.path();
     refused(d, &["brief", "show"], "BRIEF_REQUIRED", None);
     refused(d, &["brief", "show", "no-such-change"], "BRIEF_NOT_FOUND", None);
-    let created = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let created = hermetic::canon()
         .args(["subject", "new", "demo", "--domain", "dev", "--title", "Demo", "--json"])
         .current_dir(d)
         .env("CANON_ROLE", "planner")
@@ -274,7 +276,7 @@ fn atip_codesplit_05_no_brief_and_a_named_change_without_one_answer_with_their_o
         .output()
         .unwrap();
     assert_eq!(created.status.code(), Some(0), "{}", String::from_utf8_lossy(&created.stdout));
-    let change = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let change = hermetic::canon()
         .args(["change", "new", "add-login", "--subject", "demo", "--title", "Add login", "--json"])
         .current_dir(d)
         .env("CANON_ROLE", "planner")

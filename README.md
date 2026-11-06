@@ -22,24 +22,24 @@ canon gate check                 # run the evidence gate
 
 Run `canon <command> --help` for any explicit CLI command. `canon init` never
 asks: it installs the provider-neutral companion skill for the detected
-harnesses (or the `--providers` list), records the choice in `canon.yaml`, and
+harnesses (or the `--harness` names, or `--no-harness`), records the choice in `canon.yaml`, and
 installs it. Afterwards:
 
 ```bash
 canon skills install                         # follows canon.yaml skills.providers
-canon skills install --providers=claude,codex,omp,pi   # any subset; rewrites skills.providers
+canon skills install --harness claude --harness codex --harness omp --harness pi   # any subset; rewrites skills.providers
 canon skills check                           # read-only drift check
 canon skills doctor                          # diagnostics, never deletes
 ```
 
 The canonical projection is one directory-shaped `canon` skill per selected
-provider: Claude uses `.claude/skills/canon/SKILL.md`, Codex uses
+harness: Claude uses `.claude/skills/canon/SKILL.md`, Codex uses
 `.agents/skills/canon/SKILL.md` (the directory Codex scans for skills), and
 OMP/Pi use `.omp/skills/canon/SKILL.md` and `.pi/skills/canon/SKILL.md`. Every
-selected provider receives lazy `reference/**` and `scripts/**` sidecars.
-Without `--providers`, the commands serve `canon.yaml`'s
+selected harness receives lazy `reference/**` and `scripts/**` sidecars.
+Without `--harness` or `--no-harness`, the commands serve `canon.yaml`'s
 `skills: { providers: [...] }`; a repo without that key (set up before 0.17)
-uses the providers its install lock records; with neither, the harnesses
+uses the harnesses its install lock records; with neither, the harnesses
 whose `.claude`, `.codex`, `.omp` or `.pi` directory exists. Nothing
 undetected is ever added: with nothing detected, nothing is installed and
 the command says how to choose. OMP/Pi are project-local passive bundles; the

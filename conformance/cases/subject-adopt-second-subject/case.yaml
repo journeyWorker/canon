@@ -1,6 +1,6 @@
 description: "0.18 D4 (#28): after `canon change new refactor-core --subject perception`, `canon subject adopt refactor-core --subject editing` adds the subject, says the change now belongs to both (exit 0) and never re-points; a rerun writes nothing; `canon query --kind subject --json` lists the change under both"
 steps:
-  - args: [init, --providers, none]
+  - args: [init, --no-harness]
     exit: 0
   - args: [subject, new, perception, --domain, dev, --title, Perception]
     exit: 0

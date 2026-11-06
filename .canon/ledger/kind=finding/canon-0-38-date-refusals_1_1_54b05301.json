@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-date-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-38-date-rev"
+  },
+  "at": "2026-11-06T18:37:52.886989Z",
+  "change_id": "canon-0-38-date-refusals",
+  "code_tree": "ca57826d766b036bf5441d11c4f7f646f7454fb5",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md:59-63",
+  "introduced_by": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "kind": "finding",
+  "resolution_code_tree": "be514fdfebb3ec27fcc3f3810955bb3a85db1757",
+  "resolution_sha": "a144e3d5969bb38054ec583245179741a1b7cdf3",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "reviewer": "rev-0-38-date-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "(scenarios atip.daterefusals.04) [spec fidelity + standards] The Breaking row says every listed value is refused with a message naming `2030-01-02T00:00:00Z` and moves to 'the next day's `00:00:00Z`'. Real binary (built at 66d909b85): 10:00:60Z names 10:01:00Z, 23:59:60.5Z names 2030-01-02T00:00:00.500Z, 23:59:60+01:00 names 2030-01-01T23:00:00Z; only 23:59:60Z (UTC) names the next midnight. A caller who follows the row for 10:00:60Z writes a different instant (14 h off), and the row contradicts the message it quotes. The implementer's message is right (the same instant); the CHANGELOG sentence is not, and atip.daterefusals.04/05 pin the wrong phrase (`write the next day's `00:00:00Z``). Fix: say 'write the instant one second after the :59 of that minute (what the message gives; for 23:59:60Z in UTC that is the next day's 00:00:00Z)' in the row and the paragraph, split or reword the 0.38 column, and change the phrase tests 04 and 05 pin. Blast radius: the brief F4 and scenario 01/04 sentences carry the same 'next day's midnight' wording; the checks do not read the 10:00:60Z, fraction or offset spellings in the row.",
+  "worktree_dirty": false
+}

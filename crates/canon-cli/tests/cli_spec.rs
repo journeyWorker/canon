@@ -6,10 +6,12 @@
 //! rewrites it. The other tests hold the spec to the tree it describes and
 //! the `canon completion` leaf to its contract.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_cli::cli;
 use canon_cli::spec::{self, INTERNAL_ENV, SPEC_PATH};
@@ -21,7 +23,7 @@ fn repo_root() -> PathBuf {
 
 fn canon(args: &[&str]) -> Output {
     let dir = tempfile::tempdir().expect("tempdir");
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir.path()).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir.path()).output().expect("spawn canon binary")
 }
 
 #[test]

@@ -31,8 +31,9 @@
 //! registry, is `USAGE` with the option as `field`.
 //!
 //! `roles` says which roles' steps use a command ([`CommandMeta::roles`]); it travels in
-//! `x-canon.roles`. Bare `canon schema` lists every command, and `--as <ROLE>` lists only
-//! that role's (`CANON_ROLE` never filters it). A command whose effect depends on its
+//! `x-canon.roles` as the string `all` when every role's steps use the command, else as the
+//! array of role names (empty: humans only); the root of the tree says so once. Bare `canon schema` lists every command, and `--as <ROLE>` lists only
+//! that role's, reading `all` as every role (`CANON_ROLE` never filters it). A command whose effect depends on its
 //! arguments carries `effectNote`.
 
 use clap::Command;
@@ -67,7 +68,22 @@ const fn row(path: &'static str, effect: Effect, roles: &'static [Role]) -> Comm
     CommandMeta { path, effect, effect_note: None, roles }
 }
 
+/// What `x-canon.roles` holds for a command the steps of all four roles use (0.38): the string, in place of the four names.
+pub const ROLES_ALL: &str = "all";
+
+/// What the root of the tree says, once, about the two forms of `x-canon.roles` (0.38).
+pub const ROLES_FORM: &str = "x-canon.roles of a command is the string all (every role) or an array of role names; an empty array is humans only";
+
 impl CommandMeta {
+    /// The value of `x-canon.roles` of the command: `all` when every role's steps use it, else the array of role names.
+    pub fn roles_value(&self) -> serde_json::Value {
+        if crate::role::ALL.iter().all(|role| self.roles.contains(role)) {
+            serde_json::Value::String(ROLES_ALL.to_string())
+        } else {
+            serde_json::Value::Array(self.roles.iter().map(|role| serde_json::Value::String(role.as_str().to_string())).collect())
+        }
+    }
+
     const fn note(mut self, note: &'static str) -> Self {
         self.effect_note = Some(note);
         self
@@ -85,6 +101,7 @@ pub const META: &[CommandMeta] = &[
     row("adapter authorize", Read, &[O]),
     row("adapter validate", Read, &[O]),
     row("artifacts move", Destructive, &[O]),
+    row("artifacts prune", Destructive, &[O]),
     row("artifacts verify", Read, &[O]),
     row("brief approve", Write, HUMAN),
     row("brief show", Read, &[P, R]),
@@ -674,8 +691,13 @@ fn print_warning(code: &str, json: bool) -> u8 {
 
 /// The roles of a document's `x-canon`, as a line.
 fn roles_line(extensions: &std::collections::BTreeMap<String, serde_json::Value>) -> Option<String> {
-    let roles = extensions.get("x-canon")?.get("roles")?.as_array()?;
-    Some(if roles.is_empty() { "humans only".to_string() } else { roles.iter().filter_map(serde_json::Value::as_str).collect::<Vec<_>>().join(", ") })
+    let roles = extensions.get("x-canon")?.get("roles")?;
+    let names: Vec<&str> = match roles.as_str() {
+        Some(ROLES_ALL) => crate::role::ALL.iter().map(|role| role.as_str()).collect(),
+        Some(_) => return None,
+        None => roles.as_array()?.iter().filter_map(serde_json::Value::as_str).collect(),
+    };
+    Some(if names.is_empty() { "humans only".to_string() } else { names.join(", ") })
 }
 
 fn print_entries(entries: &[atip::doc::TreeEntry]) {

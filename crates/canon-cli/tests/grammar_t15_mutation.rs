@@ -13,6 +13,8 @@
 //! CI runs it as its own job. `CARGO_TARGET_DIR` (default: this repo's `target`)
 //! holds the dependencies already built, which the copy reuses.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::path::{Path, PathBuf};

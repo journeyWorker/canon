@@ -5,5 +5,4 @@ pub const SAMPLES: &[(&str, &str, &str)] = &[
     ("retrieve", "regime", "reviewer/canon/join-spine/9c93d024b1a2"),
     // A value inside the domain: a call that breaks a relation must break only that (the domains answer before the constraints).
     ("init", "language", "ko"),
-    ("init", "providers", "claude"),
 ];

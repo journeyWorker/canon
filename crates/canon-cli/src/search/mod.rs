@@ -255,7 +255,7 @@ fn format_search(report: &SearchReport) -> String {
 
 /// `canon trace <id>`.
 pub(crate) fn run_trace(args: TraceArgs) -> ExitCode {
-    let TraceArgs { id, repo, json } = args;
+    let TraceArgs { trace: id, repo, json } = args;
     let command = "canon trace";
     // A refusal changes nothing (spec 8.2): the index file is derived state, and a run that refuses must not
     // create or rewrite it. The operand is judged first, then against an index that is only read, or built in
@@ -267,7 +267,7 @@ pub(crate) fn run_trace(args: TraceArgs) -> ExitCode {
             trace::TraceError::NotFound => CliError::refused("TRACE_NOT_FOUND", format!("no record says `{id}`; it takes {shapes}")).hint("pass an id a record carries: `canon query --kind finding` shows finding keys, `canon query --kind review --json` review ids"),
             trace::TraceError::Ambiguous(shas) => CliError::refused("TRACE_CONFLICT", format!("`{id}` is the start of more than one commit ({}); it takes {shapes}", shas.join(", "))).expected(shas.clone()).hint("pass more characters of the sha"),
         };
-        ExitCode::from(error.field("ID").emit("canon trace", json))
+        ExitCode::from(error.field("TRACE_ID").emit("canon trace", json))
     };
     if !trace::is_recognized(&id) {
         return refusal(&trace::TraceError::Unrecognized);

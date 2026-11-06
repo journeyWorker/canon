@@ -129,6 +129,6 @@ artifacts:
 
 # Harnesses the canon skill is installed for: any of claude, codex, omp, pi
 # (`[]` for none). `canon skills install|check|doctor` follow this list;
-# `canon skills install --providers=<list>` rewrites it.
+# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.
 skills:
   providers: [claude, codex, omp, pi]

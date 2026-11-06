@@ -24,7 +24,7 @@ class	CLASS	evidence class
 command	TEXT	command line a hook runs
 command-result	TEXT	captured output backing a summary
 commit	-	mode: act on the previewed plan
-contradicting-trajectory	ID	trajectory that contradicts a strategy
+contradicting-trajectory	TRAJECTORY_ID	trajectory that contradicts a strategy
 cursor	CURSOR	paging position
 detail	TEXT	free-text detail of a record
 dialect	NAME	plan dialect
@@ -35,7 +35,7 @@ dry-run	-	mode: validate fully and write nothing
 error	CODE	error code to explain
 errors	-	mode: list every error code
 evaluation	FILE	evaluation bundle
-evaluator	ID	external evaluator
+evaluator	EVALUATOR_ID	external evaluator
 evaluator-digest	DIGEST	digest of the external evaluator
 evaluator-version	TEXT	version of the external evaluator
 event	NAME	hook event
@@ -47,6 +47,7 @@ file-ref	TEXT	place in the tree a finding points at
 flow	FLOW_ID	flow of the original spec
 for-role	ROLE	role the retrieved guidance is for
 full	-	mode: re-hash every blob
+harness	NAME	a harness the canon skill is installed for (repeatable, one per name: init and skills)
 hash	HASH	regime hash segment
 history	-	mode: every version of a record
 home	DIR	home directory sessions are scanned under
@@ -56,6 +57,7 @@ interval-secs	N	seconds between polls
 introduced-rev	REV	commit that introduced a defect
 introduced-unknown	-	mode: the introducing commit is not known
 json	-	mode: print the enveloped document
+keep-days	N	keep the blobs the records of the last N days bind
 kind	KIND	record kind
 lane	NAME	lane tag of a scenario
 language	TAG	language of generated prose
@@ -65,6 +67,7 @@ matcher	TEXT	hook matcher
 max-artifact-mib	N	size cap of one bound artifact in MiB
 model	NAME	declared model
 no-agents-md	-	mode: leave AGENTS.md alone
+no-harness	-	mode: choose no harness for the canon skill
 no-policy	-	mode: write no starter policy
 no-promote	-	mode: keep a staged record staged
 note	TEXT	free-text note on a record
@@ -83,7 +86,6 @@ project	PROJECT_ID	spec root a record belongs to
 promote	-	mode: promote the record staged in this run
 prompt-bundle	NAME@VERSION	prompt bundle version
 provider	NAME	declared provider
-providers	LIST	comma list of harness providers
 reason	TEXT	why a record or refusal waiver exists
 ref	TEXT	what the evidence refers to
 regime	KEY	full regime key
@@ -114,7 +116,7 @@ session	SESSION_ID	agent session
 severity	SEVERITY	severity of a finding
 signature-file	FILE	detached signature
 since	TIMESTAMP	records at or after a time
-skill	ID	skill
+skill	SKILL_ID	skill
 skill-digest	DIGEST	digest of a skill
 skills-source	DIR	directory the skills are read from
 snapshot	DIR	dashboard snapshot directory

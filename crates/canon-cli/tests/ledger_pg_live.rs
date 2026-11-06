@@ -10,6 +10,8 @@
 //! Every test builds its own repo from `tests/fixtures/ledger-0.29` and its own Postgres schema (named
 //! per run), so the schema holds exactly the rows the test seeded.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -181,7 +183,7 @@ impl PgRepo {
     fn json(&self, args: &[&str]) -> (Value, Output) {
         let mut all = args.to_vec();
         all.push("--json");
-        let out = Command::new(env!("CARGO_BIN_EXE_canon"))
+        let out = hermetic::canon()
             .args(&all)
             .current_dir(self.path())
             .env_remove("CANON_ROLE")

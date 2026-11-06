@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T06:59:05.557667Z",
+  "attachments": [
+    {
+      "case": "atip_codestored_08_an_unwritable_target_is_denied_or_invalid_and_a_wrong_ledger_root_has_no_archive",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    }
+  ],
+  "code_tree": "343ae09e077298bd79ea2fccffff72977da2da07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "5b4b203bc0f8c5745f15e055fcbc054cc649d085",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 219,
+  "scenario_id": "atip.codestored.08",
+  "schema": 1,
+  "staging_id": "eb8611df",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

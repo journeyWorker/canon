@@ -172,6 +172,32 @@ uploads, reads back and verifies every local blob, then writes the
 `.canon/artifacts/`; commit the removals, `.gitignore` and `canon.yaml`. It is
 resumable and a second run finds nothing to do.
 
+The store only grows: a report written anew on every run adds a blob per run.
+`canon artifacts prune [--keep-days N]` (a preview; `--commit --plan-digest
+<digest>` acts) deletes the blobs no record binds. It keeps a blob for every
+reason that holds, and the preview names them: `latest-evidence` (the latest
+evidence per task and per `(project_id, scenario_id)` binds it, what the gate and
+`artifacts verify` read), `current-review` (a review still in effect binds it),
+`staged` (a record not promoted yet binds it) and `within-keep-days` (with
+`--keep-days N`, evidence or a review of the last `N` days, in the ledger or its
+archive, binds it). Everything else in the configured store goes: the local
+directory, or the objects of the tier `artifact_store:` names by the same rule
+(a copy left in the local directory of such a repo is judged by it too). The
+preview counts the blobs and bytes that go and stay, lists the blobs to delete
+a page at a time (`--limit`, `--cursor`, `--all`) and offers no `--commit` when
+there is nothing to delete. The plan digest covers the blobs to delete, the
+blobs to keep with their reasons and every record read, so evidence added since
+the preview is `PLAN_STALE` and nothing is deleted. A repo whose records,
+staging area or archive cannot be read in full is refused: a blob is never
+deleted on a guess. After a prune, `artifacts verify` and `gate check` answer as
+they did. A deleted local blob leaves the working tree: commit the removal. It
+stays in git history, and shrinking that history is the repo owner's call, not
+the command's. A deleted object of a tier cannot be undone, and the preview says
+so with the object count. A delete that fails stops the run: with nothing deleted yet
+it is `ARTIFACTS_STORE_FAILED` (an object) or `WRITE_FAILED` (a local file); after
+some, `ARTIFACTS_PRUNE_INCOMPLETE` names what was deleted, and a new preview
+lists what remains.
+
 ## What `canon report build` does and doesn't read
 
 canon exposes layered `stg_`/`int_`/`mart_` query views; `canon report build`
@@ -290,13 +316,13 @@ skills:
   providers: [claude, codex]   # any of claude, codex, omp, pi; [] for none
 ```
 
-`canon init` writes it and never asks: `--providers a,b` (or `none`) is the
+`canon init` writes it and never asks: `--harness a --harness b` (or `--no-harness`) is the
 answer; without it init takes the harnesses whose
 `.claude`, `.codex`, `.omp` or `.pi` directory exists, and with none detected
 it writes only a commented example
 and installs nothing. `.agents` alone never selects Codex. `canon skills
 install|check|doctor` follow the section; `install` prunes projected files the bundle no longer ships when their bytes match the lock (a modified one stays, reported as `kept:`), `check` exits 1 (`SKILLS_CHECK_FAILED`) naming each orphan and `doctor` prints `orphan:` lines; `canon skills install
---providers=<list>` rewrites it in place. Without the section they use the
+--harness <name>` (once for each name) or `--no-harness` rewrites it in place. Without the section they use the
 install lock's providers, then the detected ones; nothing undetected is ever
 added. A present section that is not this shape, or names another harness,
 fails those commands (exit `1`), and `canon init --check` reports
@@ -381,7 +407,7 @@ retry (the command exits `2` and writes no record).
 ## The repository write lock
 
 A committed destructive command (`canon purge`, `canon tier age`, `canon ledger
-compact`, `canon artifacts move`, `canon migrate`) recomputes its plan, checks
+compact`, `canon artifacts move`, `canon artifacts prune`, `canon migrate`) recomputes its plan, checks
 its digest and then makes the effects, and nothing may change the plan in
 between. It holds an OS file lock on `.canon/repo-write.lock` for the whole
 span, from before it recomputes the plan to after its last effect; a preview

@@ -1,6 +1,7 @@
 //! The removed-spellings table: every removed spelling (a command, a bare group
 //! that used to run, an option) with the spelling that replaced it: the 0.27
-//! spellings 0.28 replaced, and the 0.30 `--<noun>-id` options 0.31 made bare nouns.
+//! spellings 0.28 replaced, the 0.30 `--<noun>-id` options 0.31 made bare nouns,
+//! and the 0.37 `--providers` list 0.38 made the repeatable `--harness`.
 //!
 //! One data table, three consumers: [`crate::removed`] reads it to turn an old
 //! spelling into a usage error (exit 2, `error.hint` names the replacement,
@@ -46,6 +47,8 @@ pub struct Row {
 const V28: &str = "0.28.0";
 /// The release that made every id option a bare noun (`--actor-id` became `--actor`).
 pub const V31: &str = "0.31.0";
+/// The release that made the harness list a repeatable `--harness` (`--providers` was removed).
+pub const V38: &str = "0.38.0";
 
 const fn command(old: &'static str, new: &'static str, note: &'static str, rule: &'static str) -> Row {
     Row { kind: Kind::Command, old, scope: &[], new, note, rule, since: V28, operand: false }
@@ -73,6 +76,7 @@ const CHANGE_OPERAND: &[&str] = &["brief show", "brief check", "brief approve"];
 const SCENARIO_OPERAND: &[&str] = &["divergence add", "divergence defer", "divergence resolve", "divergence accept"];
 const REVIEWER: &[&str] = &["divergence add", "divergence defer", "divergence resolve", "divergence accept", "finding add", "review scenario", "review change"];
 const SKILLS: &[&str] = &["skills install", "skills check", "skills doctor"];
+const HARNESS_COMMANDS: &[&str] = &["init", "skills install", "skills check", "skills doctor"];
 const DESTRUCTIVE: &[&str] = &["artifacts move", "ledger compact", "migrate", "purge", "tier age"];
 
 /// Every removed spelling, in the order of the table's 0.27 → 0.28 sections.
@@ -179,6 +183,17 @@ pub const ROWS: &[Row] = &[
     bare_noun("--review-id", &["finding add"], "--review"),
     bare_noun("--plugin-id", &["query"], "--plugin"),
     bare_noun("--contradicting-trajectory-id", &["strategy rollback"], "--contradicting-trajectory"),
+    // ── 0.38: the harness list is a repeatable option ──
+    Row {
+        kind: Kind::Option,
+        old: "--providers",
+        scope: HARNESS_COMMANDS,
+        new: "--harness",
+        note: "once for each name; `--no-harness` for none",
+        rule: "a list is a repeatable option",
+        since: V38,
+        operand: false,
+    },
 ];
 
 #[cfg(test)]

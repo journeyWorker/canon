@@ -5,6 +5,8 @@
 //! chore asks instead for one change-level review of the chore itself. Records carry explicit times so the order is the test's, not the
 //! clock's.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -51,7 +53,7 @@ fn repo() -> TempDir {
 }
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").output().expect("spawn canon binary")
 }
 
 fn stdout(o: &Output) -> String {

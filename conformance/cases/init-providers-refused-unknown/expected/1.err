@@ -1,3 +1,4 @@
-canon: INIT_ARGUMENT_INVALID: --providers is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)
-  field: --providers
-  hint: a working call: canon init; `canon schema init --json` lists the domain of each argument
+canon: USAGE: invalid value 'gemini' for '--harness <NAME>'
+  field: --harness
+  expected: claude, codex, omp, pi
+  hint: a working call: canon init; `canon schema init --json` lists every argument

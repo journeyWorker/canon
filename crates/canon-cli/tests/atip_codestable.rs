@@ -55,9 +55,9 @@ fn table_problems(changelog: &str) -> Vec<String> {
     for row in &rows {
         problems.extend(row_problems(row, &fixture, &targets));
     }
-    // Every code of the registry is the new name or the kept name of some row.
+    // Every code of the registry is the new name or the kept name of some row, or was registered after 0.36.
     let named: BTreeSet<&str> = rows.iter().flat_map(|row| row.new.iter().map(String::as_str)).collect();
-    for info in canon_cli::cli_error::all_codes() {
+    for info in canon_cli::cli_error::all_codes().iter().filter(|info| !old_codes::ADDED_AFTER_0_36.contains(&info.code)) {
         if !named.contains(info.code) {
             problems.push(format!("the registry's `{}` is the new name of no row", info.code));
         }

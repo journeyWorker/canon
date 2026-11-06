@@ -1,11 +1,13 @@
 //! D6 (0.28): the old spellings of the destructive leaves and of the leaves
 //! renamed with them are usage errors that name the new form.
 
-use std::process::{Command, Output};
+#[path = "support/hermetic.rs"]
+mod hermetic;
+use std::process::Output;
 
 fn canon(args: &[&str]) -> Output {
     let dir = tempfile::tempdir().unwrap();
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--json").current_dir(dir.path()).output().expect("spawn canon")
+    hermetic::canon().args(args).arg("--json").current_dir(dir.path()).output().expect("spawn canon")
 }
 
 fn usage_hint(args: &[&str]) -> String {

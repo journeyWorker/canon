@@ -1,13 +1,15 @@
 //! 0.30 `canon-0-30-record-links`: one test per scenario of the change, through the real binary.
 //! Each test name starts with its scenario id (`review.add.101` → `review_add_101_…`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::Value;
 
 fn canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).env_remove("CANON_ROLE").output().expect("spawn canon")
+    hermetic::canon().args(args).current_dir(cwd).env_remove("CANON_ROLE").output().expect("spawn canon")
 }
 
 fn json(output: &Output) -> Value {

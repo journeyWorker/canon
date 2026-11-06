@@ -181,7 +181,7 @@ pub struct EvidenceAuditArgs {
     #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = crate::cli::safe_min1)]
     pub max_artifact_mib: u64,
     /// The external evaluator that re-audited the scenario (canon never runs it)
-    #[arg(long = "evaluator", value_name = "ID")]
+    #[arg(long = "evaluator", value_name = "EVALUATOR_ID")]
     pub evaluator_id: String,
     /// The evaluator's version
     #[arg(long, value_name = "TEXT")]

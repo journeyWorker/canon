@@ -7,8 +7,8 @@ use std::process::ExitCode;
 pub fn run(cmd: ContextPackCommand) -> ExitCode {
     match cmd {
         ContextPackCommand::Add(args) => run_context_pack_add(args),
-        ContextPackCommand::Show(ContextPackShowArgs { id, repo, json }) => run_context_pack_show(&repo, &id, json),
-        ContextPackCommand::Verify(ContextPackVerifyArgs { id, repo, json }) => run_context_pack_verify(&repo, &id, json),
+        ContextPackCommand::Show(ContextPackShowArgs { pack, repo, json }) => run_context_pack_show(&repo, &pack, json),
+        ContextPackCommand::Verify(ContextPackVerifyArgs { pack, repo, json }) => run_context_pack_verify(&repo, &pack, json),
     }
 }
 

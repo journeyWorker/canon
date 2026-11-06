@@ -78,7 +78,7 @@ pub struct StrategyRollbackArgs {
     #[arg(long, value_name = "TIMESTAMP")]
     pub approval_at: String,
     /// A trajectory that contradicts the strategy (must exist in the trajectory store)
-    #[arg(long = "contradicting-trajectory", value_name = "ID")]
+    #[arg(long = "contradicting-trajectory", value_name = "TRAJECTORY_ID")]
     pub contradicting_trajectory_id: Option<String>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

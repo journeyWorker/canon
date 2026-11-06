@@ -9,11 +9,13 @@
 //! only adds a `canon.yaml` to exercise the backend-capability-derived
 //! WARN/note.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stderr(output: &Output) -> String {

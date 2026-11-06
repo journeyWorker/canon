@@ -95,7 +95,7 @@ pub fn rules_for(path: &str) -> Vec<Rule> {
 
 /// The relations that used to be clap's own (`conflicts_with`, `ArgGroup`), in the order the command documents list them.
 const PORTED: &[(&str, &[Rule])] = &[
-    ("init", &[Rule::at_most_one(&["check", "no-agents-md"]), Rule::at_most_one(&["check", "policy", "no-policy"]), Rule::at_most_one(&["check", "providers"]), Rule::at_most_one(&["check", "language"]), Rule::at_most_one(&["check", "dry-run"])]),
+    ("init", &[Rule::at_most_one(&["check", "no-agents-md"]), Rule::at_most_one(&["check", "policy", "no-policy"]), Rule::at_most_one(&["check", "harness", "no-harness"]), Rule::at_most_one(&["check", "language"]), Rule::at_most_one(&["check", "dry-run"])]),
     ("migrate", &[Rule::at_most_one(&["revert", "relayed-via"])]),
     ("query", &[Rule::at_most_one(&["plugin", "history"])]),
     ("review change", &[Rule::exactly_one(&["upstream-ref", "original-spec-ref"])]),
@@ -225,9 +225,6 @@ pub const SESSION_ID: &str = concat!("^[^\\p{Cc}", white_space!(), "]([^\\p{Cc}]
 pub const TIMESTAMP: &str = "^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2}))?$";
 /// A time as `--approval-at` reads it: an RFC 3339 date-time and nothing else, the spelling of [`TIMESTAMP`] with a time.
 pub const DATE_TIME: &str = "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[-+][0-9]{2}:[0-9]{2})$";
-/// `--providers` of `init` and of the `skills` commands (0.37 `canon-0-37-option-forms`): `none`, or one or more of `claude`, `codex`, `omp`, `pi` (lowercase)
-/// joined by single commas: no white space, no empty item, `none` alone. A name written twice is taken.
-pub const PROVIDERS: &str = "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$";
 /// Text with at least one character that is not white space.
 pub const NOT_BLANK: &str = concat!("^", any_char!(), "*", not_white_space!(), any_char!(), "*$");
 /// One line (no line separator), possibly empty.
@@ -246,12 +243,13 @@ pub const SHA256_HEX: &str = "^[0-9a-f]{64}$";
 
 // -------------------------------------------------------------------- shared
 
-/// The rows every command shares: the safety pair of the five destructive leaves, the id grammars by value name, and
+/// The rows every command shares: the safety pair of the six destructive leaves, the id grammars by value name, and
 /// the time grammar.
 static SHARED: Tables = Tables {
     rules: &[
         ("purge", SAFETY),
         ("artifacts move", SAFETY),
+        ("artifacts prune", SAFETY),
         ("migrate", SAFETY),
         ("ledger compact", SAFETY),
         ("tier age", SAFETY),
@@ -278,8 +276,9 @@ static SHARED: Tables = Tables {
             .inside(&["2030-01-01T00:00:00Z", "2030-01-01t10:00:00z", "2030-01-01T10:00:00.123456789+09:00", "2030-01-01T10:00:00-02:00"])
             .outside(&["tomorrow", "2030-01-01", "2030-1-1T10:00:00Z", " 2030-01-01T10:00:00Z", "2030-01-01T10:00:00Z ", "+2030-01-01T10:00:00Z", "2030-01-01 10:00:00Z", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "2030-01-01T10:00:00\u{2212}02:00"]),
         // The most records or hits per page, and the size limit of a bound file: at least 1 (clap's `range(1..)`).
-        DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search", "retrieve"], "limit"), Domain::at_least(1), "USAGE"),
+        DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search", "retrieve", "artifacts prune"], "limit"), Domain::at_least(1), "USAGE"),
         DomainRow::new(Scope::Everywhere("max-artifact-mib"), Domain::at_least(1), "USAGE"),
+        DomainRow::new(Scope::Everywhere("keep-days"), Domain::at_least(1), "USAGE"),
     ],
 };
 

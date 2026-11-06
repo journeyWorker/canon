@@ -45,7 +45,7 @@ Commands without a group word.
 | `canon search` | `<text>` | none | 읽기: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding --json` |
 | `canon selftest` | none | none | 읽기: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate --json` |
 | `canon status` | none | none | 읽기: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status --json` |
-| `canon trace` | `<id>` | none | 읽기: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1 --json` |
+| `canon trace` | `<trace-id>` | none | 읽기: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1 --json` |
 {/* canon:generated cli-top end */}
 
 ### `canon adapter`
@@ -67,6 +67,7 @@ Check or move the evidence artifact store (local, or an object-store tier).
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
 | `canon artifacts move` | none | `--tier <TIER>` | 파괴적 (미리보기 후 `--commit --plan-digest`): Move the local artifact blobs to an object-store tier, verify them, and remove the local copies | `canon artifacts move --tier cold --json` |
+| `canon artifacts prune` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes) | `canon artifacts prune --keep-days 30 --json` |
 | `canon artifacts store` | none | none | 쓰기: Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/) | `canon artifacts store --json` |
 | `canon artifacts verify` | none | none | 읽기: Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes) | `canon artifacts verify --json` |
 {/* canon:generated cli-artifacts end */}
@@ -151,7 +152,7 @@ Author a staged, attributed evidence attestation for a plan task.
 |---|---|---|---|---|
 | `canon evidence add` | none | none | 쓰기: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer --json` |
 | `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | 읽기: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --json` |
-| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | 쓰기: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json` |
+| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <EVALUATOR_ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | 쓰기: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json` |
 {/* canon:generated cli-evidence end */}
 
 ### `canon feature`
@@ -303,7 +304,7 @@ Install canon's agent guides into a repo.
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
 | `canon skills check` | none | none | 읽기: Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote | `canon skills check --json` |
-| `canon skills doctor` | none | none | 읽기: Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits | `canon skills doctor --json` |
+| `canon skills doctor` | none | none | 읽기: Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a harness that is not selected, and other skills whose description claims build work; reports only, never edits | `canon skills doctor --json` |
 | `canon skills install` | none | none | 쓰기: Install the canonical `canon` bundle or legacy developer skills | `canon skills install --json` |
 | `canon skills show` | `<name>` (optional) | none | 읽기: Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here | `canon skills show canon --full --json` |
 {/* canon:generated cli-skills end */}
@@ -376,7 +377,9 @@ canon schema --warnings --json    # 모든 경고 코드(meta.warnings)와 의�
 (`--repo`, `--as`, `--actor`, `--session`, `--role` 등)을 한 번만 정의하고, 명령은
 그 옵션을 되풀이하지 않고 이름으로 가리킵니다. `commands`는 모든 그룹과 명령이 한
 번씩, 그룹이 자기 명령 앞에 오고, 각 항목에 `command`, `summary`, 명령이면 `effect`와
-`x-canon.roles`, 그룹이면 `kind: "group"`이 있습니다. `path`는 없습니다. `group`에는
+`x-canon.roles`, 그룹이면 `kind: "group"`이 있습니다. `path`는 없습니다. `x-canon.roles`는
+네 역할이 모두 쓰는 명령이면 문자열 `"all"`이고, 아니면 역할 이름 배열입니다(빈 배열은 사람만
+쓰는 명령). 트리 최상위의 `x-canon.rolesForm`이 이를 한 번 말합니다. `group`에는
 `command`, `summary`와 직접 자식 `commands`가 있습니다. `command` 문서는 호출 표면만
 담습니다: `summary`, `effect`(`read`, `write`, `destructive`), `idempotency`(읽기는
 없음), `effectNote`, `operands`, `options`(트리 옵션을 가리키는 이름, 또는 `name`,
@@ -392,7 +395,7 @@ canon schema --warnings --json    # 모든 경고 코드(meta.warnings)와 의�
 `INPUT_CONFLICT`, `INPUT_TOO_LARGE`, `BATCH_INCOMPLETE`, `PLAN_STALE`(`--commit`이 있을
 때), `CURSOR_INVALID`(`--cursor`가 있을 때)는 내재되어 `errors`에 없습니다.
 `--commit`과 `--plan-digest`는 그것을 제공하는 명령(`purge`, `artifacts move`,
-`migrate`, `ledger compact`, `tier age`)에만 이름으로 실려, 문서만 보고 맨 호출이
+`artifacts prune`, `migrate`, `ledger compact`, `tier age`)에만 이름으로 실려, 문서만 보고 맨 호출이
 미리보기인지 알 수 있습니다. 출력마다 JSON Schema 이름(`schemaRef`, `#/schemas/<Name>`)이
 있고, 배열이나 NDJSON `--input`의 보고서는 `batch: true`입니다. `input`에는 병합 뒤
 인수의 스키마(`argumentsRef`)와 완전한 `example` 하나가 있습니다. `examples`는 `--json`으로
@@ -588,7 +591,7 @@ canon skills show role-implementer
 ### 파괴적 명령은 계획이 먼저입니다
 
 삭제하거나 기존 데이터를 다시 쓰는 `purge`, `tier age`, `ledger compact`,
-`artifacts move`, `migrate`는 **미리보기가 기본**입니다. `--commit` 없이 실행하면
+`artifacts move`, `artifacts prune`, `migrate`는 **미리보기가 기본**입니다. `--commit` 없이 실행하면
 `planDigest`와 `effects`를 출력하고 아무것도 바꾸지 않으며 exit `0`입니다.
 실제로 실행하려면 `--commit --plan-digest <planDigest>`를 줍니다. 지금 다시 계산한
 plan의 digest가 같을 때만 실행하고, 아니면 `PLAN_STALE`입니다. 이 명령들에

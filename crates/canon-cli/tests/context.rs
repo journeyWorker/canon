@@ -11,8 +11,10 @@
 //! sibling `canon fmt --check` run (also spawned) proves has real
 //! violations.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 /// The exact corpus `fmt_check.rs`'s own
 /// `fmt_check_exits_nonzero_and_lists_audited_gap_categories` test proves
@@ -25,7 +27,7 @@ fn violating_corpus() -> PathBuf {
 }
 
 fn run_canon(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).output().expect("spawn canon binary")
+    hermetic::canon().args(args).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -75,7 +77,7 @@ fn context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check()
 #[test]
 fn context_with_no_repo_flag_defaults_to_cwd_and_still_exits_zero() {
     let dir = tempfile::tempdir().unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_canon")).arg("context").current_dir(dir.path()).output().expect("spawn canon binary");
+    let output = hermetic::canon().arg("context").current_dir(dir.path()).output().expect("spawn canon binary");
     assert!(output.status.success(), "canon context with no --repo must default to `.` and still exit 0");
     assert!(stdout(&output).contains("kinds (14):"));
 }
@@ -98,7 +100,7 @@ fn context_from_a_subdirectory_resolves_the_ancestor_repo_root_policy() {
     let subdir = repo.path().join("nested").join("deep");
     std::fs::create_dir_all(&subdir).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_canon")).args(["context", "--json"]).current_dir(&subdir).output().expect("spawn canon binary");
+    let output = hermetic::canon().args(["context", "--json"]).current_dir(&subdir).output().expect("spawn canon binary");
     assert!(output.status.success(), "canon context from a subdirectory must still exit 0; stderr: {}", String::from_utf8_lossy(&output.stderr));
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("--json output must parse as JSON");

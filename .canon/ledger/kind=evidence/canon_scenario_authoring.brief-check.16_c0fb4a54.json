@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T07:11:28.187537Z",
+  "code_tree": "343ae09e077298bd79ea2fccffff72977da2da07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec028_b brief_check_16"
+  },
+  "evidence_note": {
+    "summary": "canon-0-38 test-determinism: command re-run on the merged tree: cargo nextest run --workspace (3887 tests, none failed; the tests of this record passed)"
+  },
+  "evidence_sha": "5b4b203bc0f8c5745f15e055fcbc054cc649d085",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 841,
+  "scenario_id": "authoring.brief-check.16",
+  "schema": 1,
+  "staging_id": "c09ea4e7",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

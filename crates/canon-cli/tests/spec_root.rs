@@ -5,6 +5,8 @@
 //! Read-only commands are not checked: a filter on an id no root carries
 //! matches nothing and writes nothing.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -27,7 +29,7 @@ const FEATURE: &str = "Feature: cart add
 const JUNIT: &str = "<testsuite>\n  <testcase classname=\"cart\" name=\"cart.add.01 adds\"/>\n</testsuite>\n";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
 }
 
 fn stdout(output: &Output) -> String {

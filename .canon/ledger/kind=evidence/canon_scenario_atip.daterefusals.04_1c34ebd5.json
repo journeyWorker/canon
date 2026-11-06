@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-date-refusals",
+    "role": "implementer",
+    "session_id": "s-0-38-date-refusals"
+  },
+  "at": "2026-11-06T18:19:03.982679Z",
+  "attachments": [
+    {
+      "case": "atip_daterefusals_04_the_changelog_has_the_row_of_the_leap_second_and_the_entry_of_the_new_sentence",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "151a6c2d4a4e35b37e7dbe8d54d1ab2a2680d927e95287b433ee304df8ca683e"
+    }
+  ],
+  "code_tree": "be514fdfebb3ec27fcc3f3810955bb3a85db1757",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "a144e3d5969bb38054ec583245179741a1b7cdf3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 9,
+  "scenario_id": "atip.daterefusals.04",
+  "schema": 1,
+  "staging_id": "e2b1985c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

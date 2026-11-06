@@ -5,6 +5,7 @@
 adapter authorize	dispatch.manifest.08	dispatch.manifest.09,dispatch.manifest.10
 adapter validate	dispatch.manifest.11	dispatch.manifest.12,dispatch.manifest.13
 artifacts move	evidence.add.118	evidence.add.119,evidence.add.120
+artifacts prune	artifacts.prune.01,artifacts.prune.04	artifacts.prune.02,artifacts.prune.05
 artifacts store	evidence.add.17,inventory.sync.40	inventory.sync.42
 artifacts verify	evidence.add.116	evidence.add.117
 brief approve	skills.install.20,report.dashboard.06	skills.install.68

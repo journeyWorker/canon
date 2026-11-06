@@ -32,7 +32,7 @@ pub enum ContextPackCommand {
 pub struct ContextPackShowArgs {
     /// Context pack id (sha256:<64 hex digits>)
     #[arg(value_name = "PACK_ID")]
-    pub id: String,
+    pub pack: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
@@ -44,7 +44,7 @@ pub struct ContextPackShowArgs {
 pub struct ContextPackVerifyArgs {
     /// Context pack id (sha256:<64 hex digits>)
     #[arg(value_name = "PACK_ID")]
-    pub id: String,
+    pub pack: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output a JSON verification result

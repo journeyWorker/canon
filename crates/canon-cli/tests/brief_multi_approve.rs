@@ -2,6 +2,8 @@
 //! against the built binary: one name, one answer and one timestamp for all,
 //! every id checked before any is written, one refused id refuses the call.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -16,7 +18,7 @@ fn git_seed(repo: &Path) {
 }
 
 fn run_as(repo: &Path, role: Option<&str>, args: &[&str]) -> Output {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut cmd = hermetic::canon();
     cmd.args(args).current_dir(repo).env_remove("CANON_ROLE");
     if let Some(role) = role {
         cmd.env("CANON_ROLE", role);
@@ -64,7 +66,7 @@ fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     git_seed(dir.path());
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none", "--no-agents-md"]);
+    ok(repo, &["init", "--no-harness", "--no-agents-md"]);
     ok(repo, &["subject", "new", "s", "--domain", "dev", "--title", "S"]);
     for change in ["a", "b", "c"] {
         ok(repo, &["change", "new", change, "--subject", "s", "--title", change]);

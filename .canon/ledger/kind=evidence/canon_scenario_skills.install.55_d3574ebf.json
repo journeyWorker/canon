@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-provider-option",
+    "role": "implementer",
+    "session_id": "s-0-38-provider-option"
+  },
+  "at": "2026-11-06T15:46:22.425561Z",
+  "attachments": [
+    {
+      "case": "skills_install_55_a_missing_skills_source_is_refused_with_exit_two",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ca3fd617961e15ed20451c359c630308e4357f13b8be1685ff33349b195923ac"
+    },
+    {
+      "case": "skills_install_55_an_unknown_provider_on_the_flag_is_an_invalid_argument",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ca3fd617961e15ed20451c359c630308e4357f13b8be1685ff33349b195923ac"
+    },
+    {
+      "case": "skills_install_55_a_malformed_skills_section_fails_loud",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ca3fd617961e15ed20451c359c630308e4357f13b8be1685ff33349b195923ac"
+    }
+  ],
+  "code_tree": "8a252e1cbceee75036a06bcb5a4d605274152096",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "a82e2ed3bda0f3c460f91cf4dbffb650a1f2ec68",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1094,
+  "scenario_id": "skills.install.55",
+  "schema": 1,
+  "staging_id": "4052d104",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-code-scopes",
+    "role": "implementer",
+    "session_id": "s-0-38-code-scopes"
+  },
+  "at": "2026-11-06T10:07:12.827133Z",
+  "attachments": [
+    {
+      "case": "gate_code_scopes_09_evidence_whose_tree_cannot_be_had_is_asked_for",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "391f3bf766eefcbd5c11ccb8979cfb872d16dfe03e6185e7af34685e60122d05"
+    }
+  ],
+  "code_tree": "49feaf5b29688ae566a123f9d8e79515099dc637",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "ce16ffaaaf2a9338b7610a370cd48b5a59d23836",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 22,
+  "scenario_id": "gate.code-scopes.09",
+  "schema": 1,
+  "staging_id": "019e29a3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

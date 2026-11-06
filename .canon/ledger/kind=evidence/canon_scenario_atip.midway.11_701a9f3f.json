@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T06:59:05.557667Z",
+  "attachments": [
+    {
+      "case": "atip_midway_11_the_check_catches_a_moved_code_that_comes_back",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    },
+    {
+      "case": "atip_midway_11_no_consumer_spells_a_code_that_moved_or_was_replaced_by_an_incomplete_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    }
+  ],
+  "code_tree": "343ae09e077298bd79ea2fccffff72977da2da07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "5b4b203bc0f8c5745f15e055fcbc054cc649d085",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 358,
+  "scenario_id": "atip.midway.11",
+  "schema": 1,
+  "staging_id": "90550058",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

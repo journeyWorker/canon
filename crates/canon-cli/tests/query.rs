@@ -9,6 +9,8 @@
 //! `--since` filter returns only records at or after the given
 //! timestamp.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod support;
 
 use chrono::{Duration, Utc};
@@ -142,7 +144,7 @@ fn query_with_no_flags_resolves_from_a_subdirectory_of_the_repo_root() {
     std::fs::create_dir_all(&subdir).unwrap();
 
     let output =
-        std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(["query", "--kind", "change"]).current_dir(&subdir).output().expect("spawn canon binary");
+        hermetic::canon().args(["query", "--kind", "change"]).current_dir(&subdir).output().expect("spawn canon binary");
     assert!(
         output.status.success(),
         "canon query from a subdirectory must resolve the ancestor repo root, matching canon context/gate check; stderr: {}",
@@ -159,7 +161,7 @@ fn query_with_no_flags_at_the_repo_root_resolves_and_succeeds() {
     std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
 
     let output =
-        std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(["query", "--kind", "change"]).current_dir(repo.path()).output().expect("spawn canon binary");
+        hermetic::canon().args(["query", "--kind", "change"]).current_dir(repo.path()).output().expect("spawn canon binary");
     assert!(
         output.status.success(),
         "canon query at the repo root with no flags must resolve exactly as before this change; stderr: {}",
@@ -177,7 +179,7 @@ fn query_explicit_non_default_repo_is_used_as_is_no_walk() {
     std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
     let cwd = tempfile::tempdir().unwrap();
 
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["query", "--kind", "change", "--repo"])
         .arg(repo.path())
         .current_dir(cwd.path())
@@ -197,7 +199,7 @@ fn query_explicit_non_default_repo_is_used_as_is_no_walk() {
 fn query_with_no_canon_yaml_anywhere_fails_loud_naming_the_attempted_path() {
     let cwd = tempfile::tempdir().unwrap();
     let output =
-        std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(["query", "--kind", "change"]).current_dir(cwd.path()).output().expect("spawn canon binary");
+        hermetic::canon().args(["query", "--kind", "change"]).current_dir(cwd.path()).output().expect("spawn canon binary");
     assert!(!output.status.success(), "a cwd with no canon.yaml anywhere among its ancestors must fail, never silently succeed");
     let stderr = support::stderr(&output);
     assert!(stderr.contains("canon.yaml"), "the error must name the canon.yaml path the ancestor walk ultimately attempted to read: {stderr}");
@@ -232,11 +234,11 @@ fn tree(dir: &std::path::Path) -> Vec<String> {
 fn read_commands_leave_a_directory_without_canon_yaml_unchanged() {
     let cwd = tempfile::tempdir().unwrap();
     for args in [&["query", "--kind", "change"][..], &["query", "--kind", "subject", "--json"][..], &["status"][..], &["context"][..], &["gate", "check"][..]] {
-        let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd.path()).output().expect("spawn canon binary");
+        let output = hermetic::canon().args(args).current_dir(cwd.path()).output().expect("spawn canon binary");
         assert_eq!(tree(cwd.path()), Vec::<String>::new(), "`canon {}` wrote into a directory without canon.yaml; stderr: {}", args.join(" "), support::stderr(&output));
     }
     let report = tempfile::tempdir().unwrap();
-    std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(["report", "--check"]).current_dir(report.path()).output().expect("spawn canon binary");
+    hermetic::canon().args(["report", "--check"]).current_dir(report.path()).output().expect("spawn canon binary");
     assert!(!report.path().join(".canon/audit").exists(), "`canon report --check` must not write an access audit here");
 }
 
@@ -249,7 +251,7 @@ fn query_audits_into_the_repo_it_read_never_into_the_cwd() {
     std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
     let cwd = tempfile::tempdir().unwrap();
 
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
+    let output = hermetic::canon()
         .args(["query", "--kind", "change", "--repo"])
         .arg(repo.path())
         .current_dir(cwd.path())

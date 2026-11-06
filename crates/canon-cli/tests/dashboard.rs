@@ -19,15 +19,17 @@
 //! of `canon_cli::dashboard`: always printed, regardless of what was
 //! requested), so parallel test runs never collide on a fixed port.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
 
 fn run_canon(args: &[&str], cwd: &Path) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &std::process::Output) -> String {
@@ -68,7 +70,7 @@ impl Drop for LiveDashboard {
 /// returns (module doc: the print happens right before the accept
 /// loop starts).
 fn spawn_dashboard(repo: &Path, snapshot: &Path) -> LiveDashboard {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let mut child = hermetic::canon()
         .args(["dashboard", "--repo", repo.to_str().unwrap(), "--snapshot", snapshot.to_str().unwrap(), "--port", "0"])
         .current_dir(repo)
         .stdout(Stdio::piped())

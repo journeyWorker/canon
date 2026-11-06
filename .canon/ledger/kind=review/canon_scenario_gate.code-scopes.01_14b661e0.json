@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-code-scopes",
+    "role": "reviewer",
+    "session_id": "s-0-38-scopes-rev"
+  },
+  "at": "2026-11-06T10:14:58.766108Z",
+  "code_tree": "49feaf5b29688ae566a123f9d8e79515099dc637",
+  "kind": "review",
+  "pin": "ce16ffaaaf2a9338b7610a370cd48b5a59d23836",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_code_scopes_01_a_chore_that_changes_only_app_asks_the_app_scenarios_and_not_the_core_one"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "82a0ac13400cdc2aebc6d9c3ee07a1b57fb27e7ad6056159848627540e3af755",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-code-scopes/brief.md"
+  },
+  "review_id": "01M6R5NEYE12B9R27MGM8R94FR",
+  "reviewer": "rev-0-38-code-scopes",
+  "scenario_id": "gate.code-scopes.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

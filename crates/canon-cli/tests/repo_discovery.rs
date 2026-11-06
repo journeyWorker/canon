@@ -8,14 +8,16 @@
 //! These tests drive the built binary only, so the same compiled test can be
 //! pointed at an older `canon` to show it fails there.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon(dir: &Path, home: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .args(args)
         .current_dir(dir)
         .env("CANON_ACTOR", "repo-discovery")
@@ -46,7 +48,7 @@ fn error_of(out: &Output) -> Value {
 /// A canon repo with one subject, so `status` has something to report.
 fn repo(home: &Path) -> TempDir {
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), home, &["init", "--providers", "none"]);
+    ok(dir.path(), home, &["init", "--no-harness"]);
     ok(dir.path(), home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     dir
 }
@@ -151,7 +153,7 @@ fn commands_that_run_without_a_canon_yaml_still_do() {
         let out = canon(empty.path(), home.path(), args);
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", stderr(&out));
     }
-    let init = canon(empty.path(), home.path(), &["init", "--providers", "none"]);
+    let init = canon(empty.path(), home.path(), &["init", "--no-harness"]);
     assert_eq!(init.status.code(), Some(0), "init creates the canon.yaml the others look for: {}", stderr(&init));
     assert!(empty.path().join("canon.yaml").is_file());
 }

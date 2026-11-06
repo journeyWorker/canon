@@ -1,0 +1,4 @@
+canon: USAGE: invalid value 'gemini' for '--harness <NAME>'
+  field: --harness
+  expected: claude, codex, omp, pi
+  hint: a working call: canon skills check; `canon schema skills check --json` lists every argument

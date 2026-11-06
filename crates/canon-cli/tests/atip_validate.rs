@@ -2,6 +2,8 @@
 //! validator does (`atip::domain::compile`, which needs the feature `validate`, on in this test build) for every domain
 //! canon declares, with values inside and outside its bounds.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use harness::{leaves, options};

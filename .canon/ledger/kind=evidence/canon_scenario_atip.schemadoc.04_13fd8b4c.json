@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T06:59:05.557667Z",
+  "attachments": [
+    {
+      "case": "atip_schemadoc_04_an_unknown_path_names_what_is_valid_and_overlapping_selectors_are_usage",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    },
+    {
+      "case": "atip_schemadoc_04_an_unknown_path_word_names_the_field_command_and_expects_only_where_a_word_is_valid",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    }
+  ],
+  "code_tree": "343ae09e077298bd79ea2fccffff72977da2da07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "5b4b203bc0f8c5745f15e055fcbc054cc649d085",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 373,
+  "scenario_id": "atip.schemadoc.04",
+  "schema": 1,
+  "staging_id": "7256d0c2",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

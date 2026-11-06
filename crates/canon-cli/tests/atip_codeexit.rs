@@ -2,6 +2,8 @@
 //! its code and no `data`; several causes are `error.details[]`; the check commands' negative answers are exit 1 `*_FAILED` with their result
 //! in `data`; the commands that cannot start answer exit 2. Against the built `canon` binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -12,7 +14,7 @@ use tempfile::TempDir;
 mod old_codes;
 
 fn canon(dir: &Path, args: &[&str], role: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
     if let Some(role) = role {
         command.env("CANON_ROLE", role);
@@ -62,7 +64,7 @@ fn en_brief(extra: &str) -> String {
 fn repo_with_clean_brief() -> TempDir {
     let dir = git_repo();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["init", "--no-harness"], None);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"], Some("planner"));
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"], Some("planner"));
     std::fs::write(brief_path(repo), en_brief("")).unwrap();
@@ -128,7 +130,7 @@ fn atip_codeexit_02_an_approved_brief_takes_the_call_and_an_edit_after_the_appro
 fn atip_codeexit_03_gate_promote_with_two_refused_records_is_exit_2_with_two_details_and_no_data() {
     let dir = git_repo();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["init", "--no-harness"], None);
     for seq in ["1", "2"] {
         ok(repo, &["finding", "add", "--change", "c1", "--round", "1", "--seq", seq, "--severity", "note", "--actor", "a1", "--summary", "first", "--promote"], Some("reviewer"));
     }
@@ -162,7 +164,7 @@ fn atip_codeexit_03_gate_promote_with_two_refused_records_is_exit_2_with_two_det
 fn atip_codeexit_04_a_subject_move_the_gate_blocks_is_exit_2_with_the_cause_as_the_error() {
     let dir = git_repo();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["init", "--no-harness"], None);
     ok(repo, &["subject", "new", "demo", "--domain", "d", "--title", "T"], Some("planner"));
     for to in ["specced", "building", "verifying"] {
         ok(repo, &["subject", "move", "demo", "--to", to], Some("planner"));
@@ -190,7 +192,7 @@ fn failed(dir: &Path, args: &[&str], code: &str) -> Value {
 fn atip_codeexit_06_a_check_command_that_answers_no_is_exit_1_with_its_failed_code_and_the_result_in_data() {
     let dir = git_repo();
     let d = dir.path();
-    ok(d, &["init", "--providers", "none"], None);
+    ok(d, &["init", "--no-harness"], None);
     std::fs::write(d.join("bad.json"), r#"{"nope":1}"#).unwrap();
     let b = failed(d, &["adapter", "validate", "--response", "bad.json"], "ADAPTER_VALIDATION_FAILED");
     assert_eq!(b["data"]["valid"], false, "{b}");
@@ -218,7 +220,7 @@ fn atip_codeexit_06_a_check_command_that_answers_no_is_exit_1_with_its_failed_co
 fn atip_codeexit_07_a_check_command_that_cannot_start_is_exit_2_and_not_failed() {
     let dir = git_repo();
     let d = dir.path();
-    ok(d, &["init", "--providers", "none"], None);
+    ok(d, &["init", "--no-harness"], None);
     let b = refused(d, None, &["adapter", "validate", "--response", "no-such-response.json"], "ADAPTER_FILE_NOT_FOUND", false);
     assert!(!b["error"]["code"].as_str().unwrap().ends_with("_FAILED"), "{b}");
     let out = canon(d, &["report", "check", "--repo", "/no/such/repo"], None);
@@ -235,12 +237,12 @@ fn atip_codeexit_08_a_command_that_cannot_start_is_exit_2_with_its_code_and_writ
     // CONTEXT_GIT_REQUIRED: a pack records the commit, and git cannot be run (no `git` on the PATH).
     let plain = git_repo();
     let p = plain.path();
-    ok(p, &["init", "--providers", "none"], None);
+    ok(p, &["init", "--no-harness"], None);
     std::fs::write(p.join("doc.md"), "hi\n").unwrap();
     std::fs::write(p.join("m.json"), r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":["doc.md"],"examples":[],"toolSchemas":[],"injectedGuidance":[]}"#).unwrap();
     let before = snapshot(p);
     let no_git = TempDir::new().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["context-pack", "add", "--manifest", "m.json", "--json"]).current_dir(p).env("PATH", no_git.path()).env_remove("CANON_ROLE").output().unwrap();
+    let out = hermetic::canon().args(["context-pack", "add", "--manifest", "m.json", "--json"]).current_dir(p).env("PATH", no_git.path()).env_remove("CANON_ROLE").output().unwrap();
     let b = body(&out);
     assert_eq!((out.status.code(), b["error"]["code"].as_str(), b["error"]["retryable"].as_bool()), (Some(2), Some("CONTEXT_GIT_REQUIRED"), Some(false)), "{b}");
     assert!(b.get("data").is_none(), "{b}");
@@ -268,7 +270,7 @@ fn atip_codeexit_08_a_command_that_cannot_start_is_exit_2_with_its_code_and_writ
     for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
         assert!(Command::new("git").args(args).current_dir(l).status().unwrap().success());
     }
-    ok(l, &["init", "--providers", "none"], None);
+    ok(l, &["init", "--no-harness"], None);
     let app = l.join("packages/dashboard");
     std::fs::create_dir_all(app.join("dist/snapshot")).unwrap();
     std::fs::write(app.join("package.json"), r#"{"name":"@canon-dev/dashboard"}"#).unwrap();
@@ -424,7 +426,7 @@ fn atip_codeexit_01_an_exit_2_error_cannot_be_emitted_with_data() {
 fn atip_codeexit_04_a_subject_move_blocked_for_two_causes_lists_both_in_details() {
     let dir = git_repo();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["init", "--no-harness"], None);
     ok(repo, &["subject", "new", "demo", "--domain", "d", "--title", "T"], Some("planner"));
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "L"], Some("planner"));
     for to in ["specced", "building", "verifying"] {

@@ -11,6 +11,8 @@
 //! `consumer_problems`, `minor_problems`, `changelog_problems`): each real document passes them, each seeded fault is found, and no sweep is vacuous.
 //! Tests are named by scenario id (`atip_claim14_05_…` proves `atip.claim14.05`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -27,7 +29,7 @@ const MINOR: &str = "1.5";
 // Running the binary.
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-claim14").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("canon runs")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-claim14").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("canon runs")
 }
 
 fn stdout(output: &Output) -> String {
@@ -57,7 +59,7 @@ fn repo() -> TempDir {
         assert!(out.status.success(), "{program} {args:?}: {}{}", stdout(&out), stderr(&out));
     };
     run("git", &["init", "-q"]);
-    run(env!("CARGO_BIN_EXE_canon"), &["init", "--providers", "none"]);
+    run(env!("CARGO_BIN_EXE_canon"), &["init", "--no-harness"]);
     run("git", &["add", "-A"]);
     run("git", &["-c", "user.name=canon", "-c", "user.email=canon@example.invalid", "commit", "-q", "-m", "fixture"]);
     run(env!("CARGO_BIN_EXE_canon"), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
@@ -873,6 +875,14 @@ fn heading_level(line: &str) -> usize {
 /// Every problem of the CHANGELOG's `Unreleased` section: one entry whose heading names the declaration, its before/after table, the size rows (each 1.4
 /// size equal to a live measure and smaller than its 1.3 size, except the tree's) and the paragraph for the callers. `live` maps a row name to the
 /// sizes that row may state (the sum row may be the tree plus any one of the commands).
+/// The command documents whose size may exceed the 0.36.0 size, each by at most this percent, and why (the scenario `atip.claim14.15` states the same list).
+const GROWN_SINCE_0_36: &[(&str, usize)] = &[
+    // canon-0-38-finding-closer: `finding close --role` says how the role is recorded, and the error list gained FINDING_ROLE_DENIED.
+    ("schema finding close", 10),
+    // canon-0-38-finding-closer: each listed finding gained `closedBy` and `closedRole`.
+    ("schema finding list", 10),
+];
+
 fn changelog_problems(text: &str, live: &BTreeMap<String, Vec<usize>>) -> Vec<String> {
     let mut found = Vec::new();
     let lines: Vec<&str> = text.lines().collect();
@@ -910,11 +920,12 @@ fn changelog_problems(text: &str, live: &BTreeMap<String, Vec<usize>>) -> Vec<St
             found.push(format!("the size row `{name}` has no two plain integers: {row}"));
             continue;
         };
-        // The entry states the sizes measured on the 0.36.0 build. The patterns of this build are shorter (`canon-0-37-claim-1-5`), so a live answer is not larger
-        // than the stated size and lies within a tenth of it.
+        // The entry states the sizes measured on the 0.36.0 build. A live answer is not larger than the stated size and lies within a tenth of it, except for the
+        // command documents that gained members after 0.36.0 ([`GROWN_SINCE_0_36`]), which may exceed it by the allowance the scenario states for them.
+        let allowance = GROWN_SINCE_0_36.iter().find(|(row, _)| *row == name).map_or(0, |(_, percent)| after * percent / 100);
         match live.get(name) {
-            Some(sizes) if sizes.iter().any(|size| *size <= after && after - *size <= after / 10) => {}
-            Some(sizes) => found.push(format!("the size row `{name}` states {after} bytes for 1.4 (0.36.0), the live measure is {sizes:?}: it is larger or more than a tenth smaller")),
+            Some(sizes) if sizes.iter().any(|size| *size <= after + allowance && after.saturating_sub(*size) <= after / 10) => {}
+            Some(sizes) => found.push(format!("the size row `{name}` states {after} bytes for 1.4 (0.36.0), the live measure is {sizes:?}: it is larger than the stated size by more than its allowance ({allowance} bytes) or more than a tenth smaller")),
             None => found.push(format!("no live measure for `{name}`")),
         }
         // A command document is smaller; the tree may grow (it holds the shared options); a sum may grow, with its reason.
@@ -1044,7 +1055,7 @@ fn atip_claim14_02_schema_answers_the_same_bytes_without_a_repository_and_the_fo
     let one = TempDir::new().unwrap();
     let two = TempDir::new().unwrap();
     let bare = |dir: &Path, args: &[&str]| {
-        let output = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_clear().stdin(Stdio::null()).output().expect("canon runs");
+        let output = hermetic::canon().args(args).current_dir(dir).env_clear().stdin(Stdio::null()).output().expect("canon runs");
         assert!(output.status.success() && output.stderr.is_empty(), "canon {args:?} answers with an empty environment: {}{}", stdout(&output), stderr(&output));
         output.stdout
     };
@@ -1077,7 +1088,7 @@ fn atip_claim14_02_schema_answers_the_same_bytes_without_a_repository_and_the_fo
 // ===========================================================================
 // atip.claim14.03 - 06 (F2)
 
-const DESTRUCTIVE: [&str; 5] = ["artifacts move", "ledger compact", "migrate", "purge", "tier age"];
+const DESTRUCTIVE: [&str; 6] = ["artifacts move", "artifacts prune", "ledger compact", "migrate", "purge", "tier age"];
 
 fn option_names(doc: &Value) -> Vec<String> {
     doc["options"].as_array().map(Vec::as_slice).unwrap_or_default().iter().map(|option| option_name(option).to_string()).collect()
@@ -1101,7 +1112,7 @@ fn atip_claim14_03_a_command_document_carries_the_call_surface_only() {
     assert!(!codes.is_empty() && codes.iter().all(|code| !matches!(*code, "USAGE" | "INTERNAL") && !code.starts_with("INPUT_")), "no implied code is listed: {codes:?}");
     assert_eq!(form_problems(close), Vec::<String>::new(), "finding close is in the 1.4 form");
 
-    // The five destructive commands, and only they, list `commit` and `plan-digest` by name.
+    // The six destructive commands, and only they, list `commit` and `plan-digest` by name.
     let destructive: Vec<&str> = surface.docs.iter().filter(|(_, doc)| doc.value["data"]["effect"] == "destructive").map(|(name, _)| name.as_str()).collect();
     assert_eq!(destructive, DESTRUCTIVE, "the destructive commands");
     for name in DESTRUCTIVE {
@@ -1546,7 +1557,7 @@ fn atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fi
     let fixture: Value = serde_json::from_str(&read(FIXTURE)).expect("the fixture is JSON");
     assert_eq!(fixture["contractVersion"], MINOR, "the fixture claims {MINOR}");
     // The fixture holds what the checks read.
-    assert!(fixture["commands"].as_object().is_some_and(|commands| DESTRUCTIVE.iter().all(|name| commands[*name]["preview"].is_array())), "the fixture previews the five destructive commands");
+    assert!(fixture["commands"].as_object().is_some_and(|commands| DESTRUCTIVE.iter().all(|name| commands[*name]["preview"].is_array())), "the fixture previews the six destructive commands");
 }
 
 // ===========================================================================
@@ -1589,8 +1600,16 @@ fn atip_claim14_16_the_entry_check_fails_when_the_table_a_size_row_or_the_caller
     let with_row = |name: &str, before: &str, after: usize| complete.lines().map(|line| if line.starts_with(&format!("| {name} |")) { format!("| {name} | {before} | {after} |") } else { line.to_string() }).collect::<Vec<_>>().join("\n");
     let wrong = with_row("schema purge", "4,000", live["schema purge"][0] * 2);
     assert_found("a stated size far above the live one", &changelog_problems(&wrong, &live), "live measure");
-    let below = with_row("schema purge", "4,000", live["schema purge"][0] - 1);
-    assert_found("a stated size below the live one", &changelog_problems(&below, &live), "live measure");
+    let above = with_row("schema purge", "4,000", live["schema purge"][0] - live["schema purge"][0] / 20);
+    assert_found("a stated size below the live one of a command that has no allowance", &changelog_problems(&above, &live), "live measure");
+    let allowed = with_row("schema finding close", "4,000", live["schema finding close"][0] - live["schema finding close"][0] / 20);
+    assert!(changelog_problems(&allowed, &live).iter().all(|problem| !problem.contains("live measure")), "a command with an allowance may exceed its stated size by it");
+    let beyond = with_row("schema finding close", "4,000", live["schema finding close"][0] * 8 / 10);
+    assert_found("a live size beyond the allowance", &changelog_problems(&beyond, &live), "allowance");
+    let below = with_row("schema purge", "4,000", live["schema purge"][0] * 8 / 10);
+    assert_found("a stated size more than a tenth below the live one", &changelog_problems(&below, &live), "live measure");
+    let near = with_row("schema purge", "4,000", live["schema purge"][0] + 1);
+    assert!(changelog_problems(&near, &live).iter().all(|problem| !problem.contains("live measure")), "a stated size just above the live one passes");
     let larger = with_row("schema purge", "2,999", live["schema purge"][0]);
     assert_found("a size that is not smaller than the 1.3 size", &changelog_problems(&larger, &live), "not smaller");
     let grown = with_row("schema (tree) + purge", "1", live["schema (tree) + purge"][0]);

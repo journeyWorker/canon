@@ -28,8 +28,10 @@
 //! at BUILD time, never narrowed to the routed tier alone) without
 //! needing a live connection.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::ids::{ChangeId, ProjectId, RoleId, ScenarioId, SpecDigest};
@@ -56,7 +58,7 @@ fn write_canon_yaml(root: &Path, body: &str) {
 /// ambient-environment leakage into what each test asserts about
 /// tier reachability.
 fn run_canon(args: &[&str], cwd: &Path, extra_env: &[(&str, &str)]) -> Output {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut cmd = hermetic::canon();
     cmd.args(args).current_dir(cwd).env_remove("CANON_R2_LOCAL_ROOT");
     for (k, v) in extra_env {
         cmd.env(k, v);

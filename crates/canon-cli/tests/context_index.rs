@@ -1,8 +1,10 @@
 //! T13: `canon context` is a projection of the model and the generated spec,
 //! never a list of its own — checked against the built binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeSet;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use canon_model::family::FamilyKind;
 use canon_model::RecordKind;
@@ -10,7 +12,7 @@ use serde_json::Value;
 
 fn context(args: &[&str], envs: &[(&str, &str)]) -> Output {
     let dir = tempfile::tempdir().unwrap();
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut cmd = hermetic::canon();
     cmd.arg("context").args(args).arg("--json").current_dir(dir.path());
     for (k, v) in envs {
         cmd.env(k, v);
@@ -113,6 +115,6 @@ fn a_bad_canon_role_is_a_warning_and_never_filters_or_fails_context() {
 #[test]
 fn an_unknown_field_is_refused_in_text_mode_too() {
     let dir = tempfile::tempdir().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["context", "--fields", "nope"]).current_dir(dir.path()).output().unwrap();
+    let out = hermetic::canon().args(["context", "--fields", "nope"]).current_dir(dir.path()).output().unwrap();
     assert_eq!(out.status.code(), Some(2));
 }

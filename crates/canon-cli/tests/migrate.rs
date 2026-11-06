@@ -4,6 +4,8 @@
 //! `openspec/changes/`, approvals in `proposal.md`, no `skills:` key and a
 //! `.gitignore` missing canon's newer lines.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -64,7 +66,7 @@ const CART: &str = r#"Feature: cart add
 "#;
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
 }
 
 fn text(out: &Output) -> String {
@@ -258,7 +260,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         OLD_YAML
             .replace("      root: specs\n", "      root: .canon/specs\n      former_roots: [specs]\n")
             .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
-            + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --providers=<list>` rewrites it.\nskills:\n  providers: [claude, codex]\n",
+            + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.\nskills:\n  providers: [claude, codex]\n",
         "every other byte of canon.yaml is kept"
     );
     let gitignore = read(repo, ".gitignore");
@@ -496,7 +498,7 @@ fn migrated_yaml() -> String {
     OLD_YAML
         .replace("      root: specs\n", "      root: .canon/specs\n      former_roots: [specs]\n")
         .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
-        + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --providers=<list>` rewrites it.\nskills:\n  providers: [claude, codex]\n"
+        + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.\nskills:\n  providers: [claude, codex]\n"
 }
 
 fn set_mode(path: &Path, mode: u32) {
@@ -738,7 +740,7 @@ fn commit_json(repo: &Path, env: &[(&str, &str)]) -> (Output, serde_json::Value)
         .and_then(|rest| rest.split(';').next())
         .unwrap_or_else(|| panic!("a plan digest: {}", text(&preview)))
         .to_string();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command
         .args(["migrate", "--commit", "--plan-digest", &digest, "--json"])
         .env("CANON_ACTOR", "canon")

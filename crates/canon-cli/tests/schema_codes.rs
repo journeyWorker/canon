@@ -14,6 +14,8 @@
 //! a new error site cannot be missing from `canon schema`.
 //! `CANON_BLESS_SCHEMA_CODES=1` rewrites the table.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -89,6 +91,8 @@ const AWAITING_WIRING: &[&str] = &[];
 const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `store_error`: the refusal of a store that cannot be opened or attached, emitted by both commands.
     ("artifacts.rs", &["artifacts verify", "artifacts move"]),
+    // `emit(CMD, …)` takes the command from a constant the scan cannot read: every code of the file is the command's.
+    ("artifacts_prune.rs", &["artifacts prune"]),
     // `CHANGED_CODE`, picked by `evidence add`'s brief refusal.
     ("brief.rs", &["evidence add", "evidence audit"]),
     ("brief_approve.rs", &["brief approve"]),
@@ -153,12 +157,12 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // Every code is next to its `human("canon selftest")`.
     // `open_index` builds the refusals of the index for both leaves; every other code is next to its emit.
     ("search/mod.rs", &["search", "trace"]),
-    ("safety.rs", &["purge", "artifacts move", "migrate", "ledger compact", "tier age"]),
+    ("safety.rs", &["purge", "artifacts move", "artifacts prune", "migrate", "ledger compact", "tier age"]),
     // `Refused::error`: the refusal of the repository write lock, made for every leaf that holds it (`write_lock::POLICY`), and for the dashboard's approval.
     (
         "write_lock.rs",
         &[
-            "artifacts move", "artifacts store", "brief approve", "change new", "context-pack add", "dashboard", "dispatch begin", "dispatch end", "divergence accept", "divergence add", "divergence defer",
+            "artifacts move", "artifacts prune", "artifacts store", "brief approve", "change new", "context-pack add", "dashboard", "dispatch begin", "dispatch end", "divergence accept", "divergence add", "divergence defer",
             "divergence resolve", "evidence add", "evidence audit", "feature new", "finding add", "finding close", "gate install-hooks", "gate promote", "ingest plans", "ingest records", "ingest sessions", "init",
             "inventory sync", "ledger compact", "migrate", "plugin sync", "policy approve", "prompt add", "purge", "review change", "review scenario", "scenario new", "skills install", "strategy promote",
             "strategy rollback", "subject adopt", "subject move", "subject new", "subject unadopt", "task done", "tier age",
@@ -172,7 +176,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("status.rs", &["status"]),
     ("subject.rs", &["subject"]),
     // `unavailable`: the up-front refusal of a target that cannot be written, made by every command that checks it before its first write.
-    ("write_mode.rs", &["change new", "feature new", "scenario new", "demo", "divergence", "evidence add", "evidence audit", "finding", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "brief approve", "policy approve", "export", "review scenario", "review change"]),
+    ("write_mode.rs", &["change new", "feature new", "scenario new", "demo", "divergence", "evidence add", "evidence audit", "finding", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "artifacts prune", "brief approve", "policy approve", "export", "review scenario", "review change"]),
 ];
 
 /// An `emit(&format!("canon <prefix> {verb}"), …)` shared by several commands:
@@ -193,7 +197,7 @@ const CALLER_LEAVES: &[(&str, &[&str])] = &[
     ("run/top.rs", &["report build", "report check", "report snapshot"]),
     ("search/mod.rs", &["search", "trace"]),
     // `write_mode::refuse_unwritable`: the up-front refusal of a target that cannot be written, made for the command that checks it.
-    ("write_mode.rs", &["change new", "feature new", "scenario new", "demo init", "demo review", "divergence add", "divergence accept", "evidence add", "evidence audit", "finding add", "finding close", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "brief approve", "policy approve", "export", "review scenario", "review change"]),
+    ("write_mode.rs", &["change new", "feature new", "scenario new", "demo init", "demo review", "divergence add", "divergence accept", "evidence add", "evidence audit", "finding add", "finding close", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "artifacts prune", "brief approve", "policy approve", "export", "review scenario", "review change"]),
 ];
 
 /// The leaves that record a human's decision and refuse every agent role.
@@ -256,7 +260,7 @@ fn needs_config_leaves() -> Vec<&'static str> {
             let mut args: Vec<&str> = vec!["schema"];
             args.extend(path.split(' '));
             args.push("--json");
-            let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(&args).output().expect("spawn canon");
+            let out = hermetic::canon().args(&args).output().expect("spawn canon");
             let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("schema is JSON");
             // `--repo` is the tree's shared option: a 1.4 document names it (a string) unless it defines its own.
             body["data"]["options"].as_array().expect("options").iter().any(|o| o == "repo" || o["name"] == "repo")

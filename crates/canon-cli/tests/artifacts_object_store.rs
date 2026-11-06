@@ -9,6 +9,8 @@
 //! closed port instead. The same code runs against a real bucket in
 //! `canon-store`'s `live-r2` CI job (`tests/r2_tier_live.rs`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -26,7 +28,7 @@ impl Repo {
     }
 
     fn canon(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_canon"))
+        hermetic::canon()
             .args(args)
             .env("CANON_ACTOR", "canon")
             .env("CANON_R2_LOCAL_ROOT", self.store.path())
@@ -37,7 +39,7 @@ impl Repo {
 
     /// [`Repo::canon`] with extra environment variables.
     fn canon_env(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+        let mut command = hermetic::canon();
         command.args(args).env("CANON_ACTOR", "canon").env("CANON_R2_LOCAL_ROOT", self.store.path()).current_dir(self.path());
         for (key, value) in env {
             command.env(key, value);
@@ -48,7 +50,7 @@ impl Repo {
     /// `canon` with the substitute store removed and a real-looking S3
     /// configuration instead (what a release binary always uses).
     fn canon_s3(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+        let mut command = hermetic::canon();
         command.args(args).env("CANON_ACTOR", "canon").env_remove("CANON_R2_LOCAL_ROOT").env_remove("CANON_R2_BUCKET").env_remove("S3_BUCKET").current_dir(self.path());
         for (key, value) in env {
             command.env(key, value);

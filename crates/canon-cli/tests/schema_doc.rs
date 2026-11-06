@@ -4,9 +4,11 @@
 //! the same documents. Tests are named by scenario id (`atip.schemadoc.NN`); every sweep is over the documents the
 //! generator builds, and the answers of the built binary are held equal to them.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 use std::sync::LazyLock;
 
 use jsonschema::{Registry, Resource};
@@ -17,7 +19,7 @@ fn repo_root() -> PathBuf {
 }
 
 fn run(args: &[&str], dir: &Path, role: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(dir).env_remove("CANON_ROLE");
     if let Some(role) = role {
         command.env("CANON_ROLE", role);
@@ -434,7 +436,7 @@ fn form_problems(tree: &Value, commands: &[Value], schemas: &Value) -> Vec<Strin
 // ----------------------------------------------------------------------------------------------------------
 // atip.schemadoc.01 — F1: the tree
 
-/// atip.schemadoc.01: `canon schema --json` is a `tree` that claims L2, lists 27 groups and 78 commands once, a
+/// atip.schemadoc.01: `canon schema --json` is a `tree` that claims L2, lists 27 groups and 79 commands once, a
 /// group before its commands, byte-identically twice; `--as` filters and `CANON_ROLE` does not.
 #[test]
 fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2() {
@@ -450,7 +452,7 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
     let entries = first["data"]["commands"].as_array().expect("commands");
     let kinds: Vec<&str> = entries.iter().map(|entry| if entry["kind"] == "group" { "group" } else { "command" }).collect();
     assert!(entries.iter().all(|entry| entry["kind"] != "command" && entry.get("path").is_none()), "a 1.4 tree entry has no `kind: command` and no `path`");
-    assert_eq!((kinds.iter().filter(|kind| **kind == "group").count(), kinds.iter().filter(|kind| **kind == "command").count()), (27, 78));
+    assert_eq!((kinds.iter().filter(|kind| **kind == "group").count(), kinds.iter().filter(|kind| **kind == "command").count()), (27, 79));
     let ids: Vec<&str> = entries.iter().map(|entry| entry["command"].as_str().expect("command")).collect();
     assert_eq!(ids.iter().collect::<BTreeSet<_>>().len(), ids.len(), "every id once");
     for (at, entry) in entries.iter().enumerate() {
@@ -459,7 +461,7 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
             assert!(entry.get("effect").is_none(), "a group has no effect");
         } else {
             assert!(entry["effect"].is_string(), "a command has one: {entry}");
-            assert!(entry["x-canon"]["roles"].is_array(), "the roles of a command are x-canon.roles: {entry}");
+            assert!(entry["x-canon"]["roles"] == "all" || entry["x-canon"]["roles"].is_array(), "the roles of a command are x-canon.roles, `all` or an array: {entry}");
             let parent = &ids[..at].iter().rev().find(|id| entry["command"].as_str().expect("command").starts_with(&format!("{id} "))).copied();
             if entry["command"].as_str().expect("command").contains(' ') {
                 assert!(parent.is_some(), "a group comes before its command: {entry}");
@@ -474,12 +476,12 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
     let reviewer = serde_json::from_slice::<Value>(&run(&["schema", "--as", "reviewer", "--json"], dir.path(), None).stdout).expect("JSON");
     let listed = reviewer["data"]["commands"].as_array().expect("commands");
     assert!(!listed.is_empty() && listed.len() < entries.len());
-    assert_eq!(reviewer["data"]["x-canon"], json!({ "as": "reviewer" }), "a filtered tree names the role in x-canon.as");
+    assert_eq!(reviewer["data"]["x-canon"], json!({ "as": "reviewer", "rolesForm": first["data"]["x-canon"]["rolesForm"] }), "a filtered tree names the role in x-canon.as and says the forms of roles as the tree does");
     assert_eq!(atip::schema_doc_problems(&reviewer), Vec::<String>::new());
-    assert!(first["data"].get("x-canon").is_none(), "an unfiltered tree has no x-canon");
+    assert_eq!(first["data"]["x-canon"].as_object().map(|declared| declared.keys().collect::<Vec<_>>()), Some(vec![&"rolesForm".to_string()]), "an unfiltered tree says only the forms of roles");
     for entry in listed {
         if entry["kind"] != "group" {
-            assert!(names(&entry["x-canon"], "roles").contains(&"reviewer".to_string()), "{entry}");
+            assert!(entry["x-canon"]["roles"] == "all" || names(&entry["x-canon"], "roles").contains(&"reviewer".to_string()), "{entry}");
         } else {
             let prefix = format!("{} ", entry["command"].as_str().expect("command"));
             assert!(listed.iter().any(|other| other["kind"] != "group" && other["command"].as_str().is_some_and(|c| c.starts_with(&prefix))), "a group is listed only for a command it holds: {entry}");
@@ -498,7 +500,7 @@ fn atip_schemadoc_02_schema_answers_outside_a_repo_with_no_environment_and_write
     let dir = tempfile::tempdir().expect("tempdir");
     let home = tempfile::tempdir().expect("home");
     for args in [&["schema", "--json"][..], &["schema", "finding", "--json"], &["schema", "finding", "close", "--json"], &["schema", "--errors", "--json"]] {
-        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir.path()).env_clear().env("HOME", home.path()).output().expect("spawn canon");
+        let out = hermetic::canon().args(args).current_dir(dir.path()).env_clear().env("HOME", home.path()).output().expect("spawn canon");
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
         assert!(out.stderr.is_empty(), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
         let document: Value = serde_json::from_slice(&out.stdout).expect("JSON");
@@ -656,9 +658,9 @@ fn atip_schemadoc_05_an_option_that_an_environment_variable_fills_declares_it() 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
     assert!(option(command_doc("schema"), "as").get("env").is_none(), "schema's --as reads no variable");
     assert_eq!(option(command_doc("status"), "as")["env"], "CANON_ROLE");
-    assert_eq!(option(command_doc("skills install"), "providers")["defaultNote"].as_str().map(|note| note.contains("skills.providers")), Some(true));
+    assert_eq!(option(command_doc("skills install"), "harness")["defaultNote"].as_str().map(|note| note.contains("skills.providers")), Some(true));
     for command in ["skills check", "skills doctor"] {
-        assert!(option(command_doc(command), "providers").get("defaultNote").is_some(), "{command}");
+        assert!(option(command_doc(command), "harness").get("defaultNote").is_some(), "{command}");
     }
 }
 
@@ -875,7 +877,7 @@ fn atip_schemadoc_07_errors_outputs_and_schemas_hold_together_in_every_command_d
     assert!(command_doc("completion")["outputs"][0]["mediaType"].is_string());
     let list = command_doc("finding list");
     assert!(names(list, "errors").contains(&"CURSOR_INVALID".to_string()));
-    for command in ["purge", "migrate", "ledger compact", "tier age", "artifacts move"] {
+    for command in ["purge", "migrate", "ledger compact", "tier age", "artifacts move", "artifacts prune"] {
         assert!(names(command_doc(command), "errors").contains(&"PLAN_STALE".to_string()), "{command}");
     }
 }
@@ -907,7 +909,7 @@ fn atip_schemadoc_08_a_dangling_ref_and_a_schema_that_does_not_compile_are_found
 #[test]
 fn atip_schemadoc_09_the_input_fragment_and_every_example_hold() {
     let with_input: Vec<&Value> = COMMANDS.iter().filter(|doc| doc["input"].is_object()).collect();
-    assert_eq!(with_input.len(), 47);
+    assert_eq!(with_input.len(), 48);
     let mut problems = Vec::new();
     for doc in &with_input {
         problems.extend(example_problems(doc));
@@ -1026,7 +1028,7 @@ fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command(
     assert_eq!(file["contractVersion"], "1.5");
     // The file is the 1.4 form: the tree and the command documents hold no `path`, and the schemas live in their own map.
     let commands = file["commands"].as_array().expect("commands");
-    assert_eq!(commands.len(), 78);
+    assert_eq!(commands.len(), 79);
     let dir = tempfile::tempdir().expect("tempdir");
     let mut problems = form_problems(&file["tree"], commands, &file["schemas"]);
     for doc in commands {

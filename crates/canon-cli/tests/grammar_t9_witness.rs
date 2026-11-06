@@ -12,6 +12,8 @@
 //! Always on: the recorder works, and the allowlist names real outputs with reasons.
 //! `#[ignore]`d (needs the witness of a whole suite run): the coverage check.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::BTreeSet;

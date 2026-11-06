@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-provider-option",
+    "role": "implementer",
+    "session_id": "s-0-38-provider-option"
+  },
+  "at": "2026-11-06T15:46:09.168649Z",
+  "attachments": [
+    {
+      "case": "arg_rules::enforce::tests::atip_claim15_04_a_refusal_says_for_each_pattern_that_listed_white_space_what_it_said_in_0_36",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ca3fd617961e15ed20451c359c630308e4357f13b8be1685ff33349b195923ac"
+    },
+    {
+      "case": "atip_claim15_04_the_property_is_the_white_space_of_the_old_lists_over_every_scalar_value",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ca3fd617961e15ed20451c359c630308e4357f13b8be1685ff33349b195923ac"
+    },
+    {
+      "case": "atip_claim15_04_each_pattern_takes_and_refuses_the_values_it_did_in_0_36",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ca3fd617961e15ed20451c359c630308e4357f13b8be1685ff33349b195923ac"
+    }
+  ],
+  "code_tree": "8a252e1cbceee75036a06bcb5a4d605274152096",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "a82e2ed3bda0f3c460f91cf4dbffb650a1f2ec68",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 77,
+  "scenario_id": "atip.claim15.04",
+  "schema": 1,
+  "staging_id": "ce9e99dd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

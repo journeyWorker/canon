@@ -5,6 +5,8 @@
 //!
 //! Tests are named by scenario id (`atip_canoncursor_01_…` proves `atip.canoncursor.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::io::Write as _;
 use std::path::Path;
@@ -14,7 +16,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon_in(dir: &Path, args: &[&str], env: &[(&str, &str)], stdin: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-canoncursor").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     for (name, value) in env {
         command.env(name, value);
@@ -45,7 +47,7 @@ fn ok(dir: &Path, args: &[&str]) {
 fn fixture() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     for subject in ["demo", "demo-two", "demo-three"] {
         ok(repo, &["subject", "new", subject, "--domain", "dev", "--title", &format!("Title {subject}")]);
     }
@@ -616,7 +618,7 @@ fn dash_repo() -> TempDir {
     let parent = TempDir::new().unwrap();
     let repo = parent.path().join("-dash");
     std::fs::create_dir(&repo).unwrap();
-    ok(&repo, &["init", "--providers", "none"]);
+    ok(&repo, &["init", "--no-harness"]);
     for subject in ["demo", "demo-two", "demo-three"] {
         ok(&repo, &["subject", "new", subject, "--domain", "dev", "--title", &format!("Title {subject}")]);
     }

@@ -2,7 +2,8 @@
 //! binary: every old spelling the clap tree no longer parses exits 2 with an
 //! `error.hint` that names the replacement, and lists it in `error.expected`.
 
-use std::process::Command;
+#[path = "support/hermetic.rs"]
+mod hermetic;
 
 use canon_cli::removed_028::{Kind, Row, ROWS};
 use serde_json::Value;
@@ -63,7 +64,7 @@ fn every_removed_spelling_exits_2_with_a_hint_naming_its_replacement() {
     let mut exercised = 0;
     for row in ROWS {
         for argv in invocations(&root, row) {
-            let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(&argv).arg("--json").current_dir(dir.path()).output().expect("spawn canon");
+            let out = hermetic::canon().args(&argv).arg("--json").current_dir(dir.path()).output().expect("spawn canon");
             let shown = argv.join(" ");
             assert_eq!(out.status.code(), Some(2), "canon {shown}: {}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
             assert!(out.stderr.is_empty(), "canon {shown}: JSON mode writes nothing on stderr");
@@ -129,7 +130,7 @@ fn every_replacement_the_table_names_exists() {
 #[test]
 fn an_unknown_spelling_is_an_ordinary_usage_error() {
     let dir = tempfile::tempdir().unwrap();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["gate", "check", "--no-such-option", "--json"]).current_dir(dir.path()).output().expect("spawn canon");
+    let out = hermetic::canon().args(["gate", "check", "--no-such-option", "--json"]).current_dir(dir.path()).output().expect("spawn canon");
     assert_eq!(out.status.code(), Some(2));
     let body: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert!(!body["error"]["hint"].as_str().unwrap_or_default().contains("was removed in"), "{body}");
@@ -178,7 +179,7 @@ fn an_operand_hint_names_the_typed_leaf_with_the_typed_values() {
     let dir = tempfile::tempdir().unwrap();
     for (typed, runnable) in cases {
         let argv: Vec<&str> = typed.split(' ').collect();
-        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(&argv).arg("--json").current_dir(dir.path()).output().expect("spawn canon");
+        let out = hermetic::canon().args(&argv).arg("--json").current_dir(dir.path()).output().expect("spawn canon");
         assert_eq!(out.status.code(), Some(2), "canon {typed}: {}", String::from_utf8_lossy(&out.stdout));
         let body: Value = serde_json::from_slice(&out.stdout).unwrap();
         let expected: Vec<&str> = body["error"]["expected"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
@@ -250,7 +251,7 @@ fn the_hint_of_a_line_with_several_removed_spellings_parses() {
     let dir = tempfile::tempdir().unwrap();
     for (typed, first) in cases {
         let argv: Vec<&str> = typed.split(' ').collect();
-        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(&argv).arg("--json").current_dir(dir.path()).output().expect("spawn canon");
+        let out = hermetic::canon().args(&argv).arg("--json").current_dir(dir.path()).output().expect("spawn canon");
         assert_eq!(out.status.code(), Some(2), "canon {typed}: {}", String::from_utf8_lossy(&out.stdout));
         let body: Value = serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(body["error"]["field"], *first, "{body}");

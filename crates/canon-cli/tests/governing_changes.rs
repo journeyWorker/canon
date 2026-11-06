@@ -4,6 +4,8 @@
 //! whatever the order of adoption and approval; a never-approved untagged
 //! feature change is a pending draft that blocks nothing.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -20,7 +22,7 @@ fn git_seed(repo: &Path) {
 }
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").output().expect("spawn canon binary")
 }
 
 fn stdout(o: &Output) -> String {
@@ -71,7 +73,7 @@ fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     git_seed(dir.path());
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none", "--no-agents-md", "--no-policy"]);
+    ok(repo, &["init", "--no-harness", "--no-agents-md", "--no-policy"]);
     for id in ["s", "t"] {
         ok(repo, &["subject", "new", id, "--domain", "dev", "--title", id]);
     }

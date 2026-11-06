@@ -4,6 +4,8 @@
 //! one `canon review scenario` signs off many scenarios, and a write that
 //! makes a pinned review stale names the review and its re-pin command.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -27,7 +29,7 @@ fn feature(subject_tag: &str) -> String {
 }
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
 }
 
 fn stdout(output: &Output) -> String {

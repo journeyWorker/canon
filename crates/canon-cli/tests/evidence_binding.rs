@@ -3,11 +3,13 @@
 //! wrote (canon runs nothing), and `experimental.evidence_binding`
 //! decides whether `canon gate check` holds the scenario to it.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .args(args)
         .env("CANON_ACTOR", "canon")
         .current_dir(repo)

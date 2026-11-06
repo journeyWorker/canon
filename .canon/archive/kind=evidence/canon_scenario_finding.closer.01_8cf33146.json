@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-finding-closer",
+    "role": "implementer",
+    "session_id": "s-0-38-finding-closer"
+  },
+  "at": "2026-11-06T09:09:05.027880Z",
+  "attachments": [
+    {
+      "case": "finding_closer_01_an_implementer_or_orchestrator_closes_fixed_and_the_record_carries_the_role",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "6a30e32b32820978ae41c3a0ef964825e3ad406a7ca9c90a9673e1512b30db1e"
+    }
+  ],
+  "code_tree": "c4ef23f7b5b96fc70b34813f62a80c9d50be26c2",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "79815f634e539e6bc9813d9abd405a99d70c023d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1,
+  "scenario_id": "finding.closer.01",
+  "schema": 1,
+  "staging_id": "8ac8c737",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

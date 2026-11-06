@@ -6,6 +6,8 @@
 //! share the rule; an approval with no recorded tree keeps the 0.36 rule.
 //! The dashboard's leg is `dashboard_briefs.rs` (`gate.approval-tree.03`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 use std::time::Duration;
@@ -26,7 +28,7 @@ const CHORE: &str = "---\nkind: chore\n---\n\n# Bump the client\n\n## Intent\n\n
 const CHORE_BRIEF: &str = ".canon/changes/bump-client/brief.md";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
 }
 
 fn text(bytes: &[u8]) -> String {
@@ -256,7 +258,7 @@ fn gate_approval_tree_02_an_approval_without_a_git_work_tree_or_a_commit_records
         if init_git {
             git(r, &["init", "-q", "-b", "main"]);
         }
-        ok(r, &["init", "--providers", "none"]);
+        ok(r, &["init", "--no-harness"]);
         ok(r, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
         ok(r, &["change", "new", "bump-client", "--subject", "demo", "--title", "Bump the client", "--change-kind", "chore"]);
         write(r, CHORE_BRIEF, CHORE);

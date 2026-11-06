@@ -7,6 +7,8 @@
 //! through the SAME `GitTier` root, so the CLI reads back exactly what
 //! the fixtures plant.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -53,7 +55,7 @@ fn repo() -> TempDir {
 }
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").output().expect("spawn canon binary")
 }
 
 fn stdout(o: &Output) -> String {
@@ -246,7 +248,7 @@ fn adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link(
         "tiers:\n  local: { backend: git, root: .canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_TEST_UNUSED, prefix: \"canon/\" }\nrouting:\n  subject: local\n  change: cold\n  scenario: local\n  evidence: local\n",
     )
     .unwrap();
-    let run_cold = |args: &[&str]| Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir.path()).env_remove("CANON_ROLE").env("CANON_R2_LOCAL_ROOT", &r2).output().expect("spawn canon binary");
+    let run_cold = |args: &[&str]| hermetic::canon().args(args).current_dir(dir.path()).env_remove("CANON_ROLE").env("CANON_R2_LOCAL_ROOT", &r2).output().expect("spawn canon binary");
     assert!(run_cold(&["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
     assert!(run_cold(&["subject", "new", "other", "--domain", "dev", "--title", "Other"]).status.success());
     assert!(run_cold(&["change", "new", "s36-demo", "--subject", "other", "--title", "Demo"]).status.success());

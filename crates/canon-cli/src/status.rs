@@ -610,6 +610,7 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
         }
     };
     let derived = Derived { code_tree: crate::reverify::CodeTreeMemo::lazy(), flow_changes: crate::brief_check::FlowChangesIndex::lazy() };
+    warnings.extend(crate::reverify::scope_warnings(repo, &ctx, &derived.code_tree).into_iter().map(|line| Warning::new("CODE_SCOPES_UNMATCHED", line)));
     let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, repo, &plan_roots, &derived, s))).collect();
     summaries.sort_by_key(|(s, _)| (rank(&DISPLAY_ORDER, s.status), s.subject_id.as_str().to_string()));
 
@@ -1000,6 +1001,13 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
             Some(brief)
         })
         .collect();
+    if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) {
+        for (change, scenarios, keys) in crate::reverify::chore_exemptions(repo, ctx, &derived.code_tree, subject) {
+            if let Some(brief) = briefs.iter_mut().find(|b| b.change.as_deref() == Some(change.as_str())) {
+                brief.scope_exempt = Some(crate::brief::ScopeExempt { scenarios, keys });
+            }
+        }
+    }
     // No governing change: the newest adopted change awaits its first approval.
     briefs.extend(if changes.is_empty() { crate::brief::brief_of(repo, plan_roots, subject, &[]) } else { governing.awaiting.as_ref().and_then(one) });
     let draft_briefs: Vec<BriefStatus> = governing.drafts.iter().filter_map(one).collect();
@@ -1606,6 +1614,10 @@ pub fn render(report: &StatusReport) -> String {
                     // The review is named only when the gate asks for it: no current review of this code is on record.
                     let asked = s.chore_reviews.iter().any(|(change, _)| Some(change.as_str()) == brief.change.as_deref());
                     let _ = writeln!(out, "      chore{of}: the code tree is the one it was approved on, so it asks for no evidence{}", if asked { "; its change-level review is still asked" } else { "" });
+                }
+                if let Some(exempt) = &brief.scope_exempt {
+                    let keys = exempt.keys.iter().map(|k| format!("`{k}`")).collect::<Vec<_>>().join(", ");
+                    let _ = writeln!(out, "      chore{of}: {} scenario(s) need no new evidence by code scope ({keys}): no path in their scope changed since their evidence", exempt.scenarios);
                 }
             }
             if !s.pending_drafts.is_empty() {

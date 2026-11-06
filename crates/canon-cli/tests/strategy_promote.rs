@@ -19,6 +19,8 @@
 //! additionally requires paired evaluation and verified approval, and
 //! the blocked cases below are the other half of that contract.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::Command;
 
@@ -88,7 +90,7 @@ fn seed_proven_regime(repo: &Path) {
 }
 
 fn run_promote(repo: &Path, id: &StrategyId, extra: &[&str]) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .arg("strategy")
         .arg("promote")
         .arg(id.to_string())
@@ -378,7 +380,7 @@ fn approval_payload_is_deterministic_and_enveloped_with_json() {
     let (evaluation_path, _, _, _) = write_approved_bundle(dir.path(), &candidate, &private_key);
     let id = candidate.id.to_string();
     let payload = |extra: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_canon"))
+        hermetic::canon()
             .args(["strategy", "approval-payload", &id, "--evaluation"])
             .arg(&evaluation_path)
             .args(["--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z", "--repo"])

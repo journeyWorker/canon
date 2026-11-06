@@ -5,6 +5,8 @@
 //! a report its leaf declares. An `.out` that is JSON but no envelope must be the
 //! bytes of an `artifact` leaf (`export`, `completion`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::path::Path;

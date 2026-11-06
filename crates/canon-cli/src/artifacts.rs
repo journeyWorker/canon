@@ -267,14 +267,14 @@ pub struct VerifyProblem<'a> {
 }
 
 /// One blob in the local store.
-struct LocalBlob {
-    digest: String,
-    path: PathBuf,
+pub(crate) struct LocalBlob {
+    pub(crate) digest: String,
+    pub(crate) path: PathBuf,
 }
 
 /// The regular files of the local store named by a digest, sorted, and
 /// the names of entries that are neither those nor a stale temp file.
-fn local_blobs(repo: &Path) -> std::io::Result<(Vec<LocalBlob>, Vec<String>)> {
+pub(crate) fn local_blobs(repo: &Path) -> std::io::Result<(Vec<LocalBlob>, Vec<String>)> {
     let dir = store_dir(repo);
     match std::fs::symlink_metadata(&dir) {
         Ok(meta) if meta.file_type().is_dir() => {}

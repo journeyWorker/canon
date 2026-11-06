@@ -138,7 +138,7 @@ exit 2
 
 --- stderr
 
-$ canon finding close add-login --round 1 --seq 1 --disposition rejected --reason accepted --actor impl-1 --session s-2 --json
+$ canon finding close add-login --round 1 --seq 1 --disposition rejected --reason accepted --actor impl-1 --session s-2 --role reviewer --json
 exit 0
 --- stdout
 {"ok":true,"data":{"staged":"kind=finding/add-login_1_1_<digest>.json","committed":"kind=finding/add-login_1_1_<digest>.json","changeId":"add-login","round":1,"seq":1,"from":"open","disposition":"rejected"},"meta":{"command":"finding close","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}

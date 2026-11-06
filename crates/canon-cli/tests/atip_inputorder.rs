@@ -5,6 +5,8 @@
 //!
 //! Tests are named by scenario id (`atip_inputorder_01_…` proves `atip.inputorder.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::io::Write as _;
 use std::path::Path;
@@ -14,7 +16,7 @@ use serde_json::{json, Value};
 use tempfile::TempDir;
 
 fn canon_with(dir: &Path, args: &[&str], stdin: Option<&str>, env: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-inputorder").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     for (name, value) in env {
         command.env(name, value);
@@ -57,7 +59,7 @@ fn fixture() -> TempDir {
         assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
     };
     git(&["init", "-q"]);
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     git(&["add", "-A"]);
     git(&["commit", "-q", "-m", "fixture"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);

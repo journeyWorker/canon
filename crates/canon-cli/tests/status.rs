@@ -4,6 +4,8 @@
 //! CLI reads (`tests/subject.rs`'s shape), so each test controls exactly
 //! which scenarios, evidence, reviews and findings exist.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -54,7 +56,7 @@ fn write_policy(repo: &Path, yaml: &str) {
 }
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).output().expect("spawn canon binary")
 }
 
 fn stdout(o: &Output) -> String {
@@ -326,7 +328,7 @@ fn assert_suggestion_parses_and_names_the_unit(command: &str) {
     let words = shell_words(command);
     assert_eq!(words.first().map(String::as_str), Some("canon"), "{command}");
     let filled: Vec<String> = words[1..].iter().map(|w| fill_placeholders(w)).collect();
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(&filled).arg("--help").output().expect("spawn canon binary");
+    let out = hermetic::canon().args(&filled).arg("--help").output().expect("spawn canon binary");
     assert!(out.status.success(), "`{command}` must parse as printed: {}", stderr(&out));
     let help = stdout(&out);
     for flag in ["--actor", "--session"] {
@@ -577,7 +579,7 @@ fn status_names_the_spec_root_when_several_are_configured() {
 
     let bin_dir = Path::new(env!("CARGO_BIN_EXE_canon")).parent().unwrap().to_path_buf();
     let path = format!("{}:{}", bin_dir.display(), std::env::var("PATH").unwrap_or_default());
-    let out = Command::new("sh").arg("-c").arg(case_step.replace("<unit>", "unit-a").replace("<session>", "session-a")).env("PATH", path).current_dir(dir.path()).output().unwrap();
+    let out = hermetic::scrub(Command::new("sh").arg("-c").arg(case_step.replace("<unit>", "unit-a").replace("<session>", "session-a")).env("PATH", path)).current_dir(dir.path()).output().unwrap();
     assert!(out.status.success(), "the suggested command must run once its placeholder is filled: {}", stderr(&out));
     let written = stdout(&out);
     assert!(written.contains("wrote `@world.demo.02` to ") && written.contains("/specs/demo/"), "written under the demo root: {written}");

@@ -88,6 +88,15 @@ on the closing version, shown by `finding list` as `[reason: …]` and carried
 in the JSON. Give the reason when you reject or defer: it is the only record
 of why the finding was not fixed.
 
+Closing `rejected` or `deferred` overturns the judgement of whoever raised
+the finding, so it is the reviewer's: a call that declares another role
+(`--as` or `CANON_ROLE`: planner, implementer, orchestrator) is refused
+with `FINDING_ROLE_DENIED`, nothing is written and the finding stays open.
+`fixed` is closed by every role. The closing version records the role the
+call declared (`--role` is accepted only when it names that role, or when
+none is declared) and no role when none was; `finding list` names who
+closed each closed finding and under which role (`closedBy`, `closedRole`).
+
 `--scenario` (repeatable, each a scenario the index knows; refused with
 `SCENARIO_NOT_FOUND` otherwise) names the scenarios the finding is
 about. After a `fixed` close, fresh evidence for those scenarios alone
@@ -448,7 +457,7 @@ subject's `change_ids` (`canon subject adopt`). The subject string is
 `<change_id>#<round>.<seq>`:
 
 ```
-open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or close it as rejected or deferred
+open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or have a reviewer close it as rejected or deferred
 ```
 
 Findings on changes no in-scope subject has adopted do not block.

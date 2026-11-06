@@ -209,6 +209,27 @@ is resumable (a stopped run leaves a repo the gate still passes) and a
 second run finds nothing to do. Moving the store is the repo owner's
 decision; moving bytes back to local is not supported.
 
+The store only grows: a report written anew on every run adds a blob per run.
+`canon artifacts prune` deletes the blobs no record binds any more, in the local
+store and, by the same rule, in an object-store tier:
+
+```bash
+canon artifacts prune                 # preview: what goes, what stays and why
+canon artifacts prune --keep-days 30  # also keep what the last 30 days of records bind
+canon artifacts prune --commit --plan-digest 9f2c1d7a4be03856c1e9d0a7b3f48256e1d09c7a4b3f2816d5e0a9c7b4f3e281
+```
+
+A blob stays while the latest evidence of a task or scenario binds it (what the
+gate and `artifacts verify` read), while a review still in effect binds it, while
+a record not promoted yet binds it, and with `--keep-days N` while any evidence or
+review of the last `N` days binds it. The preview counts the blobs and bytes
+that go and stay, names the reasons each kept blob stays and lists the blobs to
+delete a page at a time (`--limit`, `--cursor`). The commit deletes exactly that
+plan, and `artifacts verify` and `gate check` answer as before. A deleted local
+blob leaves the working tree, so commit the removal; it stays in git history,
+and shrinking that history is the repo owner's call, not this command's. A
+deleted object of a tier cannot be undone: the tier keeps no other copy.
+
 ## Reading the DuckDB views
 
 `crates/canon-store/sql/views.sql` layers `stg_` / `int_` / `mart_`

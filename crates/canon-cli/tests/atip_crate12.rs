@@ -1,12 +1,13 @@
 //! canon-0-35-crate-1-2, seen from canon: the `atip` crate moves to 1.2; canon declares its minor by a constant of its own (1.2 in `canon-0-35-claim-l2`, 1.4 in `canon-0-36-claim-1-4`, 1.5 in `canon-0-37-claim-1-5`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde_json::{json, Value};
 
 fn canon(dir: &Path, args: &[&str]) -> Value {
-    let output = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").output().expect("spawn canon");
+    let output = hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").output().expect("spawn canon");
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| panic!("{args:?}: {error}: {}", String::from_utf8_lossy(&output.stdout)))
 }
 

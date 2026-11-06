@@ -7,6 +7,8 @@
 //!
 //! Tests are named by scenario id (`atip_reasons_01_…` proves `atip.reasons.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,7 +21,7 @@ use tempfile::TempDir;
 // ── The binary and the fixtures ──
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
+    hermetic::canon().args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR").output().expect("spawn canon")
 }
 
 fn body(out: &Output) -> Value {
@@ -40,7 +42,7 @@ fn git(dir: &Path, args: &[&str]) {
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     git(repo, &["init", "-q"]);
@@ -65,7 +67,7 @@ fn assert_refusal(out: &Output, code: &str, reason: Option<&str>) -> Value {
 
 /// `canon schema --error <CODE> --json`: the `reasons` of the registry's view of a code.
 fn schema_reasons(code: &str) -> Vec<Value> {
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["schema", "--error", code, "--json"]).output().expect("spawn canon");
+    let out = hermetic::canon().args(["schema", "--error", code, "--json"]).output().expect("spawn canon");
     assert!(out.status.success(), "canon schema --error {code}: {}", String::from_utf8_lossy(&out.stdout));
     body(&out)["data"]["error"]["reasons"].as_array().cloned().unwrap_or_default()
 }
@@ -83,6 +85,8 @@ const AUDIT: &[Row] = &[
     ("ARTIFACTS_MOVE_INCOMPLETE", "ARTIFACTS_STORE_INVALID", "replace the thing that is no blob, then preview and commit a new plan"),
     ("ARTIFACTS_MOVE_INCOMPLETE", "ARTIFACTS_STORE_REQUIRED", "set the tier's endpoint, credentials and bucket, then preview and commit a new plan"),
     ("ARTIFACTS_MOVE_INCOMPLETE", "ARTIFACTS_STORE_UNAVAILABLE", "wait for the object store, then preview and commit a new plan"),
+    ("ARTIFACTS_PRUNE_INCOMPLETE", "ARTIFACTS_STORE_FAILED", "make the object store accept the delete, then preview and commit a new plan"),
+    ("ARTIFACTS_PRUNE_INCOMPLETE", "WRITE_FAILED", "make the blob directory writable, then preview and commit a new plan"),
     ("ARTIFACTS_STORE_INCOMPLETE", "ARTIFACTS_STORE_FAILED", "find why the write stopped, then write again"),
     ("ARTIFACTS_STORE_INCOMPLETE", "ARTIFACTS_STORE_UNAVAILABLE", "wait for the store, then write again"),
     ("BRIEF_CHECK_FAILED", "BLOCKERS", "resolve every blocker finding of the check"),
@@ -113,7 +117,6 @@ const AUDIT: &[Row] = &[
     ("FINDING_INCOMPLETE", "PROMOTION_INVALID", "fix the staged record, then run gate promote"),
     ("HOOKS_INSTALL_INCOMPLETE", "WRITE_FAILED", "finish the write the message names, then install the hooks again"),
     ("INIT_INCOMPLETE", "CONFIG_INVALID", "fix the skills: section, then run skills install"),
-    ("INIT_INCOMPLETE", "SKILLS_ARGUMENT_INVALID", "name a known provider, then run skills install"),
     ("INIT_INCOMPLETE", "SKILLS_SOURCE_NOT_FOUND", "name the skill source directory, then run skills install"),
     ("INPUT_INVALID", "BATCH_UNSUPPORTED", "pass one object and run once per item"),
     ("INPUT_INVALID", "EMPTY", "pass a document"),
@@ -648,6 +651,9 @@ fn atip_reasons_08_no_source_sets_an_exit_or_a_retryable_value_beside_the_regist
 
 // ── F6: the changelog ──
 
+/// The `(code, reason)` pairs the table of the CHANGELOG lists that a later release removed from the registry.
+const REMOVED_LATER: [(&str, &str); 1] = [("INIT_INCOMPLETE", "SKILLS_ARGUMENT_INVALID")];
+
 /// The rows `| `CODE` | `A`, `B` | … |` of the table whose header starts with `| Code | Reasons now |`.
 fn changelog_reason_rows() -> BTreeMap<String, BTreeSet<String>> {
     let text = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
@@ -683,7 +689,9 @@ fn atip_reasons_09_the_changelog_table_is_the_registry_and_stopped_midway_and_it
     assert!(rows.len() >= 14, "the CHANGELOG lists the codes whose reasons the change settled: {rows:?}");
     for (code, reasons) in &rows {
         let info = code_info(code).unwrap_or_else(|| panic!("the CHANGELOG names {code}, which is no registered code"));
-        let registered: BTreeSet<String> = info.reasons.iter().map(|r| r.reason.to_string()).collect();
+        let mut registered: BTreeSet<String> = info.reasons.iter().map(|r| r.reason.to_string()).collect();
+        // A reason a later release removed stays in the table of the release that made it (`canon-0-38-provider-option` removed the reason of `--providers`).
+        registered.extend(REMOVED_LATER.iter().filter(|(removed_from, _)| *removed_from == code.as_str()).map(|(_, reason)| (*reason).to_string()));
         assert_eq!(&registered, reasons, "{code}: the CHANGELOG and the registry list different reasons");
     }
     // Each code of the brief's table of F2 is in the CHANGELOG table.
@@ -695,6 +703,6 @@ fn atip_reasons_09_the_changelog_table_is_the_registry_and_stopped_midway_and_it
     }
     assert!(code_info("STOPPED_MIDWAY").is_none(), "STOPPED_MIDWAY is a code of 0.35");
     assert!(all_codes().iter().all(|info| info.reasons.iter().all(|r| r.reason != "SKILLS_INVALID_ARGUMENT")), "SKILLS_INVALID_ARGUMENT is a reason of 0.35");
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["schema", "--errors", "--json"]).output().unwrap();
+    let out = hermetic::canon().args(["schema", "--errors", "--json"]).output().unwrap();
     assert!(!String::from_utf8_lossy(&out.stdout).contains("STOPPED_MIDWAY"), "the registry view names STOPPED_MIDWAY");
 }

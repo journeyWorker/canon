@@ -5,9 +5,6 @@ use super::sites::{site, Kind, Site};
 pub const SITES: &[Site] = &[
     site("dashboard_briefs.rs:status_of:APPROVAL_INVALID#1", Kind::Other("the HTTP status the dashboard gives a refusal code (a table of codes to 400), not a check of an argument")),
     site("init.rs:run_init_in:INIT_ARGUMENT_INVALID#1", Kind::Domain { command: "init", argument: "language" }),
-    site("init.rs:run_init_in:INIT_ARGUMENT_INVALID#2", Kind::Domain { command: "init", argument: "providers" }),
-    site("init.rs:skill_install_error:SKILLS_ARGUMENT_INVALID#1", Kind::Precondition("`init --dry-run` says what `canon skills install` says of the skill source (`CANON_SKILLS_SOURCE` names no directory, or one with no SKILL.src.md): reads the file system, classified in run/skills.rs")),
-    site("init.rs:skill_install_error:SKILLS_ARGUMENT_INVALID#2", Kind::Other("the same refusal after `init` wrote canon.yaml: it is `INIT_INCOMPLETE` with this code (or `CONFIG_INVALID`, `SKILLS_SOURCE_NOT_FOUND`) as its reason (spec 8.3.2), not a check of an argument; classified in run/skills.rs")),
     site("input.rs:expand:USAGE#1", Kind::Other("`--input` is expanded to argv before clap runs, for every command that has it: a second `--input` is a fault of the expansion's own syntax")),
     site("input.rs:expand:USAGE#2", Kind::Other("`--input` is expanded to argv before clap runs: an `--input` without a value is a fault of the expansion's own syntax")),
     site("input.rs:run_batch:USAGE#1", Kind::Other("`--fields` with a batch: the output of a batch declares no `fields` (spec 6.10, 10.9.1), which is where the contract says it; the paging change's")),
@@ -21,7 +18,7 @@ pub const SITES: &[Site] = &[
     site("run/entry.rs:usage_parts:USAGE#1", Kind::Other("the mapping of clap's own parse error to the USAGE refusal")),
     site("run/entry.rs:usage_parts:USAGE#2", Kind::Other("the mapping of clap's own parse error (a bare group of commands) to the USAGE refusal")),
     site("run/entry.rs:usage_parts:USAGE#3", Kind::Other("the mapping of clap's own 'required arguments were not provided' error to the USAGE refusal")),
-    site("run/skills.rs:skills_error:SKILLS_ARGUMENT_INVALID#1", Kind::Domain { command: "skills install", argument: "providers" }),
+    site("run/skills.rs:skills_error:SKILLS_ARGUMENT_INVALID#1", Kind::Precondition("the install lock names a provider canon does not know: reads the install lock, so it is no argument of the command line")),
     site("run/top.rs:run_query:QUERY_ARGUMENT_INVALID#1", Kind::Precondition("`--include-sensitive` without `query.allow_sensitive: true` in .canon/policy.yaml: reads the policy file")),
     site("run/top.rs:run_regime_show:REGIME_KEY_INVALID#1", Kind::Domain { command: "regime show", argument: "hash" }),
     site("run/top.rs:run_retrieve:USAGE#1", Kind::Rule { command: "retrieve", rule: "exactlyOne", arguments: &["regime", "domain"] }),
@@ -29,5 +26,5 @@ pub const SITES: &[Site] = &[
     site("run/top.rs:run_retrieve:USAGE#3", Kind::Rule { command: "retrieve", rule: "requires", arguments: &["subject", "domain"] }),
     site("run/top.rs:run_retrieve:USAGE#4", Kind::Validator { command: "retrieve", arguments: &["for-role", "regime"] }),
     site("search/mod.rs:run_search:SEARCH_QUERY_REQUIRED#1", Kind::Domain { command: "search", argument: "text" }),
-    site("search/mod.rs:run_trace:TRACE_OPERAND_INVALID#1", Kind::Domain { command: "trace", argument: "id" }),
+    site("search/mod.rs:run_trace:TRACE_OPERAND_INVALID#1", Kind::Domain { command: "trace", argument: "trace" }),
 ];

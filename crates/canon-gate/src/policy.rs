@@ -73,11 +73,12 @@ pub const POLICY_YAML_RELATIVE_PATH: &str = canon_model::paths::POLICY_FILE;
 /// [`allowed_signers_path`] (`approval`, plus its compatibility aliases
 /// `risk_approvals` and `allowed_signers`), `canon-cli`'s retention
 /// (`query.allow_sensitive`), and `canon-cli`'s adapter authorization
-/// (`adapter_capabilities`). A new reader adds its key here.
+/// (`adapter_capabilities`), and `canon-cli`'s chore scopes (`code_scopes`). A new reader adds its key here.
 pub const KNOWN_TOP_LEVEL_KEYS: &[&str] = &[
     "adapter_capabilities",
     "allowed_signers",
     "approval",
+    "code_scopes",
     "experimental",
     "query",
     "risk_approvals",
@@ -1749,7 +1750,7 @@ trust_required:
         let rendered = resolution.diagnostics.iter().find(|d| matches!(d, PolicyDiagnostic::UnknownKey { .. })).unwrap().to_string();
         assert_eq!(
             rendered,
-            "spec_coverag: unknown top-level key (known keys: adapter_capabilities, allowed_signers, approval, experimental, query, risk_approvals, \
+            "spec_coverag: unknown top-level key (known keys: adapter_capabilities, allowed_signers, approval, code_scopes, experimental, query, risk_approvals, \
              risk_routing, risk_tiers, schema, spec_coverage, staleness, trust_required, trust_sample) — the gate refuses rather than ignoring it"
         );
     }

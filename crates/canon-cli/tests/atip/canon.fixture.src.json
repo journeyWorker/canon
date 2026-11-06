@@ -41,7 +41,7 @@
     },
     "context-pack show": {
       "domainRejects": {
-        "id": [
+        "pack": [
           "Core",
           "-core"
         ]
@@ -49,7 +49,7 @@
     },
     "context-pack verify": {
       "domainRejects": {
-        "id": [
+        "pack": [
           "Core",
           "-core"
         ]
@@ -111,6 +111,7 @@
       }
     },
     "artifacts move": {"preview": [["artifacts", "move", "--tier", "local", "--json"]]},
+    "artifacts prune": {"preview": [["artifacts", "prune", "--json"]]},
 
     "ledger compact": {"preview": [["ledger", "compact", "--json"]]},
     "migrate": {"preview": [["migrate", "--json"]]},
@@ -173,8 +174,6 @@
     "divergence defer": {"domainRejects": {"expiry": ["2030-1-1", "2030-01-01 10:00:00Z"]}},
     "divergence accept": {"domainRejects": {"expiry": ["2030-01-1", "+2030-01-01"]}},
     "strategy rollback": {"domainRejects": {"approval-at": ["2030-01-01", " 2030-01-01T10:00:00Z", "2030-01-01T10:00:00\u221202:00"]}},
-    "init": {"domainRejects": {"providers": ["Claude", "claude,,pi", "claude, pi", "", "none,claude"]}},
-    "skills install": {"domainRejects": {"providers": ["Claude", "claude,,pi", "claude, pi", "", "none,claude"]}},
     "finding list": {
       "domainRejects": {
         "change": [
@@ -304,16 +303,6 @@
         ]
       }
     },
-    "skills check": {
-      "domainRejects": {
-        "providers": ["Core", "-core", "Claude", "claude,,pi", "claude, pi", "", "none,claude"]
-      }
-    },
-    "skills doctor": {
-      "domainRejects": {
-        "providers": ["Core", "-core", "Claude", "claude,,pi", "claude, pi", "", "none,claude"]
-      }
-    },
     "status": {
       "fields": [
         [
@@ -340,7 +329,7 @@
     },
     "subject show": {
       "domainRejects": {
-        "id": [
+        "subject": [
           "Core",
           "-core"
         ]
@@ -348,7 +337,7 @@
     },
     "trace": {
       "domainRejects": {
-        "id": [
+        "trace": [
           "Core",
           "-core"
         ]
@@ -386,6 +375,11 @@
       "sh",
       "-c",
       "mkdir -p packages/dashboard/dist && echo '{\"name\":\"@canon-dev/dashboard\"}' > packages/dashboard/package.json && echo '<!doctype html><title>stub</title>' > packages/dashboard/dist/index.html"
+    ],
+    [
+      "sh",
+      "-c",
+      "mkdir -p .canon/artifacts/sha256 && printf x > .canon/artifacts/sha256/2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
     ]
   ],
   "probe": "status",

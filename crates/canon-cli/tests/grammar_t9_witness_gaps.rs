@@ -3,6 +3,8 @@
 //! context pack, a prompt bundle), the human-only acceptance of a divergence, and the
 //! failure envelopes of leaves whose refusals no other test provokes.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::path::{Path, PathBuf};

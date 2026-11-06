@@ -4,6 +4,8 @@
 //! move`, `artifacts verify`, `evidence approval-payload`, `ledger compact`,
 //! `export`, `purge`, `gate install-hooks`, `selftest` and `policy show`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -80,7 +82,7 @@ impl Repo {
     }
 
     fn canon(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_canon"))
+        hermetic::canon()
             .args(args)
             .env("CANON_ACTOR", "canon")
             .env_remove("CANON_ROLE")
@@ -372,7 +374,7 @@ fn archive_files(repo: &Path) -> usize {
 }
 
 fn canon_in(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon binary")
 }
 
 /// A repo with one `verifying` subject owning `world.demo.01`; no evidence.

@@ -107,7 +107,7 @@ canon evidence approval-payload --scenario auth.login.01 --project root --approv
 ```
 ```text
 # Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)
-usage: canon evidence audit <SCENARIO_ID> --ref <TEXT> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <DIGEST> --audit-result <confirmed|refuted|indeterminate> [--project <PROJECT_ID>] [--summary <TEXT>] [--command-result <TEXT> (with --summary)] [--run <RUN_ID>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME> (with --report)]* [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
+usage: canon evidence audit <SCENARIO_ID> --ref <TEXT> --evaluator <EVALUATOR_ID> --evaluator-version <TEXT> --evaluator-digest <DIGEST> --audit-result <confirmed|refuted|indeterminate> [--project <PROJECT_ID>] [--summary <TEXT>] [--command-result <TEXT> (with --summary)] [--run <RUN_ID>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME> (with --report)]* [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
 ```
 ```bash
 canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json
@@ -212,7 +212,7 @@ canon task done add-login#1 --json
 ```
 ```text
 # Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
-usage: canon trace <ID>
+usage: canon trace <TRACE_ID>
 ```
 ```bash
 canon trace add-login_1_1 --json
@@ -306,7 +306,8 @@ canon evidence add --input '[{"scenario":"auth.login.01","class":"test-run","ref
    re-checks them, so the working-tree report may be gitignored. Run
    `canon artifacts verify` to ask the store yourself; it refuses, never
    passes, when an object store cannot be reached. Moving an existing store
-   (`canon artifacts move --tier`) is the repo owner's call: do not run it.
+   (`canon artifacts move --tier`) and deleting the blobs no record binds
+   (`canon artifacts prune`) are the repo owner's call: do not run them.
    For a scenario about what users see, let the test report carry its
    screenshots: Playwright's JUnit reporter attaches, per test case, what a
    test attaches (`testInfo.attach(name, {path})`, or `screenshot: 'on'`), and

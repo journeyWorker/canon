@@ -129,7 +129,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   @flow:canon-0-37-option-values.F6
   @atip.optionvalues.12
   Scenario: Every option of the same name has one domain in every command
-    Given every command document of canon schema and the one name allowed by a reason, --kind (`--providers` has one domain since `canon-0-37-option-forms`)
+    Given every command document of canon schema and the one name allowed by a reason, --kind (`--harness` declares no domain at all since `canon-0-38-provider-option`: it is an enumeration)
     When the sweep groups the declarations by option name
     Then no name has two domains or closed sets that are not nested outside the allowed list, the sweep reads more than 80 names and more than 25 shared ones, and every option of the three rules has one domain
 

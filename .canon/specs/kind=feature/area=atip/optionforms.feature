@@ -1,4 +1,4 @@
-Feature: atip option forms: the time options take RFC 3339 and nothing else, and the provider list takes the exact names
+Feature: atip option forms: the time options take RFC 3339 and nothing else, and the provider names are the four exact ones
   # canon: {"schema":1,"at":"2026-11-05T15:55:04Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
 
   # canon: {"schema":1,"at":"2026-11-05T15:55:14Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
@@ -95,10 +95,10 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @case:happy
   @flow:canon-0-37-option-forms.F4
   @atip.optionforms.09
-  Scenario: init and the three skills commands take none and the exact provider names
-    Given init in a new git directory and skills install, check and doctor in the story repository, with claude, claude,omp, none, a name twice, three names and all four
+  Scenario: init and the three skills commands take no provider and each exact provider name, as the list of 0.37 was taken
+    Given init in a new git directory and skills install, check and doctor in the story repository, with --harness claude, claude and omp, --no-harness, a name twice, three names and all four
     When each call runs, and skills install records none
-    Then init records the list in canon.yaml, none is recorded as an empty list, and the skills commands are not refused for --providers
+    Then init records the list in canon.yaml, none is recorded as an empty list, and the skills commands are not refused for --harness
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:08Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
@@ -106,10 +106,10 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @case:failure
   @flow:canon-0-37-option-forms.F4
   @atip.optionforms.10
-  Scenario: A provider list that is not exact is refused by the four commands and nothing is written
-    Given Claude, NONE, None, an empty item at the start, in the middle and at the end, a lone comma, white space around or beside a comma, an empty value, white space only, none beside a name and an unknown name
+  Scenario: A provider name that is not exact is refused by the four commands and nothing is written
+    Given as the value of --harness: Claude, NONE, None, none, white space after or before a name, two names in one value, an empty value, white space only and an unknown name
     When init and the three skills commands run with each, with --json
-    Then init exits 2 with INIT_ARGUMENT_INVALID and the skills commands with SKILLS_ARGUMENT_INVALID, each naming --providers, and nothing is written, canon.yaml included
+    Then each command exits 2 with USAGE naming --harness and the four names as `expected`, and nothing is written, canon.yaml included
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:13Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
@@ -117,10 +117,10 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @case:happy
   @flow:canon-0-37-option-forms.F5
   @atip.optionforms.11
-  Scenario: Each of the seven options declares one domain in every command that has it, as a pattern of characters, and the help says the new spelling
-    Given every command document of canon schema, the four commands that take --approval-at, the five date options in their eight places and the four commands that take --providers
+  Scenario: Each of the six time options declares one domain in every command that has it, as a pattern of characters, and the help says the new spelling
+    Given every command document of canon schema, the four commands that take --approval-at and the five date options in their eight places
     When the declarations and the help are read
-    Then the four places of --approval-at declare one pattern and the eight of the date options another, the four of --providers one, init's the skills commands', each is a pattern of characters with no white-space class that the 1.5 profile reads, the help names the date-time, the RFC 3339 date and the lowercase names
+    Then the four places of --approval-at declare one pattern and the eight of the date options another, each is a pattern of characters with no white-space class that the 1.5 profile reads, the help names the date-time and the RFC 3339 date
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:19Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
@@ -131,7 +131,7 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   Scenario: The table of values inside and outside each domain agrees with the real parsers, and a command that declares another domain fails the sweep
     Given the table of values inside and outside each domain, and seeded documents in which a command declares another domain, none or the pattern of the other option
     When each value is judged by the declared pattern and by the parser of its option, and the sweep reads each document
-    Then the pattern and the parser agree on every value, a date or time that does not exist is the pattern's and the parser's refusal with its cause, and the sweep finds each seeded fault by the option and the command
+    Then the pattern and the parser agree on every value, a date or time that does not exist is the pattern's and the parser's refusal, which says what does not exist, and the sweep finds each seeded fault by the option and the command
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:25Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
@@ -164,7 +164,7 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   Scenario: The checker's fixture lists values the new domains refuse, and the recipes run at 1.5
     Given the checker's fixture and the recipes of the justfile
     When the values it lists as refused are judged by the declared domains
-    Then each of the sixteen places of the seven options lists a value its domain refuses, and the recipes run the checker at 1.5
+    Then each of the twelve places of the six options lists a value its domain refuses, and the recipes run the checker at 1.5
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:42Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
@@ -175,4 +175,4 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   Scenario: The golden file is the measure of 0.36.0 and each class of it is described
     Given atip/option_forms_0_36.json
     When its classes, its accepted and its refused entries are read
-    Then each class is described, each place of the seven options was measured, and the file says what the brief says 0.36.0 took: a date alone, white space, one digit, a space for the T and the minus sign of Unicode for --approval-at, and a capital, an empty item, a space and nothing for --providers
+    Then each class is described, each place of the six options was measured, and the file says what the brief says 0.36.0 took: a date alone, white space, one digit, a space for the T and the minus sign of Unicode for --approval-at, and the entries of --providers, which is no option in 0.38, are kept under supersededBy038 as the record

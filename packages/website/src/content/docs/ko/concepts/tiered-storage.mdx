@@ -209,6 +209,26 @@ canon artifacts move --tier cold --commit --plan-digest 0123456789abcdef
 없습니다. 스토어 이전은 레포 소유자가 정할 일이며, 바이트를 로컬로 되돌리는 것은
 지원하지 않습니다.
 
+스토어는 늘기만 합니다. 보고서를 실행마다 새로 쓰면 블롭이 실행마다 하나 늘어납니다.
+`canon artifacts prune`은 어떤 기록도 더는 묶지 않는 블롭을 지웁니다. 로컬
+스토어와, 같은 규칙으로 객체 저장소 계층에서 지웁니다.
+
+```bash
+canon artifacts prune                 # 미리보기: 무엇이 지워지고 남는지, 왜 남는지
+canon artifacts prune --keep-days 30  # 최근 30일의 기록이 묶은 블롭도 남김
+canon artifacts prune --commit --plan-digest 9f2c1d7a4be03856c1e9d0a7b3f48256e1d09c7a4b3f2816d5e0a9c7b4f3e281
+```
+
+작업별·시나리오별 최신 증거가 묶은 블롭(게이트와 `artifacts verify`가 읽는 것), 아직
+유효한 리뷰가 묶은 블롭, 승격 전 기록이 묶은 블롭은 남고, `--keep-days N`을 주면 최근
+`N`일의 증거와 리뷰가 묶은 블롭도 남습니다. 미리보기는 지울 블롭과 남길 블롭의 수와
+바이트를 세고, 남는 블롭마다 이유를 말하며, 지울 블롭의 목록을 한 페이지씩 보여
+줍니다(`--limit`, `--cursor`). 실행은 정확히 그 계획만 지우고, 그 뒤에도 `artifacts
+verify`와 `gate check`의 답은 같습니다. 지운 로컬 블롭은 작업 트리에서 사라지므로
+삭제를 커밋해야 하며, git 기록에는 남습니다. 기록을 줄이는 일은 이 명령이 아니라 저장소
+주인이 정합니다. 계층에서 지운 객체는 되돌릴 수 없습니다. 계층에는 다른 사본이
+없습니다.
+
 **Done when:** `canon artifacts move --tier cold --commit --plan-digest <digest>`가
 exit `0`으로 끝나고 `canon artifacts verify --full`과 `canon gate check`가 통과하면
 끝입니다.

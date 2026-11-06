@@ -4,13 +4,15 @@
 //! report cases, aggregated task rows, task status in the record store,
 //! and one task+scenario record answering both joins).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
 use sha2::{Digest, Sha256};
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
 }
 
 fn text(output: &Output) -> String {

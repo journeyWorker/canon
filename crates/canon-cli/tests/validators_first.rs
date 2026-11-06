@@ -2,6 +2,8 @@
 //! that `canon` moved ahead of the preconditions is refused with the validator's own code in an empty directory (no repo,
 //! no `canon.yaml`, an empty HOME), and nothing is written. The sweep over every validator is `tests/arg_rules.rs` (07).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 mod rule_support;
 

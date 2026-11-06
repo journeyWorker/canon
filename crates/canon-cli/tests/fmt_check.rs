@@ -4,15 +4,17 @@
 //! — never `canon_cli`'s library functions in-process, same discipline
 //! as `tier_age.rs`/`query.rs`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 fn fixture_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../canon-fmt/fixtures/consumer-corpus/pre/spec")
 }
 
 fn run_canon(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).output().expect("spawn canon binary")
+    hermetic::canon().args(args).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {

@@ -3,6 +3,8 @@
 //! no earlier test proves. Exit codes, JSON fields, records written and trees
 //! left unchanged; no help text and no wording.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -35,7 +37,7 @@ impl Fixture {
 }
 
 fn run(repo: &Path, home: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon"))
+    hermetic::canon()
         .args(args)
         .current_dir(repo)
         .env("CANON_ACTOR", "spec028-a")
@@ -71,7 +73,7 @@ fn fixture() -> Fixture {
     let home = TempDir::new().unwrap();
     let f = Fixture { dir, home };
     git(f.path(), &["init", "-q", "-b", "main"]);
-    f.ok(&["init", "--providers", "none", "--no-agents-md"]);
+    f.ok(&["init", "--no-harness", "--no-agents-md"]);
     std::fs::write(f.path().join("lib.rs"), "pub fn login() {}\n").unwrap();
     git(f.path(), &["add", "-A"]);
     git(f.path(), &["commit", "-q", "-m", "setup"]);
@@ -486,7 +488,7 @@ fn gate_check_102_nothing_examined_is_unverifiable_until_something_is() {
     let home = TempDir::new().unwrap();
     let r = dir.path();
     git(r, &["init", "-q", "-b", "main"]);
-    let init = run(r, home.path(), &["init", "--providers", "none", "--no-agents-md", "--no-policy"]);
+    let init = run(r, home.path(), &["init", "--no-harness", "--no-agents-md", "--no-policy"]);
     assert!(init.status.success(), "{}{}", text(&init.stdout), text(&init.stderr));
     git(r, &["add", "-A"]);
     git(r, &["commit", "-q", "-m", "setup"]);

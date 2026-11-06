@@ -120,13 +120,26 @@ impl Removed {
         Removed { command, used: used.clone(), replacement: line.clone(), note: row.note, field: used, since: row.since, line: Some(line) }
     }
 
-    /// A removed option that is renamed in place: the whole typed line with every removed option replaced.
-    fn renamed_line(row: &'static Row, command: String, used: String, args: &[String], renamed: &[(usize, String)]) -> Removed {
-        let mut words: Vec<String> = args.iter().map(|arg| shell_word(arg)).collect();
-        for (at, token) in renamed {
-            words[*at] = shell_word(token);
+    /// A removed option that is renamed in place: the whole typed line with every removed option replaced. A `--providers` list
+    /// (`expanded`: where it stands, how many tokens it spans, and the words that replace them) becomes one `--harness` for each name.
+    fn renamed_line(row: &'static Row, command: String, used: String, args: &[String], renamed: &[(usize, String)], expanded: &[(usize, usize, &[String])]) -> Removed {
+        let mut words: Vec<String> = Vec::with_capacity(args.len());
+        let mut i = 0;
+        while i < args.len() {
+            if let Some((_, span, with)) = expanded.iter().find(|(at, _, _)| *at == i) {
+                words.extend(with.iter().map(|word| shell_word(word)));
+                i += span;
+                continue;
+            }
+            words.push(match renamed.iter().find(|(at, _)| *at == i) {
+                Some((_, token)) => shell_word(token),
+                None => shell_word(&args[i]),
+            });
+            i += 1;
         }
-        Removed { command, used: used.clone(), replacement: row.new.to_string(), note: row.note, field: used, since: row.since, line: Some(words.join(" ")) }
+        // The note of a `--providers` row says what the corrected line already shows.
+        let note = if row.old == "--providers" { "" } else { row.note };
+        Removed { command, used: used.clone(), replacement: row.new.to_string(), note, field: used, since: row.since, line: Some(words.join(" ")) }
     }
 }
 
@@ -191,6 +204,11 @@ struct Hit {
     /// What the token becomes when the option is renamed in place: `--new` or `--new=value`; `None` when it is not a
     /// rename of one option to one option.
     renamed: Option<String>,
+    /// A `--providers` list the 0.37 spelling took: how many tokens it spans from `at` (the option and its value) and the words
+    /// that replace them (`--harness claude --harness omp`, or `--no-harness`); `None` for any other removed option.
+    replace: Option<(usize, Vec<String>)>,
+    /// A `--providers` whose value is no list the 0.37 spelling took (or has none): no corrected line can be written for it.
+    unfixable: bool,
 }
 
 /// The first removed spelling in `args` (argv without the program name), read
@@ -239,11 +257,20 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
                 }
                 None => {
                     if let Some(row) = option_row(&format!("--{name}"), &here) {
-                        let renamed = single_option(row.new).map(|new| match inline {
-                            Some(value) => format!("{new}={value}"),
-                            None => new.to_string(),
-                        });
-                        hits.push(Hit { row, command: here, at: i, used: format!("--{name}"), renamed });
+                        let (renamed, replace, unfixable) = if row.old == "--providers" {
+                            let value = inline.or_else(|| args.get(i + 1).map(String::as_str).filter(|value| !value.starts_with("--")));
+                            match value.and_then(harness_words) {
+                                Some(words) => (None, Some((if inline.is_some() { 1 } else { 2 }, words)), false),
+                                None => (None, None, true),
+                            }
+                        } else {
+                            let renamed = single_option(row.new).map(|new| match inline {
+                                Some(value) => format!("{new}={value}"),
+                                None => new.to_string(),
+                            });
+                            (renamed, None, false)
+                        };
+                        hits.push(Hit { row, command: here, at: i, used: format!("--{name}"), renamed, replace, unfixable });
                         // The removed option's own value is not an option, unless it is missing.
                         if inline.is_none() && args.get(i + 1).is_some_and(|value| !value.starts_with("--")) {
                             i += 1;
@@ -300,8 +327,12 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
                 _ => return Some(corrected),
             }
         }
-        if row.since == V31 || (renamed.len() > 1 && first.renamed.is_some()) {
-            return Some(Removed::renamed_line(row, command, used, args, &renamed));
+        if hits.iter().any(|hit| hit.unfixable) {
+            return Some(Removed::from_row(row, command, used.clone(), used));
+        }
+        let expanded: Vec<(usize, usize, &[String])> = hits.iter().filter_map(|hit| hit.replace.as_ref().map(|(span, words)| (hit.at, *span, words.as_slice()))).collect();
+        if row.since == V31 || (renamed.len() > 1 && first.renamed.is_some()) || !expanded.is_empty() {
+            return Some(Removed::renamed_line(row, command, used, args, &renamed, &expanded));
         }
         return Some(Removed::from_row(row, command, used.clone(), used));
     }
@@ -317,6 +348,17 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
 /// `new` when it is one long option and nothing else (`--actor`), the only replacement a token can be rewritten to in place.
 fn single_option(new: &str) -> Option<&str> {
     (new.starts_with("--") && !new.contains(' ')).then_some(new)
+}
+
+/// What a `--providers` value is typed as in the 0.38 spelling: `--no-harness` for `none`, else `--harness` before each name; `None` for a value
+/// the 0.37 spelling did not take (a name that is none of the four, upper case, white space, an empty item, `none` beside a name).
+fn harness_words(value: &str) -> Option<Vec<String>> {
+    const NAMES: [&str; 4] = ["claude", "codex", "omp", "pi"];
+    if value == "none" {
+        return Some(vec!["--no-harness".to_string()]);
+    }
+    let names: Vec<&str> = value.split(',').collect();
+    names.iter().all(|name| NAMES.contains(name)).then(|| names.iter().flat_map(|name| ["--harness".to_string(), (*name).to_string()]).collect())
 }
 
 #[cfg(test)]
@@ -389,5 +431,46 @@ mod tests {
         assert!(removed.hint().contains("`canon change new x --subject demo --title 'Add search'`"), "{}", removed.hint());
         assert_eq!(removed.message(), "--subject-id was removed in 0.31.0");
         assert_eq!(removed.expected(), "--subject");
+    }
+
+    /// A tree with `init` (a leaf that once took `--providers`) and `skills install`, which also renamed `--source`.
+    fn init_tree() -> Command {
+        use clap::Arg;
+        Command::new("canon")
+            .subcommand(Command::new("init").arg(Arg::new("repo").long("repo")).arg(Arg::new("json").long("json").action(clap::ArgAction::SetTrue)))
+            .subcommand(Command::new("skills").subcommand(Command::new("install").arg(Arg::new("skills-source").long("skills-source")).arg(Arg::new("json").long("json").action(clap::ArgAction::SetTrue))))
+    }
+
+    fn find_init(args: &[&str]) -> Option<Removed> {
+        find(&init_tree(), &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn a_providers_list_becomes_one_harness_option_for_each_name() {
+        let found = find_init(&["init", "--providers", "claude,omp", "--json"]).expect("removed");
+        assert_eq!((found.used.as_str(), found.since), ("--providers", "0.38.0"));
+        assert_eq!(found.line.as_deref(), Some("init --harness claude --harness omp --json"));
+        assert!(found.hint().contains("`canon init --harness claude --harness omp --json`"), "{}", found.hint());
+        let joined = find_init(&["init", "--providers=pi,pi", "--repo", "r"]).expect("removed");
+        assert_eq!(joined.line.as_deref(), Some("init --harness pi --harness pi --repo r"));
+        let none = find_init(&["init", "--providers", "none"]).expect("removed");
+        assert_eq!(none.line.as_deref(), Some("init --no-harness"));
+    }
+
+    #[test]
+    fn a_providers_list_the_old_spelling_did_not_take_has_no_corrected_line() {
+        for value in ["Claude", "claude,", "claude, pi", "gemini", "none,claude", "", "NONE"] {
+            let found = find_init(&["init", &format!("--providers={value}")]).expect("removed");
+            assert_eq!((found.line.as_deref(), found.expected().as_str()), (None, "--harness"), "{value:?}");
+            assert!(found.hint().contains("use `--harness`") && found.hint().contains("`--no-harness`"), "{}", found.hint());
+        }
+        let missing = find_init(&["init", "--providers", "--json"]).expect("removed");
+        assert_eq!(missing.line, None);
+    }
+
+    #[test]
+    fn a_providers_list_is_corrected_beside_another_renamed_option() {
+        let found = find_init(&["skills", "install", "--providers", "codex,pi", "--source", "dir"]).expect("removed");
+        assert_eq!(found.line.as_deref(), Some("skills install --harness codex --harness pi --skills-source dir"));
     }
 }

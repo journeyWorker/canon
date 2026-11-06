@@ -628,6 +628,17 @@ impl ObjectArtifacts {
         self.blobs.list().map_err(|e| self.error(e))
     }
 
+    /// Every digest the store holds with the size of its object, sorted by digest.
+    pub fn list_sized(&self) -> Result<Vec<(String, u64)>, ArtifactStoreError> {
+        self.blobs.list_sized().map_err(|e| self.error(e))
+    }
+
+    /// Delete the object for `digest` (`canon artifacts prune`); one the store already lacks is no error. Irreversible: the store keeps
+    /// no other copy.
+    pub fn delete(&self, digest: &str) -> Result<(), ArtifactStoreError> {
+        self.blobs.delete(digest).map_err(|e| self.error(e))
+    }
+
     fn error(&self, e: BlobError) -> ArtifactStoreError {
         match e {
             BlobError::Changed { expected, actual } => ArtifactStoreError::Changed { expected, actual },

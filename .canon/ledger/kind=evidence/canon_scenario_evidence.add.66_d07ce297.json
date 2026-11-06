@@ -1,0 +1,44 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T06:59:05.557667Z",
+  "attachments": [
+    {
+      "case": "artifact_store::tests::evidence_add_66_a_rollback_never_removes_a_blob_another_writer_published",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    },
+    {
+      "case": "artifact_store::tests::evidence_add_66_publish_counts_only_the_blobs_it_wrote",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    },
+    {
+      "case": "artifact_store::tests::evidence_add_66_a_second_store_writer_waits_for_the_lock",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    }
+  ],
+  "code_tree": "343ae09e077298bd79ea2fccffff72977da2da07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "5b4b203bc0f8c5745f15e055fcbc054cc649d085",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1764,
+  "scenario_id": "evidence.add.66",
+  "schema": 1,
+  "staging_id": "ecc73697",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

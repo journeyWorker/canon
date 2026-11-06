@@ -2,14 +2,16 @@
 //! D2), the PRD brief `canon change new` writes (D1) and `language:` (D6),
 //! against the actually-built `canon` binary.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 use tempfile::TempDir;
 
 fn run(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).output().expect("spawn canon binary")
 }
 
 fn stdout(o: &Output) -> String {
@@ -29,7 +31,7 @@ fn ok(repo: &Path, args: &[&str]) {
 /// and change `add-login` written by `canon change new`.
 fn repo_with_change(lang: Option<&str>) -> TempDir {
     let dir = TempDir::new().unwrap();
-    let mut init = vec!["init", "--providers", "none"];
+    let mut init = vec!["init", "--no-harness"];
     if let Some(lang) = lang {
         init.extend(["--language", lang]);
     }
@@ -319,7 +321,7 @@ fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
 #[test]
 fn operational_errors_carry_a_string_code_and_the_registry_exit() {
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-harness"]);
     let (code, report) = check(dir.path(), &[]);
     assert_eq!((code, report["error"]["code"].as_str()), (2, Some("BRIEF_REQUIRED")));
 
@@ -361,11 +363,11 @@ fn brief_show_names_the_next_steps_from_the_findings_and_never_edits() {
 #[test]
 fn init_language_is_validated_recorded_and_checked() {
     let dir = TempDir::new().unwrap();
-    let out = run(dir.path(), &["init", "--providers", "none", "--language", "korean language"]);
+    let out = run(dir.path(), &["init", "--no-harness", "--language", "korean language"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(!dir.path().join("canon.yaml").exists(), "nothing is written on a refused tag");
 
-    ok(dir.path(), &["init", "--providers", "none", "--language", "ko"]);
+    ok(dir.path(), &["init", "--no-harness", "--language", "ko"]);
     let out = run(dir.path(), &["init", "--check"]);
     assert!(stdout(&out).contains("[PASS] language (ko)"), "{}", stdout(&out));
 

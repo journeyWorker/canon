@@ -24,6 +24,8 @@
 //!   (`demo review`, `dispatch begin`, `divergence accept|defer|resolve`) add
 //!   a record per run by contract: there is nothing to hold them to.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 
 use std::collections::BTreeSet;
@@ -88,6 +90,7 @@ const DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789
 #[rustfmt::skip]
 const REFUSALS: &[Row] = &[
     lit("artifacts move", &["artifacts", "move", "--tier", "cold"], "ARTIFACTS_TIER_INVALID"),
+    lit("artifacts prune", &["artifacts", "prune", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("artifacts store", &["artifacts", "store"], "CONFIG_INVALID").setup(BROKEN_CONFIG),
     lit("brief approve", &["brief", "approve", "no-such-change", "--approver", "alice", "--note", "ok"], "BRIEF_NOT_FOUND"),
     lit("change new", &["change", "new", "add-login", "--subject", "demo", "--title", "Again"], "CHANGE_EXISTS"),
@@ -114,7 +117,7 @@ const REFUSALS: &[Row] = &[
     lit("ingest plans", &["ingest", "plans", "--repo", "@empty"], "CONFIG_REQUIRED"),
     lit("ingest records", &["ingest", "records", "--repo", "@empty"], "CONFIG_REQUIRED"),
     lit("ingest sessions", &["ingest", "sessions", "--repo", "@empty"], "CONFIG_REQUIRED"),
-    lit("init", &["init", "--providers", "bogus", "--repo", "@empty"], "INIT_ARGUMENT_INVALID"),
+    lit("init", &["init", "--language", "e", "--repo", "@empty"], "INIT_ARGUMENT_INVALID"),
     lit("inventory sync", &["inventory", "sync"], "CONFIG_INVALID").setup(BROKEN_CONFIG),
     lit("ledger compact", &["ledger", "compact", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("migrate", &["migrate", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
@@ -128,7 +131,7 @@ const REFUSALS: &[Row] = &[
     example("review change", &[], "REVIEW_ARGUMENT_INVALID"),
     example("review scenario", &["--project", "nosuchroot"], "SPEC_ROOT_NOT_FOUND"),
     lit("scenario new", &["scenario", "new", "auth.login.02", "--title", "Again", "--feature", FEATURE], "SCENARIO_TAG_EXISTS"),
-    lit("skills install", &["skills", "install", "--providers", "bogus"], "SKILLS_ARGUMENT_INVALID"),
+    lit("skills install", &["skills", "install", "--skills-source", "no-such-dir"], "SKILLS_SOURCE_NOT_FOUND"),
     lit("strategy promote", &["strategy", "promote", "01ARZ3NDEKTSV4RRFFQ69G5FAV"], "CONFIG_INVALID").setup(BROKEN_CONFIG),
     lit("strategy rollback", &["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason", "regressed", "--actor", "alice", "--signature-file", "missing.sig", "--approval-at", "2030-01-01T00:00:00Z"], "STRATEGY_NOT_FOUND"),
     lit("subject adopt", &["subject", "adopt", "no-such", "--change", "add-login"], "SUBJECT_NOT_FOUND"),

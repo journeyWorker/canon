@@ -3,7 +3,7 @@
 use atip::constraint::{Rule, Validator};
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, PROVIDERS, ROLE_DESCRIPTION, VIA_DESCRIPTION};
+use super::{DomainRow, Scope, Tables, ACTOR_DESCRIPTION, ANSWER_RELAYED, CALENDAR, NOT_BLANK, ROLE_DESCRIPTION, VIA_DESCRIPTION};
 
 /// `init --language`: trimmed and lowercased (ASCII), then a primary subtag of two or three letters and `-` subtags of one to
 /// eight letters or digits (`ko`, `en-US`, `zh-Hant`).
@@ -37,6 +37,9 @@ pub(crate) static TABLES: Tables = Tables {
                 Rule::forbids_in("kind", NOT_DOMAIN_KINDS, &["domain"]).code("QUERY_ARGUMENT_INVALID").help("`--domain` applies only to `--kind subject`."),
             ],
         ),
+        ("skills install", &[Rule::at_most_one(&["harness", "no-harness"])]),
+        ("skills check", &[Rule::at_most_one(&["harness", "no-harness"])]),
+        ("skills doctor", &[Rule::at_most_one(&["harness", "no-harness"])]),
         ("retrieve", &[Rule::exactly_one(&["regime", "domain"]).hint("canon retrieve --for-role <ROLE> --domain <DOMAIN>"), Rule::requires("subject", &["domain"])]),
     ],
     validators: &[
@@ -114,19 +117,10 @@ pub(crate) static TABLES: Tables = Tables {
         ),
     ],
     domains: &[
-        DomainRow::new(Scope::Arguments(&["trace"], "id"), Domain::matching(TRACE_OPERAND), "TRACE_OPERAND_INVALID").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "abcdef0", "loop-change_9_9", " a_1_2 "]).says("is none of the three shapes a trace operand takes: a review id (26 base32 characters), a commit sha (7 to 40 hex digits) or a finding key (<change>_<round>_<seq>)").outside(&["abc", "not a shape!", "abcdef", "a_1", "a__2", "a_1_x", "a_1_2_"]),
+        DomainRow::new(Scope::Arguments(&["trace"], "trace"), Domain::matching(TRACE_OPERAND), "TRACE_OPERAND_INVALID").inside(&["01ARZ3NDEKTSV4RRFFQ69G5FAV", "abcdef0", "loop-change_9_9", " a_1_2 "]).says("is none of the three shapes a trace operand takes: a review id (26 base32 characters), a commit sha (7 to 40 hex digits) or a finding key (<change>_<round>_<seq>)").outside(&["abc", "not a shape!", "abcdef", "a_1", "a__2", "a_1_x", "a_1_2_"]),
         // The text is not blank once trimmed; the handler refuses it before it opens the index.
         DomainRow::new(Scope::Arguments(&["search"], "text"), Domain::matching(NOT_BLANK), "SEARCH_QUERY_REQUIRED").inside(&["timeout", " a "]).outside(&["", "   "]),
         DomainRow::new(Scope::Arguments(&["init"], "language"), Domain::matching(LANGUAGE), "INIT_ARGUMENT_INVALID").inside(&["ko", "en-US", " zh-Hant ", "KO"]).outside(&["", "e", "eng1", "en-", "en--us", "한국어", "en-abcdefghi"]),
-        // `init` and the three `skills` commands read one list: the rows say it in the same pattern, each with its own code.
-        DomainRow::new(Scope::Arguments(&["init"], "providers"), Domain::matching(PROVIDERS), "INIT_ARGUMENT_INVALID")
-            .says("is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)")
-            .inside(&["claude", "none", "claude,omp", "omp,omp", "pi,codex,claude"])
-            .outside(&["", " ", "Claude", "NONE", "None", "claude,,pi", "claude,", ",omp", ",", " claude", "claude ", "claude, pi", "none,claude", "claude,none", "gemini", "claude,gemini"]),
-        DomainRow::new(Scope::Arguments(&["skills install", "skills check", "skills doctor"], "providers"), Domain::matching(PROVIDERS), "SKILLS_ARGUMENT_INVALID")
-            .says("is not a list of providers: `none`, or one or more of claude, codex, omp, pi (lowercase, joined by single commas)")
-            .inside(&["claude", "none", "claude,omp", "omp,omp", "pi,codex,claude"])
-            .outside(&["", " ", "Claude", "NONE", "None", "claude,,pi", "claude,", ",omp", ",", " claude", "claude ", "claude, pi", "none,claude", "claude,none", "gemini", "claude,gemini"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "role-segment"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["reviewer", " a b ", "/x/"]).outside(&["", "  ", "/", " / "]),
         DomainRow::new(Scope::Arguments(&["regime show"], "repo-name"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["my-repo", "A B"]).outside(&["", "  ", "//"]),
         DomainRow::new(Scope::Arguments(&["regime show"], "area"), Domain::matching(REGIME_SEGMENT), "REGIME_KEY_INVALID").inside(&["api", "a/b"]).outside(&["", "\t", "/ /"]),

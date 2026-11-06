@@ -9,12 +9,23 @@
 //! test copies it into a fresh tempdir first, so `cargo test` stays
 //! side-effect-free against the repo tree.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use canon_cli::skills::{self, Lock};
+use canon_cli::skills::{self, Lock, Provider};
+
+/// The providers a list of names writes, as `skills::install_canonical`, `check` and `doctor` take them: `none` is the empty list, which `--no-harness` chooses.
+fn names(list: &str) -> Option<Vec<Provider>> {
+    if list == "none" {
+        return Some(Vec::new());
+    }
+    let names: Vec<String> = list.split(',').map(str::to_string).collect();
+    skills::harness_flags(&names, false).expect("the names are providers")
+}
 
 /// `key: value` pairs of a `SKILL.md` frontmatter block, or `None` when the
 /// content does not open with a closed `---` block.
@@ -165,7 +176,7 @@ fn canonical_codex_projects_agents_skill_with_frontmatter_and_sidecars() {
     fs::write(source.join("reference/topic.md"), "# topic\n").unwrap();
     fs::write(source.join("scripts/hook.sh"), "#!/bin/sh\n").unwrap();
 
-    let first = skills::install_canonical(Some(&source), &target, Some("codex"), false).unwrap();
+    let first = skills::install_canonical(Some(&source), &target, names("codex").as_deref(), false).unwrap();
     assert!(first.changed);
     assert!(!target.join(".claude/skills/canon").exists());
     let bundle = target.join(".agents/skills/canon");
@@ -179,9 +190,9 @@ fn canonical_codex_projects_agents_skill_with_frontmatter_and_sidecars() {
     assert!(!target.join(".codex").exists(), "nothing is written under .codex");
     assert!(!source.join(".install-lock.json").exists());
 
-    let second = skills::install_canonical(Some(&source), &target, Some("codex"), false).unwrap();
+    let second = skills::install_canonical(Some(&source), &target, names("codex").as_deref(), false).unwrap();
     assert!(!second.changed);
-    let check = skills::check(Some(&source), &target, Some("codex")).unwrap();
+    let check = skills::check(Some(&source), &target, names("codex").as_deref()).unwrap();
     assert!(check.manifest_ok);
     assert!(check.remnants.is_empty());
     assert!(check.statuses.iter().all(|status| status.state == "ok"));
@@ -232,16 +243,16 @@ fn skills_install_51_a_bare_target_installs_nothing_and_names_the_flag() {
     let install = canon(&["skills", "install"], &source, &target);
     let out = String::from_utf8_lossy(&install.stdout);
     assert_eq!(install.status.code(), Some(0), "{out}");
-    assert!(out.contains("--providers=<list>"), "the output names the flag: {out}");
+    assert!(out.contains("--harness claude"), "the output names the flag: {out}");
     assert_eq!(fs::read_dir(&target).unwrap().count(), 0, "the CLI writes nothing either");
 
     let check = canon(&["skills", "check"], &source, &target);
     let out = String::from_utf8_lossy(&check.stdout);
     assert_eq!(check.status.code(), Some(0), "nothing selected, nothing to drift: {out}");
-    assert!(out.contains("--providers=<list>"), "{out}");
+    assert!(out.contains("--harness claude"), "{out}");
     let doctor = canon(&["skills", "doctor"], &source, &target);
     let out = String::from_utf8_lossy(&doctor.stdout);
-    assert!(out.lines().any(|line| line.starts_with("no-providers: ") && line.contains("--providers=<list>")), "{out}");
+    assert!(out.lines().any(|line| line.starts_with("no-providers: ") && line.contains("--harness claude")), "{out}");
     assert!(!out.contains("status: healthy"), "{out}");
 }
 
@@ -256,7 +267,7 @@ fn canonical_check_and_doctor_report_projected_drift_and_legacy_remnant() {
         "---\nname: canon\ndescription: umbrella\n---\n\n# Canon\n",
     )
     .unwrap();
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
 
     let projected = target.join(".claude/skills/canon/SKILL.md");
     fs::write(&projected, "mutated projection\n").unwrap();
@@ -284,7 +295,7 @@ fn canonical_install_projects_omp_and_pi_stubs_with_sidecars() {
     fs::write(source.join("reference/topic.md"), "# topic\n").unwrap();
     fs::write(source.join("scripts/pre-dispatch.sh"), "#!/bin/sh\n").unwrap();
 
-    let report = skills::install_canonical(Some(&source), &target, Some("pi,omp"), false).unwrap();
+    let report = skills::install_canonical(Some(&source), &target, names("pi,omp").as_deref(), false).unwrap();
 
     assert_eq!(report.providers, vec![skills::Provider::Omp, skills::Provider::Pi]);
     for root in [".omp", ".pi"] {
@@ -329,21 +340,21 @@ fn canonical_check_and_doctor_report_omp_pi_drift_and_remnant() {
     let target = tmp.path().join("target");
     fs::create_dir_all(&source).unwrap();
     fs::write(source.join("SKILL.src.md"), "---\nname: canon\n---\n\n# Canon\n").unwrap();
-    skills::install_canonical(Some(&source), &target, Some("omp,pi"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("omp,pi").as_deref(), false).unwrap();
 
     let projected = target.join(".omp/skills/canon/SKILL.md");
     fs::write(&projected, "mutated projection\n").unwrap();
     let legacy = target.join(".pi/skills/canon-old");
     fs::create_dir_all(&legacy).unwrap();
 
-    let check = skills::check(Some(&source), &target, Some("omp,pi")).unwrap();
+    let check = skills::check(Some(&source), &target, names("omp,pi").as_deref()).unwrap();
     assert!(check.providers == vec![skills::Provider::Omp, skills::Provider::Pi]);
     assert!(check
         .statuses
         .iter()
         .any(|status| status.provider == skills::Provider::Omp && status.state == "stale"));
 
-    let doctor = skills::doctor(Some(&source), &target, Some("omp,pi")).unwrap();
+    let doctor = skills::doctor(Some(&source), &target, names("omp,pi").as_deref()).unwrap();
     assert!(doctor.iter().any(|line| line.contains("stale:") && line.contains(".omp")));
     assert!(doctor.iter().any(|line| line.contains("legacy-remnant:") && line.contains("canon-old")));
     assert!(legacy.exists(), "doctor must report legacy remnants without deleting them");
@@ -424,7 +435,7 @@ fn canonical_legacy_codex_migration_removes_emptied_skills_dir_but_keeps_codex_r
     write_legacy_codex_install(&target);
     fs::write(target.join(".codex/config.toml"), "model = \"o3\"\n").unwrap();
 
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
 
     assert!(!target.join(".codex/skills").exists(), ".codex/skills is removed once it ends up empty");
     assert_eq!(fs::read_to_string(target.join(".codex/config.toml")).unwrap(), "model = \"o3\"\n");
@@ -443,7 +454,7 @@ fn canonical_legacy_codex_migration_keeps_files_the_lock_does_not_prove() {
     let unrecorded = target.join(".codex/skills/canon/reference/mine.md");
     fs::write(&unrecorded, "# mine\n").unwrap();
 
-    skills::install_canonical(Some(&source), &target, Some("codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("codex").as_deref(), false).unwrap();
 
     assert_eq!(fs::read_to_string(&edited).unwrap(), "# canon\n\nlocally edited\n", "an edited legacy file is kept");
     assert_eq!(fs::read_to_string(&unrecorded).unwrap(), "# mine\n", "an unrecorded file is kept");
@@ -476,7 +487,7 @@ fn canonical_legacy_codex_migration_never_deletes_through_a_symlinked_legacy_dir
             .collect();
         assert!(!outside_files.is_empty() && outside_files.iter().all(|path| path.is_file()), "{swapped}");
 
-        skills::install_canonical(Some(&source), &target, Some("codex"), false).unwrap();
+        skills::install_canonical(Some(&source), &target, names("codex").as_deref(), false).unwrap();
 
         for path in &outside_files {
             assert!(path.is_file(), "swapping {swapped} for a symlink let the migration delete {}", path.display());
@@ -492,27 +503,27 @@ fn canonical_check_and_doctor_report_legacy_codex_remnant_with_fix() {
     let source = tmp.path().join("source");
     let target = tmp.path().join("target");
     write_canonical_source(&source);
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
     // A legacy projection no install lock records (e.g. a lock that was
     // never committed): install cannot prove canon wrote it.
     let remnant = target.join(".codex/skills/canon.md");
     fs::create_dir_all(remnant.parent().unwrap()).unwrap();
     fs::write(&remnant, "# canon\n\n> umbrella\n\n# Canon\n").unwrap();
 
-    let check = skills::check(Some(&source), &target, Some("claude,codex")).unwrap();
+    let check = skills::check(Some(&source), &target, names("claude,codex").as_deref()).unwrap();
     assert_eq!(check.remnants, vec![remnant.clone()]);
     assert!(check.statuses.iter().all(|status| status.state == "ok"), "the remnant is not projection drift");
 
-    let doctor = skills::doctor(Some(&source), &target, Some("claude,codex")).unwrap();
+    let doctor = skills::doctor(Some(&source), &target, names("claude,codex").as_deref()).unwrap();
     let line = doctor
         .iter()
         .find(|line| line.starts_with("legacy-remnant:") && line.contains(".codex/skills/canon.md"))
         .unwrap_or_else(|| panic!("doctor must flag the legacy Codex projection: {doctor:?}"));
-    assert!(line.contains("canon skills install --providers=claude,codex"), "the remnant line names its fix: {line}");
+    assert!(line.contains("canon skills install --harness claude --harness codex"), "the remnant line names its fix: {line}");
     assert!(!doctor.iter().any(|line| line == "status: healthy"));
 
-    let output = Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(["skills", "check", "--providers", "claude,codex", "--skills-source"])
+    let output = hermetic::canon()
+        .args(["skills", "check", "--harness", "claude", "--harness", "codex", "--skills-source"])
         .arg(&source)
         .arg("--repo")
         .arg(&target)
@@ -520,9 +531,9 @@ fn canonical_check_and_doctor_report_legacy_codex_remnant_with_fix() {
         .expect("spawn canon skills check");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert_eq!(output.status.code(), Some(1), "a legacy remnant fails the read-only check: {stdout}");
-    assert!(stdout.contains("legacy-remnant") && stdout.contains("canon skills install --providers=claude,codex"), "{stdout}");
+    assert!(stdout.contains("legacy-remnant") && stdout.contains("canon skills install --harness claude --harness codex"), "{stdout}");
 
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
     assert!(remnant.is_file(), "an unproven legacy file is reported, never deleted");
 }
 
@@ -534,7 +545,7 @@ const LOOP_STEPS: [&str; 8] =
 
 /// The text of `canon skills show <args>`: the guide the binary carries.
 fn show(args: &[&str]) -> String {
-    let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "show"]).args(args).output().unwrap();
+    let out = hermetic::canon().args(["skills", "show"]).args(args).output().unwrap();
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
     String::from_utf8(out.stdout).unwrap()
 }
@@ -549,7 +560,7 @@ fn skills_install_11_the_stub_claims_build_work_and_the_guide_opens_with_the_loo
     let source = fs::read_to_string(repo.join("canon/skills/SKILL.src.md")).unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let target = tmp.path().join("target");
-    let report = skills::install_canonical(None, &target, Some("claude,codex,omp,pi"), false).unwrap();
+    let report = skills::install_canonical(None, &target, names("claude,codex,omp,pi").as_deref(), false).unwrap();
     assert_eq!(report.providers.len(), 4);
     for root in [".claude", ".agents", ".omp", ".pi"] {
         let projected = fs::read_to_string(target.join(root).join("skills/canon/SKILL.md")).unwrap();
@@ -579,7 +590,7 @@ fn skills_install_11_the_stub_claims_build_work_and_the_guide_opens_with_the_loo
     assert_eq!(skill_steps, LOOP_STEPS, "the guide's loop steps");
 
     let tmp = tempfile::tempdir().unwrap();
-    let init = Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
+    let init = hermetic::canon().arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     let agents = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
     let block_steps: Vec<&str> = agents
@@ -615,7 +626,7 @@ fn set_lock_version(target: &Path, version: Option<&str>) {
 }
 
 fn canon(args: &[&str], source: &Path, target: &Path) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--skills-source").arg(source).arg("--repo").arg(target).output().unwrap()
+    hermetic::canon().args(args).arg("--skills-source").arg(source).arg("--repo").arg(target).output().unwrap()
 }
 
 /// skills.install.55: a `--skills-source` directory that does not exist is an invalid argument too: exit 2 from install, check and doctor, nothing written.
@@ -627,7 +638,7 @@ fn skills_install_55_a_missing_skills_source_is_refused_with_exit_two() {
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     let missing = tmp.path().join("no-such-source");
     for command in ["install", "check", "doctor"] {
-        let output = canon(&["skills", command, "--providers", "claude", "--json"], &missing, &target);
+        let output = canon(&["skills", command, "--harness", "claude", "--json"], &missing, &target);
         assert_eq!(output.status.code(), Some(2), "{command}: {}", String::from_utf8_lossy(&output.stdout));
         let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(doc["error"]["code"], "SKILLS_SOURCE_NOT_FOUND", "{command}: {doc}");
@@ -649,7 +660,7 @@ fn skills_install_40_the_lock_records_the_canon_version_and_the_source_commit() 
     git(&checkout, &["commit", "-q", "-m", "skills"]);
     let head = git(&checkout, &["rev-parse", "HEAD"]);
 
-    assert!(skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap().changed);
+    assert!(skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap().changed);
     let lock = read_lock(&target);
     assert_eq!(lock["canon_version"], env!("CARGO_PKG_VERSION"), "{lock}");
     assert_eq!(lock["source_commit"], head.as_str(), "{lock}");
@@ -658,15 +669,15 @@ fn skills_install_40_the_lock_records_the_canon_version_and_the_source_commit() 
     fs::write(checkout.join("unrelated.txt"), "x\n").unwrap();
     git(&checkout, &["add", "."]);
     git(&checkout, &["commit", "-q", "-m", "unrelated"]);
-    assert!(!skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap().changed, "a commit that leaves the bundle as it was changes nothing");
+    assert!(!skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap().changed, "a commit that leaves the bundle as it was changes nothing");
     assert_eq!(fs::read(target.join(LOCK)).unwrap(), bytes, "the lock stays byte-identical");
-    let check = skills::check(Some(&source), &target, Some("claude")).unwrap();
+    let check = skills::check(Some(&source), &target, names("claude").as_deref()).unwrap();
     assert!(check.manifest_ok && check.outdated.is_none(), "{check:?}");
 
     let plain = tmp.path().join("plain");
     let plain_target = tmp.path().join("plain-target");
     write_canonical_source(&plain);
-    skills::install_canonical(Some(&plain), &plain_target, Some("claude"), false).unwrap();
+    skills::install_canonical(Some(&plain), &plain_target, names("claude").as_deref(), false).unwrap();
     let lock = read_lock(&plain_target);
     assert_eq!(lock["canon_version"], env!("CARGO_PKG_VERSION"), "{lock}");
     assert!(lock.get("source_commit").is_none(), "a source outside any git checkout records no commit: {lock}");
@@ -679,26 +690,26 @@ fn skills_install_41_a_lock_another_canon_wrote_is_reported_with_the_install_fix
     let source = tmp.path().join("source");
     let target = tmp.path().join("target");
     write_canonical_source(&source);
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
     set_lock_version(&target, Some("0.13.1"));
-    let fix = "canon skills install --providers=claude,codex";
+    let fix = "canon skills install --harness claude --harness codex";
 
-    let check = canon(&["skills", "check", "--providers", "claude,codex"], &source, &target);
+    let check = canon(&["skills", "check", "--harness", "claude", "--harness", "codex"], &source, &target);
     let out = String::from_utf8_lossy(&check.stdout);
     assert_eq!(check.status.code(), Some(1), "{out}");
     assert!(out.contains(LOCK) && out.contains("outdated") && out.contains("0.13.1") && out.contains(fix), "{out}");
     assert!(!out.contains("— stale") && !out.contains("— missing"), "only the lock's version differs: {out}");
 
-    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    let doctor = canon(&["skills", "doctor", "--harness", "claude", "--harness", "codex"], &source, &target);
     let out = String::from_utf8_lossy(&doctor.stdout);
     assert_eq!(doctor.status.code(), Some(0), "{out}");
     assert!(out.lines().any(|line| line.starts_with("outdated: ") && line.contains("0.13.1") && line.contains(fix)), "{out}");
     assert!(!out.contains("status: healthy"), "{out}");
 
-    assert!(skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap().changed, "the install rewrites an outdated lock");
+    assert!(skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap().changed, "the install rewrites an outdated lock");
     assert_eq!(read_lock(&target)["canon_version"], env!("CARGO_PKG_VERSION"));
-    assert_eq!(canon(&["skills", "check", "--providers", "claude,codex"], &source, &target).status.code(), Some(0));
-    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    assert_eq!(canon(&["skills", "check", "--harness", "claude", "--harness", "codex"], &source, &target).status.code(), Some(0));
+    let doctor = canon(&["skills", "doctor", "--harness", "claude", "--harness", "codex"], &source, &target);
     let out = String::from_utf8_lossy(&doctor.stdout);
     assert_eq!(doctor.status.code(), Some(0), "{out}");
     assert!(out.starts_with("providers: claude,codex") && out.contains("status: healthy"), "{out}");
@@ -712,25 +723,25 @@ fn skills_install_42_a_lock_from_before_0_16_is_reported_as_an_unknown_version()
     let source = tmp.path().join("source");
     let target = tmp.path().join("target");
     write_canonical_source(&source);
-    skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap();
     set_lock_version(&target, None);
     let expected = format!(
-        "installed by an unknown canon version (the lock predates 0.16), this canon is {} — run `canon skills install --providers=claude`",
+        "installed by an unknown canon version (the lock predates 0.16), this canon is {} — run `canon skills install --harness claude`",
         env!("CARGO_PKG_VERSION")
     );
 
-    let report = skills::check(Some(&source), &target, Some("claude")).unwrap();
+    let report = skills::check(Some(&source), &target, names("claude").as_deref()).unwrap();
     assert!(report.manifest_ok, "the projection itself is current");
     assert_eq!(report.outdated.as_ref().map(|o| o.installed_by.clone()), Some(None));
-    let check = canon(&["skills", "check", "--providers", "claude"], &source, &target);
+    let check = canon(&["skills", "check", "--harness", "claude"], &source, &target);
     let out = String::from_utf8_lossy(&check.stdout);
     assert_eq!(check.status.code(), Some(1), "{out}");
     assert!(out.contains(&expected), "{out}");
-    let doctor = skills::doctor(Some(&source), &target, Some("claude")).unwrap();
+    let doctor = skills::doctor(Some(&source), &target, names("claude").as_deref()).unwrap();
     assert!(doctor.iter().any(|line| line.starts_with("outdated: ") && line.ends_with(&expected)), "{doctor:?}");
 
-    skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap();
-    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &source, &target).status.code(), Some(0));
+    skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap();
+    assert_eq!(canon(&["skills", "check", "--harness", "claude"], &source, &target).status.code(), Some(0));
 }
 
 /// skills.install.43
@@ -740,7 +751,7 @@ fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edi
     let source = tmp.path().join("source");
     let target = tmp.path().join("target");
     write_canonical_source(&source);
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
     let sites = target.join(".claude/skills/sites/SKILL.md");
     let notes = target.join(".agents/skills/notes/SKILL.md");
     let sites_text = "---\nname: site-builder\ndescription: Build sites, web apps and games from a prompt\n---\n# Sites\n";
@@ -750,7 +761,7 @@ fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edi
         fs::write(path, text).unwrap();
     }
 
-    let doctor = canon(&["skills", "doctor", "--providers", "claude,codex"], &source, &target);
+    let doctor = canon(&["skills", "doctor", "--harness", "claude", "--harness", "codex"], &source, &target);
     let out = String::from_utf8_lossy(&doctor.stdout);
     assert_eq!(doctor.status.code(), Some(0), "advisory only: {out}");
     assert!(out.contains("status: healthy"), "{out}");
@@ -766,7 +777,7 @@ fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edi
 /// `skills:` section would go.
 const CONFIG_WITHOUT_SKILLS: &str = "# my config\nspecs:\n  roots:\n    - id: root\n      root: specs\n# trailing note\nwrite:\n  promote: auto\n";
 
-/// skills.install.52: an explicit `--providers` rewrites
+/// skills.install.52: an explicit `--harness` rewrites
 /// `skills.providers` and keeps every other byte; without the flag,
 /// install, check and doctor follow the list.
 #[test]
@@ -778,7 +789,7 @@ fn skills_install_52_explicit_providers_rewrite_the_config_list_that_later_runs_
     fs::create_dir_all(target.join(".claude")).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
 
-    let install = canon(&["skills", "install", "--providers", "codex,omp"], &source, &target);
+    let install = canon(&["skills", "install", "--harness", "codex", "--harness", "omp"], &source, &target);
     let out = String::from_utf8_lossy(&install.stdout);
     assert_eq!(install.status.code(), Some(0), "{out}");
     assert!(out.contains("canon v1 — installed (codex,omp)\n"), "{out}");
@@ -797,7 +808,7 @@ fn skills_install_52_explicit_providers_rewrite_the_config_list_that_later_runs_
     assert!(out.starts_with("providers: codex,omp (from canon.yaml skills.providers)\n"), "{out}");
 
     // A second rewrite replaces the section in place.
-    skills::install_canonical(Some(&source), &target, Some("pi"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("pi").as_deref(), false).unwrap();
     let config = fs::read_to_string(target.join("canon.yaml")).unwrap();
     assert!(config.starts_with(CONFIG_WITHOUT_SKILLS) && config.ends_with("skills:\n  providers: [pi]\n"), "{config}");
     assert_eq!(config.matches("skills:").count(), 1, "{config}");
@@ -806,7 +817,7 @@ fn skills_install_52_explicit_providers_rewrite_the_config_list_that_later_runs_
 
     // A section in the middle of the file, in flow style, is replaced there.
     fs::write(target.join("canon.yaml"), "a: 1\nskills: { providers: [claude] }\nb: 2\n").unwrap();
-    skills::install_canonical(Some(&source), &target, Some("none"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("none").as_deref(), false).unwrap();
     assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), "a: 1\nskills:\n  providers: []\nb: 2\n");
     assert_eq!(skills::check(Some(&source), &target, None).unwrap().providers, vec![]);
 
@@ -819,7 +830,7 @@ fn skills_install_52_explicit_providers_rewrite_the_config_list_that_later_runs_
         doc
     };
     for (list, expected) in [("codex,pi", vec![skills::Provider::Codex, skills::Provider::Pi]), ("omp", vec![skills::Provider::Omp])] {
-        skills::install_canonical(Some(&source), &target, Some(list), false).unwrap();
+        skills::install_canonical(Some(&source), &target, names(list).as_deref(), false).unwrap();
         let config = fs::read_to_string(target.join("canon.yaml")).unwrap();
         assert!(config.starts_with(&crlf), "{list}: every byte before the section is kept: {config:?}");
         assert_eq!(config.matches('\n').count(), config.matches("\r\n").count(), "{list}: every line ends CRLF: {config:?}");
@@ -831,7 +842,7 @@ fn skills_install_52_explicit_providers_rewrite_the_config_list_that_later_runs_
 
     // No canon.yaml: install never creates one.
     let bare = tmp.path().join("bare");
-    skills::install_canonical(Some(&source), &bare, Some("claude"), false).unwrap();
+    skills::install_canonical(Some(&source), &bare, names("claude").as_deref(), false).unwrap();
     assert!(!bare.join("canon.yaml").exists());
 }
 
@@ -847,7 +858,7 @@ fn skills_install_53_a_pre_0_17_repo_with_a_lock_keeps_working() {
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     // A 0.16 install: Claude plus Codex, projected to .agents.
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     fs::create_dir_all(target.join(".omp")).unwrap();
     let lock = fs::read(target.join(LOCK)).unwrap();
@@ -867,7 +878,7 @@ fn skills_install_53_a_pre_0_17_repo_with_a_lock_keeps_working() {
     assert_eq!(install.status.code(), Some(0), "{out}");
     assert_owned(&out, &[skills::Provider::Claude, skills::Provider::Codex]);
     assert_eq!(fs::read(target.join(LOCK)).unwrap(), lock, "the lock is untouched");
-    assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), CONFIG_WITHOUT_SKILLS, "only an explicit --providers writes the list");
+    assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), CONFIG_WITHOUT_SKILLS, "only an explicit --harness writes the list");
     assert!(!target.join(".omp/skills").exists(), "a marker never widens the lock's providers");
 }
 
@@ -881,8 +892,8 @@ fn skills_install_54_doctor_names_a_stray_projection_and_check_does_not_fail_on_
     write_canonical_source(&source);
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
-    skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap();
     let stray = target.join(".agents/skills/canon");
     assert!(stray.join("SKILL.md").is_file(), "install never deletes a projection");
 
@@ -896,7 +907,7 @@ fn skills_install_54_doctor_names_a_stray_projection_and_check_does_not_fail_on_
     assert_eq!(doctor.status.code(), Some(0), "{out}");
     let path = stray.display();
     let line = out.lines().find(|line| line.starts_with(&format!("stray: {path}"))).unwrap_or_else(|| panic!("doctor names the stray projection: {out}"));
-    assert!(line.contains(&format!("rm -r {path}")) && line.contains("canon skills install --providers=claude,codex"), "the stray line names both ways out: {line}");
+    assert!(line.contains(&format!("rm -r {path}")) && line.contains("canon skills install --harness claude --harness codex"), "the stray line names both ways out: {line}");
     assert!(out.contains("status: healthy"), "{out}");
     assert_owned(&out, &[skills::Provider::Claude]);
     assert!(!out.lines().any(|line| line.trim() == ".agents/skills/canon/**"), "an unselected provider's projection is not an owned path: {out}");
@@ -939,14 +950,14 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
         assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "{section:?}: nothing is written");
         assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), config);
 
-        let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--check", "--repo"]).arg(&target).output().unwrap();
+        let check = hermetic::canon().args(["init", "--check", "--repo"]).arg(&target).output().unwrap();
         let out = String::from_utf8_lossy(&check.stdout);
         assert_eq!(check.status.code(), Some(1), "{out}");
         assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ") && line.contains(needle)), "{out}");
     }
 }
 
-/// skills.install.55: a provider the `--providers` flag names that canon does not know is `SKILLS_ARGUMENT_INVALID` (exit 2, naming the field `--providers`),
+/// skills.install.55: a provider the `--harness` flag names that canon does not know is `USAGE` (exit 2, naming the field `--harness` and the four names),
 /// from install, check and doctor, with a clean canon.yaml; nothing is written.
 #[test]
 fn skills_install_55_an_unknown_provider_on_the_flag_is_an_invalid_argument() {
@@ -957,11 +968,12 @@ fn skills_install_55_an_unknown_provider_on_the_flag_is_an_invalid_argument() {
     fs::create_dir_all(target.join(".claude")).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     for command in ["install", "check", "doctor"] {
-        let output = canon(&["skills", command, "--providers", "gemini", "--json"], &source, &target);
+        let output = canon(&["skills", command, "--harness", "gemini", "--json"], &source, &target);
         assert_eq!(output.status.code(), Some(2), "{command}: {}", String::from_utf8_lossy(&output.stdout));
         let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(doc["error"]["code"], "SKILLS_ARGUMENT_INVALID", "{command}: {doc}");
-        assert_eq!(doc["error"]["field"], "--providers", "{command}: {doc}");
+        assert_eq!(doc["error"]["code"], "USAGE", "{command}: {doc}");
+        assert_eq!(doc["error"]["field"], "--harness", "{command}: {doc}");
+        assert_eq!(doc["error"]["expected"], serde_json::json!(["claude", "codex", "omp", "pi"]), "{command}: {doc}");
     }
     assert!(!target.join(".claude/skills").exists() && no_state_under_canon(&target), "nothing is written");
 }
@@ -1000,7 +1012,7 @@ fn skills_install_56_install_and_doctor_print_the_owned_path_globs() {
         }
     };
 
-    let install = canon(&["skills", "install", "--providers", "codex,claude"], &source, &target);
+    let install = canon(&["skills", "install", "--harness", "codex", "--harness", "claude"], &source, &target);
     let out = String::from_utf8_lossy(&install.stdout);
     assert_eq!(install.status.code(), Some(0), "{out}");
     expect_block(&out);
@@ -1035,7 +1047,7 @@ fn skills_install_57_a_formatter_rewrite_is_named_with_the_ignore_entry() {
     write_canonical_source(&source);
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
-    skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap();
     let skill = target.join(".claude/skills/canon/SKILL.md");
     let stub = fs::read_to_string(&skill).unwrap();
     // What a prettier-family formatter does to a markdown file: CRLF line
@@ -1052,7 +1064,7 @@ fn skills_install_57_a_formatter_rewrite_is_named_with_the_ignore_entry() {
     let out = String::from_utf8_lossy(&doctor.stdout);
     assert_eq!(doctor.status.code(), Some(0), "{out}");
     let line = out.lines().find(|line| line.starts_with(&format!("formatter-rewritten: {} (claude)", skill.display()))).unwrap_or_else(|| panic!("{out}"));
-    assert!(line.contains(".claude/skills/canon/**") && line.contains("canon skills install --providers=claude"), "the line names the ignore entry and the restore: {line}");
+    assert!(line.contains(".claude/skills/canon/**") && line.contains("canon skills install --harness claude"), "the line names the ignore entry and the restore: {line}");
     assert!(!out.contains("stale: "), "a rewrite is not drift: {out}");
     assert!(!out.contains("status: healthy"), "{out}");
     assert!(out.contains("owned-paths: "), "{out}");
@@ -1069,7 +1081,7 @@ fn skills_install_58_changed_content_stays_drift() {
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     fs::write(source.join("scripts/hook.sh"), "#!/bin/sh\nrm -rf a b\nexec canon \\\n  status\n").unwrap();
-    skills::install_canonical(Some(&source), &target, Some("claude,codex"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude,codex").as_deref(), false).unwrap();
     let hook = target.join(".claude/skills/canon/scripts/hook.sh");
     let skill = target.join(".claude/skills/canon/SKILL.md");
     let codex_skill = target.join(".agents/skills/canon/SKILL.md");
@@ -1113,7 +1125,7 @@ const RETIRED: [(&str, &str); 2] = [("reference/retired/old.md", "# old\n"), ("r
 fn installed_with_retired_references(tmp: &Path, providers: &str, projections: &[&str]) -> (std::path::PathBuf, std::path::PathBuf) {
     let (source, target) = (tmp.join("source"), tmp.join("target"));
     write_canonical_source(&source);
-    skills::install_canonical(Some(&source), &target, Some(providers), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names(providers).as_deref(), false).unwrap();
     let mut lock = read_lock(&target);
     for projection in projections {
         for (relative, text) in RETIRED {
@@ -1142,7 +1154,7 @@ fn skills_install_59_install_prunes_a_dropped_file_whose_bytes_match_the_lock() 
     assert!(retired.join("old.md").is_file() && retired.join("older.md").is_file());
     assert!(read_lock(&target)["files"][format!("{CLAUDE_PROJECTION}/reference/retired/old.md")].is_string());
 
-    let out = canon(&["skills", "install", "--providers", "claude", "--json"], &source, &target);
+    let out = canon(&["skills", "install", "--harness", "claude", "--json"], &source, &target);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
     let json = stdout_json(&out);
     let pruned: Vec<&str> = json["data"]["pruned"].as_array().unwrap().iter().map(|entry| entry["path"].as_str().unwrap()).collect();
@@ -1160,10 +1172,10 @@ fn skills_install_59_install_prunes_a_dropped_file_whose_bytes_match_the_lock() 
     let files = read_lock(&target)["files"].as_object().unwrap().keys().cloned().collect::<Vec<_>>();
     assert!(files.iter().all(|key| !key.contains("retired") && !key.contains("/reference/")), "the lock lists only shipped files: {files:?}");
 
-    let rerun = stdout_json(&canon(&["skills", "install", "--providers", "claude", "--json"], &source, &target));
+    let rerun = stdout_json(&canon(&["skills", "install", "--harness", "claude", "--json"], &source, &target));
     assert_eq!(rerun["data"]["changed"], false, "{rerun}");
     assert_eq!(rerun["data"]["pruned"], serde_json::json!([]));
-    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &source, &target).status.code(), Some(0));
+    assert_eq!(canon(&["skills", "check", "--harness", "claude"], &source, &target).status.code(), Some(0));
 }
 
 /// skills.install.60
@@ -1174,7 +1186,7 @@ fn skills_install_60_install_keeps_a_dropped_file_whose_bytes_changed_and_report
     let retired = target.join(CLAUDE_PROJECTION).join("reference/retired");
     fs::write(retired.join("old.md"), "# old, with my own notes\n").unwrap();
 
-    let out = canon(&["skills", "install", "--providers", "claude", "--json"], &source, &target);
+    let out = canon(&["skills", "install", "--harness", "claude", "--json"], &source, &target);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
     let json = stdout_json(&out);
     let kept = json["data"]["kept"].as_array().unwrap();
@@ -1192,7 +1204,7 @@ fn skills_install_60_install_keeps_a_dropped_file_whose_bytes_changed_and_report
     assert!(!retired.join("older.md").exists());
     let files = read_lock(&target)["files"].as_object().unwrap().keys().cloned().collect::<Vec<_>>();
     assert!(files.iter().all(|key| !key.contains("retired")), "the lock no longer lists the kept file: {files:?}");
-    let rerun = stdout_json(&canon(&["skills", "install", "--providers", "claude", "--json"], &source, &target));
+    let rerun = stdout_json(&canon(&["skills", "install", "--harness", "claude", "--json"], &source, &target));
     assert_eq!(rerun["data"]["changed"], false, "{rerun}");
     assert_eq!(rerun["data"]["kept"], serde_json::json!([]));
 }
@@ -1211,7 +1223,7 @@ fn skills_install_60_a_dropped_file_replaced_by_a_symlink_is_kept_and_never_foll
     fs::remove_file(&link).unwrap();
     std::os::unix::fs::symlink(&outside, &link).unwrap();
 
-    let report = skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap();
+    let report = skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap();
     assert_eq!(report.kept.len(), 1, "{report:?}");
     assert_eq!(report.kept[0].path, link);
     assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink(), "the link stays");
@@ -1229,7 +1241,7 @@ fn skills_install_61_install_prunes_only_selected_providers_and_only_what_the_lo
     fs::write(&elsewhere, "# notes\n").unwrap();
     let codex_old = target.join(CODEX_PROJECTION).join("reference/retired/old.md");
 
-    let report = skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap();
+    let report = skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap();
     assert_eq!(report.pruned.len(), 2, "{report:?}");
     assert!(report.pruned.iter().all(|orphan| orphan.provider == skills::Provider::Claude), "{report:?}");
     assert!(!target.join(CLAUDE_PROJECTION).join("reference/retired/old.md").exists());
@@ -1237,7 +1249,7 @@ fn skills_install_61_install_prunes_only_selected_providers_and_only_what_the_lo
     assert!(elsewhere.is_file());
     assert!(codex_old.is_file() && codex_old.with_file_name("older.md").is_file(), "an unselected provider's projection is untouched");
     assert!(target.join(CODEX_PROJECTION).join("SKILL.md").is_file());
-    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &source, &target).status.code(), Some(0));
+    assert_eq!(canon(&["skills", "check", "--harness", "claude"], &source, &target).status.code(), Some(0));
 }
 
 /// skills.install.62
@@ -1247,9 +1259,9 @@ fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
     let (source, target) = installed_with_retired_references(tmp.path(), "claude", &[CLAUDE_PROJECTION]);
     let retired = target.join(CLAUDE_PROJECTION).join("reference/retired");
     fs::write(retired.join("older.md"), "# older, edited\n").unwrap();
-    let fix = "canon skills install --providers=claude";
+    let fix = "canon skills install --harness claude";
 
-    let check = canon(&["skills", "check", "--providers", "claude"], &source, &target);
+    let check = canon(&["skills", "check", "--harness", "claude"], &source, &target);
     let out = String::from_utf8_lossy(&check.stdout);
     assert_eq!(check.status.code(), Some(1), "{out}");
     let old = retired.join("old.md").display().to_string();
@@ -1258,7 +1270,7 @@ fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
     assert!(line_for(&old).contains(&format!("run `{fix}`")), "an unmodified orphan names the install that removes it: {out}");
     assert!(line_for(&older).contains(&format!("rm {older}")), "a modified orphan names the removal by hand: {out}");
 
-    let json = stdout_json(&canon(&["skills", "check", "--providers", "claude", "--json"], &source, &target));
+    let json = stdout_json(&canon(&["skills", "check", "--harness", "claude", "--json"], &source, &target));
     assert_eq!(json["error"]["code"], "SKILLS_CHECK_FAILED");
     assert!(json["error"]["message"].as_str().unwrap().contains(&old), "the error names the orphan: {json}");
     assert!(json["error"]["hint"].as_str().unwrap().contains(&older), "the hint names what to remove by hand: {json}");
@@ -1276,12 +1288,12 @@ fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
     }
     let lock_path = target.join(".canon/skills/.install-lock.json");
     let (lock_before, files_before) = (fs::read(&lock_path).unwrap(), (fs::read(retired.join("old.md")).unwrap(), fs::read(retired.join("older.md")).unwrap()));
-    canon(&["skills", "check", "--providers", "claude", "--json"], &source, &target);
-    canon(&["skills", "check", "--providers", "claude"], &source, &target);
+    canon(&["skills", "check", "--harness", "claude", "--json"], &source, &target);
+    canon(&["skills", "check", "--harness", "claude"], &source, &target);
     assert_eq!(fs::read(&lock_path).unwrap(), lock_before, "check never rewrites the lock");
     assert_eq!(files_before, (fs::read(retired.join("old.md")).unwrap(), fs::read(retired.join("older.md")).unwrap()), "check never touches a file");
 
-    let doctor = canon(&["skills", "doctor", "--providers", "claude"], &source, &target);
+    let doctor = canon(&["skills", "doctor", "--harness", "claude"], &source, &target);
     let out = String::from_utf8_lossy(&doctor.stdout);
     assert_eq!(doctor.status.code(), Some(0), "{out}");
     assert!(out.lines().any(|line| line.starts_with(&format!("orphan: {old} (claude)")) && line.ends_with(&format!("run `{fix}`, which removes it"))), "{out}");
@@ -1289,10 +1301,10 @@ fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
     assert!(!out.contains("status: healthy"), "{out}");
     assert!(retired.join("old.md").is_file() && retired.join("older.md").is_file(), "check and doctor never delete");
 
-    skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap();
     assert!(!retired.join("old.md").exists() && retired.join("older.md").is_file());
-    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &source, &target).status.code(), Some(0));
-    let doctor = canon(&["skills", "doctor", "--providers", "claude"], &source, &target);
+    assert_eq!(canon(&["skills", "check", "--harness", "claude"], &source, &target).status.code(), Some(0));
+    let doctor = canon(&["skills", "doctor", "--harness", "claude"], &source, &target);
     assert!(String::from_utf8_lossy(&doctor.stdout).contains("status: healthy"));
 }
 
@@ -1302,15 +1314,15 @@ fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
 fn skills_install_62_check_ignores_unselected_providers_and_files_already_gone() {
     let tmp = tempfile::tempdir().unwrap();
     let (source, target) = installed_with_retired_references(tmp.path(), "claude,codex", &[CLAUDE_PROJECTION, CODEX_PROJECTION]);
-    let report = skills::check(Some(&source), &target, Some("claude,codex")).unwrap();
+    let report = skills::check(Some(&source), &target, names("claude,codex").as_deref()).unwrap();
     assert_eq!(report.orphans.len(), 4, "two dropped files for each of two providers: {:?}", report.orphans);
 
-    let report = skills::check(Some(&source), &target, Some("claude")).unwrap();
+    let report = skills::check(Some(&source), &target, names("claude").as_deref()).unwrap();
     assert_eq!(report.orphans.len(), 2);
     assert!(report.orphans.iter().all(|orphan| orphan.provider == skills::Provider::Claude));
 
     fs::remove_file(target.join(CLAUDE_PROJECTION).join("reference/retired/old.md")).unwrap();
-    let report = skills::check(Some(&source), &target, Some("claude")).unwrap();
+    let report = skills::check(Some(&source), &target, names("claude").as_deref()).unwrap();
     assert_eq!(report.orphans.len(), 1, "a file the user already removed is not an orphan: {:?}", report.orphans);
 }
 
@@ -1321,14 +1333,14 @@ fn skills_install_62_check_ignores_unselected_providers_and_files_already_gone()
 fn skills_install_61_a_subset_install_keeps_the_lock_entries_of_unselected_providers() {
     let tmp = tempfile::tempdir().unwrap();
     let (source, target) = installed_with_retired_references(tmp.path(), "claude,codex", &[CLAUDE_PROJECTION, CODEX_PROJECTION]);
-    skills::install_canonical(Some(&source), &target, Some("claude"), false).unwrap();
+    skills::install_canonical(Some(&source), &target, names("claude").as_deref(), false).unwrap();
     let codex_retired = target.join(CODEX_PROJECTION).join("reference/retired");
     assert!(codex_retired.join("old.md").is_file(), "the unselected projection is untouched");
 
-    let report = skills::check(Some(&source), &target, Some("codex")).unwrap();
+    let report = skills::check(Some(&source), &target, names("codex").as_deref()).unwrap();
     assert_eq!(report.orphans.len(), 2, "check for codex still names its dropped files: {:?}", report.orphans);
 
-    let report = skills::install_canonical(Some(&source), &target, Some("codex"), false).unwrap();
+    let report = skills::install_canonical(Some(&source), &target, names("codex").as_deref(), false).unwrap();
     assert_eq!(report.pruned.len(), 2, "{report:?}");
     assert!(!codex_retired.join("old.md").exists() && !codex_retired.join("older.md").exists());
     let lock = read_lock(&target);
@@ -1359,16 +1371,16 @@ fn skills_install_63_a_tampered_lock_key_is_ignored_and_named_by_doctor() {
     }
     fs::write(&lock_path, serde_json::to_string_pretty(&lock).unwrap()).unwrap();
 
-    let report = skills::check(Some(&source), &target, Some("claude")).unwrap();
+    let report = skills::check(Some(&source), &target, names("claude").as_deref()).unwrap();
     assert!(report.orphans.iter().all(|orphan| !orphan.path.ends_with("victim.txt")), "{:?}", report.orphans);
     assert_eq!(report.orphans.len(), 2, "only the two real dropped files: {:?}", report.orphans);
     assert_eq!(report.invalid_entries.len(), keys.len(), "{:?}", report.invalid_entries);
-    let doctor = String::from_utf8_lossy(&canon(&["skills", "doctor", "--providers", "claude"], &source, &target).stdout).into_owned();
+    let doctor = String::from_utf8_lossy(&canon(&["skills", "doctor", "--harness", "claude"], &source, &target).stdout).into_owned();
     for key in keys {
         assert!(doctor.lines().any(|line| line.starts_with("invalid-lock-entry:") && line.contains(&format!("{key:?}"))), "{doctor}");
     }
 
-    let out = canon(&["skills", "install", "--providers", "claude"], &source, &target);
+    let out = canon(&["skills", "install", "--harness", "claude"], &source, &target);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(fs::read_to_string(&victim).unwrap(), "keep\n");
     let rewritten = read_lock(&target);
@@ -1387,7 +1399,7 @@ fn skills_install_64_doctor_reports_a_missing_gitignore_line_with_the_fix() {
     write_canonical_source(&source);
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
-    let install = canon(&["skills", "install", "--providers", "claude"], &source, &target);
+    let install = canon(&["skills", "install", "--harness", "claude"], &source, &target);
     assert_eq!(install.status.code(), Some(0), "{}", String::from_utf8_lossy(&install.stdout));
     let managed = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/repo-write.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n.canon/migrate-backup/\n.canon/index/\n";
 

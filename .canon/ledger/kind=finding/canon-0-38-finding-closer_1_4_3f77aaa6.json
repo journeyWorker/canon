@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-finding-closer",
+    "role": "reviewer",
+    "session_id": "s-0-38-closer-rev"
+  },
+  "at": "2026-11-06T10:35:49.412063Z",
+  "change_id": "canon-0-38-finding-closer",
+  "code_tree": "c4ef23f7b5b96fc70b34813f62a80c9d50be26c2",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/finding_closer.rs",
+  "introduced_by": "79815f634e539e6bc9813d9abd405a99d70c023d",
+  "kind": "finding",
+  "resolution_code_tree": "9c64b4a2f7d31d0c55aa4ea9c83e6773ba07694c",
+  "resolution_sha": "67b6996578b827fa988ae1f629a874ec20a859a9",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0c7b545787be08b98d24c28f0b990bf38139dc3d",
+  "reviewer": "rev-0-38-finding-closer",
+  "round": 1,
+  "scenario_ids": [
+    "finding.closer.11"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Standards: finding_closer_11 proves the guides line by substring: changelog_problems only asks that the Unreleased section contain the words role-implementer and role-reviewer, so it passes on any mention of either and never reads the two guides. The claim it should pin is true today (canon skills show role-implementer lists no finding close, role-reviewer lists it; checked with the binary), but moving finding close into the implementer guide would leave the test green. Blast radius: only the CHANGELOG wording; the guide contents are held by the generated command lists, not by this test.",
+  "worktree_dirty": false
+}

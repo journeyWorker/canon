@@ -2,6 +2,8 @@
 //! window (0.34 `canon-0-34-atip-constraints`, atip/1 spec 10.7.4, 10.7.5, 10.8). Tests are named by scenario id
 //! (`atip.constraints.NN`); the sweeps that hold every declaration to the real parser are in `tests/arg_rules.rs`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod harness;
 mod rule_support;
 
@@ -77,7 +79,7 @@ fn refused(run: &Run, code: &str, field: &str) {
 #[test]
 fn atip_constraints_01_clap_relations_are_constraints_of_the_document() {
     let init = leaf("init");
-    for other in ["no-agents-md", "policy", "no-policy", "providers", "language", "dry-run"] {
+    for other in ["no-agents-md", "policy", "no-policy", "harness", "no-harness", "language", "dry-run"] {
         assert!(has_names(init, "atMostOne", &["check", other]), "init: --check and --{other} are one atMostOne: {:?}", init["constraints"]);
     }
     assert!(has_names(init, "atMostOne", &["policy", "no-policy"]), "init: {:?}", init["constraints"]);
@@ -332,9 +334,9 @@ fn time_pattern_is_the_shape(pattern: &str, parse: fn(&str) -> Result<chrono::Da
                 problems.push(format!("the parser accepts {candidate:?} and the pattern refuses it"));
             }
         }
-        // What the pattern admits and the parser refuses is a date or a time that does not exist, which the calendar's refusal says (it has a cause).
+        // What the pattern admits and the parser refuses is a date or a time that does not exist, which the refusal says does not exist (a `Missing`, not a spelling).
         if let (true, Err(error)) = (admitted, &parsed) {
-            if std::error::Error::source(error).is_none() {
+            if !matches!(error, canon_cli::timestamp::TimestampError::Missing { .. }) {
                 problems.push(format!("the pattern admits {candidate:?} and the parser refuses its spelling"));
             }
         }
@@ -577,6 +579,7 @@ fn atip_constraints_16_the_shape_of_input_is_the_parsers_and_no_document_declare
     }
     for line in [
         "canon artifacts move --tier cold --input '[{},{}]'",
+        "canon artifacts prune --input '[{},{}]'",
         "canon dashboard --input '[{},{}]'",
         "canon ledger compact --input '[{},{}]'",
         "canon migrate --input '[{},{}]'",

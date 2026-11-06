@@ -34,7 +34,7 @@ pub struct DispatchBeginArgs {
     #[arg(long, value_name = "NAME")]
     pub model: Option<String>,
     /// Skill that contributed to this run
-    #[arg(long = "skill", value_name = "ID")]
+    #[arg(long = "skill", value_name = "SKILL_ID")]
     pub skill_id: Option<String>,
     /// Declared skill digest; requires --skill
     #[arg(long, value_name = "DIGEST")]

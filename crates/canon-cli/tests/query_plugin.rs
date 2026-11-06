@@ -14,6 +14,8 @@
 //! `--kind`/`--plugin` `core_kind` mismatch pin (parent-agent steer,
 //! design.md's "s16 projects onto `Scenario` only" scope boundary).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod support;
 
 use canon_model::envelope::{Actor, Envelope, RecordKind};

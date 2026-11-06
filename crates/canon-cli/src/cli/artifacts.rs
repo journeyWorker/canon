@@ -13,6 +13,9 @@ pub enum ArtifactsCommand {
     /// Move the local artifact blobs to an object-store tier, verify them, and remove the local copies
     #[command(after_help = "Examples:\n  canon artifacts move --tier cold\n  canon artifacts move --tier cold --commit --plan-digest <PLAN_DIGEST>\n\nThe bare run previews: it lists every upload and removal and prints a planDigest, and writes nothing. --commit --plan-digest acts on exactly that plan (PLAN_STALE, exit 2, when it changed since).\n\n--tier names an `s3` tier of canon.yaml's `tiers:` (for example `cold`; its credentials are the tier's own). Every blob in .canon/artifacts/sha256 is hashed, uploaded under <prefix>sha256/<digest> (prefix artifacts/), and read back; only when all of them verified does canon.yaml gain `artifact_store: { backend: <tier>, prefix: artifacts/ }`, after which the local copies are removed and `.canon/artifacts/` is added to .gitignore. Commit the removal with the ledger.\n\nIdempotent and resumable: a run stopped anywhere leaves a repo the gate still passes, and the next run finishes; a second run finds nothing to do. A blob whose bytes do not match its name is never moved. Moving back to local is refused; `--tier local` on a local repo is a no-op.")]
     Move(ArtifactsMoveArgs),
+    /// Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes)
+    #[command(after_help = "Examples:\n  canon artifacts prune\n  canon artifacts prune --keep-days 30\n  canon artifacts prune --commit --plan-digest <PLAN_DIGEST>\n\nThe store only grows: a report written anew on every run adds a blob per run. A blob stays while a record binds it: the latest evidence of a task or of a scenario and the reviews still in effect (what `canon gate check` and `canon artifacts verify` read), a record not promoted yet, and, with --keep-days N, any evidence or review written in the last N days. Every other blob of the configured store is deleted: the local directory .canon/artifacts/sha256, or the objects of the object-store tier `artifact_store:` names (the same rule; a copy left in the local directory of such a repo is judged by it too).\n\nThe bare run previews: it says how many blobs and bytes go and stay, why each kept blob stays, lists the blobs to delete a page at a time (--limit, --cursor, --all; the totals are the whole's) and writes nothing. With nothing to delete it says so and offers no --commit. --commit --plan-digest deletes exactly that plan (PLAN_STALE, exit 2, nothing deleted, when evidence or a record changed since). A repo whose records or staging cannot be read in full is refused: a blob is never deleted on a guess. After a prune, `canon artifacts verify` and `canon gate check` answer as before.\n\nA deleted local blob leaves the working tree, so commit the removal with the ledger; it stays in git history, and shrinking that history is the repo owner's call, not this command's. A deleted object of a tier cannot be undone: the tier keeps no other copy. A delete that fails stops the run (ARTIFACTS_PRUNE_INCOMPLETE says what was deleted); a new preview lists what remains.\n\nExit 0 for a preview or a commit, 1 when a delete failed, 2 when the plan is stale or the records or the store cannot be read.")]
+    Prune(ArtifactsPruneArgs),
 }
 
 #[derive(Debug, Args)]
@@ -48,6 +51,24 @@ pub struct ArtifactsMoveArgs {
     /// The tier to move to: the name of an `s3` tier in canon.yaml (for example `cold`)
     #[arg(long, value_name = "TIER")]
     pub tier: String,
+    #[command(flatten)]
+    pub safety: crate::cli::SafetyArgs,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
+    /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
+}
+
+#[derive(Debug, Args)]
+pub struct ArtifactsPruneArgs {
+    /// Also keep the blobs that evidence and reviews written in the last N days bind
+    #[arg(long, value_name = "N", value_parser = crate::cli::safe_min1)]
+    pub keep_days: Option<u64>,
+    #[command(flatten)]
+    pub page: crate::paging::PageFlags,
     #[command(flatten)]
     pub safety: crate::cli::SafetyArgs,
     #[command(flatten)]

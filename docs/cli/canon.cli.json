@@ -3,7 +3,7 @@
   "cli": {
     "about": "Specs, evidence gates, and agent memory for your repo",
     "name": "canon",
-    "version": "0.37.0"
+    "version": "0.38.0"
   },
   "commands": [
     {
@@ -159,6 +159,101 @@
         }
       ],
       "summary": "Move the local artifact blobs to an object-store tier, verify them, and remove the local copies",
+      "x-canon": {
+        "roles": [
+          "orchestrator"
+        ]
+      }
+    },
+    {
+      "command": "artifacts prune",
+      "constraints": [
+        {
+          "names": [
+            "limit",
+            "all"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "if": {
+            "name": "commit"
+          },
+          "rule": "requires",
+          "then": [
+            "plan-digest"
+          ]
+        },
+        {
+          "if": {
+            "name": "plan-digest"
+          },
+          "rule": "requires",
+          "then": [
+            "commit"
+          ]
+        }
+      ],
+      "effect": "destructive",
+      "errors": [
+        "ARTIFACTS_DIGEST_INVALID",
+        "ARTIFACTS_PRUNE_INCOMPLETE",
+        "ARTIFACTS_STORE_DENIED",
+        "ARTIFACTS_STORE_FAILED",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
+        "CONFIG_REQUIRED",
+        "CONFIG_UNAVAILABLE",
+        "LAYOUT_MIGRATION_REQUIRED",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
+        "REPO_UNAVAILABLE",
+        "ROLE_INVALID",
+        "WRITE_DENIED",
+        "WRITE_FAILED",
+        "WRITE_INVALID"
+      ],
+      "examples": [
+        "canon artifacts prune --keep-days 30 --json"
+      ],
+      "idempotency": "replay-safe",
+      "input": {
+        "argumentsRef": "#/schemas/ArtifactsPruneArguments",
+        "example": {
+          "keepDays": 30
+        },
+        "maxBytes": 8388608
+      },
+      "kind": "command",
+      "options": [
+        {
+          "domain": {
+            "minimum": 1
+          },
+          "help": "Also keep the blobs that evidence and reviews written in the last N days bind",
+          "name": "keep-days",
+          "valueName": "N",
+          "valueType": "integer"
+        },
+        "limit",
+        "cursor",
+        "all",
+        "commit",
+        "plan-digest",
+        "repo",
+        "as"
+      ],
+      "outputs": [
+        {
+          "schemaRef": "#/schemas/ArtifactsPruneReport",
+          "schemaVersion": "1.2"
+        }
+      ],
+      "summary": "Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes)",
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -731,12 +826,7 @@
       ],
       "summary": "Write the shell completion script for canon (bash, zsh or fish)",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -775,12 +865,7 @@
       ],
       "summary": "Show what you can author here: record kinds, fields, enums, policies",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -873,7 +958,7 @@
             "pattern": "^sha256:[0-9a-f]{64}$"
           },
           "help": "Context pack id (sha256:<64 hex digits>)",
-          "name": "id",
+          "name": "pack",
           "required": true,
           "valueName": "PACK_ID"
         }
@@ -925,7 +1010,7 @@
             "pattern": "^sha256:[0-9a-f]{64}$"
           },
           "help": "Context pack id (sha256:<64 hex digits>)",
-          "name": "id",
+          "name": "pack",
           "required": true,
           "valueName": "PACK_ID"
         }
@@ -1206,7 +1291,7 @@
         {
           "help": "Skill that contributed to this run",
           "name": "skill",
-          "valueName": "ID"
+          "valueName": "SKILL_ID"
         },
         {
           "help": "Declared skill digest; requires --skill",
@@ -1915,12 +2000,7 @@
         }
       ],
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -2734,7 +2814,7 @@
           "help": "The external evaluator that re-audited the scenario (canon never runs it)",
           "name": "evaluator",
           "required": true,
-          "valueName": "ID"
+          "valueName": "EVALUATOR_ID"
         },
         {
           "domain": {
@@ -3139,6 +3219,7 @@
         "FINDING_INCOMPLETE",
         "FINDING_RESOLUTION_REV_CONFLICT",
         "FINDING_REVIEW_NOT_FOUND",
+        "FINDING_ROLE_DENIED",
         "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTION_FAILED",
         "REPO_DENIED",
@@ -3395,6 +3476,7 @@
         "FINDING_INCOMPLETE",
         "FINDING_NOT_FOUND",
         "FINDING_RESOLUTION_REV_CONFLICT",
+        "FINDING_ROLE_DENIED",
         "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTION_FAILED",
         "REPO_DENIED",
@@ -3490,12 +3572,12 @@
           "valueName": "ACTOR_ID"
         },
         {
-          "default": "reviewer",
+          "defaultNote": "the role declared with --as or CANON_ROLE",
           "domain": {
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "env": "CANON_ROLE",
-          "help": "Attribution only — no partition key derives from it",
+          "help": "The role the close is recorded under: the declared one (--as, CANON_ROLE), and --role only when it names that role or none is declared; no role is recorded when neither is given. Only a reviewer closes as rejected or deferred",
           "name": "role"
         },
         {
@@ -3587,6 +3669,8 @@
               "seq"
             ],
             "paths": [
+              "closedBy",
+              "closedRole",
               "disposition",
               "fileRef",
               "reason",
@@ -3602,12 +3686,7 @@
       ],
       "summary": "List a change's committed findings at their latest version: round, seq, severity, disposition, reviewer and summary",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -3648,12 +3727,7 @@
       ],
       "summary": "Validate a spec/artifact corpus against canon's format",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -3691,12 +3765,7 @@
       ],
       "summary": "Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -4079,7 +4148,8 @@
         {
           "names": [
             "check",
-            "providers"
+            "harness",
+            "no-harness"
           ],
           "rule": "atMostOne"
         },
@@ -4167,12 +4237,22 @@
           "valueType": "switch"
         },
         {
-          "domain": {
-            "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
-          },
-          "help": "Harnesses to install the canon skill for, without asking: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item)",
-          "name": "providers",
-          "valueName": "LIST"
+          "help": "A harness to install the canon skill for, without asking (repeatable, once per name): `claude`, `codex`, `omp` or `pi`. Omitted, and no `--no-harness`: the detected harnesses",
+          "name": "harness",
+          "possibleValues": [
+            "claude",
+            "codex",
+            "omp",
+            "pi"
+          ],
+          "repeatable": true,
+          "valueName": "NAME",
+          "valueType": "enum"
+        },
+        {
+          "help": "Install the canon skill for no harness: records an empty `skills.providers`",
+          "name": "no-harness",
+          "valueType": "switch"
         },
         {
           "domain": {
@@ -5294,12 +5374,7 @@
         }
       ],
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -5595,12 +5670,7 @@
         }
       ],
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6132,12 +6202,7 @@
         }
       ],
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6223,12 +6288,7 @@
       ],
       "summary": "Search records, brief sections and scenario text, with each hit's neighbors in the record graph",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6280,10 +6340,20 @@
     },
     {
       "command": "skills check",
+      "constraints": [
+        {
+          "names": [
+            "harness",
+            "no-harness"
+          ],
+          "rule": "atMostOne"
+        }
+      ],
       "effect": "read",
       "errors": [
         "CONFIG_INVALID",
         "ROLE_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_CHECK_FAILED",
         "SKILLS_FAILED",
         "SKILLS_SOURCE_NOT_FOUND"
@@ -6295,7 +6365,8 @@
       "options": [
         "skills-source",
         "repo",
-        "providers",
+        "harness",
+        "no-harness",
         "as"
       ],
       "outputs": [
@@ -6312,10 +6383,20 @@
     },
     {
       "command": "skills doctor",
+      "constraints": [
+        {
+          "names": [
+            "harness",
+            "no-harness"
+          ],
+          "rule": "atMostOne"
+        }
+      ],
       "effect": "read",
       "errors": [
         "CONFIG_INVALID",
         "ROLE_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_FAILED",
         "SKILLS_SOURCE_NOT_FOUND"
       ],
@@ -6326,7 +6407,8 @@
       "options": [
         "skills-source",
         "repo",
-        "providers",
+        "harness",
+        "no-harness",
         "as"
       ],
       "outputs": [
@@ -6334,7 +6416,7 @@
           "schemaRef": "#/schemas/SkillsDoctorReport"
         }
       ],
-      "summary": "Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits",
+      "summary": "Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a harness that is not selected, and other skills whose description claims build work; reports only, never edits",
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -6343,11 +6425,21 @@
     },
     {
       "command": "skills install",
+      "constraints": [
+        {
+          "names": [
+            "harness",
+            "no-harness"
+          ],
+          "rule": "atMostOne"
+        }
+      ],
       "effect": "write",
       "errors": [
         "CONFIG_INVALID",
         "REPO_LOCK_UNAVAILABLE",
         "ROLE_INVALID",
+        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_FAILED",
         "SKILLS_SOURCE_NOT_FOUND",
         "WRITE_DENIED",
@@ -6376,13 +6468,23 @@
         },
         "repo",
         {
-          "defaultNote": "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories",
-          "domain": {
-            "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
-          },
-          "help": "Providers to project: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
-          "name": "providers",
-          "valueName": "LIST"
+          "defaultNote": "canon.yaml `skills.providers`, else the install lock's harnesses, else the detected harness directories",
+          "help": "A harness to project (repeatable, once per name): `claude`, `codex`, `omp` or `pi`; also rewrites `skills.providers` in the target's canon.yaml. Omitted, and no `--no-harness`: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
+          "name": "harness",
+          "possibleValues": [
+            "claude",
+            "codex",
+            "omp",
+            "pi"
+          ],
+          "repeatable": true,
+          "valueName": "NAME",
+          "valueType": "enum"
+        },
+        {
+          "help": "Project no harness: records an empty `skills.providers` in the target's canon.yaml and installs nothing",
+          "name": "no-harness",
+          "valueType": "switch"
         },
         "dry-run",
         "as"
@@ -6471,12 +6573,7 @@
       ],
       "summary": "Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6521,12 +6618,7 @@
       ],
       "summary": "Show where this repo stands: subjects by status, their gaps, and the next commands",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6835,7 +6927,7 @@
         {
           "help": "A trajectory that contradicts the strategy (must exist in the trajectory store)",
           "name": "contradicting-trajectory",
-          "valueName": "ID"
+          "valueName": "TRAJECTORY_ID"
         },
         "repo",
         "as"
@@ -7003,7 +7095,7 @@
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "The subject to move",
-          "name": "id",
+          "name": "subject",
           "required": true,
           "valueName": "SUBJECT_ID"
         }
@@ -7116,7 +7208,7 @@
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "The subject's kebab-slug id",
-          "name": "id",
+          "name": "subject",
           "required": true,
           "valueName": "SUBJECT_ID"
         }
@@ -7214,7 +7306,7 @@
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "The subject to show",
-          "name": "id",
+          "name": "subject",
           "required": true,
           "valueName": "SUBJECT_ID"
         }
@@ -7485,8 +7577,9 @@
             "pattern": "^\\p{White_Space}*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)\\p{White_Space}*$"
           },
           "help": "A review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`)",
-          "name": "id",
-          "required": true
+          "name": "trace",
+          "required": true,
+          "valueName": "TRACE_ID"
         }
       ],
       "options": [
@@ -7500,12 +7593,7 @@
       ],
       "summary": "Follow a finding's review loop in time order: review, finding, fix, re-review, evidence",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     }
   ],
@@ -7666,6 +7754,25 @@
       "retryable": false
     },
     {
+      "code": "ARTIFACTS_PRUNE_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), deal with what the reason names, then preview and commit a new plan; the same `--commit --plan-digest` is refused as `PLAN_STALE`.",
+      "meaning": "`artifacts prune --commit` deleted some blobs and then stopped, because the object store failed or refused a later delete, or a later local blob could not be removed; what it deleted stays deleted and no blob a record binds was touched (`data` says what was deleted, the reason says what stopped it)",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon artifacts verify`), check that the object store is reachable and that its credentials may delete objects, then preview and commit a new plan.",
+          "meaning": "`canon artifacts prune --commit` deleted some blobs, then the object store failed or refused the delete of a later object; what it deleted stays deleted, no blob a record binds was touched (`data` says what was deleted)",
+          "reason": "ARTIFACTS_STORE_FAILED"
+        },
+        {
+          "fix": "Read what was done (`canon artifacts verify`), make `.canon/artifacts/sha256` writable, then preview and commit a new plan.",
+          "meaning": "`canon artifacts prune --commit` deleted some blobs, then a later local blob could not be removed; what it deleted stays deleted, no blob a record binds was touched (`data` says what was deleted)",
+          "reason": "WRITE_FAILED"
+        }
+      ],
+      "retryable": false
+    },
+    {
       "code": "ARTIFACTS_STORE_DENIED",
       "exit": 2,
       "fix": "Make `.canon/artifacts/sha256` and the directory above it readable and writable by this user, then run the command again.",
@@ -7676,7 +7783,7 @@
       "code": "ARTIFACTS_STORE_FAILED",
       "exit": 1,
       "fix": "Check that the artifact store is writable and reachable and has space, then run the command again.",
-      "meaning": "writing or uploading a blob to the artifact store failed and nothing it wrote was kept: a record or batch that bound the file was rolled back, or no blob had been stored yet",
+      "meaning": "writing or uploading a blob to the artifact store failed and nothing it wrote was kept: a record or batch that bound the file was rolled back, or no blob had been stored yet; `artifacts prune --commit` got an object-store delete refused before it had deleted anything",
       "retryable": true
     },
     {
@@ -7945,7 +8052,7 @@
           "reason": "POLICY"
         },
         {
-          "fix": "Make the `skills:` section a mapping whose `providers` is a list of claude, codex, omp, pi (`[]` for none), or pass --providers.",
+          "fix": "Make the `skills:` section a mapping whose `providers` is a list of claude, codex, omp, pi (`[]` for none), or pass --harness once for each harness or --no-harness.",
           "meaning": "the `skills:` section of canon.yaml is present but malformed",
           "reason": "SKILLS"
         },
@@ -8457,6 +8564,13 @@
       "retryable": false
     },
     {
+      "code": "FINDING_ROLE_DENIED",
+      "exit": 2,
+      "fix": "Leave the finding to a reviewer, who closes it with `--as reviewer`; close it as `fixed` if you fixed it.",
+      "meaning": "`finding close` was asked for `rejected` or `deferred` by a call that declares a role other than `reviewer` (--as or CANON_ROLE); overturning a finding is the reviewer's, nothing was written and the finding stays open",
+      "retryable": false
+    },
+    {
       "code": "FORMAT_CHECK_FAILED",
       "exit": 1,
       "fix": "Fix each violation listed in data.violations, then run `canon format` again.",
@@ -8536,8 +8650,8 @@
     {
       "code": "INIT_ARGUMENT_INVALID",
       "exit": 2,
-      "fix": "Pass a supported language and skill providers to `canon init`.",
-      "meaning": "an `init` option is invalid (language or skill providers)",
+      "fix": "Pass a supported language to `canon init`.",
+      "meaning": "an `init` option is invalid (the language)",
       "retryable": false
     },
     {
@@ -8550,11 +8664,6 @@
           "fix": "Read what init wrote (`canon status`), make the `skills:` section of canon.yaml a mapping whose `providers` is a list of claude, codex, omp, pi (`[]` for none), then run `canon skills install`; do not run `canon init` again.",
           "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because the `skills:` section of canon.yaml is malformed (the reason of the refusal `canon skills install` makes before it starts)",
           "reason": "CONFIG_INVALID"
-        },
-        {
-          "fix": "Read what init wrote (`canon status`), name only providers of claude, codex, omp, pi in `skills.providers` of canon.yaml (or pass `--providers` to `canon skills install`), then run `canon skills install`; do not run `canon init` again.",
-          "meaning": "`canon init` wrote canon.yaml and the files beside it, then its last step could not install the canon skill because a provider is unknown",
-          "reason": "SKILLS_ARGUMENT_INVALID"
         },
         {
           "fix": "Read what init wrote (`canon status`), point CANON_SKILLS_SOURCE at a directory that holds a SKILL.src.md or unset it, then run `canon skills install`; do not run `canon init` again.",
@@ -9200,8 +9309,8 @@
     {
       "code": "SKILLS_ARGUMENT_INVALID",
       "exit": 2,
-      "fix": "Name providers from claude, codex, omp, pi (or none).",
-      "meaning": "a skill provider is unknown",
+      "fix": "Run `canon skills install` with --harness once for each of claude, codex, omp, pi (or --no-harness), which writes the lock again.",
+      "meaning": "the install lock names a harness canon does not know",
       "retryable": false
     },
     {
@@ -10800,6 +10909,20 @@
         "strategy rollback"
       ],
       "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--harness",
+      "note": "once for each name; `--no-harness` for none",
+      "old": "--providers",
+      "rule": "a list is a repeatable option",
+      "scope": [
+        "init",
+        "skills install",
+        "skills check",
+        "skills doctor"
+      ],
+      "since": "0.38.0"
     }
   ],
   "schemas": {
@@ -11205,6 +11328,293 @@
               "type": "string"
             }
           },
+          "type": "object"
+        }
+      }
+    },
+    "artifacts prune": {
+      "command": "artifacts prune",
+      "kind": "schemas",
+      "schemas": {
+        "ArtifactsPruneArguments": {
+          "additionalProperties": false,
+          "properties": {
+            "keepDays": {
+              "description": "Also keep the blobs that evidence and reviews written in the last N days bind",
+              "pattern": "^-?(0|[1-9][0-9]*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          },
+          "title": "`canon artifacts prune` arguments after the --input document is merged with the command line",
+          "type": "object"
+        },
+        "ArtifactsPruneReport": {
+          "description": "`canon artifacts prune`'s `data`: what the plan deletes and keeps, the page of the blobs to delete, and what a commit did.",
+          "properties": {
+            "backend": {
+              "description": "`local`, or the name of the artifact store tier the blobs live in.",
+              "type": "string"
+            },
+            "blobs": {
+              "description": "One page of the blobs the plan deletes, in digest order: empty in a commit (`meta.page` pages a preview).",
+              "items": {
+                "$ref": "#/schemas/PruneBlob"
+              },
+              "type": "array"
+            },
+            "committed": {
+              "description": "`false` for a preview, `true` after the commit.",
+              "type": "boolean"
+            },
+            "delete": {
+              "$ref": "#/schemas/PruneCounts",
+              "description": "What the plan deletes, over the whole store (not only the page below)."
+            },
+            "deleted": {
+              "$ref": "#/schemas/PruneCounts",
+              "description": "What this run deleted: all zero in a preview."
+            },
+            "effects": {
+              "description": "Every effect the commit would make, in the order it makes them.",
+              "items": {
+                "$ref": "#/schemas/Effect"
+              },
+              "type": "array"
+            },
+            "gitNote": {
+              "description": "Present when the plan deletes local blobs: what stays in git.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "irreversible": {
+              "description": "Present when the plan deletes objects of a tier, which cannot be undone.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "keep": {
+              "$ref": "#/schemas/PruneKeep",
+              "description": "What the plan keeps, each blob with every reason it stays."
+            },
+            "keepDays": {
+              "description": "`--keep-days`, when it was given.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "planDigest": {
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
+              "type": "string"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "backend",
+            "delete",
+            "keep",
+            "deleted",
+            "blobs",
+            "planDigest",
+            "effects",
+            "committed"
+          ],
+          "title": "ArtifactsPruneReport",
+          "type": "object"
+        },
+        "Effect": {
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
+          "properties": {
+            "action": {
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
+            },
+            "path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        "Input": {
+          "additionalProperties": false,
+          "properties": {
+            "keepDays": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "pattern": "^-?(0|[1-9][0-9]*)$",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "KeptBlob": {
+          "description": "One blob that stays.",
+          "properties": {
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reasons": {
+              "description": "`latest-evidence`, `current-review`, `staged`, `within-keep-days`: every one that holds.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "sha256": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sha256",
+            "bytes",
+            "reasons"
+          ],
+          "type": "object"
+        },
+        "PruneBlob": {
+          "description": "One blob a plan deletes.",
+          "properties": {
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "sha256": {
+              "type": "string"
+            },
+            "storedIn": {
+              "description": "Where it is deleted from: `local`, the tier's name, or both.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "sha256",
+            "bytes",
+            "storedIn"
+          ],
+          "type": "object"
+        },
+        "PruneCounts": {
+          "description": "Blobs and bytes of a set of blobs of the store.",
+          "properties": {
+            "blobs": {
+              "description": "Distinct blobs (digests).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "bytes": {
+              "description": "Bytes of every copy of them.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "localCopies": {
+              "description": "Copies in the local directory.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "tierObjects": {
+              "description": "Objects in the tier.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blobs",
+            "bytes",
+            "localCopies",
+            "tierObjects"
+          ],
+          "type": "object"
+        },
+        "PruneKeep": {
+          "description": "The blobs a plan keeps.",
+          "properties": {
+            "blobs": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "items": {
+              "description": "Every kept blob, in digest order.",
+              "items": {
+                "$ref": "#/schemas/KeptBlob"
+              },
+              "type": "array"
+            },
+            "reasons": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "How many kept blobs each reason holds (a blob with several reasons is counted under each).",
+              "type": "object"
+            }
+          },
+          "required": [
+            "blobs",
+            "bytes",
+            "reasons",
+            "items"
+          ],
           "type": "object"
         }
       }
@@ -11793,6 +12203,16 @@
             "policyApproved": {
               "type": "boolean"
             },
+            "policyHeld": {
+              "description": "The `code_scopes` keys that differ from the last approved policy (0.38): the policy approval was not recorded, so it stays stale until a human runs `canon policy approve`.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "relay": {
               "anyOf": [
                 {
@@ -11950,6 +12370,16 @@
             "policyApproved": {
               "type": "boolean"
             },
+            "policyHeld": {
+              "description": "The `code_scopes` keys held back from the policy approval (see [`Approved::policy_held`]).",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "relay": {
               "anyOf": [
                 {
@@ -12004,6 +12434,16 @@
             },
             "policyApproved": {
               "type": "boolean"
+            },
+            "policyHeld": {
+              "description": "The `code_scopes` keys that differ from the last approved policy (0.38): the policy approval was not recorded, so it stays stale until a human runs `canon policy approve`.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "relay": {
               "anyOf": [
@@ -21930,7 +22370,7 @@
               "type": "string"
             },
             "role": {
-              "description": "Attribution only — no partition key derives from it",
+              "description": "The role the close is recorded under: the declared one (--as, CANON_ROLE), and --role only when it names that role or none is declared; no role is recorded when neither is given. Only a reviewer closes as rejected or deferred",
               "type": "string"
             },
             "round": {
@@ -22149,6 +22589,20 @@
         "FindingRow": {
           "description": "One finding of `canon finding list`.",
           "properties": {
+            "closedBy": {
+              "description": "Who closed it (0.38): the actor of the closing version; absent while the finding is open.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "closedRole": {
+              "description": "The role the closing version was recorded under; absent while open, and for a close that declared none.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "disposition": {
               "type": "string"
             },
@@ -22199,7 +22653,9 @@
             "summary",
             "resolutionSha",
             "fileRef",
-            "reason"
+            "reason",
+            "closedBy",
+            "closedRole"
           ],
           "type": "object"
         }
@@ -25476,12 +25932,28 @@
               "description": "Validate fully and report what would be written, without writing anything",
               "type": "boolean"
             },
+            "harness": {
+              "description": "A harness to install the canon skill for, without asking (repeatable, once per name): `claude`, `codex`, `omp` or `pi`. Omitted, and no `--no-harness`: the detected harnesses",
+              "items": {
+                "enum": [
+                  "claude",
+                  "codex",
+                  "omp",
+                  "pi"
+                ]
+              },
+              "type": "array"
+            },
             "language": {
               "description": "Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml",
               "type": "string"
             },
             "noAgentsMd": {
               "description": "Do not write or refresh the canon block in AGENTS.md",
+              "type": "boolean"
+            },
+            "noHarness": {
+              "description": "Install the canon skill for no harness: records an empty `skills.providers`",
               "type": "boolean"
             },
             "noPolicy": {
@@ -25495,10 +25967,6 @@
                 "standard",
                 "strict"
               ]
-            },
-            "providers": {
-              "description": "Harnesses to install the canon skill for, without asking: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item)",
-              "type": "string"
             }
           },
           "title": "`canon init` arguments after the --input document is merged with the command line",
@@ -25625,10 +26093,24 @@
             "dryRun": {
               "type": "boolean"
             },
+            "harness": {
+              "items": {
+                "enum": [
+                  "claude",
+                  "codex",
+                  "omp",
+                  "pi"
+                ]
+              },
+              "type": "array"
+            },
             "language": {
               "type": "string"
             },
             "noAgentsMd": {
+              "type": "boolean"
+            },
+            "noHarness": {
               "type": "boolean"
             },
             "noPolicy": {
@@ -25640,9 +26122,6 @@
                 "standard",
                 "strict"
               ]
-            },
-            "providers": {
-              "type": "string"
             }
           },
           "type": "object"
@@ -32803,8 +33282,19 @@
             "dryRun": {
               "type": "boolean"
             },
-            "providers": {
-              "type": "string"
+            "harness": {
+              "items": {
+                "enum": [
+                  "claude",
+                  "codex",
+                  "omp",
+                  "pi"
+                ]
+              },
+              "type": "array"
+            },
+            "noHarness": {
+              "type": "boolean"
             },
             "skillsSource": {
               "type": "string"
@@ -32930,9 +33420,21 @@
               "description": "Validate fully and report what would be written, without writing anything",
               "type": "boolean"
             },
-            "providers": {
-              "description": "Providers to project: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item); also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
-              "type": "string"
+            "harness": {
+              "description": "A harness to project (repeatable, once per name): `claude`, `codex`, `omp` or `pi`; also rewrites `skills.providers` in the target's canon.yaml. Omitted, and no `--no-harness`: canon.yaml `skills.providers`, else the install lock's providers, else the detected `.claude`, `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is projected to `.agents/skills/canon/`",
+              "items": {
+                "enum": [
+                  "claude",
+                  "codex",
+                  "omp",
+                  "pi"
+                ]
+              },
+              "type": "array"
+            },
+            "noHarness": {
+              "description": "Project no harness: records an empty `skills.providers` in the target's canon.yaml and installs nothing",
+              "type": "boolean"
             },
             "skillsSource": {
               "description": "Developer override: read SKILL.src.md's frontmatter and scripts/ from this directory instead of the text built into the binary; defaults to CANON_SKILLS_SOURCE, else the built-in text",
@@ -33160,6 +33662,17 @@
                 }
               ],
               "description": "Set when an agent recorded the approval for the human (0.32): the\n`(relayed by …)` marker of the approval line, read back."
+            },
+            "scopeExempt": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ScopeExempt"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An approved chore the code scopes of the policy let off part of its evidence (0.38):\nhow many scenarios need nothing from it and by which `code_scopes` keys. Set by\n`canon status` for a chore entry."
             },
             "source": {
               "description": "The external plan document the change comes from: the `Source:`\nline of the canon `brief.md`, or, before that file exists, the\nexternal openspec `proposal.md` found under the plan sources.",
@@ -33411,6 +33924,29 @@
             "scope",
             "distinct_actor",
             "block_on_findings"
+          ],
+          "type": "object"
+        },
+        "ScopeExempt": {
+          "description": "The scenarios a chore does not ask evidence for by code scope (0.38).",
+          "properties": {
+            "keys": {
+              "description": "The `code_scopes` keys they were exempt by, sorted.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "scenarios": {
+              "description": "How many scenarios.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "scenarios",
+            "keys"
           ],
           "type": "object"
         },
@@ -38035,6 +38571,16 @@
         }
       },
       {
+        "command": "artifacts prune",
+        "effect": "destructive",
+        "summary": "Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes)",
+        "x-canon": {
+          "roles": [
+            "orchestrator"
+          ]
+        }
+      },
+      {
         "command": "artifacts store",
         "effect": "write",
         "summary": "Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)",
@@ -38109,12 +38655,7 @@
         "effect": "read",
         "summary": "Write the shell completion script for canon (bash, zsh or fish)",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38122,12 +38663,7 @@
         "effect": "read",
         "summary": "Show what you can author here: record kinds, fields, enums, policies",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38278,12 +38814,7 @@
         "effect": "read",
         "summary": "List the current divergence burn-down state",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38389,12 +38920,7 @@
         "effect": "read",
         "summary": "List a change's committed findings at their latest version: round, seq, severity, disposition, reviewer and summary",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38402,12 +38928,7 @@
         "effect": "read",
         "summary": "Validate a spec/artifact corpus against canon's format",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38420,12 +38941,7 @@
         "effect": "read",
         "summary": "Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38612,12 +39128,7 @@
         "effect": "read",
         "summary": "Read stored records across every storage tier",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38675,12 +39186,7 @@
         "effect": "read",
         "summary": "Fetch role-scoped strategy guidance",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38729,12 +39235,7 @@
         "effect": "read",
         "summary": "Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38742,12 +39243,7 @@
         "effect": "read",
         "summary": "Search records, brief sections and scenario text, with each hit's neighbors in the record graph",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38778,7 +39274,7 @@
       {
         "command": "skills doctor",
         "effect": "read",
-        "summary": "Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits",
+        "summary": "Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a harness that is not selected, and other skills whose description claims build work; reports only, never edits",
         "x-canon": {
           "roles": [
             "orchestrator"
@@ -38800,12 +39296,7 @@
         "effect": "read",
         "summary": "Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38813,12 +39304,7 @@
         "effect": "read",
         "summary": "Show where this repo stands: subjects by status, their gaps, and the next commands",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38949,12 +39435,7 @@
         "effect": "read",
         "summary": "Follow a finding's review loop in time order: review, finding, fix, re-review, evidence",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       }
     ],
@@ -38982,6 +39463,28 @@
         ],
         "valueName": "ROLE",
         "valueType": "enum"
+      },
+      {
+        "default": 100,
+        "domain": {
+          "minimum": 1
+        },
+        "flagOnly": true,
+        "help": "Return at most this many records per page",
+        "name": "limit",
+        "valueName": "N",
+        "valueType": "integer"
+      },
+      {
+        "flagOnly": true,
+        "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
+        "name": "cursor"
+      },
+      {
+        "flagOnly": true,
+        "help": "Return every record from the cursor on, not one page",
+        "name": "all",
+        "valueType": "switch"
       },
       {
         "help": "Validate fully and report what would be written, without writing anything",
@@ -39072,28 +39575,6 @@
       {
         "help": "Keep this write staged even under canon.yaml `write: { promote: auto }`",
         "name": "no-promote",
-        "valueType": "switch"
-      },
-      {
-        "default": 100,
-        "domain": {
-          "minimum": 1
-        },
-        "flagOnly": true,
-        "help": "Return at most this many records per page",
-        "name": "limit",
-        "valueName": "N",
-        "valueType": "integer"
-      },
-      {
-        "flagOnly": true,
-        "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
-        "name": "cursor"
-      },
-      {
-        "flagOnly": true,
-        "help": "Return every record from the cursor on, not one page",
-        "name": "all",
         "valueType": "switch"
       },
       {
@@ -39224,15 +39705,28 @@
         "valueType": "path"
       },
       {
-        "defaultNote": "the providers `skills install` would use",
-        "domain": {
-          "pattern": "^(none|(claude|codex|omp|pi)(,(claude|codex|omp|pi))*)$"
-        },
-        "help": "Providers to inspect: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item). Omitted: as for install",
-        "name": "providers",
-        "valueName": "LIST"
+        "defaultNote": "the harnesses `skills install` would use",
+        "help": "A harness to inspect (repeatable, once per name): `claude`, `codex`, `omp` or `pi`. Omitted, and no `--no-harness`: as for install",
+        "name": "harness",
+        "possibleValues": [
+          "claude",
+          "codex",
+          "omp",
+          "pi"
+        ],
+        "repeatable": true,
+        "valueName": "NAME",
+        "valueType": "enum"
+      },
+      {
+        "help": "Inspect no harness: the selection is an empty list",
+        "name": "no-harness",
+        "valueType": "switch"
       }
-    ]
+    ],
+    "x-canon": {
+      "rolesForm": "x-canon.roles of a command is the string all (every role) or an array of role names; an empty array is humans only"
+    }
   },
   "warnings": [
     {
@@ -39254,6 +39748,11 @@
       "code": "BRIEF_UNAPPROVED_NOT_ENFORCED",
       "fix": "Give the change a brief with `canon change new`, or fix the `plans:` section of canon.yaml, then have the human approve the brief.",
       "meaning": "a subject moved past a brief that is not approved but cannot be enforced (the change has no brief canon reads, or the `plans:` section is unreadable)"
+    },
+    {
+      "code": "CODE_SCOPES_UNMATCHED",
+      "fix": "Correct the key or the pattern in `.canon/policy.yaml` (matching is byte-exact), then have the human run `canon policy approve` again.",
+      "meaning": "a `code_scopes` key matches no scenario; or a pattern of it matches no file of the code tree, and when none of a key's patterns does the key declares no scope and its scenarios follow the rule without scopes; or the key is malformed (not a map of non-empty lists of non-empty patterns; an empty list is malformed) and no scenario has a scope"
     },
     {
       "code": "CONFIG_MISSING",

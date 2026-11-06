@@ -6,6 +6,8 @@
 //! The test reads every hint the sources can print (the first string literal of each `.hint(…)` argument and
 //! each `*HINT*` constant) and every hint the conformance corpus froze, and holds them to that rule.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -267,7 +269,7 @@ fn atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_opt
             groups += 1;
         }
         args.push("--json");
-        let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(&args).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("spawn canon");
+        let out = hermetic::canon().args(&args).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("spawn canon");
         let document: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{args:?}: stdout is not JSON ({e})"));
         if let Some(hint) = document["error"]["hint"].as_str() {
             seen += 1;
@@ -280,7 +282,7 @@ fn atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_opt
     assert!(problems.is_empty(), "hints the binary prints that break 7.1.2:\n{}", problems.join("\n"));
     // The two removed groups of 0.28 answer with a sentence, not a command line.
     for group in ["brief", "report"] {
-        let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args([group, "--json"]).current_dir(dir.path()).output().expect("spawn canon");
+        let out = hermetic::canon().args([group, "--json"]).current_dir(dir.path()).output().expect("spawn canon");
         let document: serde_json::Value = serde_json::from_slice(&out.stdout).expect("JSON");
         let hint = document["error"]["hint"].as_str().expect("a hint");
         assert!(!hint.starts_with("canon "), "{group}: {hint}");

@@ -4,6 +4,8 @@
 //! inherits, changes — never because a sibling scenario in the same
 //! `.feature` file did.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -29,7 +31,7 @@ const BASE: &str = r#"Feature: cart add
 "#;
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
 }
 
 fn text(output: &Output) -> String {

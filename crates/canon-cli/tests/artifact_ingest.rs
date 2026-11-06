@@ -28,6 +28,8 @@
 //! queried through the real `duckdb` CLI `canon-report` itself shells
 //! out to (`canon_report::marts`), never a parallel Rust re-derivation.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -51,7 +53,7 @@ fn data_of(stdout: &str) -> Value {
 use uuid::Uuid;
 
 fn run_canon(args: &[&str], cwd: &Path) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(cwd).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(cwd).output().expect("spawn canon binary")
 }
 
 fn stdout(output: &Output) -> String {

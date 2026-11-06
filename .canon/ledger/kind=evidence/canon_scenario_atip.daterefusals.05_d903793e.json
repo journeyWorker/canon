@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-date-refusals",
+    "role": "implementer",
+    "session_id": "s-0-38-date-refusals"
+  },
+  "at": "2026-11-06T18:19:04.791604Z",
+  "attachments": [
+    {
+      "case": "atip_daterefusals_05_the_check_of_the_changelog_fails_without_the_row_or_the_entry",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "151a6c2d4a4e35b37e7dbe8d54d1ab2a2680d927e95287b433ee304df8ca683e"
+    }
+  ],
+  "code_tree": "be514fdfebb3ec27fcc3f3810955bb3a85db1757",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "a144e3d5969bb38054ec583245179741a1b7cdf3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "atip.daterefusals.05",
+  "schema": 1,
+  "staging_id": "38f9ecae",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,5 +1,5 @@
-//! Preview and commit for the five destructive leaves (0.28 D6; `atip::plan` since 0.35): `purge`, `artifacts move`,
-//! `migrate` (and `migrate --revert`), `ledger compact`, `tier age`.
+//! Preview and commit for the six destructive leaves (0.28 D6; `atip::plan` since 0.35): `purge`, `artifacts move`,
+//! `artifacts prune`, `migrate` (and `migrate --revert`), `ledger compact`, `tier age`.
 //!
 //! A bare run computes the plan and prints it: `effects[]`, the `planDigest` over them and what they were computed from,
 //! `committed: false`, exit 0, nothing written (no audit line either). `--commit --plan-digest <PLAN_DIGEST>` computes the plan again
@@ -233,6 +233,14 @@ impl Plan {
 
     pub fn digest(&self) -> &str {
         self.digest.as_str()
+    }
+
+    /// The same plan whose preview and commit calls leave out the paging options (`--limit`, `--cursor`, `--all`): a listing of a
+    /// preview is paged, and what it commits is the whole plan, whichever page was read. The digest never covered them.
+    #[must_use]
+    pub fn unpaged(mut self) -> Self {
+        self.given.retain(|argument| !matches!(argument.name.as_str(), "limit" | "cursor" | "all"));
+        self
     }
 
     pub fn effects(&self) -> &[Effect] {

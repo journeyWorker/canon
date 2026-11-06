@@ -12,7 +12,7 @@ pub const SITES: &[Site] = &[
     // change new
     site("change.rs:run_new:CHANGE_ARGUMENT_INVALID#1", Kind::Unreachable("the staged brief is canon's own template and no --title (blank, several lines, a markdown heading, a colon, a tab) was found to make the plan adapter reject it; what is left is a failure of the staging directory, not an argument")),
     // context packs
-    site("context_pack.rs:pack_id_usage_error:USAGE#1", Kind::Domain { command: "context-pack show", argument: "id" }),
+    site("context_pack.rs:pack_id_usage_error:USAGE#1", Kind::Domain { command: "context-pack show", argument: "pack" }),
     // task done
     site("gate.rs:run_task:TASK_ID_INVALID#1", Kind::Domain { command: "task done", argument: "task" }),
     // strategies

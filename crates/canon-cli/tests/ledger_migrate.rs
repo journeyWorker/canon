@@ -7,6 +7,8 @@
 //! rule, three pre-0.23 reviews, a sqlite `.canon/hot.db`), stored without `.git`
 //! and with its ignore file as `gitignore`. The copy gets a git repo and one commit.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -150,7 +152,7 @@ impl Repo {
     }
 
     fn command(&self, args: &[&str]) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+        let mut command = hermetic::canon();
         command
             .args(args)
             .current_dir(self.path())

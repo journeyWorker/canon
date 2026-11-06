@@ -171,7 +171,7 @@ canon status --json
 ```
 ```text
 # Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
-usage: canon trace <ID>
+usage: canon trace <TRACE_ID>
 ```
 ```bash
 canon trace add-login_1_1 --json
@@ -325,6 +325,9 @@ covered for the ship guard and stays listed as `accepted-divergence` in
   (`FINDING_REASON_REQUIRED`), and `finding list` shows it as
   `[reason: …]` so the next reader sees why it was not fixed. Closing a
   finding that already has that disposition is `unchanged`.
+  Only you close a finding `rejected` or `deferred`: another role is refused
+  (`FINDING_ROLE_DENIED`), so declare `--as reviewer`; the close records
+  that role.
 - Sign off in one batch with `review scenario <ids>`, all or nothing. It writes
   directly; nothing to promote. canon stores and re-checks attached bytes
   and never compares images.

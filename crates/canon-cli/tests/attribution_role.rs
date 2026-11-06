@@ -3,13 +3,15 @@
 //! `CANON_ROLE`; with none declared it carries what it carried before. Against
 //! the built `canon` binary, reading what the leaves wrote.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 
 fn canon(repo: &Path, args: &[&str], role_flag: Option<&str>, role_env: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+    let mut command = hermetic::canon();
     command.args(args).current_dir(repo).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
     if let Some(role) = role_flag {
         command.args(["--as", role]);
@@ -28,7 +30,7 @@ fn ok(repo: &Path, args: &[&str], role_flag: Option<&str>, role_env: Option<&str
 
 fn repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    ok(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--providers", "none"], None, None);
+    ok(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--no-harness"], None, None);
     dir
 }
 

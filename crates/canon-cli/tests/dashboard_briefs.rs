@@ -9,6 +9,8 @@
 //! `src/dashboard.rs`; `duckdb` is taken off `PATH` so the snapshot cannot
 //! be generated, which is the case for a consumer without it.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
@@ -20,7 +22,7 @@ use sha2::Digest;
 use tempfile::TempDir;
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(repo).output().expect("spawn canon binary")
 }
 
 fn ok(repo: &Path, args: &[&str]) {
@@ -58,7 +60,7 @@ fn brief_path(repo: &Path, change: &str) -> PathBuf {
 fn repo_with_briefs() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     for change in ["ready", "blocked", "settled"] {
         ok(repo, &["change", "new", change, "--subject", "demo", "--title", change]);
@@ -114,7 +116,7 @@ fn serve_with(repo: &Path, git: bool) -> Live {
         std::os::unix::fs::symlink(found, no_tools.join("git")).unwrap();
     }
     let stderr = repo.join("dashboard.stderr");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let mut child = hermetic::canon()
         .args(["dashboard", "--port", "0", "--json"])
         .current_dir(repo)
         .env("PATH", &no_tools)
@@ -331,7 +333,7 @@ fn subject_lifecycle_52_the_briefs_list_carries_the_relayed_approvals() {
     let repo = dir.path();
     let shown = canon(repo, &["brief", "show", "ready", "--body"]);
     let digest = String::from_utf8(shown.stdout).unwrap().lines().last().unwrap().strip_prefix("digest: ").unwrap().to_string();
-    let relayed = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let relayed = hermetic::canon()
         .args(["brief", "approve", "ready", "--approver", "Ana", "--note", "Go.", "--relayed-via", "ask", "--actor", "plan-1", "--digest", &format!("ready={digest}")])
         .current_dir(repo)
         .env("CANON_ROLE", "planner")
@@ -499,7 +501,7 @@ fn gate_approval_tree_03_the_page_the_command_and_a_relay_record_the_tree_alike(
     ok(repo, &["brief", "approve", "ready2", "--approver", "Ana", "--note", "Go."]);
     let shown = canon(repo, &["brief", "show", "ready3", "--body"]);
     let digest = String::from_utf8(shown.stdout).unwrap().lines().last().unwrap().strip_prefix("digest: ").unwrap().to_string();
-    let relayed = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let relayed = hermetic::canon()
         .args(["brief", "approve", "ready3", "--approver", "Ana", "--note", "Go.", "--relayed-via", "ask", "--actor", "plan-1", "--digest", &format!("ready3={digest}")])
         .current_dir(repo)
         .env("CANON_ROLE", "planner")
@@ -728,7 +730,7 @@ fn report_generation_17_a_hot_path_that_is_a_directory_is_named_as_why_there_is_
     std::fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n  change: local\n").unwrap();
     std::fs::create_dir_all(repo.join(".canon/hot.db/nested")).unwrap();
     let stderr = repo.join("dashboard.stderr");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let mut child = hermetic::canon()
         .args(["dashboard", "--port", "0", "--json"])
         .current_dir(repo)
         .stdout(Stdio::piped())
@@ -760,7 +762,7 @@ fn report_dashboard_04_serves_an_explicit_snapshot_without_duckdb() {
     let snapshot = dir.path().join("my-snapshot");
     std::fs::create_dir_all(&snapshot).unwrap();
     std::fs::write(snapshot.join("manifest.json"), r#"{"ok":true}"#).unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let mut child = hermetic::canon()
         .args(["dashboard", "--port", "0", "--json", "--snapshot", snapshot.to_str().unwrap()])
         .current_dir(dir.path())
         .stdout(Stdio::piped())

@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-provider-option",
+    "role": "reviewer",
+    "session_id": "s-0-38-provider-rev"
+  },
+  "at": "2026-11-06T16:28:52.417819Z",
+  "code_tree": "875c9f914de1bca7210b612ab7a7e4655f8f7f39",
+  "kind": "review",
+  "pin": "e8c8b9a693c2313b0d89bb3a13c7710d4d220a04",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_provideroption_09_the_old_providers_is_refused_with_a_hint_whose_line_runs"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "6b8b18265619cd297f9175468a55671e3de1409cfc5f82dce3244f5ff5b64929",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-provider-option/brief.md"
+  },
+  "review_id": "01M6RV22T1VM6BA1AQSSFJKS4Y",
+  "reviewer": "rev-0-38-provider-option",
+  "scenario_id": "atip.provideroption.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

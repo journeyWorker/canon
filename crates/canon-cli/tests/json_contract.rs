@@ -3,9 +3,11 @@
 //! exactly one JSON value to stdout (a refusal counts), and a non-zero exit
 //! carries a registered `error.code`.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -18,7 +20,7 @@ const ULID: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
 
 fn canon(dir: &Path, args: &[String]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ACTOR", "json-contract").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env("CANON_ACTOR", "json-contract").output().expect("spawn canon binary")
 }
 
 fn run(dir: &Path, args: &[&str]) -> Output {
@@ -35,7 +37,7 @@ fn ok(dir: &Path, args: &[&str]) {
 fn scratch_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, &["feature", "new", "auth.login", "--title", "Login"]);
@@ -51,16 +53,16 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("purge", "kind"), "session"),
         (("change new", "slug"), "another-change"),
         (("dispatch end", "run-outcome"), "succeeded"),
-        (("subject new", "id"), "demo-two"),
-        (("subject show", "id"), "demo"),
-        (("subject move", "id"), "demo"),
+        (("subject new", "subject"), "demo-two"),
+        (("subject show", "subject"), "demo"),
+        (("subject move", "subject"), "demo"),
         (("subject move", "to"), "specced"),
         (("evidence audit", "audit-result"), "confirmed"),
         (("subject adopt", "subject"), "demo"),
         (("subject unadopt", "subject"), "demo"),
         (("skills show", "name"), "canon"),
-        (("context-pack show", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
-        (("context-pack verify", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+        (("context-pack show", "pack"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+        (("context-pack verify", "pack"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();
@@ -108,7 +110,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
 fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
     let path = |p: &str| scratch.join(p).display().to_string();
     match command {
-        "init" => vec!["--repo".into(), path("fresh"), "--providers".into(), "none".into()],
+        "init" => vec!["--repo".into(), path("fresh"), "--no-harness".into()],
         "demo init" => vec!["--repo".into(), path("demo")],
         // `--role` is optional in the schema (a declared role supplies it), but the sweep declares none.
         "divergence accept" | "divergence add" | "divergence defer" | "divergence resolve" | "dispatch begin" | "evidence audit" | "review scenario" | "review change" => vec!["--role".into(), "reviewer".into()],
@@ -233,7 +235,7 @@ fn gate_check_reports_its_violations_as_json_and_keeps_its_exit_code() {
 #[test]
 fn a_clean_gate_is_data_with_exit_zero() {
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-harness"]);
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     let out = run(dir.path(), &["gate", "check", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
@@ -266,7 +268,7 @@ fn progress_and_refresh_notices_stay_off_stdout_in_json_mode() {
 #[test]
 fn a_failing_format_check_is_an_error_with_the_violations_as_data() {
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-harness"]);
     std::fs::create_dir_all(dir.path().join("corpus/kind=feature")).unwrap();
     std::fs::write(dir.path().join("corpus/kind=feature/bad.feature"), "Feature: no provenance\n  Scenario: s\n    Given x\n").unwrap();
     let out = run(dir.path(), &["format", "corpus", "--json"]);

@@ -4,6 +4,8 @@
 //!
 //! Tests are named by scenario id (`atip_helpjson_01_…` proves `atip.helpjson.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
@@ -12,7 +14,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-helpjson").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("canon runs")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-helpjson").stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("canon runs")
 }
 
 fn stdout(output: &Output) -> String {
@@ -38,7 +40,7 @@ fn repo() -> TempDir {
         assert!(out.status.success(), "{program} {args:?}: {}{}", stdout(&out), stderr(&out));
     };
     run("git", &["init", "-q"]);
-    run(env!("CARGO_BIN_EXE_canon"), &["init", "--providers", "none"]);
+    run(env!("CARGO_BIN_EXE_canon"), &["init", "--no-harness"]);
     run("git", &["add", "-A"]);
     run("git", &["-c", "user.name=canon", "-c", "user.email=canon@example.invalid", "commit", "-q", "-m", "fixture"]);
     run(env!("CARGO_BIN_EXE_canon"), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);

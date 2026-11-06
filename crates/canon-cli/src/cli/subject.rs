@@ -24,7 +24,7 @@ pub enum SubjectCommand {
 pub struct SubjectNewArgs {
     /// The subject's kebab-slug id
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
-    pub id: SubjectId,
+    pub subject: SubjectId,
     /// The subject's domain (kebab slug)
     #[arg(long, value_name = "NAME")]
     pub domain: String,
@@ -93,7 +93,7 @@ pub struct SubjectUnadoptArgs {
 pub struct SubjectShowArgs {
     /// The subject to show
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
-    pub id: SubjectId,
+    pub subject: SubjectId,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
@@ -105,7 +105,7 @@ pub struct SubjectShowArgs {
 pub struct SubjectMoveArgs {
     /// The subject to move
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
-    pub id: SubjectId,
+    pub subject: SubjectId,
     /// The state to move the subject to (proposed/specced/building/verifying/shipped/retired)
     #[arg(long, value_name = "STATE", value_parser = crate::subject::status_parser())]
     pub to: canon_model::SubjectStatus,

@@ -5,6 +5,8 @@
 //!
 //! Tests are named by scenario id (`atip_paging_01_…` proves `atip.paging.01`).
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -19,7 +21,7 @@ fn declared_rules() -> Rules {
 }
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-paging").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "atip-paging").output().expect("spawn canon binary")
 }
 
 fn json(output: &Output) -> Value {
@@ -36,7 +38,7 @@ fn ok(dir: &Path, args: &[&str]) -> Value {
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     for subject in ["demo", "demo-two", "demo-three"] {
         ok(repo, &["subject", "new", subject, "--domain", "dev", "--title", &format!("Title {subject}")]);
     }

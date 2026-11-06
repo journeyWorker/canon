@@ -87,11 +87,12 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Format(FormatArgs { dir, repo, json }) => run_fmt(dir.as_deref(), &repo, json),
         Command::Context(ContextArgs { repo, json, fields }) => run_context(&repo, json, fields, declared_role),
         Command::Status(StatusArgs { repo, json, fields }) => ExitCode::from(crate::status::run(&repo, json, fields.as_deref())),
-        Command::Init(InitArgs { repo, check, no_agents_md, policy, no_policy, providers, language, dry_run, json, .. }) => {
+        Command::Init(InitArgs { repo, check, no_agents_md, policy, no_policy, harness, no_harness, language, dry_run, json, .. }) => {
             let policy = (!no_policy).then(|| policy.unwrap_or(crate::policy_level::PolicyLevel::Strict));
-            let skills = match providers {
-                Some(list) => crate::init::SkillsChoice::Providers(list),
-                None => crate::init::SkillsChoice::Detected,
+            let skills = match crate::skills::harness_flags(&harness, no_harness) {
+                Ok(Some(providers)) => crate::init::SkillsChoice::Providers(providers),
+                Ok(None) => crate::init::SkillsChoice::Detected,
+                Err(err) => return ExitCode::from(skills::skills_error(&err).emit("canon init", json)),
             };
             run_init(&repo, check, crate::init::InitOptions { agents_md: !no_agents_md, policy, skills, language, dry_run: dry_run.dry_run }, json)
         }

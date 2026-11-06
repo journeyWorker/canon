@@ -4,6 +4,8 @@
 //! report paths, which runs as written; and a bound report decides the
 //! verdict of a single-scenario `evidence add` as it does the batch's.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -21,7 +23,7 @@ const REPORT_B: &str = r#"<testsuite><testcase classname="cart" name="shop.cart.
 const BATCH: &str = "canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")
 }
 
 fn text(bytes: &[u8]) -> String {

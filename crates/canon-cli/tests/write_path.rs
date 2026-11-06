@@ -3,11 +3,13 @@
 //! readers of the scenario index refresh it when a `.feature` file
 //! changed, and `.canon/audit/` stays out of git.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
+    hermetic::canon().args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
 }
 
 fn stdout(out: &Output) -> String {
@@ -549,7 +551,7 @@ fn concurrent_syncs_and_refreshes_write_each_index_record_once() {
     let lock = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(repo.join(".canon/scenario-index.lock")).unwrap();
     lock.lock().unwrap();
     let spawn = |args: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn canon")
+        hermetic::canon().args(args).env("CANON_ACTOR", "canon").current_dir(repo).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn canon")
     };
     let children = [spawn(&["inventory", "sync"]), spawn(&["inventory", "sync"]), spawn(&["artifacts", "store"]), spawn(&["artifacts", "store"])];
     std::thread::sleep(std::time::Duration::from_millis(500));

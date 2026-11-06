@@ -8,6 +8,8 @@
 //! Tests are named by scenario id (`atip_codestored_01_…` proves `atip.codestored.01`). A test that needs a read-only file says that it is skipped
 //! as root, which ignores file modes, and does not pass without running.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 mod old_codes;
 mod support;
 
@@ -21,7 +23,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 fn canon(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "code-stored").output().expect("spawn canon binary")
+    hermetic::canon().args(args).current_dir(dir).env_remove("CANON_ROLE").env("CANON_ACTOR", "code-stored").output().expect("spawn canon binary")
 }
 
 fn text(output: &Output) -> String {
@@ -46,7 +48,7 @@ fn git(dir: &Path, args: &[&str]) {
 fn scratch_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, &["feature", "new", "auth.login", "--title", "Login"]);
@@ -436,7 +438,7 @@ fn atip_codestored_06_a_write_that_waits_in_vain_for_the_lock_is_unavailable_and
     let held = canon_store::file_lock::FileLock::acquire(&repo.join(".canon/repo-write.lock"), std::time::Duration::ZERO).expect("take the lock");
 
     let before = listing(repo);
-    let short = Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").env("CANON_ACTOR", "code-stored").env("CANON_TEST_REPO_LOCK_WAIT_MS", "200").output().unwrap();
+    let short = hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").env("CANON_ACTOR", "code-stored").env("CANON_TEST_REPO_LOCK_WAIT_MS", "200").output().unwrap();
     let body = assert_refusal(&short, "REPO_LOCK_UNAVAILABLE", true);
     assert!(body["error"]["hint"].as_str().unwrap().contains("again"), "{body}");
     assert_eq!(listing(repo), before, "a write that waited in vain started nothing");
@@ -726,7 +728,7 @@ fn atip_codestored_13_an_unattached_tier_is_required_and_a_stored_object_that_do
     assert!(good.contains(hot), "{good}");
     fs::write(&canon_yaml, good.replace(hot, "  hot:\n    backend: postgres\n    dsn_env: CANON_PG_DSN\n    schema: canon_v1\n")).unwrap();
     let before = listing(repo);
-    let export = Command::new(env!("CARGO_BIN_EXE_canon"))
+    let export = hermetic::canon()
         .args(["export", "--kind", "session", "--output", "out.json", "--json"])
         .current_dir(repo)
         .env_remove("CANON_ROLE")
