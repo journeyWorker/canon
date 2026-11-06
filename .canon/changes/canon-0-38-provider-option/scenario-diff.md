@@ -2,7 +2,7 @@
 
 The scenarios of the specs whose title, Given, When or Then differ between `main` at 251e49300 and this change. Their ids, tags and flows are unchanged. A review of one of them was pinned to the old sentence and is stale; a reviewer other than the author reads the table and signs again. The new scenarios `atip.provideroption.01-15` (`area=atip/provideroption.feature`) are not in the table.
 
-Scenarios changed: 21
+Scenarios changed: 22
 
 | scenario | file | what changed |
 |---|---|---|
@@ -16,6 +16,7 @@ Scenarios changed: 21
 | @skills.install.51 | area=skills/install.feature | a target with no harness is told `canon skills install --harness claude` and `--no-harness` (it was `--providers=<list>`) |
 | @skills.install.52 | area=skills/install.feature | an explicit list is written by `--harness codex` and `--harness omp` (it was `--providers codex,omp`); a later `--harness` replaces the section and `--no-harness` records an empty list (it was `--providers none`) |
 | @skills.install.55 | area=skills/install.feature | an unknown harness on the `--harness` option of a clean canon.yaml is `USAGE`, refused by the enumeration before any section is read (it was `SKILLS_ARGUMENT_INVALID` on `--providers`) |
+| @skills.install.54 | area=skills/install.feature | the title and the stray line of the doctor say a harness that is not selected (review c76310f34 note 1; it said a provider) |
 | @skills.install.67 | area=skills/install.feature | `canon init --harness claude --harness codex` (it was `--providers claude,codex`) |
 | @atip.codesplit.04 | area=atip/codesplit.feature | the bad harness is `skills install --harness bogus`, which is `USAGE` (it was `--providers bogus` with `SKILLS_ARGUMENT_INVALID`) |
 | @atip.midway.06 | area=atip/midway.feature | the refusal of an unknown harness is `canon init --harness` with `USAGE` (it was `--providers` with `INIT_ARGUMENT_INVALID`); it is still no `INIT_INCOMPLETE` and writes nothing |

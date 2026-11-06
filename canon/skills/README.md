@@ -89,7 +89,7 @@ provider is not selected. Canon no longer updates it; the line is advisory,
 `check` ignores it, and `doctor` still reports healthy:
 
 ```
-stray: ./.agents/skills/canon — codex is not a selected provider (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r ./.agents/skills/canon`, or select it with `canon skills install --harness claude --harness codex`
+stray: ./.agents/skills/canon — codex is not a selected harness (from canon.yaml skills.providers), so canon no longer updates it; remove it with `rm -r ./.agents/skills/canon`, or select it with `canon skills install --harness claude --harness codex`
 ```
 
 The lock also records `canon_version`, the canon that wrote it, and

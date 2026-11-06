@@ -358,7 +358,7 @@ fn installed() -> PathBuf {
 }
 
 #[test]
-fn atip_provideroption_05_check_and_doctor_serve_the_harnesss_they_are_given_and_only_those() {
+fn atip_provideroption_05_check_and_doctor_serve_the_harnesses_they_are_given_and_only_those() {
     let repo = installed();
     // With no option they follow canon.yaml: claude and omp.
     let check = document(&run(&repo, &["skills", "check", "--json"]));
@@ -474,7 +474,7 @@ fn hinted_line(hint: &str) -> Vec<String> {
 }
 
 #[test]
-fn atip_provideroption_09_the_old_harnesss_is_refused_with_a_hint_whose_line_runs() {
+fn atip_provideroption_09_the_old_providers_is_refused_with_a_hint_whose_line_runs() {
     // init: a comma list, the `=` form, and none.
     for (typed, expected_line) in [
         (vec!["init", "--providers", "claude,omp", "--json"], "init --harness claude --harness omp --json"),
@@ -516,7 +516,7 @@ fn atip_provideroption_09_the_old_harnesss_is_refused_with_a_hint_whose_line_run
 }
 
 #[test]
-fn atip_provideroption_10_a_harnesss_value_the_old_spelling_did_not_take_is_refused_and_the_hint_names_the_options_only() {
+fn atip_provideroption_10_a_providers_value_the_old_spelling_did_not_take_is_refused_and_the_hint_names_the_options_only() {
     for value in ["Claude", "claude,", "claude, pi", "gemini", "none,claude", "NONE", ""] {
         let given = format!("--providers={value}");
         for command in [vec!["init"], vec!["skills", "install"], vec!["skills", "check"], vec!["skills", "doctor"]] {

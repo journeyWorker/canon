@@ -350,7 +350,7 @@ pub enum SkillsError {
     SourceNotFound(PathBuf),
     #[error("canonical skill source is missing SKILL.src.md under {0}")]
     CanonicalSourceMissing(PathBuf),
-    #[error("unknown provider `{0}`; expected one of: claude, codex, omp, pi")]
+    #[error("unknown harness `{0}`; expected one of: claude, codex, omp, pi")]
     InvalidProvider(String),
     #[error(transparent)]
     Config(#[from] SkillsConfigError),
@@ -1849,7 +1849,7 @@ pub fn doctor(
             with.push(provider);
             with.sort();
             format!(
-                "stray: {} — {} is not a selected provider ({}), so canon no longer updates it; remove it with `rm -r {}`, or select it with `{}`",
+                "stray: {} — {} is not a selected harness ({}), so canon no longer updates it; remove it with `rm -r {}`, or select it with `{}`",
                 dir.display(),
                 provider.as_str(),
                 selection.describe(),

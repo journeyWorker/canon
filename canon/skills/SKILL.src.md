@@ -369,7 +369,7 @@ canon skills install
 canon skills install --harness claude --harness codex --harness omp --harness pi
 # read-only drift check; exit 1 (SKILLS_CHECK_FAILED) names each orphan, a projected file the bundle no longer ships
 canon skills check
-# diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
+# diagnostics, incl. a stray canon projection for an unselected harness and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
 canon skills doctor
 ```
 

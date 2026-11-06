@@ -241,11 +241,11 @@ Feature: skills install
   @subject:skills-install
   @case:failure
   @skills.install.54
-  Scenario: Doctor names a canon projection left for a provider that is not selected
+  Scenario: Doctor names a canon projection left for a harness that is not selected
     Given a target whose canon.yaml selects Claude and that still holds canon's Codex projection from an earlier install
     When canon skills check and canon skills doctor run
     Then the check exits 0 and does not mention the Codex projection
-    And the doctor still reports healthy and adds a stray line naming the directory, saying codex is not a selected provider and canon no longer updates it, with `rm -r <dir>` to remove it and the install command that selects it
+    And the doctor still reports healthy and adds a stray line naming the directory, saying codex is not a selected harness and canon no longer updates it, with `rm -r <dir>` to remove it and the install command that selects it
     And the projection is left on disk
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
