@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-provider-option",
+    "role": "implementer",
+    "session_id": "s-0-38-provider-option"
+  },
+  "at": "2026-11-06T16:24:09.873354Z",
+  "attachments": [
+    {
+      "case": "atip_provideroption_05_check_and_doctor_serve_the_harnesses_they_are_given_and_only_those",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "2e650088628abb0a5fb7ec9f43e3d8efa865389e3b093b912e5f138d18e36ef9"
+    }
+  ],
+  "code_tree": "875c9f914de1bca7210b612ab7a7e4655f8f7f39",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "e8c8b9a693c2313b0d89bb3a13c7710d4d220a04",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 16,
+  "scenario_id": "atip.provideroption.05",
+  "schema": 1,
+  "staging_id": "220a4c29",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
