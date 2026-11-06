@@ -24,7 +24,7 @@ class	CLASS	evidence class
 command	TEXT	command line a hook runs
 command-result	TEXT	captured output backing a summary
 commit	-	mode: act on the previewed plan
-contradicting-trajectory	ID	trajectory that contradicts a strategy
+contradicting-trajectory	TRAJECTORY_ID	trajectory that contradicts a strategy
 cursor	CURSOR	paging position
 detail	TEXT	free-text detail of a record
 dialect	NAME	plan dialect
@@ -35,7 +35,7 @@ dry-run	-	mode: validate fully and write nothing
 error	CODE	error code to explain
 errors	-	mode: list every error code
 evaluation	FILE	evaluation bundle
-evaluator	ID	external evaluator
+evaluator	EVALUATOR_ID	external evaluator
 evaluator-digest	DIGEST	digest of the external evaluator
 evaluator-version	TEXT	version of the external evaluator
 event	NAME	hook event
@@ -116,7 +116,7 @@ session	SESSION_ID	agent session
 severity	SEVERITY	severity of a finding
 signature-file	FILE	detached signature
 since	TIMESTAMP	records at or after a time
-skill	ID	skill
+skill	SKILL_ID	skill
 skill-digest	DIGEST	digest of a skill
 skills-source	DIR	directory the skills are read from
 snapshot	DIR	dashboard snapshot directory

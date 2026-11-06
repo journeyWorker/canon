@@ -1,0 +1,25 @@
+description: "0.38 schema shape (canon-0-38-schema-shape): the operand of trace is named trace with value name TRACE_ID and its refusals have field TRACE_ID; the operands of subject show and context-pack show are named subject and pack; the options --skill and --evaluator have value names SKILL_ID and EVALUATOR_ID; a command all four roles use (status) carries x-canon.roles all, evidence add keeps the array, and the root of the tree says the two forms in x-canon.rolesForm"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [schema, trace, --json]
+    exit: 0
+  - args: [trace, abc, --json]
+    exit: 2
+  - args: [trace, deadbeefdead, --json]
+    exit: 2
+  - args: [schema, subject, show, --json]
+    exit: 0
+  - args: [schema, context-pack, show, --json]
+    exit: 0
+  - args: [schema, dispatch, begin, --json]
+    exit: 0
+  - args: [schema, evidence, audit, --json]
+    exit: 0
+  - args: [schema, status, --json]
+    exit: 0
+  - args: [schema, evidence, add, --json]
+    exit: 0
+  - args: [schema, --as, reviewer, --json]
+    exit: 0

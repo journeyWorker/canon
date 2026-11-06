@@ -207,9 +207,9 @@ fn declared_minor() -> Built<atip::Minor> {
     atip::Minor::parse(crate::json_out::DECLARED_MINOR).map_err(|unknown| unknown.to_string())
 }
 
-/// `x-canon` of a command: the roles whose steps use it (empty: humans only).
+/// `x-canon` of a command: the roles whose steps use it (`all` for the four, an empty array for humans only).
 fn x_canon(path: &str) -> BTreeMap<String, Value> {
-    let roles: Vec<&str> = meta_for(path).map_or_else(Vec::new, |meta| meta.roles.iter().map(|role| role.as_str()).collect());
+    let roles = meta_for(path).map_or_else(|| json!([]), crate::schema::CommandMeta::roles_value);
     BTreeMap::from([("x-canon".to_string(), json!({ "roles": roles }))])
 }
 
@@ -243,8 +243,13 @@ pub fn tree(root: &Command, role: Option<Role>) -> Built<TreeDoc> {
             entries.push(entry(node)?);
         }
     }
-    // A filtered tree says so (spec 10.2.2, 10.12): the role is `x-canon.as`, and an unfiltered tree has no `x-canon`.
-    let extensions = role.map(|role| ("x-canon".to_string(), json!({ "as": role.as_str() }))).into_iter().collect();
+    // The root of a tree says the two forms of `x-canon.roles` once; a filtered tree names its role in `x-canon.as` too (spec 10.2.2, 10.12).
+    let mut declared = serde_json::Map::new();
+    if let Some(role) = role {
+        declared.insert("as".to_string(), json!(role.as_str()));
+    }
+    declared.insert("rolesForm".to_string(), json!(crate::schema::ROLES_FORM));
+    let extensions = BTreeMap::from([("x-canon".to_string(), Value::Object(declared))]);
     Ok(TreeDoc { kind: TreeDoc::KIND, level: LEVEL.to_string(), commands: entries, extensions })
 }
 

@@ -123,7 +123,7 @@ canon demo review --json
 ```
 ```text
 # Mint a Run manifest with retrieved guidance and context/policy lineage
-usage: canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill <ID>] [--skill-digest <DIGEST> (with --skill)] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task <TASK_ID>] [--parent-run <RUN_ID>] [--input]
+usage: canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill <SKILL_ID>] [--skill-digest <DIGEST> (with --skill)] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task <TASK_ID>] [--parent-run <RUN_ID>] [--input]
 ```
 ```bash
 canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer --json
@@ -392,7 +392,7 @@ canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --json
 ```
 ```text
 # Disable an active strategy with durable rollback provenance
-usage: canon strategy rollback <STRATEGY_ID> --reason <TEXT> --actor <ACTOR_ID> --signature-file <FILE> --approval-at <TIMESTAMP> [--contradicting-trajectory <ID>] [--input]
+usage: canon strategy rollback <STRATEGY_ID> --reason <TEXT> --actor <ACTOR_ID> --signature-file <FILE> --approval-at <TIMESTAMP> [--contradicting-trajectory <TRAJECTORY_ID>] [--input]
 ```
 ```bash
 canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z --json
@@ -442,7 +442,7 @@ canon tier age --json
 ```
 ```text
 # Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
-usage: canon trace <ID>
+usage: canon trace <TRACE_ID>
 ```
 ```bash
 canon trace add-login_1_1 --json

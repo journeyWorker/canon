@@ -23,6 +23,39 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 | `--providers none` | an empty list: `init` and `skills install` record `providers: []` and install nothing, `skills check` and `skills doctor` select nothing | refused with `USAGE` (field `--providers`, exit 2); the hint is the line with `--no-harness`; nothing is written | the switch `--no-harness` |
 | `"providers": "claude,omp"` in an `--input` document | the key took the same string, and `"providers": "none"` took none | refused with `INPUT_INVALID` (exit 2, field `/providers`, an unknown key); nothing is recorded | an array and a boolean: `"harness": ["claude", "omp"]`, and for none `"noHarness": true` |
 
+**An id operand is named for what it is, the id options for the id they take, and a command all four roles use says `all`** (`canon-0-38-schema-shape`, scenarios `atip.schemashape.01-12`; the ATIP author's request in #141; atip/1 Annex S1 items 3 and 4, spec 9.5 and 9.10.2). `canon schema` called the operand of six commands `id`, whatever the id was, gave `canon trace` the value name `ID` and three options the bare value name `ID`, and wrote the four role names into `x-canon.roles` of the thirteen commands every role uses. Command lines and `--input` documents are as they were; what changes is what a tool that reads the schema finds.
+
+- **Operand names.** The operand of `subject new`, `subject show` and `subject move` is `subject`, of `context-pack show` and `context-pack verify` is `pack`, of `trace` is `trace`; no operand of any command is named `id` any more. The name never appears in an input document (it takes the `operands` array, which is read as before; a key named `id` was and still is an unknown key). The value names `SUBJECT_ID` and `PACK_ID` are as they were.
+- **Value names.** `canon trace` takes `<TRACE_ID>` (a review id, a commit sha or a finding key, as before), `--skill` takes `SKILL_ID`, `--evaluator` `EVALUATOR_ID` and `--contradicting-trajectory` `TRAJECTORY_ID`. The refusal of a trace operand has `field` `TRACE_ID` where it had `ID`, and its message names `TRACE_ID`; what is accepted and refused, the codes, `received` and the domains are 0.37's. No value name `ID` is left in the tree.
+- **Roles.** `x-canon.roles` of a command is the string `"all"` when the steps of all four roles use it, and the array of role names otherwise (the empty array is a command only a human runs, as before). A tool that reads the schema reads `"all"` as the four roles, and a missing `roles` member means nothing: it is not `all` and not humans only. A reader that assumes an array (`roles.includes("reviewer")`, `roles.map`, `roles.length`) breaks on the thirteen commands below: read `roles === "all" || roles.includes(role)`. `canon schema --as <role>`, `canon context`, `canon status` and the command blocks of the role guides list the same commands as before (the `roles` arrays of `canon context` are unchanged).
+- **The two forms, said once.** The root of the tree says them in `x-canon.rolesForm` (a filtered tree has it beside `x-canon.as`); no group or command document repeats it. The skill guide and the website schema section (English and Korean) say the same.
+- **Bytes.** The tree of `canon schema --json` was 25,709 bytes in 0.37.0. The same tree with this change applied is 25,252: 598 bytes fewer for `"all"` in place of four names in 13 commands (13 × 46, 2.3% of the tree), 141 bytes more for the declaration at the root (`,"x-canon":{"rolesForm":"…"}`), 457 fewer in all (1.8%).
+
+| name | 0.37 | 0.38 |
+|---|---|---|
+| `subject new` operand | named `id`, value name `SUBJECT_ID` | named `subject`, value name `SUBJECT_ID` |
+| `subject show` operand | named `id`, value name `SUBJECT_ID` | named `subject`, value name `SUBJECT_ID` |
+| `subject move` operand | named `id`, value name `SUBJECT_ID` | named `subject`, value name `SUBJECT_ID` |
+| `context-pack show` operand | named `id`, value name `PACK_ID` | named `pack`, value name `PACK_ID` |
+| `context-pack verify` operand | named `id`, value name `PACK_ID` | named `pack`, value name `PACK_ID` |
+| `trace` operand | named `id`, value name `ID` (`<ID>` in the help, `field` `ID` in a refusal) | named `trace`, value name `TRACE_ID` (`<TRACE_ID>` in the help, `field` `TRACE_ID` in a refusal) |
+| `dispatch begin --skill` | value name `ID` | value name `SKILL_ID` |
+| `evidence audit --evaluator` | value name `ID` | value name `EVALUATOR_ID` |
+| `strategy rollback --contradicting-trajectory` | value name `ID` | value name `TRAJECTORY_ID` |
+| `completion` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `context` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `divergence list` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `finding list` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `format` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `gate check` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `query` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `retrieve` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `schema` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `search` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `skills show` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `status` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+| `trace` roles | `x-canon.roles` is `["planner","implementer","reviewer","orchestrator"]` | `x-canon.roles` is `"all"` |
+
 ### Added
 
 - **`canon artifacts prune` deletes the blobs no record binds any more** (`canon-0-38-artifacts-prune`, scenarios `artifacts.prune.01-15`; issue #138). The artifact store only grew: a report written anew on every run adds a blob per run, and nothing took them out (this repo held 174 blobs, 59.7 MiB, and the gate and `artifacts verify` read 9 of them, 3.7 MiB). The command is the orchestrator's, one of the six destructive leaves, so the bare run is the preview and `--commit --plan-digest <digest>` deletes.

@@ -195,8 +195,8 @@ pub struct SearchArgs {
 #[derive(Debug, Args)]
 pub struct TraceArgs {
     /// A review id (26 characters), a commit sha (7 to 40 hex digits, the first characters are enough) or a finding key (`<change>_<round>_<seq>`, as `canon query --kind finding` shows it)
-    #[arg(value_name = "ID")]
-    pub id: String,
+    #[arg(value_name = "TRACE_ID")]
+    pub trace: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form

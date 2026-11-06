@@ -150,7 +150,7 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("query").out(&[report("QueryReport")]),
     leaf("regime show").out(&[report("RegimeShowReport")]),
     leaf("search").out(&[report("SearchReport")]).operands(&[operand("text", "The text to find, read as typed: quotes and words such as AND are not syntax")]),
-    leaf("trace").out(&[report("TraceReport")]).operands(&[operand("id", "A review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`)")]),
+    leaf("trace").out(&[report("TraceReport")]).operands(&[operand("trace", "A review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`)")]),
     leaf("report build").idem(ReplaySafe).out(&[report("ReportBuildReport")]),
     leaf("report check").out(&[report("ReportCheckReport")]),
     leaf("report snapshot").idem(ReplaySafe).out(&[report("ReportSnapshotReport")]),

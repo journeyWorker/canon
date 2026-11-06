@@ -45,7 +45,7 @@ Commands without a group word.
 | `canon search` | `<text>` | none | 읽기: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding --json` |
 | `canon selftest` | none | none | 읽기: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate --json` |
 | `canon status` | none | none | 읽기: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status --json` |
-| `canon trace` | `<id>` | none | 읽기: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1 --json` |
+| `canon trace` | `<trace-id>` | none | 읽기: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1 --json` |
 {/* canon:generated cli-top end */}
 
 ### `canon adapter`
@@ -152,7 +152,7 @@ Author a staged, attributed evidence attestation for a plan task.
 |---|---|---|---|---|
 | `canon evidence add` | none | none | 쓰기: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer --json` |
 | `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | 읽기: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --json` |
-| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | 쓰기: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json` |
+| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <EVALUATOR_ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | 쓰기: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json` |
 {/* canon:generated cli-evidence end */}
 
 ### `canon feature`
@@ -377,7 +377,9 @@ canon schema --warnings --json    # 모든 경고 코드(meta.warnings)와 의�
 (`--repo`, `--as`, `--actor`, `--session`, `--role` 등)을 한 번만 정의하고, 명령은
 그 옵션을 되풀이하지 않고 이름으로 가리킵니다. `commands`는 모든 그룹과 명령이 한
 번씩, 그룹이 자기 명령 앞에 오고, 각 항목에 `command`, `summary`, 명령이면 `effect`와
-`x-canon.roles`, 그룹이면 `kind: "group"`이 있습니다. `path`는 없습니다. `group`에는
+`x-canon.roles`, 그룹이면 `kind: "group"`이 있습니다. `path`는 없습니다. `x-canon.roles`는
+네 역할이 모두 쓰는 명령이면 문자열 `"all"`이고, 아니면 역할 이름 배열입니다(빈 배열은 사람만
+쓰는 명령). 트리 최상위의 `x-canon.rolesForm`이 이를 한 번 말합니다. `group`에는
 `command`, `summary`와 직접 자식 `commands`가 있습니다. `command` 문서는 호출 표면만
 담습니다: `summary`, `effect`(`read`, `write`, `destructive`), `idempotency`(읽기는
 없음), `effectNote`, `operands`, `options`(트리 옵션을 가리키는 이름, 또는 `name`,

@@ -9,7 +9,7 @@ Feature: atip schema: the L1 self-description documents
   Scenario: The schema tree is a tree document at level L2 that lists every group and command once, a group before its commands, and --as filters while CANON_ROLE does not
     Given a built canon and no environment
     When canon schema --json runs twice, then with --as reviewer, and with CANON_ROLE=reviewer
-    Then data.kind is tree and level is L2; the 27 groups and 78 commands appear once each with a group before its commands and no entry has path or kind command; meta.schemaVersion and contractVersion are 1.5; the two plain answers are byte-equal; --as keeps only the reviewer commands and their groups and the tree names the role in x-canon.as; the unfiltered trees have no x-canon; CANON_ROLE changes nothing
+    Then data.kind is tree and level is L2; the 27 groups and 78 commands appear once each with a group before its commands and no entry has path or kind command; meta.schemaVersion and contractVersion are 1.5; the two plain answers are byte-equal; --as keeps only the reviewer commands and their groups and the tree names the role in x-canon.as; every tree, filtered or not, says the two forms of x-canon.roles once in x-canon.rolesForm and the unfiltered trees have no other x-canon member; each command entry carries x-canon.roles as all or an array of role names; CANON_ROLE changes nothing
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:12Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema

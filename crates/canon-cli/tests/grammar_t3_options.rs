@@ -22,9 +22,9 @@ use harness::*;
 use serde_json::Value;
 
 /// D1's placeholders and the names the per-leaf table adds (`docs/design/cli-commands-0.28.md`, "Value names");
-/// the table's rows also use `STATUS` and `HASH`, the typed forms `JSON|FILE|-` and `FORMAT:PATH`, and the concept ids (`*_ID`).
+/// the table's rows also use `STATUS` and `HASH`, the typed forms `JSON|FILE|-` and `FORMAT:PATH`, and the concept ids (`*_ID`; 0.38 removed the bare `ID`).
 const PLACEHOLDERS: &[&str] = &[
-    "DIR", "FILE", "PATH", "ID", "SHA", "N", "TIMESTAMP", "NAME", "TEXT", "URL", "KIND", "FIELDS", // D1
+    "DIR", "FILE", "PATH", "SHA", "N", "TIMESTAMP", "NAME", "TEXT", "URL", "KIND", "FIELDS", // D1
     "REV", "DIGEST", "PLAN_DIGEST", "LIST", "TAG", "LEVEL", "TIER", "STATE", "SHELL", "KEY", "CURSOR", "CLASS", "CODE", "SEVERITY", "DISPOSITION", "RUN_OUTCOME", "REVIEW_OUTCOME", "RESULT", "VERDICT", "ROLE", "CHANGE_KIND", "FLOW_ID", "PATH_OR_EFFECT", "NAME@VERSION", // the table
     "STATUS", "HASH", "JSON|FILE|-", "FORMAT:PATH", // used by table rows
 ];

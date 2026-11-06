@@ -42,7 +42,7 @@ Commands without a group word.
 | `canon search` | `<text>` | none | read: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding --json` |
 | `canon selftest` | none | none | read: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate --json` |
 | `canon status` | none | none | read: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status --json` |
-| `canon trace` | `<id>` | none | read: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1 --json` |
+| `canon trace` | `<trace-id>` | none | read: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1 --json` |
 {/* canon:generated cli-top end */}
 
 ### `canon adapter`
@@ -149,7 +149,7 @@ Author a staged, attributed evidence attestation for a plan task.
 |---|---|---|---|---|
 | `canon evidence add` | none | none | write: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer --json` |
 | `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | read: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z --json` |
-| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | write: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json` |
+| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <EVALUATOR_ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | write: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --json` |
 {/* canon:generated cli-evidence end */}
 
 ### `canon feature`
@@ -376,7 +376,10 @@ and `commands`. `options` defines once every option that two or more commands
 define identically (`--repo`, `--as`, `--actor`, `--session`, `--role`, …); a command
 names such an option instead of repeating it. `commands` lists every group and command
 once, a group before its commands, each with `command`, `summary` and, for a command,
-`effect` and `x-canon.roles`, for a group `kind: "group"`; there is no `path`. A `group`
+`effect` and `x-canon.roles`, for a group `kind: "group"`; there is no `path`. `x-canon.roles`
+is the string `"all"` for a command all four roles use, and otherwise an array of role names
+(the empty array is a command only a human runs); the root of the tree says so in
+`x-canon.rolesForm`. A `group`
 has `command`, `summary` and its direct `commands`. A `command` document is the call
 surface and nothing more: `summary`, `effect` (`read`, `write` or `destructive`),
 `idempotency` (not for a read), `effectNote`, `operands`, `options` (a name that

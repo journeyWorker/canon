@@ -223,8 +223,11 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   your complete command set, every option of every leaf included. Run `canon schema <command> --json` only for a
   command it does not list, or after a `USAGE` refusal (read `error.field`
   and `error.expected` first). `canon schema --json` is the tree of every group and command
-  with its `effect` and `x-canon.roles` (`--as <role>` lists one role's, and `x-canon.as` names it);
-  its `options` define once the options that two or more commands share (`--repo`, `--as`, `--actor`, …)
+  with its `effect` and `x-canon.roles` (`--as <role>` lists one role's, and `x-canon.as` names it).
+  `x-canon.roles` is the string `all` for a command all four roles use, else an array of
+  role names (empty: only a human runs it), so read it as `roles == "all"` or a name in the array;
+  the root's `x-canon.rolesForm` says so once. The tree's
+  `options` define once the options that two or more commands share (`--repo`, `--as`, `--actor`, …)
   and a command names them. `canon schema <group> --json` lists a group's
   commands; `canon schema <command> --json` is the call surface of one command and nothing
   else: `options` (each name of a tree option, or an object with `valueType`, a typed

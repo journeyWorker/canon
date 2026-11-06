@@ -53,16 +53,16 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("purge", "kind"), "session"),
         (("change new", "slug"), "another-change"),
         (("dispatch end", "run-outcome"), "succeeded"),
-        (("subject new", "id"), "demo-two"),
-        (("subject show", "id"), "demo"),
-        (("subject move", "id"), "demo"),
+        (("subject new", "subject"), "demo-two"),
+        (("subject show", "subject"), "demo"),
+        (("subject move", "subject"), "demo"),
         (("subject move", "to"), "specced"),
         (("evidence audit", "audit-result"), "confirmed"),
         (("subject adopt", "subject"), "demo"),
         (("subject unadopt", "subject"), "demo"),
         (("skills show", "name"), "canon"),
-        (("context-pack show", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
-        (("context-pack verify", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+        (("context-pack show", "pack"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+        (("context-pack verify", "pack"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();

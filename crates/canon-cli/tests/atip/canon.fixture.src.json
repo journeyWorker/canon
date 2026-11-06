@@ -41,7 +41,7 @@
     },
     "context-pack show": {
       "domainRejects": {
-        "id": [
+        "pack": [
           "Core",
           "-core"
         ]
@@ -49,7 +49,7 @@
     },
     "context-pack verify": {
       "domainRejects": {
-        "id": [
+        "pack": [
           "Core",
           "-core"
         ]
@@ -329,7 +329,7 @@
     },
     "subject show": {
       "domainRejects": {
-        "id": [
+        "subject": [
           "Core",
           "-core"
         ]
@@ -337,7 +337,7 @@
     },
     "trace": {
       "domainRejects": {
-        "id": [
+        "trace": [
           "Core",
           "-core"
         ]

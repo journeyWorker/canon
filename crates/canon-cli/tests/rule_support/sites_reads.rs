@@ -26,5 +26,5 @@ pub const SITES: &[Site] = &[
     site("run/top.rs:run_retrieve:USAGE#3", Kind::Rule { command: "retrieve", rule: "requires", arguments: &["subject", "domain"] }),
     site("run/top.rs:run_retrieve:USAGE#4", Kind::Validator { command: "retrieve", arguments: &["for-role", "regime"] }),
     site("search/mod.rs:run_search:SEARCH_QUERY_REQUIRED#1", Kind::Domain { command: "search", argument: "text" }),
-    site("search/mod.rs:run_trace:TRACE_OPERAND_INVALID#1", Kind::Domain { command: "trace", argument: "id" }),
+    site("search/mod.rs:run_trace:TRACE_OPERAND_INVALID#1", Kind::Domain { command: "trace", argument: "trace" }),
 ];

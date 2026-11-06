@@ -461,7 +461,7 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
             assert!(entry.get("effect").is_none(), "a group has no effect");
         } else {
             assert!(entry["effect"].is_string(), "a command has one: {entry}");
-            assert!(entry["x-canon"]["roles"].is_array(), "the roles of a command are x-canon.roles: {entry}");
+            assert!(entry["x-canon"]["roles"] == "all" || entry["x-canon"]["roles"].is_array(), "the roles of a command are x-canon.roles, `all` or an array: {entry}");
             let parent = &ids[..at].iter().rev().find(|id| entry["command"].as_str().expect("command").starts_with(&format!("{id} "))).copied();
             if entry["command"].as_str().expect("command").contains(' ') {
                 assert!(parent.is_some(), "a group comes before its command: {entry}");
@@ -476,12 +476,12 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
     let reviewer = serde_json::from_slice::<Value>(&run(&["schema", "--as", "reviewer", "--json"], dir.path(), None).stdout).expect("JSON");
     let listed = reviewer["data"]["commands"].as_array().expect("commands");
     assert!(!listed.is_empty() && listed.len() < entries.len());
-    assert_eq!(reviewer["data"]["x-canon"], json!({ "as": "reviewer" }), "a filtered tree names the role in x-canon.as");
+    assert_eq!(reviewer["data"]["x-canon"], json!({ "as": "reviewer", "rolesForm": first["data"]["x-canon"]["rolesForm"] }), "a filtered tree names the role in x-canon.as and says the forms of roles as the tree does");
     assert_eq!(atip::schema_doc_problems(&reviewer), Vec::<String>::new());
-    assert!(first["data"].get("x-canon").is_none(), "an unfiltered tree has no x-canon");
+    assert_eq!(first["data"]["x-canon"].as_object().map(|declared| declared.keys().collect::<Vec<_>>()), Some(vec![&"rolesForm".to_string()]), "an unfiltered tree says only the forms of roles");
     for entry in listed {
         if entry["kind"] != "group" {
-            assert!(names(&entry["x-canon"], "roles").contains(&"reviewer".to_string()), "{entry}");
+            assert!(entry["x-canon"]["roles"] == "all" || names(&entry["x-canon"], "roles").contains(&"reviewer".to_string()), "{entry}");
         } else {
             let prefix = format!("{} ", entry["command"].as_str().expect("command"));
             assert!(listed.iter().any(|other| other["kind"] != "group" && other["command"].as_str().is_some_and(|c| c.starts_with(&prefix))), "a group is listed only for a command it holds: {entry}");

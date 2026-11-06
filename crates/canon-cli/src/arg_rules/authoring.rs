@@ -136,7 +136,7 @@ pub(crate) static TABLES: Tables = Tables {
         // `NAME@VERSION`, by clap's parser.
         DomainRow::new(Scope::Arguments(&["prompt add", "prompt show"], "bundle"), Domain::matching(NAME_AT_VERSION), "USAGE").inside(&["reviewer@v1", "a@b", "a b@c d"]).outside(&["reviewer", "@v1", "reviewer@", "a@b@c", "@", ""]),
         // The id of a context pack, read by the handler.
-        DomainRow::new(Scope::Arguments(&["context-pack show", "context-pack verify"], "id"), Domain::matching(PACK_ID), "USAGE")
+        DomainRow::new(Scope::Arguments(&["context-pack show", "context-pack verify"], "pack"), Domain::matching(PACK_ID), "USAGE")
             .inside(&["sha256:0000000000000000000000000000000000000000000000000000000000000000", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"])
             .outside(&["", "sha256:", "sha256:abc", "sha256:000000000000000000000000000000000000000000000000000000000000000", "sha256:00000000000000000000000000000000000000000000000000000000000000000", "sha256:ABCDEF0000000000000000000000000000000000000000000000000000000000", "0000000000000000000000000000000000000000000000000000000000000000", "sha256:g000000000000000000000000000000000000000000000000000000000000000"]),
     ],

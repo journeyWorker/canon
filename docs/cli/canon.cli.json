@@ -826,12 +826,7 @@
       ],
       "summary": "Write the shell completion script for canon (bash, zsh or fish)",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -870,12 +865,7 @@
       ],
       "summary": "Show what you can author here: record kinds, fields, enums, policies",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -968,7 +958,7 @@
             "pattern": "^sha256:[0-9a-f]{64}$"
           },
           "help": "Context pack id (sha256:<64 hex digits>)",
-          "name": "id",
+          "name": "pack",
           "required": true,
           "valueName": "PACK_ID"
         }
@@ -1020,7 +1010,7 @@
             "pattern": "^sha256:[0-9a-f]{64}$"
           },
           "help": "Context pack id (sha256:<64 hex digits>)",
-          "name": "id",
+          "name": "pack",
           "required": true,
           "valueName": "PACK_ID"
         }
@@ -1301,7 +1291,7 @@
         {
           "help": "Skill that contributed to this run",
           "name": "skill",
-          "valueName": "ID"
+          "valueName": "SKILL_ID"
         },
         {
           "help": "Declared skill digest; requires --skill",
@@ -2010,12 +2000,7 @@
         }
       ],
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -2829,7 +2814,7 @@
           "help": "The external evaluator that re-audited the scenario (canon never runs it)",
           "name": "evaluator",
           "required": true,
-          "valueName": "ID"
+          "valueName": "EVALUATOR_ID"
         },
         {
           "domain": {
@@ -3701,12 +3686,7 @@
       ],
       "summary": "List a change's committed findings at their latest version: round, seq, severity, disposition, reviewer and summary",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -3747,12 +3727,7 @@
       ],
       "summary": "Validate a spec/artifact corpus against canon's format",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -3790,12 +3765,7 @@
       ],
       "summary": "Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -5404,12 +5374,7 @@
         }
       ],
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -5705,12 +5670,7 @@
         }
       ],
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6242,12 +6202,7 @@
         }
       ],
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6333,12 +6288,7 @@
       ],
       "summary": "Search records, brief sections and scenario text, with each hit's neighbors in the record graph",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6623,12 +6573,7 @@
       ],
       "summary": "Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6673,12 +6618,7 @@
       ],
       "summary": "Show where this repo stands: subjects by status, their gaps, and the next commands",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     },
     {
@@ -6987,7 +6927,7 @@
         {
           "help": "A trajectory that contradicts the strategy (must exist in the trajectory store)",
           "name": "contradicting-trajectory",
-          "valueName": "ID"
+          "valueName": "TRAJECTORY_ID"
         },
         "repo",
         "as"
@@ -7155,7 +7095,7 @@
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "The subject to move",
-          "name": "id",
+          "name": "subject",
           "required": true,
           "valueName": "SUBJECT_ID"
         }
@@ -7268,7 +7208,7 @@
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "The subject's kebab-slug id",
-          "name": "id",
+          "name": "subject",
           "required": true,
           "valueName": "SUBJECT_ID"
         }
@@ -7366,7 +7306,7 @@
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "help": "The subject to show",
-          "name": "id",
+          "name": "subject",
           "required": true,
           "valueName": "SUBJECT_ID"
         }
@@ -7637,8 +7577,9 @@
             "pattern": "^\\p{White_Space}*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|[^\u0000]+_[0-9]+_[0-9]+)\\p{White_Space}*$"
           },
           "help": "A review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`)",
-          "name": "id",
-          "required": true
+          "name": "trace",
+          "required": true,
+          "valueName": "TRACE_ID"
         }
       ],
       "options": [
@@ -7652,12 +7593,7 @@
       ],
       "summary": "Follow a finding's review loop in time order: review, finding, fix, re-review, evidence",
       "x-canon": {
-        "roles": [
-          "planner",
-          "implementer",
-          "reviewer",
-          "orchestrator"
-        ]
+        "roles": "all"
       }
     }
   ],
@@ -38719,12 +38655,7 @@
         "effect": "read",
         "summary": "Write the shell completion script for canon (bash, zsh or fish)",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38732,12 +38663,7 @@
         "effect": "read",
         "summary": "Show what you can author here: record kinds, fields, enums, policies",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38888,12 +38814,7 @@
         "effect": "read",
         "summary": "List the current divergence burn-down state",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -38999,12 +38920,7 @@
         "effect": "read",
         "summary": "List a change's committed findings at their latest version: round, seq, severity, disposition, reviewer and summary",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39012,12 +38928,7 @@
         "effect": "read",
         "summary": "Validate a spec/artifact corpus against canon's format",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39030,12 +38941,7 @@
         "effect": "read",
         "summary": "Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39222,12 +39128,7 @@
         "effect": "read",
         "summary": "Read stored records across every storage tier",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39285,12 +39186,7 @@
         "effect": "read",
         "summary": "Fetch role-scoped strategy guidance",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39339,12 +39235,7 @@
         "effect": "read",
         "summary": "Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39352,12 +39243,7 @@
         "effect": "read",
         "summary": "Search records, brief sections and scenario text, with each hit's neighbors in the record graph",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39410,12 +39296,7 @@
         "effect": "read",
         "summary": "Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39423,12 +39304,7 @@
         "effect": "read",
         "summary": "Show where this repo stands: subjects by status, their gaps, and the next commands",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       },
       {
@@ -39559,12 +39435,7 @@
         "effect": "read",
         "summary": "Follow a finding's review loop in time order: review, finding, fix, re-review, evidence",
         "x-canon": {
-          "roles": [
-            "planner",
-            "implementer",
-            "reviewer",
-            "orchestrator"
-          ]
+          "roles": "all"
         }
       }
     ],
@@ -39852,7 +39723,10 @@
         "name": "no-harness",
         "valueType": "switch"
       }
-    ]
+    ],
+    "x-canon": {
+      "rolesForm": "x-canon.roles of a command is the string all (every role) or an array of role names; an empty array is humans only"
+    }
   },
   "warnings": [
     {

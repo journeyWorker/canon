@@ -165,7 +165,7 @@ canon subject unadopt demo --change add-login --json
 ```
 ```text
 # Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
-usage: canon trace <ID>
+usage: canon trace <TRACE_ID>
 ```
 ```bash
 canon trace add-login_1_1 --json
