@@ -131,7 +131,7 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   Scenario: The table of values inside and outside each domain agrees with the real parsers, and a command that declares another domain fails the sweep
     Given the table of values inside and outside each domain, and seeded documents in which a command declares another domain, none or the pattern of the other option
     When each value is judged by the declared pattern and by the parser of its option, and the sweep reads each document
-    Then the pattern and the parser agree on every value, a date or time that does not exist is the pattern's and the parser's refusal with its cause, and the sweep finds each seeded fault by the option and the command
+    Then the pattern and the parser agree on every value, a date or time that does not exist is the pattern's and the parser's refusal, which says what does not exist, and the sweep finds each seeded fault by the option and the command
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:25Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema

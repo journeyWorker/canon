@@ -334,9 +334,9 @@ fn time_pattern_is_the_shape(pattern: &str, parse: fn(&str) -> Result<chrono::Da
                 problems.push(format!("the parser accepts {candidate:?} and the pattern refuses it"));
             }
         }
-        // What the pattern admits and the parser refuses is a date or a time that does not exist, which the calendar's refusal says (it has a cause).
+        // What the pattern admits and the parser refuses is a date or a time that does not exist, which the refusal says does not exist (a `Missing`, not a spelling).
         if let (true, Err(error)) = (admitted, &parsed) {
-            if std::error::Error::source(error).is_none() {
+            if !matches!(error, canon_cli::timestamp::TimestampError::Missing { .. }) {
                 problems.push(format!("the pattern admits {candidate:?} and the parser refuses its spelling"));
             }
         }

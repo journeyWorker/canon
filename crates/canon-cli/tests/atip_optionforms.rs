@@ -668,7 +668,7 @@ fn atip_optionforms_12_the_table_of_values_inside_and_outside_each_domain_agrees
         assert_eq!(parsed, *taken, "the parser of `--{option}` and {value:?}");
     }
     // A date or a time that does not exist matches the pattern (it states the spelling) and is refused by the parser: the validator's.
-    for value in ["2026-02-30T10:00:00Z", "2030-01-01T25:00:00Z", "2030-13-01T00:00:00Z", "2030-01-01T10:60:00Z", "2030-01-01T10:00:00+24:00"] {
+    for value in ["2026-02-30T10:00:00Z", "2030-01-01T25:00:00Z", "2030-13-01T00:00:00Z", "2030-01-01T10:60:00Z", "2030-01-01T10:00:00+24:00", "2030-01-01T23:59:60Z", "2030-01-01T10:00:60.5+01:00"] {
         assert!(admits("evidence approval-payload", "approval-at", &json!(value)), "the pattern is the spelling: {value}");
         assert!(canon_cli::timestamp::parse_date_time(value).is_err(), "{value}");
         assert!(canon_cli::timestamp::parse(value).is_err(), "{value}");
@@ -912,3 +912,137 @@ fn atip_optionforms_16_the_golden_file_is_the_measure_of_0_36_and_its_classes_ar
     let held = |key: &str, value: &str| kept[key].as_array().expect("entries").iter().any(|entry| entry["value"] == value);
     assert!(held("accepted", "Claude") && held("accepted", "claude,,pi") && held("accepted", "") && held("accepted", "claude, pi") && held("accepted", "NONE"));
     assert!(!held("accepted", "none,claude") && !held("accepted", "gemini") && held("refused", "gemini"));}
+
+// ===========================================================================
+// `canon-0-38-date-refusals`: a leap second is refused in the twelve places, and a date, a time or an offset that does not exist says so.
+
+/// The call that gives `--option` the value `value` in `command`, any of the twelve places.
+fn place_call(option: &str, command: &str, value: &str) -> Vec<String> {
+    let given = format!("--{option}={value}");
+    let ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    let mut argv: Vec<&str> = match command {
+        "evidence approval-payload" => vec!["evidence", "approval-payload", "--scenario", "auth.login.01", "--project", "root", "--approver", "alice"],
+        "evidence add" => vec!["evidence", "add", "--project", "root", "--scenario", "auth.login.02", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--approver", "alice", "--approval-role", "human", "--signature-file", "s.sig"],
+        "strategy approval-payload" => vec!["strategy", "approval-payload", ulid, "--evaluation", "evaluation.json", "--approver", "alice"],
+        "strategy rollback" => vec!["strategy", "rollback", ulid, "--reason", "r", "--actor", "alice", "--signature-file", "s.sig"],
+        _ => return date_call(option, command, value),
+    };
+    argv.push(&given);
+    harness::strs(&argv)
+}
+
+/// Every `(option, command)` of the twelve places, with the call of a value there refused with `USAGE` for the option and nothing written; its message.
+fn refused_in_every_place(value: &str) -> Vec<(String, String)> {
+    let places = places();
+    assert_eq!(places.len(), 12);
+    places
+        .into_iter()
+        .map(|(option, command)| {
+            let argv = place_call(option, command, value);
+            let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
+            let got = call(&argv);
+            assert_eq!((got.exit, got.code(), got.field()), (2, "USAGE", format!("--{option}").as_str()), "`canon {command} --{option} {value}`: {}", got.envelope);
+            assert_eq!(got.envelope["error"]["received"], value, "`canon {command} --{option} {value}`: {}", got.envelope);
+            assert!(got.changed.is_empty(), "`canon {command} --{option} {value}` wrote {:?}", got.changed);
+            (command.to_string(), got.envelope["error"]["message"].as_str().unwrap_or_default().to_string())
+        })
+        .collect()
+}
+
+#[test]
+fn atip_daterefusals_01_a_leap_second_is_refused_in_the_twelve_places_and_the_second_before_and_the_next_day_are_taken() {
+    for value in ["2030-01-01T23:59:60Z", "1998-12-31T23:59:60Z", "2030-01-01T10:00:60Z", "2030-01-01T23:59:60.5Z", "2030-01-01T23:59:60+01:00"] {
+        for (command, message) in refused_in_every_place(value) {
+            assert!(message.contains("leap second") && message.contains("is not accepted"), "`{command}` {value}: {message}");
+        }
+    }
+    // The next day's midnight is the spelling the refusal gives.
+    let messages = refused_in_every_place("2030-01-01T23:59:60Z");
+    assert!(messages.iter().all(|(_, message)| message.contains("`2030-01-02T00:00:00Z`")), "{messages:?}");
+    for (option, commands) in DATE_OPTIONS {
+        for command in commands {
+            for value in ["2030-01-01T23:59:59Z", "2030-01-02T00:00:00Z"] {
+                let argv = date_call(option, command, value);
+                let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
+                assert_taken(&argv, &format!("--{option}"));
+            }
+        }
+    }
+    for at in ["2030-01-01T23:59:59Z", "2030-01-02T00:00:00Z"] {
+        assert_taken(&payload_args(at), "--approval-at");
+    }
+    // A date alone has no second.
+    canon_cli::timestamp::parse("2030-01-01").expect("a date alone has no second");
+}
+
+#[test]
+fn atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refused_in_the_twelve_places_and_says_what_does_not_exist() {
+    for (value, says) in [
+        ("2026-02-30T10:00:00Z", "day 30 does not exist in 2026-02"),
+        ("2026-02-29T10:00:00Z", "day 29 does not exist in 2026-02"),
+        ("2026-13-01T10:00:00Z", "month 13 does not exist"),
+        ("2026-01-01T25:00:00Z", "hour 25 does not exist"),
+        ("2026-01-01T10:61:00Z", "minute 61 does not exist"),
+        ("2026-01-01T10:00:00+24:00", "offset +24:00 does not exist"),
+    ] {
+        for (command, message) in refused_in_every_place(value) {
+            assert!(message.contains(says), "`{command}` {value}: {message}");
+            assert!(!message.contains("want RFC 3339"), "`{command}` {value}: not a spelling error: {message}");
+        }
+    }
+    // The date options also take the date alone.
+    for (value, says) in [("2026-02-30", "day 30 does not exist in 2026-02"), ("2026-02-29", "day 29 does not exist"), ("2026-04-31", "day 31 does not exist in 2026-04"), ("2026-13-01", "month 13 does not exist")] {
+        for (option, commands) in DATE_OPTIONS {
+            for command in commands {
+                let argv = date_call(option, command, value);
+                let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
+                let got = call(&argv);
+                assert_eq!((got.exit, got.code(), got.field()), (2, "USAGE", format!("--{option}").as_str()), "{}", got.envelope);
+                assert!(got.envelope["error"]["message"].as_str().unwrap_or_default().contains(says), "{}", got.envelope);
+            }
+        }
+    }
+    canon_cli::timestamp::parse("2028-02-29").expect("a day of the calendar");
+}
+
+#[test]
+fn atip_daterefusals_03_a_misspelled_value_keeps_the_spelling_refusal_of_0_37() {
+    for value in ["2026-2-30", "2026-02-30 10:00:00Z", "2030-1-1T10:00:00Z"] {
+        for (command, message) in refused_in_every_place(value) {
+            assert!(message.contains("RFC 3339"), "`{command}` {value}: {message}");
+            assert!(!message.contains("does not exist"), "`{command}` {value}: {message}");
+        }
+    }
+}
+
+/// What the CHANGELOG lacks of this change: the row of the leap second in the Breaking table and the entry of the new sentence in Changed.
+fn leap_second_problems(changelog: &str) -> Vec<String> {
+    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).unwrap_or_default();
+    let section = |name: &str| unreleased.split("\n### ").find(|part| part.starts_with(name)).unwrap_or_default().to_string();
+    let mut problems = Vec::new();
+    match section("Breaking").lines().find(|line| line.starts_with("| `2030-01-01T23:59:60Z`")) {
+        None => problems.push("no row of the leap second in the Breaking table".to_string()),
+        Some(row) if !(row.contains("refused") && row.contains("write the next day's `00:00:00Z`")) => problems.push(format!("the row of the leap second has no refusal or no way to move: {row}")),
+        Some(_) => {}
+    }
+    if !section("Changed").contains("says what does not exist") {
+        problems.push("no Changed entry says that the refusal names what does not exist".to_string());
+    }
+    problems
+}
+
+#[test]
+fn atip_daterefusals_04_the_changelog_has_the_row_of_the_leap_second_and_the_entry_of_the_new_sentence() {
+    assert_eq!(leap_second_problems(&read("CHANGELOG.md")), Vec::<String>::new());
+}
+
+#[test]
+fn atip_daterefusals_05_the_check_of_the_changelog_fails_without_the_row_or_the_entry() {
+    let changelog = read("CHANGELOG.md");
+    let without_row: String = changelog.lines().filter(|line| !line.starts_with("| `2030-01-01T23:59:60Z`")).collect::<Vec<_>>().join("\n");
+    assert!(leap_second_problems(&without_row).iter().any(|problem| problem.contains("no row of the leap second")));
+    let without_move = changelog.replace("write the next day's `00:00:00Z`", "write another time");
+    assert!(leap_second_problems(&without_move).iter().any(|problem| problem.contains("no way to move")));
+    let without_entry = changelog.replace("says what does not exist", "says something");
+    assert!(leap_second_problems(&without_entry).iter().any(|problem| problem.contains("no Changed entry")));
+}
