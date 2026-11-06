@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-schema-shape",
+    "role": "implementer",
+    "session_id": "s-0-38-schema-shape"
+  },
+  "at": "2026-11-06T16:39:52.926025Z",
+  "attachments": [
+    {
+      "case": "atip_schemashape_04_an_input_document_takes_the_operands_array_as_before_and_never_the_operand_name",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "5eb23e1710f7501a76dd72fee82895cf6c7b3548a8d2a987e80e340185dc463e"
+    }
+  ],
+  "code_tree": "639c82a391de1dd0b94e927f8b17260d0b1fe9d6",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "41d01f1943f98a5e79e7722c376062163bee63f7",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "atip.schemashape.04",
+  "schema": 1,
+  "staging_id": "cce983ef",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
