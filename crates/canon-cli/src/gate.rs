@@ -203,6 +203,25 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
         crate::say_raw!(json, "\nadvisory: {line}\n");
         advisories.push(advisory("policy_approval", line, Vec::new()));
     }
+    // The policy's code scopes (0.38): what a chore is let off by them, as status says it, and what is wrong with the declarations. Neither blocks.
+    let exemptions: Vec<String> = canon_gate::spec_coverage::latest_subjects(&gate_context)
+        .into_iter()
+        .filter(|s| matches!(s.status, canon_model::SubjectStatus::Building | canon_model::SubjectStatus::Verifying))
+        .flat_map(|s| {
+            crate::reverify::chore_exemptions(&repo, &gate_context, &code_tree, s).into_iter().map(move |(change, scenarios, keys)| {
+                format!("{}: chore change `{}`: {scenarios} scenario(s) need no new evidence by code scope ({}): no path in their scope changed since their evidence", s.subject_id.as_str(), change.as_str(), keys.iter().map(|k| format!("`{k}`")).collect::<Vec<_>>().join(", "))
+            })
+        })
+        .collect();
+    if !exemptions.is_empty() {
+        crate::say_raw!(json, "\nadvisory: {} chore scope exemption(s):\n{}\n", exemptions.len(), exemptions.iter().map(|l| format!("  {l}")).collect::<Vec<_>>().join("\n"));
+        advisories.push(advisory("chore_code_scopes", format!("{} chore(s) are let off evidence by the policy's code scopes — not failing the gate", exemptions.len()), exemptions));
+    }
+    let scope_warnings = crate::reverify::scope_warnings(&repo, &gate_context, &code_tree);
+    if !scope_warnings.is_empty() {
+        crate::say_raw!(json, "\nadvisory: {} code scope problem(s) in .canon/policy.yaml:\n{}\n", scope_warnings.len(), scope_warnings.iter().map(|l| format!("  {l}")).collect::<Vec<_>>().join("\n"));
+        advisories.push(advisory("code_scopes", format!("{} code scope problem(s) in .canon/policy.yaml — not failing the gate", scope_warnings.len()), scope_warnings));
+    }
     if let Some(summary) = canon_gate::binding_summary(&gate_context) {
         crate::say_raw!(json, "{}", format_binding_summary(&summary));
         let gaps = if summary.mode == canon_gate::BindingMode::Warn {

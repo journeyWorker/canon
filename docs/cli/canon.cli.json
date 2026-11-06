@@ -33562,6 +33562,17 @@
               ],
               "description": "Set when an agent recorded the approval for the human (0.32): the\n`(relayed by …)` marker of the approval line, read back."
             },
+            "scopeExempt": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ScopeExempt"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An approved chore the code scopes of the policy let off part of its evidence (0.38):\nhow many scenarios need nothing from it and by which `code_scopes` keys. Set by\n`canon status` for a chore entry."
+            },
             "source": {
               "description": "The external plan document the change comes from: the `Source:`\nline of the canon `brief.md`, or, before that file exists, the\nexternal openspec `proposal.md` found under the plan sources.",
               "type": [
@@ -33812,6 +33823,29 @@
             "scope",
             "distinct_actor",
             "block_on_findings"
+          ],
+          "type": "object"
+        },
+        "ScopeExempt": {
+          "description": "The scenarios a chore does not ask evidence for by code scope (0.38).",
+          "properties": {
+            "keys": {
+              "description": "The `code_scopes` keys they were exempt by, sorted.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "scenarios": {
+              "description": "How many scenarios.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "scenarios",
+            "keys"
           ],
           "type": "object"
         },
@@ -39665,6 +39699,11 @@
       "code": "BRIEF_UNAPPROVED_NOT_ENFORCED",
       "fix": "Give the change a brief with `canon change new`, or fix the `plans:` section of canon.yaml, then have the human approve the brief.",
       "meaning": "a subject moved past a brief that is not approved but cannot be enforced (the change has no brief canon reads, or the `plans:` section is unreadable)"
+    },
+    {
+      "code": "CODE_SCOPES_UNMATCHED",
+      "fix": "Correct the key or the pattern in `.canon/policy.yaml`, then have the human run `canon policy approve` again.",
+      "meaning": "a `code_scopes` key matches no scenario, or one of its patterns matches no file of the code tree, or the key is not a map of path-pattern lists; a scope that matches nothing exempts nothing"
     },
     {
       "code": "CONFIG_MISSING",

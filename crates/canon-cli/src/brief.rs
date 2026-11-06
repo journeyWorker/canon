@@ -208,6 +208,16 @@ pub fn approved_at(line: &str) -> Option<DateTime<Utc>> {
         .or_else(|| NaiveDate::parse_from_str(when, "%Y-%m-%d").ok().and_then(|day| day.and_hms_opt(0, 0, 0)).map(|at| at.and_utc()))
 }
 
+/// The scenarios a chore does not ask evidence for by code scope (0.38).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScopeExempt {
+    /// How many scenarios.
+    pub scenarios: usize,
+    /// The `code_scopes` keys they were exempt by, sorted.
+    pub keys: Vec<String>,
+}
+
 /// Whether one adopted change records the human's approval of its brief: an
 /// `Approved:` line in that change's canon `brief.md` (module doc). A fix
 /// stays inside the approved change, so a newer adopted change is a new
@@ -270,6 +280,11 @@ pub struct BriefStatus {
     /// change-level review. Set by `canon status` for a chore entry.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub tree_unchanged: bool,
+    /// An approved chore the code scopes of the policy let off part of its evidence (0.38):
+    /// how many scenarios need nothing from it and by which `code_scopes` keys. Set by
+    /// `canon status` for a chore entry.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope_exempt: Option<ScopeExempt>,
     /// What `canon brief check` found in the brief's text (0.19 D2):
     /// filled by `canon status` only, for a brief in the PRD format.
     /// Omitted for a pre-0.19 brief, which is read as before.
@@ -384,6 +399,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             changed: false,
             legacy_approval: false,
             tree_unchanged: false,
+            scope_exempt: None,
             findings: None,
             advisory_rules: Vec::new(),
             old_format: None,
@@ -411,6 +427,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 changed: matches!(verdict, Approval::Changed { .. }),
                 legacy_approval: matches!(verdict, Approval::Unbound { .. }),
                 tree_unchanged: false,
+                scope_exempt: None,
                 findings: None,
                 advisory_rules: Vec::new(),
                 old_format,
@@ -431,6 +448,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 changed: false,
                 legacy_approval: false,
                 tree_unchanged: false,
+                scope_exempt: None,
                 findings: None,
                 advisory_rules: Vec::new(),
                 old_format: None,
@@ -450,6 +468,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 changed: false,
                 legacy_approval: false,
                 tree_unchanged: false,
+                scope_exempt: None,
                 findings: None,
                 advisory_rules: Vec::new(),
                 old_format: None,

@@ -51,6 +51,7 @@ pub fn no_commit(message: impl Into<String>) -> CliError {
 /// run reads the repository and writes nothing in it, `.git` included: a refusal changes nothing (atip/1 8.2),
 /// and a read command (`gate check`) does not grow `.git/objects`. A code tree is only ever compared as an id,
 /// never read back as an object, so its objects need not outlive the run.
+#[derive(Debug)]
 struct Scratch {
     index: PathBuf,
     objects: PathBuf,
@@ -171,7 +172,7 @@ pub fn code_exclude(repo: &Path) -> Result<Vec<String>, CliError> {
 }
 
 /// `glob` against a repo-relative path (see the module docs for the semantics).
-fn glob_matches(glob: &str, path: &str) -> bool {
+pub fn glob_matches(glob: &str, path: &str) -> bool {
     let anchored = glob.contains('/');
     let glob = glob.trim_start_matches('/');
     if anchored {
@@ -197,6 +198,7 @@ fn wild(glob: &[u8], text: &[u8]) -> bool {
 }
 
 /// A temporary index file, removed when dropped (also on error paths).
+#[derive(Debug)]
 struct TempIndex(PathBuf);
 
 impl TempIndex {
@@ -299,5 +301,76 @@ pub fn code_tree(repo: &Path, rev: Option<&str>) -> Result<CodeTree, CliError> {
             };
             Ok(CodeTree { tree, dirty })
         }
+    }
+}
+
+/// The code of the working tree as it is now, held in a scratch object directory so that the code tree
+/// of a commit can be compared with it (0.38): the paths that differ, and the files there are. A code tree is
+/// never an object of the repository (it is the commit's tree with `.canon/`, the spec roots and the
+/// `code.exclude` globs removed), so the old tree is recomputed from the commit an evidence record names and
+/// trusted only when it comes out as the id the record carries.
+#[derive(Debug)]
+pub struct TreeDiffer {
+    repo: PathBuf,
+    exclude: Vec<String>,
+    roots: Vec<String>,
+    _tmp: TempIndex,
+    index: Scratch,
+    now: String,
+}
+
+impl TreeDiffer {
+    /// The working tree's code, as [`code_tree`] reads it. Outside a git work tree the answer is `COMMIT_REQUIRED`.
+    pub fn new(repo: &Path) -> Result<Self, CliError> {
+        let exclude = code_exclude(repo)?;
+        let roots = spec_root_prefixes(repo)?;
+        let fail = |why: String| no_commit(format!("git could not compute the code tree: {why}"));
+        #[expect(clippy::map_err_ignore, reason = "`no_commit` reports one fixed message; git's own stderr for a non-work-tree is the failure being named")]
+        git(repo, None, &["rev-parse", "--is-inside-work-tree"], None).map_err(|_| no_commit("this directory is not a git work tree"))?;
+        let head = resolve_rev(repo, "HEAD").ok();
+        let tmp = TempIndex::new();
+        std::fs::create_dir_all(&tmp.0).map_err(|e| fail(e.to_string()))?;
+        let index = Scratch::new(repo, &tmp.0).map_err(fail)?;
+        let now = (|| -> Result<String, String> {
+            if let Some(sha) = &head {
+                git(repo, Some(&index), &["read-tree", sha], None)?;
+            }
+            git(repo, Some(&index), &["add", "-A", "--", "."], None)?;
+            Ok(filtered_tree(repo, &index, &exclude, &roots)?.0)
+        })()
+        .map_err(fail)?;
+        Ok(Self { repo: repo.to_path_buf(), exclude, roots, _tmp: tmp, index, now })
+    }
+
+    /// The tree id of the working tree's code.
+    pub fn tree(&self) -> &str {
+        &self.now
+    }
+
+    /// Every code file of the working tree, repo-relative with `/` separators.
+    pub fn files(&self) -> Option<Vec<String>> {
+        let listing = git(&self.repo, Some(&self.index), &["ls-tree", "-r", "-z", "--name-only", &self.now], None).ok()?.stdout;
+        Some(listing.split(|&b| b == 0).filter(|p| !p.is_empty()).map(|p| String::from_utf8_lossy(p).into_owned()).collect())
+    }
+
+    /// The paths that differ between the code tree of commit `sha` and the working tree's: added, modified and
+    /// deleted files, a renamed file as its old and its new path. `None` when the old tree cannot be had: the
+    /// commit is gone, or its code tree is not `recorded` (the record was made over uncommitted code, or
+    /// `code.exclude` changed since).
+    pub fn changed_since(&self, sha: &str, recorded: &str) -> Option<Vec<String>> {
+        let _ = std::fs::remove_file(&self.index.index);
+        git(&self.repo, Some(&self.index), &["read-tree", sha], None).ok()?;
+        let (old, _) = filtered_tree(&self.repo, &self.index, &self.exclude, &self.roots).ok()?;
+        if old != recorded {
+            return None;
+        }
+        if old == self.now {
+            return Some(Vec::new());
+        }
+        let listing = git(&self.repo, Some(&self.index), &["diff-tree", "-r", "-z", "--no-renames", "--name-only", &old, &self.now], None).ok()?.stdout;
+        let mut paths: Vec<String> = listing.split(|&b| b == 0).filter(|p| !p.is_empty()).map(|p| String::from_utf8_lossy(p).into_owned()).collect();
+        paths.sort();
+        paths.dedup();
+        Some(paths)
     }
 }

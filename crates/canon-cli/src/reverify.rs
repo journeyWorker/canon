@@ -26,6 +26,14 @@
 //! the review) does not count. An approval with no recorded tree
 //! (written before 0.37, or with no git commit) keeps the rule above.
 //!
+//! A scenario with a code scope (0.38, [`crate::code_scopes`], the policy's
+//! `code_scopes`) asks nothing of the chore when no path that differs between
+//! the code tree of its latest evidence and the code tree now lies in the scope
+//! ([`crate::git_rev::TreeDiffer`]); a path that does asks for it, and the
+//! refusal names the path. No scope, no recorded tree and an old tree that
+//! cannot be had keep the rule above: the exemption stands only when the
+//! difference was computed.
+//!
 //! New evidence stales a pinned review, so the re-review follows with no
 //! rule of its own. Every refusal names the scenarios and leads with ONE batch
 //! command, [`canon_gate::review_gate::batch_commands`]: `canon evidence add
@@ -35,13 +43,13 @@
 
 use std::path::Path;
 
-use canon_gate::freshness::scenarios_without_evidence_after_on_code;
+use canon_gate::freshness::{latest_evidence, scenario_evidence, scenarios_without_evidence_after_on_code};
 use canon_gate::review_gate::{
     active_require_review, batch_commands, change_review_gap, fixed_blockers, is_reverify, is_scoped_reverify, reverify_remedy, reverify_scenarios, scoped_reverify_remedy,
 };
 use canon_gate::spec_coverage::subject_change_ids;
 use canon_gate::{FailureClass, GateContext, Violation};
-use canon_model::{ChangeId, SpecDigest, Subject, SubjectStatus};
+use canon_model::{ChangeId, Scenario, SpecDigest, Subject, SubjectStatus};
 use chrono::{DateTime, SecondsFormat, Utc};
 
 /// What a re-verification gap waits on.
@@ -64,6 +72,11 @@ pub struct Gap {
     pub commands: Vec<String>,
     /// The chore change whose approval triggered the gap, when it is a chore.
     pub chore: Option<ChangeId>,
+    /// The scoped scenarios among `scenarios` and the changed paths that put each in
+    /// the gap (0.38 code scopes).
+    pub hits: Vec<ScopeHit>,
+    /// The `code_scopes` key of each scenario the chore does not ask for by scope.
+    pub exempt: Vec<String>,
     remedy: String,
 }
 
@@ -81,7 +94,7 @@ impl Gap {
         } else {
             (batch_commands(ctx, &pairs, multi_root), reverify_remedy(ctx, &pairs, multi_root))
         };
-        Gap { trigger, since, scenarios, scoped, commands, chore, remedy }
+        Gap { trigger, since, scenarios, scoped, commands, chore, hits: Vec::new(), exempt: Vec::new(), remedy }
     }
 
     /// The `canon evidence add` step this gap names: the batch for the
@@ -117,13 +130,49 @@ impl Gap {
     /// The step's text for `subject` in `canon status`.
     pub fn why(&self, subject: &str) -> String {
         format!(
-            "{subject}: {} (since {}) and {} evidenced scenario(s) ({}) have no evidence recorded after it; the ship guard refuses until each does. {}; a review stays current while the scenario's verdict and checks are unchanged",
+            "{subject}: {} (since {}) and {} evidenced scenario(s) ({}) have no evidence recorded after it{}; the ship guard refuses until each does. {}; a review stays current while the scenario's verdict and checks are unchanged",
             self.trigger,
             self.since.to_rfc3339_opts(SecondsFormat::Secs, true),
             self.scenarios.len(),
             self.scenario_list(),
+            self.scope_note(),
             if self.scoped { "The finding names these scenarios, so evidence for each of them alone is enough" } else { "Run the whole suite again; a scenario last evidenced on the code as it stands needs nothing" }
         )
+    }
+
+    /// What the code scopes say about this gap (0.38): the changed paths in scope that
+    /// ask for each scoped scenario, and how many scenarios the scopes let go. Each
+    /// part starts with `; `; empty when no scope played a part.
+    pub fn scope_note(&self) -> String {
+        let mut note = String::new();
+        // Scenarios with the same scope and the same changed paths are one group.
+        let mut groups: Vec<(&str, &[String], Vec<&str>)> = Vec::new();
+        for hit in &self.hits {
+            match groups.iter_mut().find(|(key, paths, _)| *key == hit.key && *paths == hit.paths.as_slice()) {
+                Some((_, _, scenarios)) => scenarios.push(&hit.scenario),
+                None => groups.push((&hit.key, &hit.paths, vec![&hit.scenario])),
+            }
+        }
+        for (key, paths, scenarios) in groups {
+            let shown = scenarios.iter().take(3).map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", ");
+            let scenarios = match scenarios.len().saturating_sub(3) {
+                0 => shown,
+                more => format!("{shown}, … {more} more"),
+            };
+            let first = paths.iter().take(PATHS_SHOWN).map(|p| format!("`{p}`")).collect::<Vec<_>>().join(", ");
+            let more = match paths.len().saturating_sub(PATHS_SHOWN) {
+                0 => String::new(),
+                more => format!(", … {more} more"),
+            };
+            note.push_str(&format!("; {scenarios} changed in scope `{key}`: {} path(s) ({first}{more})", paths.len()));
+        }
+        if !self.exempt.is_empty() {
+            let mut keys = self.exempt.clone();
+            keys.sort();
+            keys.dedup();
+            note.push_str(&format!("; {} scenario(s) need nothing from this chore: no path in their code scope ({}) changed since their evidence", self.exempt.len(), keys.iter().map(|k| format!("`{k}`")).collect::<Vec<_>>().join(", ")));
+        }
+        note
     }
 }
 
@@ -168,26 +217,72 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Cho
         .collect()
 }
 
+/// What `canon status` and `canon gate check` warn about the policy's code scopes (0.38 F5): a
+/// pattern that matches no file of the code tree, a key that matches no scenario, a key that
+/// is not a map of lists. Nothing for a policy that declares no scope. Never a refusal.
+pub fn scope_warnings(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo) -> Vec<String> {
+    let scopes = crate::code_scopes::CodeScopes::read(repo);
+    if !scopes.declares() {
+        return Vec::new();
+    }
+    let files = code_tree.files(repo);
+    scopes.warnings(files.as_deref(), canon_gate::spec_coverage::latest_scenarios(ctx).into_iter().map(|s| &s.scenario_id))
+}
+
+/// The paths that changed between an evidence record's code tree and now, when that is known.
+type Changed = Option<std::rc::Rc<Vec<String>>>;
+
+/// The changed paths a refusal names for one scope before it counts the rest.
+const PATHS_SHOWN: usize = 3;
+
 /// The code tree as it is now, computed at most once per command and only
 /// when a subject with an approved chore needs it (`git add -A` over the
 /// work tree is the cost). Errors (no git work tree) read as `None`, the
 /// same as [`crate::git_rev::code_tree`] failing for the time-rule-only case.
+/// It also holds, once and only when a code scope asks, the working tree's code
+/// in a scratch object directory, and each comparison of an evidence record's
+/// code with it (0.38).
 #[derive(Debug)]
-pub struct CodeTreeMemo(std::cell::OnceCell<Option<String>>);
+pub struct CodeTreeMemo {
+    tree: std::cell::OnceCell<Option<String>>,
+    differ: std::cell::OnceCell<Option<crate::git_rev::TreeDiffer>>,
+    changed: std::cell::RefCell<std::collections::HashMap<(String, String), Changed>>,
+}
 
 impl CodeTreeMemo {
     /// A memo that computes the tree on first use.
     pub fn lazy() -> Self {
-        Self(std::cell::OnceCell::new())
+        Self { tree: std::cell::OnceCell::new(), differ: std::cell::OnceCell::new(), changed: std::cell::RefCell::default() }
     }
 
     /// A memo for a tree the command already computed.
     pub fn known(tree: Option<String>) -> Self {
-        Self(std::cell::OnceCell::from(tree))
+        Self { tree: std::cell::OnceCell::from(tree), ..Self::lazy() }
     }
 
     fn get(&self, repo: &Path) -> Option<&str> {
-        self.0.get_or_init(|| crate::git_rev::code_tree(repo, None).ok().map(|c| c.tree)).as_deref()
+        self.tree.get_or_init(|| crate::git_rev::code_tree(repo, None).ok().map(|c| c.tree)).as_deref()
+    }
+
+    fn differ(&self, repo: &Path) -> Option<&crate::git_rev::TreeDiffer> {
+        self.differ.get_or_init(|| crate::git_rev::TreeDiffer::new(repo).ok()).as_ref()
+    }
+
+    /// The paths that changed between the code tree `recorded` of commit `sha` and the
+    /// working tree's; `None` when that cannot be known ([`crate::git_rev::TreeDiffer::changed_since`]).
+    fn changed(&self, repo: &Path, sha: &str, recorded: &str) -> Option<std::rc::Rc<Vec<String>>> {
+        let key = (sha.to_string(), recorded.to_string());
+        if let Some(known) = self.changed.borrow().get(&key) {
+            return known.clone();
+        }
+        let found = self.differ(repo).and_then(|differ| differ.changed_since(sha, recorded)).map(std::rc::Rc::new);
+        self.changed.borrow_mut().insert(key, found.clone());
+        found
+    }
+
+    /// The files of the working tree's code, for the checks of the scope declarations.
+    pub fn files(&self, repo: &Path) -> Option<Vec<String>> {
+        self.differ(repo).and_then(crate::git_rev::TreeDiffer::files)
     }
 }
 
@@ -207,22 +302,104 @@ pub fn tree_unchanged(repo: &Path, code_tree: &CodeTreeMemo, change: &ChangeId) 
 /// the code tree that is the current one (0.37) triggers nothing: the code is
 /// as the approval saw it, whatever tree the scenarios' evidence is on.
 pub fn chore_gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<Gap> {
+    judged(repo, ctx, code_tree, subject).into_iter().filter_map(|j| j.gap).collect()
+}
+
+/// A scenario a chore asks evidence for although it is scoped (0.38): paths that
+/// changed since its latest evidence lie in its scope.
+#[derive(Debug, Clone)]
+pub struct ScopeHit {
+    pub scenario: String,
+    /// The `code_scopes` key the scenario's scope came from.
+    pub key: String,
+    /// The changed paths in the scope, sorted.
+    pub paths: Vec<String>,
+}
+
+/// What a chore asks of one subject, and what it does not ask for by code scope.
+struct Judged {
+    change: ChangeId,
+    gap: Option<Gap>,
+    /// The `code_scopes` key of each scenario the chore does not ask for by scope.
+    exempt: Vec<String>,
+}
+
+/// How one scenario fares against its code scope.
+enum Scoped {
+    /// No scope, or no diff could be had: the 0.37 rule stands.
+    Unscoped,
+    /// No path in the scope changed since the latest evidence.
+    Exempt(String),
+    /// A path in the scope changed.
+    Changed(ScopeHit),
+}
+
+fn scoped(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, scopes: &crate::code_scopes::CodeScopes, scenario: &Scenario) -> Scoped {
+    let Some((key, patterns)) = scopes.of(&scenario.scenario_id) else { return Scoped::Unscoped };
+    let evidence = scenario_evidence(ctx, scenario);
+    let Some(latest) = latest_evidence(&evidence) else { return Scoped::Unscoped };
+    let (Some(sha), Some(tree)) = (latest.evidence_sha.as_ref(), latest.code_tree.as_deref()) else { return Scoped::Unscoped };
+    let Some(changed) = code_tree.changed(repo, sha.as_str(), tree) else { return Scoped::Unscoped };
+    let inside: Vec<String> = changed.iter().filter(|path| patterns.iter().any(|glob| crate::git_rev::glob_matches(glob, path))).cloned().collect();
+    if inside.is_empty() {
+        Scoped::Exempt(key.to_string())
+    } else {
+        Scoped::Changed(ScopeHit { scenario: scenario.scenario_id.as_str().to_string(), key: key.to_string(), paths: inside })
+    }
+}
+
+/// The one rule behind [`chore_gaps`] and [`chore_exemptions`] (0.38): the 0.37
+/// set of scenarios a chore asks evidence for, less each scenario with a code
+/// scope whose paths changed since its latest evidence lie all outside it.
+fn judged(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<Judged> {
     let approvals = chore_approvals(repo, ctx, subject);
     if approvals.is_empty() {
         return Vec::new();
     }
     // The code as it is now (D11): a scenario last evidenced on it needs nothing.
     // No git work tree means nothing to compare, and the time rule stands.
-    let code_tree = code_tree.get(repo);
+    let current = code_tree.get(repo);
+    let scopes = crate::code_scopes::CodeScopes::read(repo);
     approvals
         .into_iter()
-        .filter(|approval| !approval.saw(code_tree))
-        .filter_map(|ChoreApproval { change, at: since, .. }| {
-            let scenarios: Vec<(String, String)> = scenarios_without_evidence_after_on_code(ctx, &subject.subject_id, since, code_tree)
-                .into_iter()
-                .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
-                .collect();
-            (!scenarios.is_empty()).then(|| Gap::new(repo, ctx, format!("chore change `{}` approved", change.as_str()), since, scenarios, false, Some(change)))
+        .filter(|approval| !approval.saw(current))
+        .map(|ChoreApproval { change, at: since, .. }| {
+            let mut needed: Vec<(String, String)> = Vec::new();
+            let mut hits = Vec::new();
+            let mut exempt = Vec::new();
+            for scenario in scenarios_without_evidence_after_on_code(ctx, &subject.subject_id, since, current) {
+                match scoped(repo, ctx, code_tree, &scopes, scenario) {
+                    Scoped::Exempt(key) => exempt.push(key),
+                    Scoped::Changed(hit) => {
+                        hits.push(hit);
+                        needed.push((scenario.project_id.as_str().to_string(), scenario.scenario_id.as_str().to_string()));
+                    }
+                    Scoped::Unscoped => needed.push((scenario.project_id.as_str().to_string(), scenario.scenario_id.as_str().to_string())),
+                }
+            }
+            let gap = (!needed.is_empty()).then(|| {
+                let mut gap = Gap::new(repo, ctx, format!("chore change `{}` approved", change.as_str()), since, needed, false, Some(change.clone()));
+                gap.hits = hits;
+                gap.exempt = exempt.clone();
+                gap
+            });
+            Judged { change, gap, exempt }
+        })
+        .collect()
+}
+
+/// The scenarios an approved chore of `subject` does not ask evidence for by code scope (0.38),
+/// per chore: how many, and by which `code_scopes` keys, sorted. `canon status` says it on the
+/// chore's line and `canon gate check` as an advisory.
+pub fn chore_exemptions(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<(ChangeId, usize, Vec<String>)> {
+    judged(repo, ctx, code_tree, subject)
+        .into_iter()
+        .filter(|j| !j.exempt.is_empty())
+        .map(|j| {
+            let mut keys = j.exempt.clone();
+            keys.sort();
+            keys.dedup();
+            (j.change, j.exempt.len(), keys)
         })
         .collect()
 }
@@ -318,11 +495,12 @@ pub fn chore_violations(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo
                 FailureClass::UncoveredCell,
                 subject.subject_id.as_str(),
                 format!(
-                    "{} {}: {} evidenced scenario(s) ({}) have no evidence recorded after the approval; {}",
+                    "{} {}: {} evidenced scenario(s) ({}) have no evidence recorded after the approval{}; {}",
                     gap.trigger,
                     gap.since.to_rfc3339_opts(SecondsFormat::Secs, true),
                     gap.scenarios.len(),
                     gap.scenario_list(),
+                    gap.scope_note(),
                     gap.remedy()
                 ),
             )

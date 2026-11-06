@@ -266,6 +266,21 @@ approval needs a new review, and so does a review of other code, as when the
 same brief is approved again over code that came after the review. An approval
 with no recorded tree (written before 0.37) follows the rule above.
 
+A policy may narrow what a chore asks for with `code_scopes` (0.38): a key is
+a scenario id's area (`core`) or surface (`app.bulkread`), the value a list of
+path patterns written like `code.exclude`; the surface key wins over the area
+key, and a scenario with neither has no scope. For a scenario with a scope the
+chore compares the code tree of its latest evidence with the tree now, and asks
+for new evidence only when a changed path (added, modified, deleted, a rename
+by its old and its new path) matches the scope; the refusal names the first
+three such paths and how many there are. No scope, no recorded tree, or an old
+tree that cannot be computed (the commit is gone, the evidence was recorded over
+uncommitted code) keep the rule above. The scopes stand only while the policy
+is the one a human approved: an agent cannot widen them, and `status` and
+`gate check` warn, never refuse, about a pattern that matches no file or a key
+that matches no scenario. A shared file (lock file, build setting, fixture)
+belongs in the scope of every scenario that depends on it.
+
 ### Audit records (`canon evidence audit`)
 
 canon never generates or runs an audit. An external evaluator does, and

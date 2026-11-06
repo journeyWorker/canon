@@ -15,6 +15,7 @@ pub mod cli_error;
 pub mod completion;
 pub mod change;
 pub mod cli;
+pub mod code_scopes;
 pub mod context;
 pub mod context_pack;
 pub mod coverage;
