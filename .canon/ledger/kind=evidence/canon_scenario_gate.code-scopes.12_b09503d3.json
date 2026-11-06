@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-code-scopes",
+    "role": "implementer",
+    "session_id": "s-0-38-code-scopes"
+  },
+  "at": "2026-11-06T10:07:32.737934Z",
+  "attachments": [
+    {
+      "case": "gate_code_scopes_12_the_changelog_names_the_key_and_what_the_gate_asks_less",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "391f3bf766eefcbd5c11ccb8979cfb872d16dfe03e6185e7af34685e60122d05"
+    }
+  ],
+  "code_tree": "49feaf5b29688ae566a123f9d8e79515099dc637",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "ce16ffaaaf2a9338b7610a370cd48b5a59d23836",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 25,
+  "scenario_id": "gate.code-scopes.12",
+  "schema": 1,
+  "staging_id": "18187cb6",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
