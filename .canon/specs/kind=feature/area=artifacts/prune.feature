@@ -168,3 +168,15 @@ Feature: canon artifacts prune deletes the blobs no record binds
     When canon skills show canon, canon-storage and role-orchestrator are read, and the Unreleased section of the CHANGELOG
     Then each guide names canon artifacts prune and says a deleted local blob stays in git history
     And the Added section of the Unreleased CHANGELOG names the command and says the same
+
+  # canon: {"schema":1,"at":"2026-11-06T09:29:35Z","actor":{"agent_id":"impl-artifacts-prune","role":"implementer","session_id":"s-0-38-artifacts-prune"}}
+  @subject:evidence-attestation
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-38-artifacts-prune.F6
+  @artifacts.prune.15
+  Scenario: A release without the announcement fails the release check, each missing item named
+    Given the guides and the CHANGELOG of this repo, and copies of them with the command or the git-history sentence taken out, with no Added section, and with no Unreleased section
+    When the release check reads each copy
+    Then it passes on the real text and fails on each copy, naming the guide or the CHANGELOG section and what it never says
+    And the failure names the missing command and the missing sentence separately

@@ -677,19 +677,78 @@ fn artifacts_prune_13_commit_without_a_plan_digest_is_refused() {
     assert_eq!(repo.files(), before);
 }
 
+/// What the release lacks of the announcement of the command: each guide (`(name, text)`) names it and says a deleted local blob stays in git
+/// history, and the Added section of the Unreleased CHANGELOG says both. The release check: a missing item is named.
+fn release_problems(guides: &[(&str, String)], changelog: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, text) in guides {
+        let said = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !said.contains("canon artifacts prune") {
+            problems.push(format!("the guide `{name}` never names `canon artifacts prune`"));
+        }
+        if !said.contains("git history") {
+            problems.push(format!("the guide `{name}` never says a deleted local blob stays in git history"));
+        }
+    }
+    let unreleased = changelog.split("\n## ").nth(1).filter(|section| section.starts_with("Unreleased"));
+    let added = unreleased.and_then(|section| section.split("\n### ").find(|part| part.starts_with("Added")));
+    match added {
+        None => problems.push("the CHANGELOG has no Added section under Unreleased".to_string()),
+        Some(added) => {
+            if !added.contains("canon artifacts prune") {
+                problems.push("the Added section never names `canon artifacts prune`".to_string());
+            }
+            if !added.contains("git history") {
+                problems.push("the Added section never says a deleted local blob stays in git history".to_string());
+            }
+        }
+    }
+    problems
+}
+
+const GUIDES: [&str; 3] = ["canon", "canon-storage", "role-orchestrator"];
+
+fn guides(repo: &Repo) -> Vec<(&'static str, String)> {
+    GUIDES.iter().map(|guide| (*guide, String::from_utf8_lossy(&repo.ok(&["skills", "show", guide]).stdout).into_owned())).collect()
+}
+
+fn changelog() -> String {
+    std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap()
+}
+
 /// artifacts.prune.14: the guides name the command and say that a deleted local blob stays in git history, and the CHANGELOG lists it under Added.
 #[test]
 fn artifacts_prune_14_the_guides_and_the_changelog_name_the_command_and_git_history() {
     let repo = new_repo(None);
-    for guide in ["canon", "canon-storage", "role-orchestrator"] {
-        let out = repo.ok(&["skills", "show", guide]);
-        let said = String::from_utf8_lossy(&out.stdout).split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(said.contains("canon artifacts prune"), "`canon skills show {guide}` names the command");
-        assert!(said.contains("git history"), "`canon skills show {guide}` says a deleted local blob stays in git history");
-    }
-    let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## ").nth(1).expect("the Unreleased section");
-    assert!(unreleased.starts_with("Unreleased"), "the first section is Unreleased");
-    let added = unreleased.split("\n### ").find(|section| section.starts_with("Added")).expect("an Added section under Unreleased");
-    assert!(added.contains("canon artifacts prune") && added.contains("git history"), "the Added section names the command and says a deleted local blob stays in git history");
+    assert_eq!(release_problems(&guides(&repo), &changelog()), Vec::<String>::new());
+}
+
+/// artifacts.prune.15: the release check fails when the announcement is missing: a guide without the command or without the git-history sentence,
+/// a CHANGELOG without an Added section, or an Added section without either, is named, each by what it lacks.
+#[test]
+fn artifacts_prune_15_a_release_without_the_announcement_fails_the_release_check() {
+    let repo = new_repo(None);
+    let (guides, changelog) = (guides(&repo), changelog());
+    assert_eq!(release_problems(&guides, &changelog), Vec::<String>::new(), "the check passes on the real text");
+
+    let without = |needle: &str, text: &str| text.replace(needle, "removed");
+    // A guide that loses the command, and one that loses the sentence.
+    let mut bare = guides.clone();
+    bare[0].1 = without("canon artifacts prune", &bare[0].1);
+    let problems = release_problems(&bare, &changelog);
+    assert_eq!(problems, ["the guide `canon` never names `canon artifacts prune`"], "{problems:?}");
+    let mut silent = guides.clone();
+    silent[1].1 = without("git history", &silent[1].1);
+    assert_eq!(release_problems(&silent, &changelog), ["the guide `canon-storage` never says a deleted local blob stays in git history"]);
+
+    // A CHANGELOG with no Added section under Unreleased, and with an Added section that says neither thing.
+    let no_added = changelog.replacen("\n### Added\n", "\n### Changed\n", 1);
+    assert_eq!(release_problems(&guides, &no_added), ["the CHANGELOG has no Added section under Unreleased"]);
+    let start = changelog.find("\n### Added\n").expect("an Added section");
+    let end = changelog[start + 1..].find("\n### ").map_or(changelog.len(), |at| start + 1 + at);
+    let emptied = format!("{}\n### Added\n\n- something else\n{}", &changelog[..start], &changelog[end..]);
+    let problems = release_problems(&guides, &emptied);
+    assert_eq!(problems, ["the Added section never names `canon artifacts prune`", "the Added section never says a deleted local blob stays in git history"], "{problems:?}");
+    // A CHANGELOG with no Unreleased section at all.
+    assert_eq!(release_problems(&guides, "# Changelog\n\n## 0.37.0\n\n### Added\n").len(), 1);
 }
