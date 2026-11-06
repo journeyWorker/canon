@@ -632,7 +632,7 @@ fn gate_code_scopes_17_over_a_core_change_ship_status_and_gate_check_ask_for_eve
 
 fn unreleased() -> String {
     let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).expect("the CHANGELOG");
-    let start = changelog.find("\n## Unreleased").expect("the CHANGELOG has an Unreleased section");
+    let start = changelog.find("\n## 0.38.0").expect("the CHANGELOG has a 0.38.0 section");
     let end = changelog[start + 1..].find("\n## ").map_or(changelog.len(), |at| start + 1 + at);
     changelog[start..end].to_string()
 }
@@ -686,7 +686,7 @@ fn gate_code_scopes_12_the_changelog_names_the_key_and_what_the_gate_asks_less()
 #[test]
 fn gate_code_scopes_13_a_changelog_without_the_entries_is_named_by_the_release_check() {
     let section = unreleased();
-    assert_eq!(changelog_problems("## Unreleased\n\n### Added\n\n- Something else.\n").len(), 2 + 4 + 6, "an empty section names both entries and each piece");
+    assert_eq!(changelog_problems("## 0.38.0\n\n### Added\n\n- Something else.\n").len(), 2 + 4 + 6, "an empty section names both entries and each piece");
     let without_added: String = section.lines().filter(|l| !(l.contains("canon-0-38-code-scopes") && l.contains("`code_scopes`"))).collect::<Vec<_>>().join("\n");
     assert!(changelog_problems(&without_added).iter().any(|p| p.contains("no entry") && p.contains("Added")), "{:?}", changelog_problems(&without_added));
     let without_before = section.replace("without the key", "otherwise");

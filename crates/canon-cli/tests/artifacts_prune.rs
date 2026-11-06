@@ -690,10 +690,10 @@ fn release_problems(guides: &[(&str, String)], changelog: &str) -> Vec<String> {
             problems.push(format!("the guide `{name}` never says a deleted local blob stays in git history"));
         }
     }
-    let unreleased = changelog.split("\n## ").nth(1).filter(|section| section.starts_with("Unreleased"));
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.38.0"));
     let added = unreleased.and_then(|section| section.split("\n### ").find(|part| part.starts_with("Added")));
     match added {
-        None => problems.push("the CHANGELOG has no Added section under Unreleased".to_string()),
+        None => problems.push("the CHANGELOG has no Added section under 0.38.0".to_string()),
         Some(added) => {
             if !added.contains("canon artifacts prune") {
                 problems.push("the Added section never names `canon artifacts prune`".to_string());
@@ -741,14 +741,14 @@ fn artifacts_prune_15_a_release_without_the_announcement_fails_the_release_check
     silent[1].1 = without("git history", &silent[1].1);
     assert_eq!(release_problems(&silent, &changelog), ["the guide `canon-storage` never says a deleted local blob stays in git history"]);
 
-    // A CHANGELOG with no Added section under Unreleased, and with an Added section that says neither thing.
+    // A CHANGELOG with no Added section under 0.38.0, and with an Added section that says neither thing.
     let no_added = changelog.replacen("\n### Added\n", "\n### Changed\n", 1);
-    assert_eq!(release_problems(&guides, &no_added), ["the CHANGELOG has no Added section under Unreleased"]);
+    assert_eq!(release_problems(&guides, &no_added), ["the CHANGELOG has no Added section under 0.38.0"]);
     let start = changelog.find("\n### Added\n").expect("an Added section");
     let end = changelog[start + 1..].find("\n### ").map_or(changelog.len(), |at| start + 1 + at);
     let emptied = format!("{}\n### Added\n\n- something else\n{}", &changelog[..start], &changelog[end..]);
     let problems = release_problems(&guides, &emptied);
     assert_eq!(problems, ["the Added section never names `canon artifacts prune`", "the Added section never says a deleted local blob stays in git history"], "{problems:?}");
-    // A CHANGELOG with no Unreleased section at all.
+    // A CHANGELOG with no 0.38.0 section at all.
     assert_eq!(release_problems(&guides, "# Changelog\n\n## 0.37.0\n\n### Added\n").len(), 1);
 }

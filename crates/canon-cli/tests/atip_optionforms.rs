@@ -1045,7 +1045,7 @@ fn atip_daterefusals_03_a_misspelled_value_keeps_the_spelling_refusal_of_0_37() 
 
 /// What the CHANGELOG lacks of this change: the row of the leap second in the Breaking table and the entry of the new sentence in Changed.
 fn leap_second_problems(changelog: &str) -> Vec<String> {
-    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("0.38.0")).unwrap_or_default();
     let section = |name: &str| unreleased.split("\n### ").find(|part| part.starts_with(name)).unwrap_or_default().to_string();
     let mut problems = Vec::new();
     match section("Breaking").lines().find(|line| line.starts_with("| `2030-01-01T23:59:60Z`")) {

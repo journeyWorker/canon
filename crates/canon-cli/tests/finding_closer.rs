@@ -362,7 +362,7 @@ fn changelog() -> String {
 
 /// What the Unreleased section of `changelog` lacks for this change: the Breaking entry, the Changed entry and the line on the guides.
 fn changelog_problems(changelog: &str) -> Vec<String> {
-    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("Unreleased")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.38.0")).unwrap_or_default();
     let subsection = |name: &str| -> String {
         let marker = format!("### {name}\n");
         let Some(start) = unreleased.find(&marker) else { return String::new() };
@@ -405,8 +405,8 @@ fn finding_closer_11_the_changelog_names_the_refusal_the_recorded_role_and_the_g
 /// finding.closer.12 (failure case): the check finds each missing entry, and a real entry passes it.
 #[test]
 fn finding_closer_12_a_changelog_without_the_entry_fails_the_release_check() {
-    assert_eq!(changelog_problems("# Changelog\n\n## Unreleased\n\n## 0.37.0\n").len(), 3);
-    assert_eq!(changelog_problems("# Changelog\n\n## Unreleased\n\n### Breaking\n\nonly canon-0-38-finding-closer FINDING_ROLE_DENIED rejected deferred\n\n### Changed\n\nnothing\n").len(), 2);
-    let whole = "# Changelog\n\n## Unreleased\n\n### Breaking\n\ncanon-0-38-finding-closer FINDING_ROLE_DENIED rejected deferred\n\n### Changed\n\ncanon-0-38-finding-closer closedBy closedRole role-implementer role-reviewer\n";
+    assert_eq!(changelog_problems("# Changelog\n\n## 0.38.0\n\n## 0.37.0\n").len(), 3);
+    assert_eq!(changelog_problems("# Changelog\n\n## 0.38.0\n\n### Breaking\n\nonly canon-0-38-finding-closer FINDING_ROLE_DENIED rejected deferred\n\n### Changed\n\nnothing\n").len(), 2);
+    let whole = "# Changelog\n\n## 0.38.0\n\n### Breaking\n\ncanon-0-38-finding-closer FINDING_ROLE_DENIED rejected deferred\n\n### Changed\n\ncanon-0-38-finding-closer closedBy closedRole role-implementer role-reviewer\n";
     assert!(changelog_problems(whole).is_empty());
 }

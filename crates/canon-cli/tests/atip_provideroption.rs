@@ -684,7 +684,7 @@ fn atip_provideroption_13_a_command_that_declares_other_names_a_pattern_or_the_o
 
 /// The table under `### Breaking` of the `Unreleased` entry that begins with the old spelling: its rows, split into cells.
 fn breaking_rows(changelog: &str) -> Vec<Vec<String>> {
-    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("0.38.0")).unwrap_or_default();
     let breaking = unreleased.split("\n### ").find(|part| part.starts_with("Breaking")).unwrap_or_default();
     breaking
         .lines()
@@ -707,7 +707,7 @@ fn changelog_problems(changelog: &str) -> Vec<String> {
             problems.push(format!("a row lacks its 0.37 answer, its 0.38 answer or the way to move: {row:?}"));
         }
     }
-    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("0.38.0")).unwrap_or_default();
     if !unreleased.contains("| old spelling | 0.37 | 0.38 | move |") {
         problems.push("the table has no header of its four columns".to_string());
     }
@@ -730,7 +730,7 @@ fn atip_provideroption_14_the_changelog_has_a_row_for_each_shape_of_the_old_valu
     assert!(rows[..2].iter().all(|row| row[2].contains("`USAGE`")) && rows[2][2].contains("`INPUT_INVALID`"), "0.38 refuses the options with USAGE and the key with INPUT_INVALID: {rows:?}");
     assert!(rows.iter().all(|row| row[1].len() > 20), "0.37's answer is said: {rows:?}");
     // The entry says who is broken and how to find the callers.
-    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).expect("the Unreleased entry");
+    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("0.38.0")).expect("the 0.38.0 entry");
     assert!(unreleased.contains("`canon-0-38-provider-option`") && unreleased.contains("`--no-harness`"), "the entry names its change and the switch");
 }
 

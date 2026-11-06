@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.38.0 — 2026-11-07
+
+canon takes the harnesses with a repeatable `--harness` and `--no-harness` (and refuses `--providers`), names every operand and option value for what it is and declares `x-canon.roles: "all"` for a command all four roles use, refuses a leap second and names the date or time that does not exist, gives a scenario area or surface the code paths its evidence is about (`code_scopes` in the policy, #130; a scope an agent widens holds the policy approval), records the role that closes a finding (only a reviewer closes one `rejected` or `deferred`), adds `canon artifacts prune` (#138, part), and makes two tests deterministic. It is BREAKING for callers: the `### Breaking` tables below name every spelling, value and code that moved.
+
 ### Breaking
 
 **Only a reviewer closes a finding `rejected` or `deferred`** (`canon-0-38-finding-closer`, scenarios `finding.closer.01-12`): `canon finding close --disposition rejected` and `--disposition deferred` are refused with `FINDING_ROLE_DENIED` (exit 2, not retryable) when the call declares a role other than `reviewer` with `--as` or `CANON_ROLE` (`planner`, `implementer`, `orchestrator`, or any other). Nothing is written: the finding stays open and an open blocker keeps blocking the gate. `--disposition fixed` is closed by every role and by a call that declares none; a call that declares no role is not refused (canon's roles are guidance, and a person's shell is not told apart from an agent that declared nothing). `--role` on `finding close` now has to name the declared role: a different one is refused with `FINDING_ARGUMENT_INVALID` (field `--role`); with no declared role, `--role` is the role of the call.

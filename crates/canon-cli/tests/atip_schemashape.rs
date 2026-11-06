@@ -536,7 +536,7 @@ fn atip_schemashape_10_the_root_of_the_tree_says_the_two_forms_once_and_the_docu
 
 /// The rows of the table of the `Unreleased` Breaking entry of this change, split into cells: `(first cell, 0.37 cell, 0.38 cell)` for the rows that name a command.
 fn breaking_rows(changelog: &str) -> Vec<Vec<String>> {
-    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|part| part.starts_with("0.38.0")).unwrap_or_default();
     let breaking = unreleased.split("\n### ").find(|part| part.starts_with("Breaking")).unwrap_or_default();
     let entry = breaking.split("\n**").find(|part| part.contains("`canon-0-38-schema-shape`")).unwrap_or_default();
     entry.lines().filter(|line| line.starts_with("| `")).map(|line| line.trim().trim_matches('|').split('|').map(|cell| cell.trim().to_string()).collect::<Vec<String>>()).collect()
@@ -576,7 +576,7 @@ fn changelog_problems(changelog: &str, saved: usize, declared: usize) -> Vec<Str
             }
         }
     }
-    let entry = changelog.split("\n## ").find(|part| part.starts_with("Unreleased")).unwrap_or_default().split("\n**").find(|part| part.contains("`canon-0-38-schema-shape`")).unwrap_or_default();
+    let entry = changelog.split("\n## ").find(|part| part.starts_with("0.38.0")).unwrap_or_default().split("\n**").find(|part| part.contains("`canon-0-38-schema-shape`")).unwrap_or_default();
     if !entry.contains("| name | 0.37 | 0.38 |") {
         problems.push("the table has no header of its three columns".to_string());
     }
