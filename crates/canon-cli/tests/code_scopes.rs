@@ -510,6 +510,126 @@ fn gate_code_scopes_11_the_warnings_do_not_change_an_exit_code() {
     assert!(advisory_items(&report, "code_scopes").iter().any(|w| w.contains("malformed")), "{report}");
 }
 
+/// gate.code-scopes.14: a key whose patterns match no file declares no scope: the misspelt `Core/**` never exempts.
+#[test]
+fn gate_code_scopes_14_a_key_whose_patterns_match_no_file_declares_no_scope() {
+    let dir = repo_with("code_scopes:\n  core: [\"Core/**\"]\n", true);
+    let r = dir.path();
+    approve(r);
+    edit(r, "core/lib.rs");
+    let err = text(&ship(r).stderr);
+    assert!(err.contains(GAP_REFUSAL), "{err}");
+    assert_names(&err, &["core.engine.01"], &[]);
+    assert!(!err.contains("changed in scope") && !err.contains("need nothing from this chore"), "the misspelt scope exempts and names nothing: {err}");
+    let violations = gate_evidence_violations(r);
+    assert_eq!(violations.len(), 1, "{violations:?}");
+    assert_names(&violations[0], &["core.engine.01"], &[]);
+    let entry = chore_entry(&status_json(r));
+    assert!(entry.get("scopeExempt").is_none(), "{entry}");
+
+    // Even over a change outside every real scope: the key stands for nothing, the scenario follows the rule without scopes.
+    let dir = repo_with("code_scopes:\n  core: [\"Core/**\"]\n", true);
+    let r = dir.path();
+    approve(r);
+    edit(r, "util/notes.txt");
+    assert_names(&text(&ship(r).stderr), &["core.engine.01"], &[]);
+
+    // The warning says what follows from it, and a key with one live pattern still stands.
+    let (code, report) = gate_json(r);
+    assert_eq!(code, Some(1), "the evidence gap is the gate's: {report}");
+    let items = advisory_items(&report, "code_scopes");
+    assert!(items.iter().any(|w| w.contains("`Core/**`") && w.contains("declares no scope") && w.contains("0.37 rule")), "{items:?}");
+    let dir = repo_with("code_scopes:\n  core: [\"Core/**\", \"core/**\"]\n", true);
+    let r = dir.path();
+    approve(r);
+    edit(r, "util/notes.txt");
+    let err = text(&ship(r).stderr);
+    assert!(!err.contains("`core.engine.01`"), "one live pattern keeps the scope standing: {err}");
+}
+
+/// gate.code-scopes.15: an empty list is malformed: warned, no scope.
+#[test]
+fn gate_code_scopes_15_an_empty_list_is_malformed_and_declares_no_scope() {
+    let dir = repo_with("code_scopes:\n  core: []\n  app: [\"app/**\"]\n", true);
+    let r = dir.path();
+    approve(r);
+    edit(r, "util/notes.txt");
+    let err = text(&ship(r).stderr);
+    assert!(err.contains(GAP_REFUSAL), "{err}");
+    assert_names(&err, &SCENARIOS, &[]);
+    assert!(!err.contains("need nothing from this chore"), "{err}");
+    let (_, report) = gate_json(r);
+    let items = advisory_items(&report, "code_scopes");
+    assert!(items.iter().any(|w| w.contains("malformed") && w.contains("`core` has no pattern")), "{items:?}");
+    assert!(chore_entry(&status_json(r)).get("scopeExempt").is_none());
+    let status = status_json(r);
+    assert!(status["meta"]["warnings"].as_array().into_iter().flatten().any(|w| w["code"] == "CODE_SCOPES_UNMATCHED" && w["message"].as_str().unwrap().contains("malformed")), "{status}");
+}
+
+/// gate.code-scopes.16: `canon brief approve` does not approve a policy whose `code_scopes` differs from the last approved one.
+#[test]
+fn gate_code_scopes_16_a_brief_approval_leaves_the_policy_approval_stale_when_the_scopes_changed() {
+    let dir = repo();
+    let r = dir.path();
+    let approval = read(r, ".canon/policy.approval.json");
+    // An agent widens the scope of `core` and asks for the brief's approval.
+    write(r, ".canon/policy.yaml", &read(r, ".canon/policy.yaml").replace("core: [\"core/**\"]", "core: [\"core/**\", \"util/**\"]"));
+    std::thread::sleep(Duration::from_millis(1100));
+    let out = ok(r, &["brief", "approve", "bump-client", "--approver", "Journey", "--note", "go"]);
+    assert!(out.contains("policy approval was NOT recorded") && out.contains("`core`"), "{out}");
+    assert!(!out.contains("`app`"), "only the changed key is named: {out}");
+    assert_eq!(read(r, ".canon/policy.approval.json"), approval, "the policy approval is as it was");
+    assert!(read(r, CHORE_BRIEF).contains("Approved: Journey"), "the brief is approved");
+    let json: Value = serde_json::from_str(&ok(r, &["brief", "approve", "bump-client", "--approver", "Journey", "--note", "go", "--json"])).unwrap();
+    assert_eq!(json["data"]["policyApproved"], false, "{json}");
+    assert_eq!(json["data"]["policyHeld"], serde_json::json!(["core"]), "{json}");
+
+    // The gate fails closed until a human approves the policy.
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out.stderr));
+    assert!(text(&out.stderr).contains("POLICY_APPROVAL_STALE"), "{}", text(&out.stderr));
+    assert_eq!(chore_entry(&status_json(r)).get("scopeExempt"), None);
+
+    // The human approves the policy; a brief approval over unchanged scopes (a comment edit) records the policy approval as before.
+    approve_policy(r);
+    commit_all(r, "the human approves the widened policy");
+    write(r, ".canon/policy.yaml", &format!("{}# a comment\n", read(r, ".canon/policy.yaml")));
+    std::thread::sleep(Duration::from_millis(1100));
+    let out = ok(r, &["brief", "approve", "bump-client", "--approver", "Journey", "--note", "go again"]);
+    assert!(out.contains("policy approval recorded too") && !out.contains("NOT recorded"), "{out}");
+
+    // A first approval, with no earlier one, is as before; the approved bytes that git does not hold (an approval never committed) cannot be compared, so the scopes count as changed.
+    let dir = repo_with(SCOPES, false);
+    let r = dir.path();
+    let out = ok(r, &["brief", "approve", "bump-client", "--approver", "Journey", "--note", "go"]);
+    assert!(out.contains("policy approval recorded too"), "{out}");
+    assert!(r.join(".canon/policy.approval.json").is_file());
+}
+
+/// gate.code-scopes.17: over a change in `core/` the three ask for every scenario alike; none lets one go.
+#[test]
+fn gate_code_scopes_17_over_a_core_change_ship_status_and_gate_check_ask_for_every_scenario_alike() {
+    let dir = repo();
+    let r = dir.path();
+    approve(r);
+    edit(r, "core/lib.rs");
+    let all = "canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer";
+    let err = text(&ship(r).stderr);
+    let violations = gate_evidence_violations(r);
+    assert_eq!(violations.len(), 1, "{violations:?}");
+    let steps = status_steps(r);
+    assert_eq!(evidence_steps(&steps).len(), 1, "{steps:?}");
+    let why = steps[0]["why"].as_str().unwrap();
+    for (who, said) in [("ship", err.as_str()), ("gate check", violations[0].as_str()), ("status", why)] {
+        assert_names(said, &SCENARIOS, &[]);
+        assert!(said.contains("changed in scope `core`") && said.contains("changed in scope `app`") && said.contains("`core/lib.rs`"), "{who}: {said}");
+        assert!(!said.contains("need nothing from this chore"), "{who}: {said}");
+    }
+    assert!(err.contains(&format!("`{all}`")) && violations[0].contains(&format!("`{all}`")), "{err} / {violations:?}");
+    assert_eq!(steps[0]["command"], all, "{steps:?}");
+    assert!(chore_entry(&status_json(r)).get("scopeExempt").is_none());
+}
+
 fn unreleased() -> String {
     let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).expect("the CHANGELOG");
     let start = changelog.find("\n## Unreleased").expect("the CHANGELOG has an Unreleased section");
@@ -531,7 +651,12 @@ fn changelog_problems(section: &str) -> Vec<String> {
     if changed_entry.is_empty() {
         problems.push("no entry of `canon-0-38-code-scopes` under `### Changed`".to_string());
     }
-    for (what, needle) in [("the policy key", "`code_scopes`"), ("the keys, an area or a surface", "surface"), ("that the policy is approved by a human", "approved")] {
+    for (what, needle) in [
+        ("the policy key", "`code_scopes`"),
+        ("the keys, an area or a surface", "surface"),
+        ("that the policy is approved by a human", "approved"),
+        ("that `canon brief approve` leaves the policy approval stale when the scopes changed", "stale"),
+    ] {
         if !added_entry.join("\n").contains(needle) {
             problems.push(format!("the Added entry does not say {what} (`{needle}`)"));
         }
@@ -541,6 +666,8 @@ fn changelog_problems(section: &str) -> Vec<String> {
         ("that it is a chore's approval the rule is about", "chore"),
         ("that the changed paths decide", "changed since"),
         ("that a policy without the key behaves as before", "without the key"),
+        ("that a key whose patterns match no file declares no scope", "none of whose patterns matches a file"),
+        ("that an empty list is malformed", "list is empty"),
     ] {
         if !changed_entry.join("\n").contains(needle) {
             problems.push(format!("the Changed entry does not say {what} (`{needle}`)"));
@@ -559,7 +686,7 @@ fn gate_code_scopes_12_the_changelog_names_the_key_and_what_the_gate_asks_less()
 #[test]
 fn gate_code_scopes_13_a_changelog_without_the_entries_is_named_by_the_release_check() {
     let section = unreleased();
-    assert_eq!(changelog_problems("## Unreleased\n\n### Added\n\n- Something else.\n").len(), 2 + 3 + 4, "an empty section names both entries and each piece");
+    assert_eq!(changelog_problems("## Unreleased\n\n### Added\n\n- Something else.\n").len(), 2 + 4 + 6, "an empty section names both entries and each piece");
     let without_added: String = section.lines().filter(|l| !(l.contains("canon-0-38-code-scopes") && l.contains("`code_scopes`"))).collect::<Vec<_>>().join("\n");
     assert!(changelog_problems(&without_added).iter().any(|p| p.contains("no entry") && p.contains("Added")), "{:?}", changelog_problems(&without_added));
     let without_before = section.replace("without the key", "otherwise");

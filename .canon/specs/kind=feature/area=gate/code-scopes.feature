@@ -147,3 +147,49 @@ Feature: gate code-scopes
     Given an Unreleased section without the entries or without a piece of one
     When the release check reads it
     Then it names each missing entry and each missing piece
+
+  # canon: {"schema":1,"at":"2026-11-06T09:07:32Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @flow:canon-0-38-code-scopes.F5
+  @gate.code-scopes.14
+  Scenario: A key whose patterns match no file declares no scope, so a misspelt pattern never exempts
+    Given a policy whose `code_scopes` give `core` the pattern `Core/**` (matching is byte-exact), approved by the human
+    When the approved chore changes `core/lib.rs` and the subject is moved to shipped, and `canon gate check` runs
+    Then the refusal asks for `core.engine.01`, names no scope and says no scenario was let go
+    And a change outside every real scope asks for it too, and the warning says the key declares no scope and its scenarios follow the 0.37 rule
+    And a key with one live pattern and one misspelt one still stands
+
+  # canon: {"schema":1,"at":"2026-11-06T09:07:33Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @flow:canon-0-38-code-scopes.F5
+  @gate.code-scopes.15
+  Scenario: An empty list is malformed: warned, and no scenario has a scope
+    Given a policy whose `code_scopes` give `core` an empty list and `app` the pattern `app/**`
+    When the approved chore changes a file outside every scope and the subject is moved to shipped, and `canon status` and `canon gate check` run
+    Then all three scenarios are asked for and none is let go
+    And both warn that `code_scopes` is malformed because `core` has no pattern
+
+  # canon: {"schema":1,"at":"2026-11-06T09:07:34Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @flow:canon-0-38-code-scopes.F1
+  @gate.code-scopes.16
+  Scenario: Approving a brief does not approve a policy whose scopes changed since its last approval
+    Given a policy approved by the human, then edited to widen the scope of `core`, with an unapproved chore brief
+    When `canon brief approve` approves the chore
+    Then the brief is approved, the policy approval file is as it was, and the output says the policy approval was not recorded and names `core` alone (`--json`: `policyApproved` false and `policyHeld`)
+    And the move to shipped fails closed with `POLICY_APPROVAL_STALE` until a human runs `canon policy approve`
+    And a first policy approval, and a brief approval over unchanged scopes, record the policy approval as before
+
+  # canon: {"schema":1,"at":"2026-11-06T09:25:24Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @flow:canon-0-38-code-scopes.F3
+  @gate.code-scopes.17
+  Scenario: Over a change in core the ship guard, status and gate check ask for every scenario alike, so no one of them lets one go
+    Given the subject and the policy of the first scenario, and an approved chore that changed one file under `core/`
+    When the subject is moved to shipped, `canon status` runs and `canon gate check` runs
+    Then each names all three scenarios, the scopes `core` and `app` and the path `core/lib.rs`, and none says a scenario needs nothing
+    And each leads with the same batch command over every report of the suite

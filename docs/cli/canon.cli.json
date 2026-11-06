@@ -12205,6 +12205,16 @@
             "policyApproved": {
               "type": "boolean"
             },
+            "policyHeld": {
+              "description": "The `code_scopes` keys that differ from the last approved policy (0.38): the policy approval was not recorded, so it stays stale until a human runs `canon policy approve`.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "relay": {
               "anyOf": [
                 {
@@ -12362,6 +12372,16 @@
             "policyApproved": {
               "type": "boolean"
             },
+            "policyHeld": {
+              "description": "The `code_scopes` keys held back from the policy approval (see [`Approved::policy_held`]).",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "relay": {
               "anyOf": [
                 {
@@ -12416,6 +12436,16 @@
             },
             "policyApproved": {
               "type": "boolean"
+            },
+            "policyHeld": {
+              "description": "The `code_scopes` keys that differ from the last approved policy (0.38): the policy approval was not recorded, so it stays stale until a human runs `canon policy approve`.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "relay": {
               "anyOf": [
@@ -39729,8 +39759,8 @@
     },
     {
       "code": "CODE_SCOPES_UNMATCHED",
-      "fix": "Correct the key or the pattern in `.canon/policy.yaml`, then have the human run `canon policy approve` again.",
-      "meaning": "a `code_scopes` key matches no scenario, or one of its patterns matches no file of the code tree, or the key is not a map of path-pattern lists; a scope that matches nothing exempts nothing"
+      "fix": "Correct the key or the pattern in `.canon/policy.yaml` (matching is byte-exact), then have the human run `canon policy approve` again.",
+      "meaning": "a `code_scopes` key matches no scenario; or a pattern of it matches no file of the code tree, and when none of a key's patterns does the key declares no scope and its scenarios follow the rule without scopes; or the key is malformed (not a map of non-empty lists of non-empty patterns; an empty list is malformed) and no scenario has a scope"
     },
     {
       "code": "CONFIG_MISSING",

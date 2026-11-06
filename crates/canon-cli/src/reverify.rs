@@ -226,7 +226,7 @@ pub fn scope_warnings(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo) 
         return Vec::new();
     }
     let files = code_tree.files(repo);
-    scopes.warnings(files.as_deref(), canon_gate::spec_coverage::latest_scenarios(ctx).into_iter().map(|s| &s.scenario_id))
+    scopes.warnings(files, canon_gate::spec_coverage::latest_scenarios(ctx).into_iter().map(|s| &s.scenario_id))
 }
 
 /// The paths that changed between an evidence record's code tree and now, when that is known.
@@ -247,12 +247,14 @@ pub struct CodeTreeMemo {
     tree: std::cell::OnceCell<Option<String>>,
     differ: std::cell::OnceCell<Option<crate::git_rev::TreeDiffer>>,
     changed: std::cell::RefCell<std::collections::HashMap<(String, String), Changed>>,
+    files: std::cell::OnceCell<Option<Vec<String>>>,
+    live: std::cell::RefCell<std::collections::HashMap<String, bool>>,
 }
 
 impl CodeTreeMemo {
     /// A memo that computes the tree on first use.
     pub fn lazy() -> Self {
-        Self { tree: std::cell::OnceCell::new(), differ: std::cell::OnceCell::new(), changed: std::cell::RefCell::default() }
+        Self { tree: std::cell::OnceCell::new(), differ: std::cell::OnceCell::new(), changed: std::cell::RefCell::default(), files: std::cell::OnceCell::new(), live: std::cell::RefCell::default() }
     }
 
     /// A memo for a tree the command already computed.
@@ -281,8 +283,19 @@ impl CodeTreeMemo {
     }
 
     /// The files of the working tree's code, for the checks of the scope declarations.
-    pub fn files(&self, repo: &Path) -> Option<Vec<String>> {
-        self.differ(repo).and_then(crate::git_rev::TreeDiffer::files)
+    pub fn files(&self, repo: &Path) -> Option<&[String]> {
+        self.files.get_or_init(|| self.differ(repo).and_then(crate::git_rev::TreeDiffer::files)).as_deref()
+    }
+
+    /// Whether the scope `key` stands: one of its patterns matches a file of the code tree
+    /// ([`crate::code_scopes::live`]).
+    fn key_live(&self, repo: &Path, key: &str, patterns: &[String]) -> bool {
+        if let Some(known) = self.live.borrow().get(key) {
+            return *known;
+        }
+        let live = crate::code_scopes::live(patterns, self.files(repo));
+        self.live.borrow_mut().insert(key.to_string(), live);
+        live
     }
 }
 
@@ -336,6 +349,10 @@ enum Scoped {
 
 fn scoped(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, scopes: &crate::code_scopes::CodeScopes, scenario: &Scenario) -> Scoped {
     let Some((key, patterns)) = scopes.of(&scenario.scenario_id) else { return Scoped::Unscoped };
+    // A key none of whose patterns matches a file of the code tree declares no scope (fail closed: a misspelt pattern never exempts).
+    if !code_tree.key_live(repo, key, patterns) {
+        return Scoped::Unscoped;
+    }
     let evidence = scenario_evidence(ctx, scenario);
     let Some(latest) = latest_evidence(&evidence) else { return Scoped::Unscoped };
     let (Some(sha), Some(tree)) = (latest.evidence_sha.as_ref(), latest.code_tree.as_deref()) else { return Scoped::Unscoped };

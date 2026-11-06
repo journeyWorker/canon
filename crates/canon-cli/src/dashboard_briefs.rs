@@ -328,7 +328,7 @@ fn approve_many(repo: &Path, briefs: &[ApproveBrief], request: &ApproveRequest) 
             for (entry, _) in &many.entries {
                 crate::human_err!("canon dashboard: {} {:?} by `{}`", entry.change, entry.outcome, many.approved_by);
             }
-            let report = crate::brief_approve::ApprovedMany { approved_by: many.approved_by, policy_approved: many.policy_approved, relay: None, approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
+            let report = crate::brief_approve::ApprovedMany { approved_by: many.approved_by, policy_approved: many.policy_approved, policy_held: many.policy_held, relay: None, approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
             if let Some(e) = many.failure {
                 return Reply { status: 500, body: crate::json_out::failure_value("dashboard briefs", &e, Some(&report)) };
             }

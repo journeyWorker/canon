@@ -276,10 +276,21 @@ by its old and its new path) matches the scope; the refusal names the first
 three such paths and how many there are. No scope, no recorded tree, or an old
 tree that cannot be computed (the commit is gone, the evidence was recorded over
 uncommitted code) keep the rule above. The scopes stand only while the policy
-is the one a human approved: an agent cannot widen them, and `status` and
+is the one a human approved: an agent cannot widen them (an edit after the
+approval fails closed, and so does a change that a brief approval would have
+approved implicitly), and `status` and
 `gate check` warn, never refuse, about a pattern that matches no file or a key
 that matches no scenario. A shared file (lock file, build setting, fixture)
 belongs in the scope of every scenario that depends on it.
+A key none of whose patterns matches a file of the current code tree declares no
+scope (a misspelt `Core/**` never exempts; matching is byte-exact), and an empty
+list is malformed, so that scenario follows the rule above; both are warned.
+`canon brief approve` records the policy approval in its own call except when
+the policy's `code_scopes` differs from the last approved policy's: then it
+approves the brief only, leaves the policy approval stale (the gate fails closed
+until a human reads the scopes and runs `canon policy approve`) and names the
+changed keys, so an agent cannot widen the scopes by asking for a brief's
+approval.
 
 ### Audit records (`canon evidence audit`)
 
