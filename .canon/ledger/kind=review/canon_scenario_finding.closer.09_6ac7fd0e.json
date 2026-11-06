@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-finding-closer",
+    "role": "reviewer",
+    "session_id": "s-0-38-closer-rev"
+  },
+  "at": "2026-11-06T09:24:14.744681Z",
+  "code_tree": "c4ef23f7b5b96fc70b34813f62a80c9d50be26c2",
+  "kind": "review",
+  "pin": "0c7b545787be08b98d24c28f0b990bf38139dc3d",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:finding_closer_09_the_list_names_who_closed_each_closed_finding_and_under_which_role"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "b8b5da746846e9cc5b0df88a64409b54b9069c92f649be338dd643850300a8ae",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-finding-closer/brief.md"
+  },
+  "review_id": "01M6R2RJ8RJHJ73A6JT5VRK8JC",
+  "reviewer": "rev-0-38-finding-closer",
+  "scenario_id": "finding.closer.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

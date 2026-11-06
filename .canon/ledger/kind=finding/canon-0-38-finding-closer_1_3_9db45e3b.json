@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-finding-closer",
+    "role": "reviewer",
+    "session_id": "s-0-38-closer-rev"
+  },
+  "at": "2026-11-06T09:20:31.994910Z",
+  "change_id": "canon-0-38-finding-closer",
+  "code_tree": "c4ef23f7b5b96fc70b34813f62a80c9d50be26c2",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/finding.rs",
+  "introduced_by": "79815f634e539e6bc9813d9abd405a99d70c023d",
+  "kind": "finding",
+  "reviewed_sha": "0c7b545787be08b98d24c28f0b990bf38139dc3d",
+  "reviewer": "rev-0-38-finding-closer",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "A non-reviewer can still overwrite a reviewer's rejected or deferred close with fixed: verified with the binary, a finding the reviewer closed rejected is closed fixed by CANON_ROLE=implementer (exit 0), and finding list then names the implementer as the closer; the version history keeps the reviewer's close. The brief decides that fixed is open to every role and puts the rule on who may close, not on what a close may replace, so this is not a defect of the diff. It does leave the reviewer's judgement overturnable without a reviewer: a rejected blocker is not blocking, a fixed one blocks until new evidence for its scenarios, so the effect is stricter, never a way past the gate. If it is wanted closed, the check is on the finding's current disposition in run_close.",
+  "worktree_dirty": false
+}
