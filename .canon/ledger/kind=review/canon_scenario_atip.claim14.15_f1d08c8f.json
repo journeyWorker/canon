@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-finding-closer",
+    "role": "reviewer",
+    "session_id": "s-0-38-closer-rev"
+  },
+  "at": "2026-11-06T10:36:07.106111Z",
+  "code_tree": "9c64b4a2f7d31d0c55aa4ea9c83e6773ba07694c",
+  "kind": "review",
+  "pin": "e80e63a8377fc37b78cac7fa0f182dbbbf86129b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claim14_15_the_changelog_entry_states_the_measured_sizes_and_the_note_for_callers"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e1b6cd1b153de9dae768acdb2000536a29c8d33749b82c01b970cb054a6c4733",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-finding-closer/brief.md"
+  },
+  "review_id": "01M6R6W5J2CH51N7Z1BJ15BZTY",
+  "reviewer": "rev-0-38-finding-closer",
+  "scenario_id": "atip.claim14.15",
+  "schema": 2,
+  "worktree_dirty": false
+}
