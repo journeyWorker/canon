@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Fixed
+
+- **Two tests no longer depend on chance or on who runs them** (`canon-0-38-test-determinism`; tests only, canon's behaviour, output and records are unchanged). `every_spec_example_document_writes_what_its_flags_write` masked a record's 8-character digest only when it held a digit, so an all-letter digest (`cfcaaadc`) made two runs' file names differ, about one run in 25 to 30; the mask now takes lower-case hex words of 8, 12 and 40 or more characters with or without a digit, and a table test shows `cfcaaadc` and `abcdefab` masked in a name and a body while two runs that write different content still differ. `authoring_init_93` and the other test files that start canon inherited the caller's `CANON_ROLE` and `CANON_ACTOR`; every test now starts the binary from `tests/support/hermetic.rs`, which carries neither, and `tests/hermetic_env.rs` fails a test file that does not.
+
 ## 0.37.0 — 2026-11-06
 
 canon declares atip/1 1.5 and meets its L2 with `\p{White_Space}` patterns, gives an option of one name one rule of values in every command (ids, one-line names and sentences trimmed, rounds and limits from 1, RFC 3339-only time options, exact `--providers`, `finding close` refusing `open`), asks no new evidence of an approval whose code tree is unchanged, and takes the `atip` crate and the checker at atip v0.2.0. It is BREAKING for callers: the Breaking tables below name every value and code that moved.
