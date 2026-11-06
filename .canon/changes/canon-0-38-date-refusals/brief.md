@@ -79,4 +79,4 @@ Source: 리뷰 발견 canon-0-37-option-forms_1_1과 canon-0-37-option-forms_1_2
 - 기간 값과 `--after`, `--before` 순서 검사.
 - 다른 옵션의 값 규칙.
 
-Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:a6704b550d6828f01d24b981b925e8771865b2586dc45b17001d24885d59fa98)
+Approved: Journey Hwang 2026-11-06T17:37:41Z — "승인 위임(2026-11-01 대화) 하의 사실 정정: 윤초 안내는 직전 초의 다음 초" (relayed by orchestrator orchestrator-main via chat) (code tree ca57826d766b036bf5441d11c4f7f646f7454fb5) (brief sha256:1fd02667463476aec2bee35439a8f7341f5aa7d9981ff42d4d5ae85eed0a3d45)
