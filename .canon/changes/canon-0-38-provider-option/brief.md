@@ -131,4 +131,4 @@ Source: canon 이슈 #141의 첫째 항목(ATIP 저자의 요청), ATIP 태그 v
 - 목록을 한 값으로 받는 열거 도메인.
 - 옛 철자를 오래 살려 두는 별칭.
 
-Approved: Journey Hwang 2026-11-06T04:51:45Z — "승인 (--no-provider 스위치, rejected/deferred만 리뷰어 전용, roles는 예약어 all, 나머지 플래너 기본안)" (relayed by orchestrator orchestrator-main via ask) (code tree fc6a5ee63429937a17458f2885681fedad7f19f8) (brief sha256:58968cadb280dbb7a055d0c3d2eca0d6931bfe5664ee7e6dc082eed8757723be)
+Approved: Journey Hwang 2026-11-06T15:06:03Z — "1번으로 해 (--harness / --no-harness, dispatch begin --provider 유지)" (relayed by orchestrator orchestrator-main via chat) (code tree 9c64b4a2f7d31d0c55aa4ea9c83e6773ba07694c) (brief sha256:11da6c673b903aec23926a02e567be9f7caef1fec3307a84a828a950d159eae1)
