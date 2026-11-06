@@ -4,6 +4,8 @@
 //!
 //! The object store is the debug-build local-filesystem substitute (`CANON_R2_LOCAL_ROOT`, the seam the tier tests use), so these run offline.
 
+#[path = "support/hermetic.rs"]
+mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -23,7 +25,7 @@ impl Repo {
     }
 
     fn command(&self, args: &[&str]) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+        let mut command = hermetic::canon();
         command.args(args).env("CANON_ACTOR", "canon").env("CANON_R2_LOCAL_ROOT", self.store.path()).current_dir(self.path());
         command
     }
@@ -42,7 +44,7 @@ impl Repo {
 
     /// `canon` with the substitute store removed and a real-looking S3 configuration instead (what a release binary always uses).
     fn canon_s3(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
+        let mut command = hermetic::canon();
         command.args(args).env("CANON_ACTOR", "canon").env_remove("CANON_R2_LOCAL_ROOT").env_remove("CANON_R2_BUCKET").env_remove("S3_BUCKET").current_dir(self.path());
         for (key, value) in env {
             command.env(key, value);
