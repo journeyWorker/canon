@@ -549,7 +549,7 @@ fn open_blocker_violation(finding: &Finding, subjects: &[&str]) -> Violation {
         FailureClass::OpenBlocker,
         format!("{}#{}.{}", finding.change_id.as_str(), finding.round, finding.seq),
         format!(
-            "open blocker finding by `{}` on change `{}` (subject {subjects}): {}; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or close it as rejected or deferred",
+            "open blocker finding by `{}` on change `{}` (subject {subjects}): {}; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or have a reviewer close it as rejected or deferred",
             finding.reviewer,
             finding.change_id.as_str(),
             finding.summary

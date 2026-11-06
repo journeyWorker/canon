@@ -457,7 +457,7 @@ subject's `change_ids` (`canon subject adopt`). The subject string is
 `<change_id>#<round>.<seq>`:
 
 ```
-open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or close it as rejected or deferred
+open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or have a reviewer close it as rejected or deferred
 ```
 
 Findings on changes no in-scope subject has adopted do not block.

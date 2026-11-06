@@ -384,11 +384,22 @@ fn changelog_problems(changelog: &str) -> Vec<String> {
     problems
 }
 
+fn guide(name: &str) -> String {
+    std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../canon/skills/reference").join(name)).unwrap_or_else(|e| panic!("{name}: {e}"))
+}
+
 /// finding.closer.11
 #[test]
 fn finding_closer_11_the_changelog_names_the_refusal_the_recorded_role_and_the_guides() {
     let problems = changelog_problems(&changelog());
     assert!(problems.is_empty(), "{problems:#?}");
+    // What the entry says of the guides is what the guides hold: the reviewer's lists the leaf and says who closes, the implementer's has no `finding close`.
+    let reviewer = guide("role-reviewer.md");
+    assert!(reviewer.lines().any(|line| line.starts_with("usage: canon finding close ")), "the reviewer guide lists the `finding close` leaf");
+    assert!(reviewer.contains("Only you close a finding `rejected` or `deferred`") && reviewer.contains("FINDING_ROLE_DENIED"), "the reviewer guide says only the reviewer closes rejected or deferred");
+    let implementer = guide("role-implementer.md");
+    assert!(!implementer.contains("finding close"), "the implementer guide has no `finding close`");
+    assert!(implementer.lines().any(|line| line.starts_with("usage: canon finding list ")), "the implementer guide still lists `finding list`");
 }
 
 /// finding.closer.12 (failure case): the check finds each missing entry, and a real entry passes it.
