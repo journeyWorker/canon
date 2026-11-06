@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-date-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-38-date-rev"
+  },
+  "at": "2026-11-06T18:37:54.206164Z",
+  "change_id": "canon-0-38-date-refusals",
+  "code_tree": "ca57826d766b036bf5441d11c4f7f646f7454fb5",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/finding.rs:1450-1900",
+  "introduced_by": "79815f634e539e6bc9813d9abd405a99d70c023d",
+  "kind": "finding",
+  "resolution_code_tree": "be514fdfebb3ec27fcc3f3810955bb3a85db1757",
+  "resolution_sha": "a144e3d5969bb38054ec583245179741a1b7cdf3",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "reviewer": "rev-0-38-date-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[standards] Env leak, not this change's: five unit tests in finding::tests (close_defaults_fixed_to_head_and_refuses_a_rev_on_other_dispositions, close_never_edits_the_record_it_supersedes, close_stages_a_transition_that_preserves_every_content_field, closing_to_the_current_disposition_is_a_no_op_that_stages_nothing, the_current_disposition_is_the_latest_version_not_the_first_read) fail with CANON_ROLE=implementer (cargo nextest run -p canon-cli --lib, 540 passed 5 failed; green without the variable, 545/545). Cause: closing_role reads CANON_ROLE in-process (Role::current) since canon-0-38-finding-closer (79815f634), and the tests close rejected/deferred without declaring a role, so an implementer session is refused FINDING_ROLE_DENIED. The 0.38 test-determinism chore (4a17fad62, an ancestor of 79815f634) could not have caught it: it landed first, and its guard (tests/hermetic_env.rs) scans only tests/*.rs files that start the binary, so in-process unit tests in src/ are outside both the helper and the guard, and its three-environment check was run on a tree that did not hold closing_role. It is a gap in that chore's invariant ('tests do not inherit the caller's role') for unit tests, which the finding-closer review did not run under a declared role. Fix: the five tests set or clear the role they close under (a serialized env guard, or pass the role explicitly), and the guard or a three-environment run covers `--lib`. Blast radius: every in-process unit test that reaches Role::current.",
+  "worktree_dirty": false
+}

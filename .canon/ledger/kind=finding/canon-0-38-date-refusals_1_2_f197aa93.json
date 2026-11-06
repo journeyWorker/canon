@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-date-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-38-date-rev"
+  },
+  "at": "2026-11-06T18:37:53.336099Z",
+  "change_id": "canon-0-38-date-refusals",
+  "code_tree": "ca57826d766b036bf5441d11c4f7f646f7454fb5",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/timestamp.rs:121-126",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "be514fdfebb3ec27fcc3f3810955bb3a85db1757",
+  "resolution_sha": "a144e3d5969bb38054ec583245179741a1b7cdf3",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "reviewer": "rev-0-38-date-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[standards] 9999-12-31T23:59:60Z is refused with 'the same instant is written `+10000-01-01T00:00:00Z`': chrono's rfc3339 writer prints a five-digit year with a sign, which canon's own RFC 3339 shape refuses, so the spelling offered cannot be given back. Same for any value that carries into year 10000. Real binary, all 12 places. Edge only; the message could say the instant is past 9999-12-31 and cannot be written, or the fallback 'the next second' branch could take it. Blast radius: no test reaches the year edge.",
+  "worktree_dirty": false
+}

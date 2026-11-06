@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-date-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-38-date-rev"
+  },
+  "at": "2026-11-06T18:37:53.769099Z",
+  "change_id": "canon-0-38-date-refusals",
+  "code_tree": "ca57826d766b036bf5441d11c4f7f646f7454fb5",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip_optionforms.rs:953-1010",
+  "introduced_by": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "kind": "finding",
+  "resolution_code_tree": "be514fdfebb3ec27fcc3f3810955bb3a85db1757",
+  "resolution_sha": "a144e3d5969bb38054ec583245179741a1b7cdf3",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "reviewer": "rev-0-38-date-refusals",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "(scenarios atip.daterefusals.01, atip.daterefusals.03) [standards] Two assertions are weaker than their Then steps. atip.daterefusals.01 reads the offered spelling in the twelve places only for 23:59:60Z (next midnight); the 10:00:60Z -> 10:01:00Z case, the one that departs from the brief's wording, is asserted nowhere (the unit test covers .5Z and +01:00). atip.daterefusals.03 asserts the message contains `RFC 3339` and not `does not exist`, not that it is the 0.37 sentence; I compared 720 calls (30 misspellings x 12 places x --json and human) against 0.37.0 and every byte matched, so the behaviour holds, the test would not notice a reworded sentence. Blast radius: spelling refusals in --input documents (field /expiry) were not compared by the test.",
+  "worktree_dirty": false
+}
