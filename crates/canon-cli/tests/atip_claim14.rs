@@ -912,11 +912,12 @@ fn changelog_problems(text: &str, live: &BTreeMap<String, Vec<usize>>) -> Vec<St
             found.push(format!("the size row `{name}` has no two plain integers: {row}"));
             continue;
         };
-        // The entry states the sizes measured on the 0.36.0 build. The patterns of this build are shorter (`canon-0-37-claim-1-5`), so a live answer is not larger
-        // than the stated size and lies within a tenth of it.
+        // The entry states the sizes measured on the 0.36.0 build. A later change may lengthen or shorten a command document (the patterns of 0.37 are
+        // shorter, `canon-0-37-claim-1-5`; `finding close` and `finding list` of 0.38 say who closed a finding, `canon-0-38-finding-closer`), so a live answer
+        // lies within a tenth of the stated size.
         match live.get(name) {
-            Some(sizes) if sizes.iter().any(|size| *size <= after && after - *size <= after / 10) => {}
-            Some(sizes) => found.push(format!("the size row `{name}` states {after} bytes for 1.4 (0.36.0), the live measure is {sizes:?}: it is larger or more than a tenth smaller")),
+            Some(sizes) if sizes.iter().any(|size| size.abs_diff(after) <= after / 10) => {}
+            Some(sizes) => found.push(format!("the size row `{name}` states {after} bytes for 1.4 (0.36.0), the live measure is {sizes:?}: it is more than a tenth away")),
             None => found.push(format!("no live measure for `{name}`")),
         }
         // A command document is smaller; the tree may grow (it holds the shared options); a sum may grow, with its reason.
@@ -1591,8 +1592,10 @@ fn atip_claim14_16_the_entry_check_fails_when_the_table_a_size_row_or_the_caller
     let with_row = |name: &str, before: &str, after: usize| complete.lines().map(|line| if line.starts_with(&format!("| {name} |")) { format!("| {name} | {before} | {after} |") } else { line.to_string() }).collect::<Vec<_>>().join("\n");
     let wrong = with_row("schema purge", "4,000", live["schema purge"][0] * 2);
     assert_found("a stated size far above the live one", &changelog_problems(&wrong, &live), "live measure");
-    let below = with_row("schema purge", "4,000", live["schema purge"][0] - 1);
-    assert_found("a stated size below the live one", &changelog_problems(&below, &live), "live measure");
+    let below = with_row("schema purge", "4,000", live["schema purge"][0] * 8 / 10);
+    assert_found("a stated size more than a tenth below the live one", &changelog_problems(&below, &live), "live measure");
+    let near = with_row("schema purge", "4,000", live["schema purge"][0] - 1);
+    assert!(changelog_problems(&near, &live).iter().all(|problem| !problem.contains("live measure")), "a stated size within a tenth of the live one passes");
     let larger = with_row("schema purge", "2,999", live["schema purge"][0]);
     assert_found("a size that is not smaller than the 1.3 size", &changelog_problems(&larger, &live), "not smaller");
     let grown = with_row("schema (tree) + purge", "1", live["schema (tree) + purge"][0]);

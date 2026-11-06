@@ -301,6 +301,13 @@ fn contract_view(transcript: &str) -> String {
                     for added in ["unchanged", "waitingOn", "nextOmitted", "note"] {
                         object.remove(added);
                     }
+                    // 0.38: a listed finding names who closed it.
+                    for finding in object.get_mut("findings").and_then(Value::as_array_mut).into_iter().flatten() {
+                        if let Some(row) = finding.as_object_mut() {
+                            row.remove("closedBy");
+                            row.remove("closedRole");
+                        }
+                    }
                 }
                 view.insert("data".into(), data);
             }

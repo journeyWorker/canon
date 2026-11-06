@@ -3234,6 +3234,7 @@
         "FINDING_INCOMPLETE",
         "FINDING_RESOLUTION_REV_CONFLICT",
         "FINDING_REVIEW_NOT_FOUND",
+        "FINDING_ROLE_DENIED",
         "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTION_FAILED",
         "REPO_DENIED",
@@ -3490,6 +3491,7 @@
         "FINDING_INCOMPLETE",
         "FINDING_NOT_FOUND",
         "FINDING_RESOLUTION_REV_CONFLICT",
+        "FINDING_ROLE_DENIED",
         "LAYOUT_MIGRATION_REQUIRED",
         "PROMOTION_FAILED",
         "REPO_DENIED",
@@ -3585,12 +3587,12 @@
           "valueName": "ACTOR_ID"
         },
         {
-          "default": "reviewer",
+          "defaultNote": "the role declared with --as or CANON_ROLE",
           "domain": {
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
           "env": "CANON_ROLE",
-          "help": "Attribution only — no partition key derives from it",
+          "help": "The role the close is recorded under: the declared one (--as, CANON_ROLE), and --role only when it names that role or none is declared; no role is recorded when neither is given. Only a reviewer closes as rejected or deferred",
           "name": "role"
         },
         {
@@ -3682,6 +3684,8 @@
               "seq"
             ],
             "paths": [
+              "closedBy",
+              "closedRole",
               "disposition",
               "fileRef",
               "reason",
@@ -8568,6 +8572,13 @@
       "exit": 2,
       "fix": "Pass the review id that `canon review scenario` or `canon review change` printed; `canon query --kind review` shows the ids.",
       "meaning": "--review names no review in the ledger or the archive",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_ROLE_DENIED",
+      "exit": 2,
+      "fix": "Leave the finding to a reviewer, who closes it with `--as reviewer`; close it as `fixed` if you fixed it.",
+      "meaning": "`finding close` was asked for `rejected` or `deferred` by a call that declares a role other than `reviewer` (--as or CANON_ROLE); overturning a finding is the reviewer's, nothing was written and the finding stays open",
       "retryable": false
     },
     {
@@ -22331,7 +22342,7 @@
               "type": "string"
             },
             "role": {
-              "description": "Attribution only — no partition key derives from it",
+              "description": "The role the close is recorded under: the declared one (--as, CANON_ROLE), and --role only when it names that role or none is declared; no role is recorded when neither is given. Only a reviewer closes as rejected or deferred",
               "type": "string"
             },
             "round": {
@@ -22550,6 +22561,20 @@
         "FindingRow": {
           "description": "One finding of `canon finding list`.",
           "properties": {
+            "closedBy": {
+              "description": "Who closed it (0.38): the actor of the closing version; absent while the finding is open.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "closedRole": {
+              "description": "The role the closing version was recorded under; absent while open, and for a close that declared none.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "disposition": {
               "type": "string"
             },
@@ -22600,7 +22625,9 @@
             "summary",
             "resolutionSha",
             "fileRef",
-            "reason"
+            "reason",
+            "closedBy",
+            "closedRole"
           ],
           "type": "object"
         }

@@ -99,9 +99,9 @@ pub struct FindingCloseArgs {
     /// The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes
     #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID", value_parser = crate::cli::trimmed)]
     pub actor_id: String,
-    /// Attribution only — no partition key derives from it
-    #[arg(long, default_value = "reviewer", value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
-    pub role: RoleId,
+    /// The role the close is recorded under: the declared one (--as, CANON_ROLE), and --role only when it names that role or none is declared; no role is recorded when neither is given. Only a reviewer closes as rejected or deferred
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
+    pub role: Option<RoleId>,
     /// The session that authored the TRANSITION (recorded as actor.session_id)
     #[arg(long = "session", value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
@@ -131,7 +131,7 @@ pub struct FindingListArgs {
     pub repo: crate::cli::RepoArgs,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// With --json, keep only these members of each finding (comma-separated field paths: severity, disposition, reviewer, summary, resolutionSha, fileRef, reason; round and seq are always kept)
+    /// With --json, keep only these members of each finding (comma-separated field paths: severity, disposition, reviewer, summary, resolutionSha, fileRef, reason, closedBy, closedRole; round and seq are always kept)
     #[arg(long, value_name = "FIELDS")]
     pub fields: Option<String>,
 }

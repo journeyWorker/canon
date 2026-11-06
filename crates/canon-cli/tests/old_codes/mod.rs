@@ -28,7 +28,7 @@ static GONE: LazyLock<Vec<&'static str>> =
 
 /// The error codes the registry gained after the 0.36 table closed (the table lists the 179 codes of 0.35 and what became of each): a code born later
 /// has no row and the CHANGELOG section of 0.36 does not say it; the CHANGELOG entry of the release that added it does.
-pub const ADDED_AFTER_0_36: &[&str] = &["ARTIFACTS_PRUNE_INCOMPLETE"];
+pub const ADDED_AFTER_0_36: &[&str] = &["ARTIFACTS_PRUNE_INCOMPLETE", "FINDING_ROLE_DENIED"];
 
 /// The 0.35 registry: `(code, exit, retryable)`, in the order of the fixture.
 pub fn registry_0_35() -> &'static [(&'static str, u8, bool)] {

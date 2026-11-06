@@ -8,7 +8,7 @@ Feature: finding list
   Scenario: A change's committed findings list one row each at their latest version
     Given a change with a blocker raised open and later closed rejected, an open should-fix, a staged finding, and a finding on another change
     When canon finding list --change runs for that change
-    Then it prints a header and one row per committed finding with round, seq, severity, disposition, reviewer and summary, ordered by round and seq
+    Then it prints a header and one row per committed finding with round, seq, severity, disposition, reviewer, the closer and summary, ordered by round and seq
     And the closed finding shows rejected, its latest disposition
     And the other change's finding is not listed
     And the staged finding is not listed but named on stderr with canon gate promote

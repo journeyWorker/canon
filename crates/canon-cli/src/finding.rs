@@ -487,6 +487,18 @@ fn authoring_actor(actor_id: &str, role: &RoleId, session_id: Option<&SessionId>
     }
 }
 
+/// The envelope actor of a close: the role when one is declared, none otherwise.
+fn closing_actor(actor_id: &str, role: Option<&RoleId>, session_id: Option<&SessionId>) -> Actor {
+    let actor = match role {
+        Some(role) => Actor::new(actor_id, role.clone()),
+        None => Actor::new_unattributed(actor_id),
+    };
+    match session_id {
+        Some(session_id) => actor.with_session(session_id.clone()),
+        None => actor,
+    }
+}
+
 /// `canon finding add`: the finding staged or committed.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -541,6 +553,10 @@ pub struct FindingRow<'a> {
     pub resolution_sha: Option<&'a str>,
     pub file_ref: Option<&'a str>,
     pub reason: Option<&'a str>,
+    /// Who closed it (0.38): the actor of the closing version; absent while the finding is open.
+    pub closed_by: Option<&'a str>,
+    /// The role the closing version was recorded under; absent while open, and for a close that declared none.
+    pub closed_role: Option<&'a str>,
 }
 
 /// `canon finding list`: a change's findings; paging is in `meta`.
@@ -816,7 +832,9 @@ pub struct FindingCloseArgs {
     /// `deferred`, optional otherwise, always one line.
     pub reason: Option<String>,
     pub actor_id: String,
-    pub role: RoleId,
+    /// `--role`: the role the close is attributed to, when it was given. Never defaulted (0.38): the role recorded is the declared one
+    /// (`--as` / `CANON_ROLE`), else this, else none ([`closing_role`]).
+    pub role: Option<RoleId>,
     /// The session that authored the transition, recorded as
     /// `actor.session_id`.
     pub session_id: Option<SessionId>,
@@ -824,6 +842,39 @@ pub struct FindingCloseArgs {
     pub promote: crate::write_mode::PromoteFlag,
     /// `--json`: one JSON document on stdout, every human line on stderr.
     pub json: bool,
+}
+
+/// The role a close is recorded under (0.38): the declared role (`--as`, else `CANON_ROLE`); `--role` only when it names that same role,
+/// or when nothing is declared; none when neither is given. A role is never invented.
+fn closing_role(role_flag: Option<&RoleId>) -> Result<Option<RoleId>, CliError> {
+    let declared = crate::role::Role::current(None);
+    match (declared, role_flag) {
+        (Some(declared), Some(flag)) if flag.as_str() != declared.as_str() => Err(CliError::refused(
+            "FINDING_ARGUMENT_INVALID",
+            format!("--role {flag} names a different role from the declared one (`{declared}`, from --as or CANON_ROLE); the record carries the declared role"),
+        )
+        .hint(format!("drop --role, or pass --role {declared}"))
+        .field("--role")),
+        (Some(declared), _) => Ok(Some(RoleId::parse(declared.as_str()).expect("a role name is a valid role id"))),
+        (None, flag) => Ok(flag.cloned()),
+    }
+}
+
+/// The refusal of a `rejected` or `deferred` close made under a role other than `reviewer`: overturning the judgement of whoever raised the
+/// finding is the reviewer's, and the refusal writes nothing, so the finding stays open and a blocker keeps blocking the gate.
+fn closer_not_reviewer(args: &FindingCloseArgs, role: &RoleId) -> CliError {
+    CliError::refused(
+        "FINDING_ROLE_DENIED",
+        format!("`finding close --disposition {}` is the reviewer's, and this call declares the `{role}` role; the finding stays open", args.disposition.as_str()),
+    )
+    .hint(format!(
+        "leave the finding to a reviewer (`canon finding close {} --round {} --seq {} --disposition {} --reason \"<why>\" --as reviewer`), or, if you fixed it, close it with --disposition fixed",
+        args.change_id,
+        args.round,
+        args.seq,
+        args.disposition.as_str()
+    ))
+    .field("--disposition")
 }
 
 /// The command shape `FINDING_REASON_REQUIRED`'s hint shows: this close,
@@ -874,6 +925,17 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
         return CliError::refused("FINDING_ARGUMENT_INVALID", format!("--round and --seq are 1-based (got --round {} --seq {}); no finding was ever authored under a 0",
             args.round, args.seq
         )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").field(if args.round == 0 { "--round" } else { "--seq" }).emit("canon finding close", args.json);
+    }
+
+    // The role the record will carry, and who may close what (0.38): refused before anything is read or written.
+    let closer = match closing_role(args.role.as_ref()) {
+        Ok(role) => role,
+        Err(refusal) => return refusal.emit("canon finding close", args.json),
+    };
+    if let Some(role) = &closer {
+        if role.as_str() != "reviewer" && matches!(args.disposition, FindingDisposition::Rejected | FindingDisposition::Deferred) {
+            return closer_not_reviewer(args, role).emit("canon finding close", args.json);
+        }
     }
 
     // The same coherence pair `add` enforces, in this command's own
@@ -981,7 +1043,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     // this, and stamping the original author's `at` would lose exactly
     // the fact that makes the pair a history.
     let mut transitioned = Finding::new(
-        Envelope::current(RecordKind::Finding, Utc::now(), authoring_actor(&args.actor_id, &args.role, args.session_id.as_ref())),
+        Envelope::current(RecordKind::Finding, Utc::now(), closing_actor(&args.actor_id, closer.as_ref(), args.session_id.as_ref())),
         existing.change_id.clone(),
         existing.round,
         existing.seq,
@@ -1154,6 +1216,8 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> u8 {
             resolution_sha: f.resolution_sha().map(canon_model::Sha::as_str),
             file_ref: f.file_ref.as_deref(),
             reason: f.reason.as_deref(),
+            closed_by: closer_of(f).map(|actor| actor.agent_id.as_str()),
+            closed_role: closer_of(f).and_then(|actor| actor.role.as_ref()).map(RoleId::as_str),
         });
         crate::json_out::data_with_meta("finding list", &FindingListReport { change_id: args.change_id.as_str(), findings: rows.collect() }, meta.to_json());
     } else if findings.is_empty() {
@@ -1171,12 +1235,17 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> u8 {
     0
 }
 
+/// The actor of the version that closed `finding`; `None` while it is open.
+fn closer_of(finding: &Finding) -> Option<&Actor> {
+    (finding.disposition() != FindingDisposition::Open).then_some(&finding.envelope.actor)
+}
+
 /// One header row and one row per finding, columns padded to their
 /// widest cell; the summary, last, is never padded and carries the
 /// closing reason, when there is one, as a trailing `[reason: …]`.
 fn render_finding_table(findings: &[Finding]) -> String {
-    const LIST_COLUMNS: usize = 6;
-    let header: [&str; LIST_COLUMNS] = ["round", "seq", "severity", "disposition", "reviewer", "summary"];
+    const LIST_COLUMNS: usize = 7;
+    let header: [&str; LIST_COLUMNS] = ["round", "seq", "severity", "disposition", "reviewer", "closed by", "summary"];
     let rows: Vec<[String; LIST_COLUMNS]> = findings
         .iter()
         .map(|f| {
@@ -1186,6 +1255,13 @@ fn render_finding_table(findings: &[Finding]) -> String {
                 severity_slug(f.severity).to_string(),
                 f.disposition().as_str().to_string(),
                 f.reviewer.clone(),
+                match closer_of(f) {
+                    Some(actor) => match &actor.role {
+                        Some(role) => format!("{} ({role})", actor.agent_id),
+                        None => actor.agent_id.clone(),
+                    },
+                    None => "-".to_string(),
+                },
                 match &f.reason {
                     Some(reason) => format!("{} [reason: {reason}]", f.summary),
                     None => f.summary.clone(),
@@ -1214,7 +1290,7 @@ fn render_finding_table(findings: &[Finding]) -> String {
     };
     let mut out = line(header);
     for row in &rows {
-        out.push_str(&line([&row[0], &row[1], &row[2], &row[3], &row[4], &row[5]]));
+        out.push_str(&line([&row[0], &row[1], &row[2], &row[3], &row[4], &row[5], &row[6]]));
     }
     out
 }
@@ -1630,7 +1706,7 @@ mod tests {
             resolution_rev: None,
             reason: matches!(disposition, FindingDisposition::Rejected | FindingDisposition::Deferred).then(|| "by design".to_string()),
             actor_id: "canon".to_string(),
-            role: RoleId::parse("reviewer").unwrap(),
+            role: Some(RoleId::parse("reviewer").unwrap()),
             session_id: None,
             promote: crate::write_mode::PromoteFlag::Config,
             json: false,

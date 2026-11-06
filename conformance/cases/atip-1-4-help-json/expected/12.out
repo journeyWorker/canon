@@ -15,7 +15,7 @@ Options:
       --resolution-rev <REV>       The commit that closed it, any git revision (resolved to the full sha, with the code tree it saw). Permitted only with --disposition fixed, where it defaults to HEAD. Existence only; canon never reads the commit's message or diff
       --reason <TEXT>              Why it was closed, one line. Required for rejected and deferred, optional for fixed; stored on the closing version and shown by `finding list`
       --actor <ACTOR_ID>           The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes [default: canon]
-      --role <ROLE>                Attribution only — no partition key derives from it [default: reviewer]
+      --role <ROLE>                The role the close is recorded under: the declared one (--as, CANON_ROLE), and --role only when it names that role or none is declared; no role is recorded when neither is given. Only a reviewer closes as rejected or deferred
       --session <SESSION_ID>       The session that authored the TRANSITION (recorded as actor.session_id)
       --promote                    Promote the record this run staged, in the same run; records others staged stay staged (the default under canon.yaml `write: { promote: auto }`)
       --no-promote                 Keep this write staged even under canon.yaml `write: { promote: auto }`

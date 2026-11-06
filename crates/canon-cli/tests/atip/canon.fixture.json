@@ -1346,6 +1346,11 @@
       "retryable": false
     },
     {
+      "code": "FINDING_ROLE_DENIED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "FORMAT_CHECK_FAILED",
       "exit": 1,
       "retryable": false

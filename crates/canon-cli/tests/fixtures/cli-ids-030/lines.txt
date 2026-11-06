@@ -27,7 +27,7 @@ review scenario demo.login.01 --project-id root --actor-id rev-1 --session-id s-
 review change add-login --project-id root --actor-id rev-1 --session-id s-3 --role reviewer --original-spec-ref brief.md --json
 finding add --change-id add-login --round 1 --seq 1 --severity note --actor-id rev-1 --session-id s-3 --scenario-id demo.login.01 --summary "Token is logged" --json
 finding add --change-id add-login --round 1 --seq 2 --severity note --actor-id rev-1 --session-id s-3 --review-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --summary "Unknown review" --json
-finding close add-login --round 1 --seq 1 --disposition rejected --reason "accepted" --actor-id impl-1 --session-id s-2 --json
+finding close add-login --round 1 --seq 1 --disposition rejected --reason "accepted" --actor-id impl-1 --session-id s-2 --role reviewer --json
 gate promote --json
 finding list --change-id add-login --json
 query --kind change --change-id add-login --json

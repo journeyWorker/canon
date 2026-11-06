@@ -37,6 +37,7 @@ pub const SITES: &[Site] = &[
     site("finding.rs:check_add:FINDING_INTRODUCED_REQUIRED#1", Kind::Validator { command: "finding add", arguments: &["severity", "introduced-rev", "introduced-unknown"] }),
     site("finding.rs:run_add:FINDING_ARGUMENT_INVALID#1", Kind::Unreachable("the natural key is built from the change id, round and seq, which the parser and the round/seq domain already hold to the key's grammar")),
     site("finding.rs:run_close:FINDING_ARGUMENT_INVALID#1", Kind::Domain { command: "finding close", argument: "round" }),
+    site("finding.rs:closing_role:FINDING_ARGUMENT_INVALID#1", Kind::Precondition("reads the declared role (--as, CANON_ROLE): --role must name it")),
     site("finding.rs:run_close:FINDING_RESOLUTION_REV_CONFLICT#1", Kind::Rule { command: "finding close", rule: "forbids", arguments: &["disposition", "resolution-rev"] }),
     site("finding.rs:run_close:FINDING_REASON_REQUIRED#1", Kind::Rule { command: "finding close", rule: "requires", arguments: &["disposition", "reason"] }),
     site("finding.rs:run_close:FINDING_REASON_REQUIRED#2", Kind::Domain { command: "finding close", argument: "reason" }),

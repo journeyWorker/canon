@@ -325,6 +325,9 @@ covered for the ship guard and stays listed as `accepted-divergence` in
   (`FINDING_REASON_REQUIRED`), and `finding list` shows it as
   `[reason: …]` so the next reader sees why it was not fixed. Closing a
   finding that already has that disposition is `unchanged`.
+  Only you close a finding `rejected` or `deferred`: another role is refused
+  (`FINDING_ROLE_DENIED`), so declare `--as reviewer`; the close records
+  that role.
 - Sign off in one batch with `review scenario <ids>`, all or nothing. It writes
   directly; nothing to promote. canon stores and re-checks attached bytes
   and never compares images.
