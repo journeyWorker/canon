@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-code-scopes",
+    "role": "reviewer",
+    "session_id": "s-0-38-scopes-rev"
+  },
+  "at": "2026-11-06T09:02:32.054138Z",
+  "change_id": "canon-0-38-code-scopes",
+  "code_tree": "af18f64671d77216c1a5909f38f49ea887c0f9a8",
+  "disposition": "open",
+  "file_ref": "canon/skills/reference/canon-gate.md:277",
+  "introduced_by": "54482e63c51c10515389f9612703f74582b6c53e",
+  "kind": "finding",
+  "reviewed_sha": "54482e63c51c10515389f9612703f74582b6c53e",
+  "reviewer": "rev-0-38-code-scopes",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "canon-gate.md and the CHANGELOG say 'an agent cannot widen' the scopes, true only for an edit after the approval (POLICY_APPROVAL_STALE). An agent can narrow code_scopes before the chore is approved and `canon brief approve` records the policy's approval in the same call (verified: 'policy approval recorded too'), so the human's one answer covers scopes they were not shown. Mitigation exists (status chore line and gate advisory chore_code_scopes name the exempted keys); say it in the guide, or show the code_scopes in the approval prompt. Not a defect of the rule. Symlinks are not followed (a symlink app/corelink -> ../core: a core edit exempts app, the link path itself is a change), consistent with the documented 'scope narrower than the real dependencies'.",
+  "worktree_dirty": false
+}

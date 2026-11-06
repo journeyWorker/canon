@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-code-scopes",
+    "role": "reviewer",
+    "session_id": "s-0-38-scopes-rev"
+  },
+  "at": "2026-11-06T09:02:30.295166Z",
+  "change_id": "canon-0-38-code-scopes",
+  "code_tree": "af18f64671d77216c1a5909f38f49ea887c0f9a8",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/cli_error.rs:639",
+  "introduced_by": "54482e63c51c10515389f9612703f74582b6c53e",
+  "kind": "finding",
+  "reviewed_sha": "54482e63c51c10515389f9612703f74582b6c53e",
+  "reviewer": "rev-0-38-code-scopes",
+  "round": 1,
+  "scenario_ids": [
+    "gate.code-scopes.10"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "CODE_SCOPES_UNMATCHED says 'a scope that matches nothing exempts nothing', but the binary does the opposite: a key none of whose patterns matches a changed path is let go by every chore, so a pattern misspelled (`Core/**` for `core/`; matching is byte-exact, also on case-insensitive macOS) or an empty list (`core: []`, neither malformed nor warned) exempts its scenarios for good and only a warning (none for []) says so. Reproduced: scopes core:[\"Core/**\"], chore edits core/lib.rs, the ship asks for no core evidence, status warns the pattern matches no file. Reword the meaning (cli_error.rs, docs/cli/canon.cli.json) to say a scope that matches nothing exempts everything, or fail closed (a key none of whose patterns matches a file has no scope; [] malformed). Blast radius: same fail-open for every policy edit between approvals, and brief approve approves the policy in the same answer as the chore brief, so the human sees the scopes only through the chore line's keys.",
+  "worktree_dirty": false
+}
