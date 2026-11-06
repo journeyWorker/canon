@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-code-scopes",
+    "role": "implementer",
+    "session_id": "s-0-38-code-scopes"
+  },
+  "at": "2026-11-06T08:36:37.569503Z",
+  "attachments": [
+    {
+      "case": "gate_code_scopes_04_a_chore_that_changes_core_asks_the_core_and_the_app_scenarios",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "3bc08f83607ebde4a929e37cb7d16345b43b18d77be49e87eef18417e7c2ae49"
+    }
+  ],
+  "code_tree": "af18f64671d77216c1a5909f38f49ea887c0f9a8",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "54482e63c51c10515389f9612703f74582b6c53e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "gate.code-scopes.04",
+  "schema": 1,
+  "staging_id": "e2f9ad9a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
