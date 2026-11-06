@@ -1,0 +1,44 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T06:59:05.557667Z",
+  "attachments": [
+    {
+      "case": "read_cause::tests::atip_reasons_11_only_a_read_the_system_failed_for_a_repeat_to_pass_is_unavailable_before_work",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    },
+    {
+      "case": "atip_reasons_11_a_migrate_whose_reads_fail_for_a_repeat_to_pass_is_unavailable_and_a_missing_canon_yaml_is_still_required",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    },
+    {
+      "case": "atip_reasons_11_a_query_whose_ledger_read_fails_for_a_repeat_to_pass_is_repo_unavailable_not_query_failed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    }
+  ],
+  "code_tree": "343ae09e077298bd79ea2fccffff72977da2da07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "5b4b203bc0f8c5745f15e055fcbc054cc649d085",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 165,
+  "scenario_id": "atip.reasons.11",
+  "schema": 1,
+  "staging_id": "03722ea0",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

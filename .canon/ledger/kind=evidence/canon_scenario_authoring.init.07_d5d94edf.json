@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T07:16:25.380895Z",
+  "attachments": [
+    {
+      "case": "init_no_agents_md_and_no_policy_skip_those_files",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "72552074692944d2c2edbd482bd725a9b9381fec7df88322ed2f403f3d96b157"
+    }
+  ],
+  "code_tree": "343ae09e077298bd79ea2fccffff72977da2da07",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "canon-0-38 test-determinism: the same cases re-run on the merged tree (cargo nextest run --workspace, 3887 tests, no role or actor declared)"
+  },
+  "evidence_sha": "5b4b203bc0f8c5745f15e055fcbc054cc649d085",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 807,
+  "scenario_id": "authoring.init.07",
+  "schema": 1,
+  "staging_id": "7906ca12",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}
