@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-provider-option",
+    "role": "implementer",
+    "session_id": "s-0-38-provider-option"
+  },
+  "at": "2026-11-06T15:46:01.123816Z",
+  "attachments": [
+    {
+      "case": "atip_provideroption_06_check_and_doctor_refuse_what_install_refuses",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ca3fd617961e15ed20451c359c630308e4357f13b8be1685ff33349b195923ac"
+    }
+  ],
+  "code_tree": "8a252e1cbceee75036a06bcb5a4d605274152096",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "a82e2ed3bda0f3c460f91cf4dbffb650a1f2ec68",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "atip.provideroption.06",
+  "schema": 1,
+  "staging_id": "aa0696b5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

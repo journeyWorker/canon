@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-provider-option",
+    "role": "implementer",
+    "session_id": "s-0-38-provider-option"
+  },
+  "at": "2026-11-06T15:45:58.177231Z",
+  "attachments": [
+    {
+      "case": "atip_provideroption_02_a_name_that_is_not_one_of_the_four_is_refused_with_its_choices_and_nothing_is_written",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "ca3fd617961e15ed20451c359c630308e4357f13b8be1685ff33349b195923ac"
+    }
+  ],
+  "code_tree": "8a252e1cbceee75036a06bcb5a4d605274152096",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "a82e2ed3bda0f3c460f91cf4dbffb650a1f2ec68",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "atip.provideroption.02",
+  "schema": 1,
+  "staging_id": "0610757e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
