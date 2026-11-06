@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-date-refusals",
+    "role": "implementer",
+    "session_id": "s-0-38-date-refusals"
+  },
+  "at": "2026-11-06T17:14:47.832198Z",
+  "attachments": [
+    {
+      "case": "atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refused_in_the_twelve_places_and_says_what_does_not_exist",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "377b2855faeda9d36881a00eec524f6de3675f17bfc4c7db71ba687fa98eb6db"
+    }
+  ],
+  "code_tree": "ca57826d766b036bf5441d11c4f7f646f7454fb5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "atip.daterefusals.02",
+  "schema": 1,
+  "staging_id": "84daa508",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

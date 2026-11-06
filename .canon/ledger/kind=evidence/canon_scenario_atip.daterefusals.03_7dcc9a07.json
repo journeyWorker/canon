@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-date-refusals",
+    "role": "implementer",
+    "session_id": "s-0-38-date-refusals"
+  },
+  "at": "2026-11-06T17:14:48.617145Z",
+  "attachments": [
+    {
+      "case": "atip_daterefusals_03_a_misspelled_value_keeps_the_spelling_refusal_of_0_37",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "377b2855faeda9d36881a00eec524f6de3675f17bfc4c7db71ba687fa98eb6db"
+    }
+  ],
+  "code_tree": "ca57826d766b036bf5441d11c4f7f646f7454fb5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 3,
+  "scenario_id": "atip.daterefusals.03",
+  "schema": 1,
+  "staging_id": "1b4ef2e3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
