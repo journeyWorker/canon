@@ -10,7 +10,7 @@ Feature: atip daterefusals
   Scenario: A second of 60 is refused in the twelve time places whatever the time, and the second before and the next day are taken
     Given 2030-01-01T23:59:60Z, 1998-12-31T23:59:60Z, 2030-01-01T10:00:60Z, a second of 60 with a fraction and with an offset, and 23:59:59 and the next day's 00:00:00Z
     When each is given to the twelve places that read a time
-    Then every second of 60 is refused with USAGE and exit 2 naming the option, the value as received and the same instant written as the next 00:00:00Z, nothing is written, and the two taken values pass as before
+    Then every second of 60 is refused with USAGE and exit 2 naming the option, the value as received and the same instant written as the second after the preceding second (23:59:60Z names the next day's 00:00:00Z, 10:00:60Z names 10:01:00Z, a following second past year 9999 names none), nothing is written, and the two taken values pass as before
 
   # canon: {"schema":1,"at":"2026-11-06T16:46:39Z","actor":{"agent_id":"impl-date-refusals","role":"implementer","session_id":"s-0-38-date-refusals"}}
   @subject:atip-schema
@@ -43,7 +43,7 @@ Feature: atip daterefusals
   Scenario: The CHANGELOG lists the leap second as a breaking change and the new sentence as a change
     Given the CHANGELOG of the unreleased entry
     When its Breaking table and its Changed list are read
-    Then a row names the refused second of 60 and the next day's midnight as the way to move, and a Changed entry says the refusal names what does not exist
+    Then a row names the refused second of 60 and the second after the preceding second as the way to move, and a Changed entry says the refusal names what does not exist
 
   # canon: {"schema":1,"at":"2026-11-06T16:47:42Z","actor":{"agent_id":"impl-date-refusals","role":"implementer","session_id":"s-0-38-date-refusals"}}
   @subject:atip-schema
@@ -52,6 +52,6 @@ Feature: atip daterefusals
   @flow:canon-0-38-date-refusals.F4
   @atip.daterefusals.05
   Scenario: Without the row of the leap second or the entry of the new sentence, the check of the CHANGELOG fails
-    Given the CHANGELOG with the row of the leap second taken out, with its way to move taken out, and with the entry of the new sentence taken out
+    Given the CHANGELOG with the row of the leap second taken out, with its way to move (the second after the preceding second) taken out, and with the entry of the new sentence taken out
     When the check of the CHANGELOG reads each
     Then each is reported as a missing row, a missing way to move or a missing entry, and the CHANGELOG as it is passes

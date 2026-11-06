@@ -933,6 +933,11 @@ fn place_call(option: &str, command: &str, value: &str) -> Vec<String> {
 
 /// Every `(option, command)` of the twelve places, with the call of a value there refused with `USAGE` for the option and nothing written; its message.
 fn refused_in_every_place(value: &str) -> Vec<(String, String)> {
+    refused_places(value).into_iter().map(|(_, command, message)| (command, message)).collect()
+}
+
+/// [`refused_in_every_place`] with the option of each place: `(option, command, message)`.
+fn refused_places(value: &str) -> Vec<(String, String, String)> {
     let places = places();
     assert_eq!(places.len(), 12);
     places
@@ -944,7 +949,7 @@ fn refused_in_every_place(value: &str) -> Vec<(String, String)> {
             assert_eq!((got.exit, got.code(), got.field()), (2, "USAGE", format!("--{option}").as_str()), "`canon {command} --{option} {value}`: {}", got.envelope);
             assert_eq!(got.envelope["error"]["received"], value, "`canon {command} --{option} {value}`: {}", got.envelope);
             assert!(got.changed.is_empty(), "`canon {command} --{option} {value}` wrote {:?}", got.changed);
-            (command.to_string(), got.envelope["error"]["message"].as_str().unwrap_or_default().to_string())
+            (option.to_string(), command.to_string(), got.envelope["error"]["message"].as_str().unwrap_or_default().to_string())
         })
         .collect()
 }
@@ -956,9 +961,24 @@ fn atip_daterefusals_01_a_leap_second_is_refused_in_the_twelve_places_and_the_se
             assert!(message.contains("leap second") && message.contains("is not accepted"), "`{command}` {value}: {message}");
         }
     }
-    // The next day's midnight is the spelling the refusal gives.
-    let messages = refused_in_every_place("2030-01-01T23:59:60Z");
-    assert!(messages.iter().all(|(_, message)| message.contains("`2030-01-02T00:00:00Z`")), "{messages:?}");
+    // The refusal names the second after the preceding second, in UTC, in every place: the next midnight only after a `23:59:59Z` second.
+    for (value, named) in [
+        ("2030-01-01T23:59:60Z", "2030-01-02T00:00:00Z"),
+        ("1998-12-31T23:59:60Z", "1999-01-01T00:00:00Z"),
+        ("2030-01-01T10:00:60Z", "2030-01-01T10:01:00Z"),
+        ("2030-01-01T23:59:60.5Z", "2030-01-02T00:00:00.500Z"),
+        ("2030-01-01T23:59:60+01:00", "2030-01-01T23:00:00Z"),
+    ] {
+        for (command, message) in refused_in_every_place(value) {
+            assert!(message.ends_with(&format!("the same instant is written `{named}`")), "`{command}` {value}: {message}");
+        }
+    }
+    // Past 9999-12-31 the following second has no spelling, and none is offered.
+    for value in ["9999-12-31T23:59:60Z", "9999-12-31T23:59:60-01:00"] {
+        for (command, message) in refused_in_every_place(value) {
+            assert!(message.contains("cannot be written") && !message.contains("+10000") && !message.contains("same instant is written"), "`{command}` {value}: {message}");
+        }
+    }
     for (option, commands) in DATE_OPTIONS {
         for command in commands {
             for value in ["2030-01-01T23:59:59Z", "2030-01-02T00:00:00Z"] {
@@ -1005,12 +1025,20 @@ fn atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refuse
     canon_cli::timestamp::parse("2028-02-29").expect("a day of the calendar");
 }
 
+/// What 0.37.0 said of a misspelled time given to `--option`: the sentence of its declared domain.
+fn spelling_sentence(option: &str) -> String {
+    if option == "approval-at" {
+        "--approval-at is an invalid timestamp: an RFC 3339 date-time (`2030-01-01T10:00:00Z`) is expected; a date alone is refused".to_string()
+    } else {
+        format!("--{option} is an invalid timestamp: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`) is expected")
+    }
+}
+
 #[test]
 fn atip_daterefusals_03_a_misspelled_value_keeps_the_spelling_refusal_of_0_37() {
     for value in ["2026-2-30", "2026-02-30 10:00:00Z", "2030-1-1T10:00:00Z"] {
-        for (command, message) in refused_in_every_place(value) {
-            assert!(message.contains("RFC 3339"), "`{command}` {value}: {message}");
-            assert!(!message.contains("does not exist"), "`{command}` {value}: {message}");
+        for (option, command, message) in refused_places(value) {
+            assert_eq!(message, spelling_sentence(&option), "`{command}` {value}");
         }
     }
 }
@@ -1022,7 +1050,7 @@ fn leap_second_problems(changelog: &str) -> Vec<String> {
     let mut problems = Vec::new();
     match section("Breaking").lines().find(|line| line.starts_with("| `2030-01-01T23:59:60Z`")) {
         None => problems.push("no row of the leap second in the Breaking table".to_string()),
-        Some(row) if !(row.contains("refused") && row.contains("write the next day's `00:00:00Z`")) => problems.push(format!("the row of the leap second has no refusal or no way to move: {row}")),
+        Some(row) if !(row.contains("refused") && row.contains("write the second after the preceding second")) => problems.push(format!("the row of the leap second has no refusal or no way to move: {row}")),
         Some(_) => {}
     }
     if !section("Changed").contains("says what does not exist") {
@@ -1041,7 +1069,7 @@ fn atip_daterefusals_05_the_check_of_the_changelog_fails_without_the_row_or_the_
     let changelog = read("CHANGELOG.md");
     let without_row: String = changelog.lines().filter(|line| !line.starts_with("| `2030-01-01T23:59:60Z`")).collect::<Vec<_>>().join("\n");
     assert!(leap_second_problems(&without_row).iter().any(|problem| problem.contains("no row of the leap second")));
-    let without_move = changelog.replace("write the next day's `00:00:00Z`", "write another time");
+    let without_move = changelog.replace("write the second after the preceding second", "write another time");
     assert!(leap_second_problems(&without_move).iter().any(|problem| problem.contains("no way to move")));
     let without_entry = changelog.replace("says what does not exist", "says something");
     assert!(leap_second_problems(&without_entry).iter().any(|problem| problem.contains("no Changed entry")));

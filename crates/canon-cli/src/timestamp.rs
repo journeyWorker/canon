@@ -10,9 +10,9 @@
 //! other separator, no white space around the value and no other character for the minus of an offset. That the date and the time exist
 //! (`2026-02-30`, 25:00, `+24:00`) is the calendar's: [`parse`] and [`parse_date_time`] refuse both after the shape, and say what does not
 //! exist ([`TimestampError::Missing`]). A second of 60 is refused in every time place (`canon-0-38-date-refusals`): canon's time is UTC without
-//! a table of leap seconds, and the instant one second after `23:59:59` has one spelling, the next day's `00:00:00Z`.
+//! a table of leap seconds, and the instant one second after the preceding second has one spelling, the one the refusal names.
 
-use chrono::{DateTime, Duration, SecondsFormat, Utc};
+use chrono::{DateTime, Datelike as _, Duration, SecondsFormat, Utc};
 
 /// A `<TIMESTAMP>` option value that is not the RFC 3339 spelling the option takes.
 #[derive(Debug, thiserror::Error)]
@@ -121,8 +121,11 @@ fn date_time(text: &str, wanted: &'static str) -> Result<DateTime<Utc>, Timestam
     let parse = |text: &str| DateTime::parse_from_rfc3339(text).map(|time| time.with_timezone(&Utc)).map_err(|source| TimestampError::Invalid { input: text.to_string(), wanted, source: Some(source) });
     if second == 60 {
         let same = parse(&format!("{}59{}", &text[..17], &text[19..])).ok().and_then(|time| time.checked_add_signed(Duration::seconds(1)));
-        let spelling = same.map_or_else(|| "the next second".to_string(), |time| format!("`{}`", time.to_rfc3339_opts(SecondsFormat::AutoSi, true)));
-        return Err(missing(text, format!("a leap second (second 60) is not accepted; the same instant is written {spelling}")));
+        // A following second outside the years 0000-9999 has no RFC 3339 spelling in UTC: the refusal names no instant then.
+        return Err(match same.filter(|time| (0..=9999).contains(&time.year())) {
+            Some(time) => missing(text, format!("a leap second (second 60) is not accepted; the same instant is written `{}`", time.to_rfc3339_opts(SecondsFormat::AutoSi, true))),
+            None => missing(text, "a leap second (second 60) is not accepted; the second after it is outside the years 0000-9999 and cannot be written".to_string()),
+        });
     }
     parse(text)
 }
@@ -195,6 +198,12 @@ mod tests {
         assert_eq!(parse("2030-01-01T23:59:60Z").unwrap_err().to_string(), "invalid timestamp `2030-01-01T23:59:60Z`: a leap second (second 60) is not accepted; the same instant is written `2030-01-02T00:00:00Z`");
         assert!(parse_date_time("2030-01-01T23:59:60.5Z").unwrap_err().to_string().ends_with("`2030-01-02T00:00:00.500Z`"));
         assert!(parse_date_time("2030-01-01T23:59:60+01:00").unwrap_err().to_string().ends_with("`2030-01-01T23:00:00Z`"));
+        // The following second past 9999-12-31 has no spelling: nothing is offered.
+        for text in ["9999-12-31T23:59:60Z", "9999-12-31T23:59:60-01:00"] {
+            let message = parse(text).unwrap_err().to_string();
+            assert!(message.contains("cannot be written") && !message.contains("+10000") && !message.contains("same instant is written"), "{message}");
+        }
+        assert!(parse("9999-12-31T22:59:60Z").unwrap_err().to_string().ends_with("`9999-12-31T23:00:00Z`"));
         assert_eq!(parse_date_time("2030-01-01T23:59:59Z").unwrap() + Duration::seconds(1), parse_date_time("2030-01-02T00:00:00Z").unwrap());
         assert_eq!(parse("2030-01-02T00:00:00Z").unwrap().to_rfc3339(), "2030-01-02T00:00:00+00:00");
     }

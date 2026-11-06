@@ -3,7 +3,9 @@
 //! canon reads `CANON_ROLE` and `CANON_ACTOR` from the environment, and an agent session that runs `cargo test` has both declared, so a
 //! test that inherits them answers differently per caller. Every test file that starts the binary takes its command from
 //! `support/hermetic.rs`, which carries neither variable; this test fails a file that does not. The suite itself is run under three
-//! callers (no role, an implementer with an actor, an unknown role) to see the result does not change.
+//! callers (no role, an implementer with an actor, an unknown role) to see the result does not change: `just test-callers` and the CI step
+//! "unit tests under three callers" run the unit tests (`--lib`) that way, which this file's scan cannot: a unit test reaches the role through
+//! `Role::current`, not through a command line.
 
 use std::path::{Path, PathBuf};
 

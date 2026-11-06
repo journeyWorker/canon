@@ -845,9 +845,9 @@ pub struct FindingCloseArgs {
 }
 
 /// The role a close is recorded under (0.38): the declared role (`--as`, else `CANON_ROLE`); `--role` only when it names that same role,
-/// or when nothing is declared; none when neither is given. A role is never invented.
-fn closing_role(role_flag: Option<&RoleId>) -> Result<Option<RoleId>, CliError> {
-    let declared = crate::role::Role::current(None);
+/// or when nothing is declared; none when neither is given. A role is never invented. `declared` is the caller's, which [`run_close`] reads
+/// and a unit test gives, so no test depends on the role of whoever runs it.
+fn closing_role(declared: Option<crate::role::Role>, role_flag: Option<&RoleId>) -> Result<Option<RoleId>, CliError> {
     match (declared, role_flag) {
         (Some(declared), Some(flag)) if flag.as_str() != declared.as_str() => Err(CliError::refused(
             "FINDING_ARGUMENT_INVALID",
@@ -913,6 +913,11 @@ fn reason_shape(args: &FindingCloseArgs) -> String {
 /// enforced at the authority and a hand-written body must clear the
 /// same bar as this command's output.
 pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
+    run_close_as(repo, args, crate::role::Role::current(None))
+}
+
+/// [`run_close`] for the caller `declared` (`--as`, else `CANON_ROLE`, else none).
+fn run_close_as(repo: &Path, args: &FindingCloseArgs, declared: Option<crate::role::Role>) -> u8 {
     let repo = resolve_repo_root(repo);
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
@@ -928,7 +933,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     }
 
     // The role the record will carry, and who may close what (0.38): refused before anything is read or written.
-    let closer = match closing_role(args.role.as_ref()) {
+    let closer = match closing_role(declared, args.role.as_ref()) {
         Ok(role) => role,
         Err(refusal) => return refusal.emit("canon finding close", args.json),
     };
@@ -1451,6 +1456,11 @@ mod tests {
     use std::process::Command;
     use super::*;
 
+    /// A close by a caller who declared no role, whoever runs the tests: the role of the environment is never read here.
+    fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
+        run_close_as(repo, args, None)
+    }
+
     #[test]
     fn the_value_parsers_refuse_in_their_old_words() {
         assert_eq!(parse_severity("minor").unwrap_err().to_string(), "`minor` is not a finding severity — expected one of: blocker, should-fix, note");
@@ -1881,6 +1891,19 @@ mod tests {
         close.resolution_rev = Some("b".repeat(40));
         assert_eq!(run_close(dir.path(), &close), 2);
         assert!(staged_bodies(dir.path()).is_empty());
+    }
+
+    /// A declared role that is not the reviewer's closes `rejected` and `deferred` nowhere, and the declared role is the caller's to give.
+    #[test]
+    fn a_declared_implementer_does_not_close_rejected_and_a_declared_reviewer_does() {
+        let (dir, _) = git_repo();
+        assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
+        promote_staged(dir.path());
+        let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Rejected);
+        close.role = None;
+        assert_eq!(run_close_as(dir.path(), &close, Some(crate::role::Role::Implementer)), 2);
+        assert!(staged_bodies(dir.path()).is_empty());
+        assert_eq!(run_close_as(dir.path(), &close, Some(crate::role::Role::Reviewer)), 0);
     }
 
     /// A finding is never reopened: `finding close` takes the three dispositions that close one, and a defect that came back is a new finding.

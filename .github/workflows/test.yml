@@ -142,6 +142,13 @@ jobs:
           mkdir -p "$CANON_WITNESS_DIR"
           cargo test --workspace --locked --offline
 
+      # The unit tests under three callers (none, an implementer with an actor, an unknown role): a test that reads CANON_ROLE or CANON_ACTOR fails in one of them.
+      - name: unit tests under three callers
+        run: |
+          env -u CANON_ROLE -u CANON_ACTOR cargo test --workspace --lib --locked --offline
+          env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test --workspace --lib --locked --offline
+          env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test --workspace --lib --locked --offline
+
       - name: every declared output was emitted by the suite (witness)
         env:
           CANON_WITNESS_DIR: ${{ runner.temp }}/canon-witness

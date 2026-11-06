@@ -26,6 +26,13 @@ install:
 test:
     cargo test --workspace --locked
 
+# The unit tests of the workspace under three callers: none, an implementer with an actor, and an unknown role. A unit test that reads the declared role
+# or actor from the environment (`closing_role` once did) answers differently in two of them and fails here; `tests/hermetic_env.rs` covers the tests that start the binary.
+test-callers:
+    env -u CANON_ROLE -u CANON_ACTOR cargo test --workspace --lib --locked
+    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test --workspace --lib --locked
+    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test --workspace --lib --locked
+
 # The three clippy runs of test.yml `clippy`.
 lint:
     cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -101,4 +108,4 @@ atip-deep:
     atip check --bin {{ target }}/debug/canon --level L2 --contract 1.5 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # Every CI check that needs no docker.
-ci: release-check lint test gate launcher platformer atip-deep
+ci: release-check lint test test-callers gate launcher platformer atip-deep
