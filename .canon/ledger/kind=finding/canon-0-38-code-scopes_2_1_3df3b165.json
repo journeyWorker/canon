@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-code-scopes",
+    "role": "reviewer",
+    "session_id": "s-0-38-scopes-rev"
+  },
+  "at": "2026-11-06T10:14:55.595983Z",
+  "change_id": "canon-0-38-code-scopes",
+  "code_tree": "49feaf5b29688ae566a123f9d8e79515099dc637",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/code_scopes.rs",
+  "introduced_by": "ce16ffaaaf2a9338b7610a370cd48b5a59d23836",
+  "kind": "finding",
+  "reviewed_sha": "ce16ffaaaf2a9338b7610a370cd48b5a59d23836",
+  "reviewer": "rev-0-38-code-scopes",
+  "round": 2,
+  "scenario_ids": [
+    "gate.code-scopes.16"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Two residuals of the round-2 fix, both inside what the briefs sanction: (1) the hold in changed_since_approval applies only when an approval already exists, so a policy nobody has approved (or whose policy.approval.json was removed) gets its first approval, scopes included, from the next brief approve (verified: approval file deleted, core scope edited, brief approve records 'policy approval recorded too'); the human is not shown the scopes there. (2) A key with one live pattern and one misspelt one stands (as scenario 14 requires), so the misspelt pattern's paths are let go with only a warning. Blast radius: a first policy approval and partially-typo'd keys, neither exercised by a test beyond scenario 14's live+dead case.",
+  "worktree_dirty": false
+}

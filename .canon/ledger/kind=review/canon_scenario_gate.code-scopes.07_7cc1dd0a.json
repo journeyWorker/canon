@@ -4,30 +4,30 @@
     "role": "reviewer",
     "session_id": "s-0-38-scopes-rev"
   },
-  "at": "2026-11-06T09:02:41.171788Z",
-  "code_tree": "af18f64671d77216c1a5909f38f49ea887c0f9a8",
+  "at": "2026-11-06T10:14:58.766108Z",
+  "code_tree": "49feaf5b29688ae566a123f9d8e79515099dc637",
   "kind": "review",
-  "pin": "54482e63c51c10515389f9612703f74582b6c53e",
+  "pin": "ce16ffaaaf2a9338b7610a370cd48b5a59d23836",
   "pins": {
     "checks": [
       {
         "checks": [
-          "junit:gate_code_scopes_13_a_changelog_without_the_entries_is_named_by_the_release_check"
+          "junit:gate_code_scopes_07_the_chore_line_says_how_many_scenarios_the_scopes_let_go_and_by_which_keys"
         ],
         "role": "implementer",
         "verdict": "faithful"
       }
     ],
-    "scenario_digest": "d4e6b03ad9826ad38abad5e003f281545f3ac91555864f520f6853df83d52fec",
+    "scenario_digest": "e3ad1aaf4a1c4322d5dbea99d3e801d154df818001b76d0cb4eaae814802be32",
     "scenario_digest_scope": "scenario"
   },
   "project_id": "canon",
   "provenance_ref": {
     "original_spec_ref": ".canon/changes/canon-0-38-code-scopes/brief.md"
   },
-  "review_id": "01M6R1H30K8KPY7BB8QB9V339S",
+  "review_id": "01M6R5NEYE12B9R27MGM8R94FR",
   "reviewer": "rev-0-38-code-scopes",
-  "scenario_id": "gate.code-scopes.13",
+  "scenario_id": "gate.code-scopes.07",
   "schema": 2,
   "worktree_dirty": false
 }
