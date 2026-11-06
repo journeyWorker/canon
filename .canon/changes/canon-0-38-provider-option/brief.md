@@ -116,12 +116,12 @@ Source: canon 이슈 #141의 첫째 항목(ATIP 저자의 요청), ATIP 태그 v
 
 ## Questions and assumptions
 
-- 결정: 제공자 없음은 스위치 `--no-provider`이다. 열거 값 `none`은 `none` 단독이라는 값 사이 규칙을 선언할 수 없고, `--input`의 빈 배열은 canon이 거절한다. 이미 `--no-policy`와 `--no-agents-md`가 같은 모양이다. 사람이 열거 값 `none`을 택하면 단독 규칙은 핸들러가 검사하고 선언은 이를 말하지 못한다.
+- 결정: 제공자 없음은 스위치 `--no-provider`이다. 열거 값 `none`은 `none` 단독이라는 값 사이 규칙을 선언할 수 없고, `--input`의 빈 배열은 canon이 거절한다. 이미 `--no-policy`와 `--no-agents-md`가 같은 모양이다.
 - 결정: 모르는 이름은 열거 단계의 `USAGE`로 거절한다. 이 옵션 때문에만 내보내던 `INIT_ARGUMENT_INVALID`와 `SKILLS_ARGUMENT_INVALID`의 사유는 코드 표에서 걷는다. 설정 파일의 모르는 이름은 지금의 사유를 그대로 쓴다.
 - 결정: 같은 이름을 두 번 적은 호출은 0.37처럼 받는다.
 - 결정: 옛 `--providers`는 별칭 없이 거절만 한다(annex-schema S1 7).
 - 결정: 설정 파일의 제공자 목록 키는 옵션이 아니어서 이 변경 밖이다.
-- 정책 질문: 이전에 받던 호출이 거절되므로 호출자에게 깨지는 변경이다. 스크립트, CI, 에이전트 안내문이 `--providers`를 쓰고 있으면 고쳐야 한다. 사람이 이 거절을 승인한다.
+- 결정: 이전에 받던 호출이 거절되므로 호출자에게 깨지는 변경이다. 스크립트, CI, 에이전트 안내문이 `--providers`를 쓰고 있으면 고쳐야 한다. CHANGELOG의 Breaking에 싣는다.
 
 ## Out of scope
 
