@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-provider-option",
+    "role": "reviewer",
+    "session_id": "s-0-38-provider-rev"
+  },
+  "at": "2026-11-06T16:28:52.417819Z",
+  "code_tree": "875c9f914de1bca7210b612ab7a7e4655f8f7f39",
+  "kind": "review",
+  "pin": "e8c8b9a693c2313b0d89bb3a13c7710d4d220a04",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:skills_install_54_doctor_names_a_stray_projection_and_check_does_not_fail_on_it"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "28a32bf48ba315638c866688c189a48a06bf78bda8303840c8112e28b27e97dc",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-provider-option/brief.md"
+  },
+  "review_id": "01M6RV22T1VM6BA1AQSSFJKS4Y",
+  "reviewer": "rev-0-38-provider-option",
+  "scenario_id": "skills.install.54",
+  "schema": 2,
+  "worktree_dirty": false
+}
