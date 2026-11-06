@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-artifacts-prune",
+    "role": "implementer",
+    "session_id": "s-0-38-artifacts-prune"
+  },
+  "at": "2026-11-06T07:54:56.089156Z",
+  "attachments": [
+    {
+      "case": "artifacts_prune_13_commit_without_a_plan_digest_is_refused",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0721107e5053fc9cf36f36e47bccb000ddc405f3c810dcccc7f0adabd83b6556"
+    }
+  ],
+  "code_tree": "a58a3c2b88cf1b42d407a8368a012ce999ec7491",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_sha": "62bfc312ee2f6f34d843e4f17bd8345231247f2f",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 13,
+  "scenario_id": "artifacts.prune.13",
+  "schema": 1,
+  "staging_id": "989255fe",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
