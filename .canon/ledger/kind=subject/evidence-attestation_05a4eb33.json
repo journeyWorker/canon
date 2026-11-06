@@ -1,0 +1,43 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-06T04:52:04.018555Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-loop",
+    "canon-0-31-fixes",
+    "canon-0-31-cli-ids",
+    "canon-0-33-atip-l0",
+    "canon-0-35-canon-stopped-midway",
+    "canon-0-38-artifacts-prune"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-38-orch"
+    },
+    "change": "canon-0-38-artifacts-prune",
+    "reason": "0.38 briefs approved"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-main",
+      "role": "orchestrator",
+      "session_id": "s-0-38-orch"
+    },
+    "reason": "0.38 briefs approved"
+  },
+  "subject_id": "evidence-attestation",
+  "summary": "",
+  "title": "Evidence: staged attributed attestation"
+}
