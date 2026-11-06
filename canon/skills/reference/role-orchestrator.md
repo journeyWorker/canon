@@ -214,7 +214,7 @@ canon ingest sessions --json
 ```
 ```text
 # Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
-usage: canon init [--check] [--no-agents-md | --check] [--policy <light|standard|strict> | --check | --no-policy] [--providers <LIST> | --check] [--language <TAG> | --check] [--dry-run | --check] [--input]
+usage: canon init [--check] [--no-agents-md | --check] [--policy <light|standard|strict> | --check | --no-policy] [--harness <claude|codex|omp|pi> | --check | --no-harness]* [--language <TAG> | --check] [--dry-run | --check] [--input]
 ```
 ```bash
 canon init --json
@@ -343,21 +343,21 @@ canon selftest --suite trust-spine-gate --json
 ```
 ```text
 # Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote
-usage: canon skills check [--skills-source <DIR>] [--providers <LIST>]
+usage: canon skills check [--skills-source <DIR>] [--harness <claude|codex|omp|pi> | --no-harness]*
 ```
 ```bash
 canon skills check --json
 ```
 ```text
-# Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits
-usage: canon skills doctor [--skills-source <DIR>] [--providers <LIST>]
+# Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a harness that is not selected, and other skills whose description claims build work; reports only, never edits
+usage: canon skills doctor [--skills-source <DIR>] [--harness <claude|codex|omp|pi> | --no-harness]*
 ```
 ```bash
 canon skills doctor --json
 ```
 ```text
 # Install the canonical `canon` bundle or legacy developer skills
-usage: canon skills install [--skills-source <DIR>] [--providers <LIST>] [--dry-run] [--input]
+usage: canon skills install [--skills-source <DIR>] [--harness <claude|codex|omp|pi> | --no-harness]* [--dry-run] [--input]
 ```
 ```bash
 canon skills install --json

@@ -106,7 +106,7 @@ fn fixture(home: &Path) -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
     git(repo, &["init", "-q", "."]);
-    ok(repo, home, &["init", "--providers", "none"]);
+    ok(repo, home, &["init", "--no-harness"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);

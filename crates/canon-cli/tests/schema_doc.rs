@@ -658,9 +658,9 @@ fn atip_schemadoc_05_an_option_that_an_environment_variable_fills_declares_it() 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
     assert!(option(command_doc("schema"), "as").get("env").is_none(), "schema's --as reads no variable");
     assert_eq!(option(command_doc("status"), "as")["env"], "CANON_ROLE");
-    assert_eq!(option(command_doc("skills install"), "providers")["defaultNote"].as_str().map(|note| note.contains("skills.providers")), Some(true));
+    assert_eq!(option(command_doc("skills install"), "harness")["defaultNote"].as_str().map(|note| note.contains("skills.providers")), Some(true));
     for command in ["skills check", "skills doctor"] {
-        assert!(option(command_doc(command), "providers").get("defaultNote").is_some(), "{command}");
+        assert!(option(command_doc(command), "harness").get("defaultNote").is_some(), "{command}");
     }
 }
 

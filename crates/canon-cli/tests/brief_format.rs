@@ -142,7 +142,7 @@ fn waive_comment(rule: &str, section: &str, reason: &str) -> String {
 /// A git repo made by `canon init`, with subject `demo`; nothing committed yet.
 fn repo(language: Option<&str>) -> TempDir {
     let dir = TempDir::new().unwrap();
-    let mut init = vec!["init", "--providers", "none"];
+    let mut init = vec!["init", "--no-harness"];
     if let Some(language) = language {
         init.extend(["--language", language]);
     }

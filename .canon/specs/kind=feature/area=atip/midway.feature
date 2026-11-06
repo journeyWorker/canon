@@ -58,8 +58,8 @@ Feature: atip: the INCOMPLETE codes of a command that stopped after its earlier 
   @atip.midway.06
   Scenario: A refusal with no effect is exit 2 with the refusal's own code, never INIT_INCOMPLETE
     Given a repository holding .pi and a skill source that does not exist
-    When canon init --dry-run --json runs, and canon init --providers with an unknown harness runs
-    Then the first exits 2 with SKILLS_SOURCE_NOT_FOUND and the second with INIT_ARGUMENT_INVALID, neither is INIT_INCOMPLETE and nothing is written
+    When canon init --dry-run --json runs, and canon init --harness with an unknown harness runs
+    Then the first exits 2 with SKILLS_SOURCE_NOT_FOUND and the second with USAGE, neither is INIT_INCOMPLETE and nothing is written
 
   # canon: {"schema":1,"at":"2026-11-02T09:40:24Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
   @subject:atip-contract

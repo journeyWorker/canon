@@ -447,17 +447,6 @@
         ]
       ]
     },
-    "init": {
-      "domainRejects": {
-        "providers": [
-          "Claude",
-          "claude,,pi",
-          "claude, pi",
-          "",
-          "none,claude"
-        ]
-      }
-    },
     "ledger compact": {
       "preview": [
         [
@@ -601,43 +590,6 @@
         "text": [
           "",
           " "
-        ]
-      }
-    },
-    "skills check": {
-      "domainRejects": {
-        "providers": [
-          "Core",
-          "-core",
-          "Claude",
-          "claude,,pi",
-          "claude, pi",
-          "",
-          "none,claude"
-        ]
-      }
-    },
-    "skills doctor": {
-      "domainRejects": {
-        "providers": [
-          "Core",
-          "-core",
-          "Claude",
-          "claude,,pi",
-          "claude, pi",
-          "",
-          "none,claude"
-        ]
-      }
-    },
-    "skills install": {
-      "domainRejects": {
-        "providers": [
-          "Claude",
-          "claude,,pi",
-          "claude, pi",
-          "",
-          "none,claude"
         ]
       }
     },
@@ -1413,7 +1365,6 @@
       "exit": 1,
       "reasons": [
         "CONFIG_INVALID",
-        "SKILLS_ARGUMENT_INVALID",
         "SKILLS_SOURCE_NOT_FOUND"
       ],
       "retryable": false

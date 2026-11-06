@@ -108,7 +108,7 @@ fn atip_l0_13_every_warning_the_status_report_produces_has_a_registered_code() {
 #[test]
 fn atip_l0_13_status_json_carries_coded_warnings_in_meta_and_plain_lines_in_data() {
     let dir = tempfile::TempDir::new().unwrap();
-    let init = hermetic::canon().args(["init", "--providers", "none", "--no-policy"]).current_dir(dir.path()).output().expect("spawn canon binary");
+    let init = hermetic::canon().args(["init", "--no-harness", "--no-policy"]).current_dir(dir.path()).output().expect("spawn canon binary");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     let out = hermetic::canon().args(["status", "--json"]).current_dir(dir.path()).output().expect("spawn canon binary");
     let document: Value = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {}", String::from_utf8_lossy(&out.stdout)));

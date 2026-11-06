@@ -69,7 +69,7 @@ fn old_spellings(text: &str) -> Vec<String> {
 fn repo_with_change() -> TempDir {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-q"]);
-    ok(dir.path(), &["init", "--repo", ".", "--no-policy", "--providers", "none"]);
+    ok(dir.path(), &["init", "--repo", ".", "--no-policy", "--no-harness"]);
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(dir.path(), &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     let brief_path = dir.path().join(".canon/changes/add-login/brief.md");
@@ -245,7 +245,7 @@ fn parity_transcript(binary: &Path, old_spelling: bool) -> String {
         masked(&text)
     };
     git(repo, &["init", "-q", "-b", "main"]);
-    let init = run(&["init", "--repo", ".", "--no-policy", "--providers", "none"].map(String::from));
+    let init = run(&["init", "--repo", ".", "--no-policy", "--no-harness"].map(String::from));
     assert!(init.status.success(), "{}{}", stdout(&init), stderr(&init));
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "init"]);
@@ -749,7 +749,7 @@ fn context_capability_56_every_command_line_canon_generates_uses_the_bare_spelli
     ok(repo, &["scenario", "new", "demo.login.01", "--title", "One", "--subject", "demo", "--change", "add-login", "--flow", "F1", "--case", "happy"]);
     let gated = tempfile::tempdir().unwrap();
     git(gated.path(), &["init", "-q"]);
-    ok(gated.path(), &["init", "--repo", ".", "--providers", "none"]);
+    ok(gated.path(), &["init", "--repo", ".", "--no-harness"]);
     ok(gated.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(gated.path(), &["scenario", "new", "demo.login.01", "--title", "One", "--subject", "demo", "--case", "happy"]);
     let two = repo_with_roots(&["game", "ui"]);

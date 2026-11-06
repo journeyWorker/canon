@@ -109,7 +109,7 @@ fn world() -> World {
         assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
     };
     git(&["init", "-q"]);
-    world.ok(&["init", "--providers", "none"]);
+    world.ok(&["init", "--no-harness"]);
     git(&["add", "-A"]);
     git(&["commit", "-q", "-m", "fixture"]);
     world.ok(&["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
@@ -297,7 +297,7 @@ fn atip_readwrites_04_every_dry_run_help_version_schema_and_skills_show_writes_n
     assert_eq!(world.snapshot(), before, "ingest sessions --dry-run wrote");
     // init previews in an empty directory, and `canon init` really would write there
     let empty = TempDir::new().unwrap();
-    let out = world.canon_in(empty.path(), &["init", "--providers", "none", "--dry-run", "--json"]);
+    let out = world.canon_in(empty.path(), &["init", "--no-harness", "--dry-run", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
     assert_eq!(std::fs::read_dir(empty.path()).unwrap().count(), 0, "init --dry-run wrote");
     assert_eq!(world.snapshot(), before);

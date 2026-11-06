@@ -71,7 +71,7 @@ fn repo() -> TempDir {
         let out = Command::new("git").args(args).current_dir(dir.path()).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
     }
-    ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-harness"]);
     dir
 }
 
@@ -232,13 +232,13 @@ fn atip_codesplit_03_ending_a_run_twice_is_a_conflict_with_the_reason_already_en
 }
 
 /// atip.codesplit.04: a malformed `skills:` or `specs:` section is `CONFIG_INVALID` with the reason `SKILLS` or `SPECS`, an unknown provider is
-/// `SKILLS_ARGUMENT_INVALID`, a missing `--skills-source` is `SKILLS_SOURCE_NOT_FOUND`; each exits 2 and writes nothing.
+/// `USAGE` (the enumeration of `--harness` refuses it, since `canon-0-38-provider-option`), a missing `--skills-source` is `SKILLS_SOURCE_NOT_FOUND`; each exits 2 and writes nothing.
 #[test]
 fn atip_codesplit_04_a_broken_section_and_a_bad_provider_answer_with_their_condition_and_reason() {
     let dir = repo();
     let d = dir.path();
     let yaml = std::fs::read_to_string(d.join("canon.yaml")).unwrap();
-    refused(d, &["skills", "install", "--providers", "bogus"], "SKILLS_ARGUMENT_INVALID", None);
+    refused(d, &["skills", "install", "--harness", "bogus"], "USAGE", None);
     refused(d, &["skills", "install", "--skills-source", "no-such-dir"], "SKILLS_SOURCE_NOT_FOUND", None);
     std::fs::write(d.join("canon.yaml"), format!("{yaml}\nskills: [claude]\n")).unwrap();
     let before = tree(d);

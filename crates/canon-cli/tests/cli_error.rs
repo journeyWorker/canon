@@ -81,7 +81,7 @@ fn repo_with_unapproved_brief() -> TempDir {
     let dir = TempDir::new().unwrap();
     git_seed(dir.path());
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
@@ -126,7 +126,7 @@ fn finding_close_of_an_unknown_seq_is_refused() {
 fn query_scope_errors_and_unknown_kinds_have_codes_in_json_mode() {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
 
     // A flag that does not apply to the kind: canon's own refusal.
     let out = run(repo, &["query", "--kind", "subject", "--change", "add-login", "--json"]);
@@ -143,8 +143,8 @@ fn query_scope_errors_and_unknown_kinds_have_codes_in_json_mode() {
 fn init_over_a_finished_repo_is_unchanged_and_demo_init_over_it_is_refused() {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
-    let out = run(repo, &["init", "--providers", "none", "--no-agents-md", "--json"]);
+    ok(repo, &["init", "--no-harness"]);
+    let out = run(repo, &["init", "--no-harness", "--no-agents-md", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     let shown: Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(shown["data"]["unchanged"], true, "{shown}");

@@ -41,7 +41,7 @@ fn atip_claiml2_01_every_envelope_declares_1_5_and_the_schema_tree_says_l2() {
     let dir = tempfile::tempdir().expect("tempdir");
     assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.5");
     assert_eq!(canon_cli::spec::LEVEL, "L2");
-    let init = hermetic::canon().args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
+    let init = hermetic::canon().args(["init", "--no-harness"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     for args in [&["status", "--json"][..], &["nosuch", "--json"], &["schema", "--json"], &["schema", "--errors", "--json"], &["schema", "--warnings", "--json"]] {
         let document = canon_in(dir.path(), args);
@@ -89,7 +89,7 @@ fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_an_earlier_minor() {
 #[test]
 fn atip_claiml2_06_input_too_large_names_the_field_input() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let init = hermetic::canon().args(["init", "--providers", "none"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
+    let init = hermetic::canon().args(["init", "--no-harness"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     let big = dir.path().join("big.json");
     std::fs::write(&big, vec![b' '; 8 * 1024 * 1024 + 1]).expect("write");
@@ -413,7 +413,7 @@ fn repo_with_a_finding() -> tempfile::TempDir {
     git(&["init", "-q"]);
     git(&["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-qm", "fixture"]);
     for args in [
-        &["init", "--providers", "none", "--json"][..],
+        &["init", "--no-harness", "--json"][..],
         &["subject", "new", "alpha", "--domain", "core", "--title", "Alpha", "--json"],
         &["change", "new", "add-login", "--subject", "alpha", "--title", "Add login", "--json"],
         &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "fixture", "--summary", "first", "--json"],

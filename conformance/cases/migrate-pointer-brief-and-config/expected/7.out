@@ -1,3 +1,3 @@
 canon migrate: plan:
   left: 1 openspec change(s) not written by `canon change new` stay where they are, read as an external plan: c-checkout
-planDigest sha256:ae39a78a2fe874db2a0d8c0cc99d700836e9df5673020d2698a311484b63ff43; nothing written. To act: canon migrate --commit --plan-digest=sha256:ae39a78a2fe874db2a0d8c0cc99d700836e9df5673020d2698a311484b63ff43
+planDigest sha256:b73ef558afacf0df866d7941df97f79063a26042d9cf31078a7663755be3273e; nothing written. To act: canon migrate --commit --plan-digest=sha256:b73ef558afacf0df866d7941df97f79063a26042d9cf31078a7663755be3273e

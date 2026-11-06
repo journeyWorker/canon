@@ -49,7 +49,7 @@ fn parent_of_repo(name: &str) -> TempDir {
     let parent = TempDir::new().expect("a temp dir");
     let repo: PathBuf = parent.path().join(name);
     std::fs::create_dir(&repo).unwrap_or_else(|e| panic!("a directory called {name:?}: {e}"));
-    ok(&repo, &["init", "--providers", "none"]);
+    ok(&repo, &["init", "--no-harness"]);
     for subject in ["one", "two"] {
         ok(&repo, &["subject", "new", subject, "--domain", "dev", "--title", subject]);
     }

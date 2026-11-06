@@ -39,7 +39,7 @@ fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     git(dir.path(), &["init", "-q", "-b", "main"]);
     git(dir.path(), &["commit", "-q", "--allow-empty", "-m", "seed"]);
-    ok(dir.path(), &["init", "--providers", "none", "--no-agents-md"]);
+    ok(dir.path(), &["init", "--no-harness", "--no-agents-md"]);
     dir
 }
 
@@ -183,13 +183,14 @@ fn skills_install_07_an_unknown_provider_is_refused_before_anything_is_written()
     let dir = repo();
     let repo = dir.path();
     let before = tree(repo);
-    let out = canon(repo, &["skills", "install", "--providers", "gemini", "--json"]);
+    let out = canon(repo, &["skills", "install", "--harness", "gemini", "--json"]);
     assert_eq!(out.status.code(), Some(2), "an unknown provider is an invalid argument, a refusal: {}", text(&out));
     let body = json(&out);
     assert_eq!(body["ok"], false, "{body}");
-    assert_eq!(body["error"]["code"], "SKILLS_ARGUMENT_INVALID", "{body}");
+    assert_eq!(body["error"]["code"], "USAGE", "{body}");
     assert_eq!(body["error"]["received"], "gemini", "the provider is named: {body}");
-    assert_eq!(body["error"]["field"], "--providers", "{body}");
+    assert_eq!(body["error"]["field"], "--harness", "{body}");
+    assert_eq!(body["error"]["expected"], serde_json::json!(["claude", "codex", "omp", "pi"]), "the names are listed: {body}");
     assert_eq!(tree(repo), before, "no projection and no lock were written");
     assert!(!repo.join(".canon/skills").exists());
 }

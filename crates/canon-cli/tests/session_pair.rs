@@ -21,7 +21,7 @@ fn ok(repo: &Path, args: &[&str]) -> Value {
 
 fn repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    ok(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--no-harness"]);
     dir
 }
 

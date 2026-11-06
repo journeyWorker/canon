@@ -260,7 +260,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         OLD_YAML
             .replace("      root: specs\n", "      root: .canon/specs\n      former_roots: [specs]\n")
             .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
-            + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --providers=<list>` rewrites it.\nskills:\n  providers: [claude, codex]\n",
+            + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.\nskills:\n  providers: [claude, codex]\n",
         "every other byte of canon.yaml is kept"
     );
     let gitignore = read(repo, ".gitignore");
@@ -498,7 +498,7 @@ fn migrated_yaml() -> String {
     OLD_YAML
         .replace("      root: specs\n", "      root: .canon/specs\n      former_roots: [specs]\n")
         .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
-        + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --providers=<list>` rewrites it.\nskills:\n  providers: [claude, codex]\n"
+        + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.\nskills:\n  providers: [claude, codex]\n"
 }
 
 fn set_mode(path: &Path, mode: u32) {

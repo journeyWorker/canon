@@ -83,7 +83,7 @@ fn init_repo(dir: &Path, with_git: bool) {
         git(dir, &["init", "-q", "-b", "main"]);
         git(dir, &["commit", "-q", "--allow-empty", "-m", "seed"]);
     }
-    let out = canon_in(dir, &words(&["init", "--providers", "none", "--no-agents-md", "--no-policy"]), &[]);
+    let out = canon_in(dir, &words(&["init", "--no-harness", "--no-agents-md", "--no-policy"]), &[]);
     assert!(out.status.success(), "{}", text(&out));
     if with_git {
         git(dir, &["add", "-A"]);

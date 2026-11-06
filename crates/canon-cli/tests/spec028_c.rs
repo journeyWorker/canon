@@ -42,7 +42,7 @@ fn git(dir: &Path, args: &[&str]) {
 fn repo() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     git(dir.path(), &["init", "-q"]);
-    let init = canon(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--providers", "none"]);
+    let init = canon(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--no-harness"]);
     assert!(init.status.success(), "{}", stderr(&init));
     git(dir.path(), &["add", "-A"]);
     git(dir.path(), &["commit", "-q", "-m", "fixture"]);

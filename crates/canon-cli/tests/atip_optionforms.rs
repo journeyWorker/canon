@@ -1,9 +1,9 @@
-//! `canon-0-37-option-forms` (scenarios `atip.optionforms.01-16`): the time options take RFC 3339 and nothing else, and `--providers` takes the exact names, against the
+//! `canon-0-37-option-forms` (scenarios `atip.optionforms.01-16`): the time options take RFC 3339 and nothing else, and the provider options take the exact names, against the
 //! built binary and the documents it declares.
 //!
 //! `--approval-at` takes a date-time (`YYYY-MM-DDTHH:MM:SS`, a fraction, `Z` or `+HH:MM`); `--expiry`, `--as-of`, `--before`, `--after` and `--since` take a full-date or the
-//! same date-time; `T` and `Z` are read in either case. `--providers` takes `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas, in `init` and in
-//! the three `skills` commands. `atip/option_forms_0_36.json` holds what canon 0.36.0 accepted, per option and class of value, and the CHANGELOG of the build holds a row
+//! same date-time; `T` and `Z` are read in either case. The provider list was `--providers` in 0.37 and is the repeatable `--harness` and the switch `--no-harness` since `canon-0-38-provider-option`
+//! (scenarios `.09` and `.10` hold the names those take; the 0.37 rows for `--providers` are history). `atip/option_forms_0_36.json` holds what canon 0.36.0 accepted, per option and class of value, and the CHANGELOG of the build holds a row
 //! for each value of it that is refused now.
 //!
 //! The checks that seeded faults must trip are small pure functions in this file (`forms_problems`, `changelog_problems`): each real input passes them, each seeded fault is
@@ -33,16 +33,12 @@ const APPROVAL_AT_COMMANDS: [&str; 4] = ["evidence add", "evidence approval-payl
 const DATE_OPTIONS: [(&str, &[&str]); 5] =
     [("expiry", &["divergence accept", "divergence add", "divergence defer"]), ("as-of", &["divergence list"]), ("before", &["export", "purge"]), ("after", &["export"]), ("since", &["query"])];
 
-/// The four commands that read `--providers`.
-const PROVIDER_COMMANDS: [&str; 4] = ["init", "skills check", "skills doctor", "skills install"];
-
-/// The classes of the golden file that 0.37 still takes: the RFC 3339 spellings and the lists that were exact.
-const KEPT: [&str; 5] = ["date-time", "fraction", "lowercase-t-z", "valid", "duplicate"];
+/// The classes of the golden file that 0.37 still takes: the RFC 3339 spellings.
+const KEPT: [&str; 3] = ["date-time", "fraction", "lowercase-t-z"];
 
 /// The pattern of each option, as `arg_rules` writes it.
 const TIMESTAMP: &str = canon_cli::arg_rules::TIMESTAMP;
 const DATE_TIME: &str = canon_cli::arg_rules::DATE_TIME;
-const PROVIDERS: &str = canon_cli::arg_rules::PROVIDERS;
 
 /// An approval time as the same instant, in the spellings RFC 3339 reads.
 const ONE_INSTANT: [&str; 7] =
@@ -97,11 +93,11 @@ const NOT_A_TIME: [&str; 22] = [
     "",
 ];
 
-/// The provider lists that are refused: what 0.36.0 took, what it refused, and the empty value.
-const NOT_A_LIST: [&str; 16] = ["Claude", "NONE", "None", "claude,,pi", "claude,", ",omp", ",", " claude", "claude ", "claude, pi", "", "  ", "none,claude", "claude,none", "gemini", "claude,gemini"];
+/// The values `--harness` refuses: what 0.37 took as part of a list and what it refused, one name each (a capital, `none`, white space around, an empty value, an unknown name).
+const NOT_A_NAME: [&str; 10] = ["Claude", "NONE", "None", "none", "claude ", " claude", "claude,omp", "", "  ", "gemini"];
 
-/// The provider lists that are taken (a name written twice among them).
-const A_LIST: [&str; 6] = ["claude", "claude,omp", "none", "omp,omp", "pi,codex,claude", "claude,codex,omp,pi"];
+/// The provider selections that are taken, as the names given (a name written twice among them) and `none` for `--no-harness`: the lists 0.37 took, written the 0.38 way.
+const A_SELECTION: [&[&str]; 6] = [&["claude"], &["claude", "omp"], &[], &["omp", "omp"], &["pi", "codex", "claude"], &["claude", "codex", "omp", "pi"]];
 
 // ---------------------------------------------------------------------------
 // The story repo and the calls.
@@ -226,7 +222,6 @@ fn admits(command: &str, option: &str, value: &Value) -> bool {
 fn pattern_of_option(option: &str) -> &'static str {
     match option {
         "approval-at" => DATE_TIME,
-        "providers" => PROVIDERS,
         _ => TIMESTAMP,
     }
 }
@@ -237,7 +232,6 @@ fn places() -> Vec<(&'static str, &'static str)> {
     for (option, commands) in DATE_OPTIONS {
         found.extend(commands.iter().map(|command| (option, *command)));
     }
-    found.extend(PROVIDER_COMMANDS.iter().map(|command| ("providers", *command)));
     found
 }
 
@@ -528,7 +522,7 @@ fn atip_optionforms_08_a_loose_or_impossible_time_is_refused_for_each_date_optio
 }
 
 // ===========================================================================
-// atip.optionforms.09 - 10 (F4): the provider list.
+// atip.optionforms.09 - 10 (F4): the provider names (`--harness` and `--no-harness` since 0.38).
 
 /// A new git directory, which `init` sets up.
 fn fresh() -> TempDir {
@@ -541,54 +535,70 @@ fn tree_of(dir: &Path) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
     harness::tree(dir)
 }
 
+/// The arguments that give `names` (`--harness` for each, or `--no-harness` for none).
+fn selection_args(names: &[&str]) -> Vec<String> {
+    if names.is_empty() {
+        return vec!["--no-harness".to_string()];
+    }
+    names.iter().flat_map(|name| ["--harness".to_string(), (*name).to_string()]).collect()
+}
+
 #[test]
-fn atip_optionforms_09_init_and_the_three_skills_commands_take_none_and_the_exact_names() {
-    for value in A_LIST {
-        let given = format!("--providers={value}");
+fn atip_optionforms_09_init_and_the_three_skills_commands_take_no_provider_and_each_name_as_the_list_of_0_37_was_taken() {
+    for names in A_SELECTION {
+        let given = selection_args(names);
         // `init` records the list it is given.
         let dir = fresh();
-        let output = harness::canon_in(dir.path(), home(), &harness::strs(&["init", &given, "--json"]), &[]);
-        assert!(output.status.success(), "init {value}: {}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+        let mut argv = vec!["init".to_string()];
+        argv.extend(given.clone());
+        argv.push("--json".to_string());
+        let output = harness::canon_in(dir.path(), home(), &argv, &[]);
+        assert!(output.status.success(), "init {names:?}: {}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
         let yaml = std::fs::read_to_string(dir.path().join("canon.yaml")).expect("canon.yaml");
-        let expected = if value == "none" { "[]".to_string() } else { format!("[{}]", canon_cli::skills::parse_provider_list(value).expect("a list").iter().map(|provider| provider.as_str()).collect::<Vec<_>>().join(", ")) };
-        assert!(yaml.contains(&format!("providers: {expected}")), "init {value}: {yaml}");
+        let mut chosen: Vec<&str> = names.to_vec();
+        chosen.sort_unstable();
+        chosen.dedup();
+        assert!(yaml.contains(&format!("providers: [{}]", chosen.join(", "))), "init {names:?}: {yaml}");
         // The skills commands take it.
         for command in ["install", "check", "doctor"] {
-            let mut args = vec!["skills", command, given.as_str()];
+            let mut args: Vec<String> = vec!["skills".to_string(), command.to_string()];
+            args.extend(given.clone());
             if command == "install" {
-                args.push("--dry-run");
+                args.push("--dry-run".to_string());
             }
-            let got = assert_taken(&args, "--providers");
-            assert_ne!(got.code(), "SKILLS_ARGUMENT_INVALID", "skills {command} {value}: {}", got.envelope);
+            let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+            let got = assert_taken(&refs, "--harness");
+            assert_ne!(got.code(), "USAGE", "skills {command} {names:?}: {}", got.envelope);
         }
     }
-    // `skills install --providers none` records the empty list.
+    // `skills install --no-harness` records the empty list.
     let (_guard, repo) = harness::copy_of(base());
-    let output = harness::canon_in(&repo, home(), &harness::strs(&["skills", "install", "--providers", "none", "--json"]), &[]);
+    let output = harness::canon_in(&repo, home(), &harness::strs(&["skills", "install", "--no-harness", "--json"]), &[]);
     assert!(output.status.success(), "{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).expect("canon.yaml").contains("providers: []"));
 }
 
 #[test]
-fn atip_optionforms_10_a_provider_list_that_is_not_exact_is_refused_by_the_four_commands_and_nothing_is_written() {
-    for value in NOT_A_LIST {
-        let given = format!("--providers={value}");
+fn atip_optionforms_10_a_provider_name_that_is_not_exact_is_refused_by_the_four_commands_and_nothing_is_written() {
+    for value in NOT_A_NAME {
+        let given = format!("--harness={value}");
         // `init` in a new directory writes nothing.
         let dir = fresh();
         let before = tree_of(dir.path());
         let output = harness::canon_in(dir.path(), home(), &harness::strs(&["init", &given, "--json"]), &[]);
         let document = envelope(&output);
-        assert_eq!((output.status.code(), document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some(2), Some("INIT_ARGUMENT_INVALID"), Some("--providers")), "init `{value}`: {document}");
+        assert_eq!((output.status.code(), document["error"]["code"].as_str(), document["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("--harness")), "init `{value}`: {document}");
+        assert_eq!(document["error"]["expected"], json!(["claude", "codex", "omp", "pi"]), "init `{value}`: {document}");
         assert_eq!(harness::changed(&before, &tree_of(dir.path())), Vec::<PathBuf>::new(), "init `{value}` wrote");
         assert!(!dir.path().join("canon.yaml").exists());
         for command in ["install", "check", "doctor"] {
-            assert_refused(&["skills", command, &given], "SKILLS_ARGUMENT_INVALID", "--providers");
+            assert_refused(&["skills", command, &given], "USAGE", "--harness");
         }
     }
-    // A refused list leaves canon.yaml's own setting alone: it is not an option, and is read as before.
+    // A refused name leaves canon.yaml's own setting alone.
     let (_guard, repo) = harness::copy_of(base());
     let yaml = std::fs::read_to_string(repo.join("canon.yaml")).expect("canon.yaml");
-    let output = harness::canon_in(&repo, home(), &harness::strs(&["skills", "install", "--providers=Claude", "--json"]), &[]);
+    let output = harness::canon_in(&repo, home(), &harness::strs(&["skills", "install", "--harness=Claude", "--json"]), &[]);
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(std::fs::read_to_string(repo.join("canon.yaml")).expect("canon.yaml"), yaml);
 }
@@ -601,26 +611,22 @@ fn atip_optionforms_11_each_option_declares_one_domain_in_every_command_and_the_
     let docs = docs();
     let problems = forms_problems(&docs);
     assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
-    assert_eq!(places().len(), 4 + 8 + 4, "every place of the four approval commands, the five date options and the four list commands");
+    assert_eq!(places().len(), 4 + 8, "every place of the four approval commands and the five date options");
     // The five date options say one declaration, and `--approval-at` another; each is a pattern of digits and separators.
     let time: BTreeSet<String> = DATE_OPTIONS.iter().flat_map(|(option, commands)| commands.iter().map(move |command| option_of(doc_of(command), option).expect("a date option")["domain"].to_string())).collect();
     assert_eq!(time.len(), 1, "{time:?}");
     let approval: BTreeSet<String> = APPROVAL_AT_COMMANDS.iter().map(|command| option_of(doc_of(command), "approval-at").expect("--approval-at")["domain"].to_string()).collect();
     assert_eq!(approval.len(), 1, "{approval:?}");
     assert_ne!(time, approval);
-    for pattern in [TIMESTAMP, DATE_TIME, PROVIDERS] {
+    for pattern in [TIMESTAMP, DATE_TIME] {
         assert_eq!(atip::domain::pattern_problem(pattern, atip::Minor::parse("1.5").expect("1.5")), None, "{pattern}");
         assert!(!pattern.contains("White_Space"), "a pattern of characters alone, no white-space class: {pattern}");
     }
-    // `init` declares the domain of the list the `skills` commands declare, with its own code.
-    let init = option_of(doc_of("init"), "providers").expect("init --providers");
-    assert_eq!(init["domain"], option_of(doc_of("skills install"), "providers").expect("skills install --providers")["domain"]);
     // The help says what is taken.
-    for (command, option, needle) in [("evidence add", "approval-at", "date-time"), ("evidence approval-payload", "approval-at", "date-time"), ("strategy approval-payload", "approval-at", "date-time"), ("strategy rollback", "approval-at", "date-time"), ("divergence add", "expiry", "RFC 3339"), ("divergence list", "as-of", "RFC 3339"), ("export", "before", "RFC 3339"), ("export", "after", "RFC 3339"), ("query", "since", "RFC 3339"), ("init", "providers", "lowercase"), ("skills install", "providers", "lowercase"), ("skills check", "providers", "lowercase"), ("skills doctor", "providers", "lowercase")] {
+    for (command, option, needle) in [("evidence add", "approval-at", "date-time"), ("evidence approval-payload", "approval-at", "date-time"), ("strategy approval-payload", "approval-at", "date-time"), ("strategy rollback", "approval-at", "date-time"), ("divergence add", "expiry", "RFC 3339"), ("divergence list", "as-of", "RFC 3339"), ("export", "before", "RFC 3339"), ("export", "after", "RFC 3339"), ("query", "since", "RFC 3339")] {
         let help = option_of(doc_of(command), option).expect("an option")["help"].as_str().unwrap_or_default().to_string();
         assert!(help.contains(needle), "`{command} --{option}` says `{needle}`: {help}");
     }
-    assert_eq!(init["domain"]["pattern"], PROVIDERS);
 }
 
 /// The values the domains judge, `(command, option, value, taken)`: the table run through the real pattern and the real parser.
@@ -644,28 +650,19 @@ fn value_table() -> Vec<(&'static str, &'static str, String, bool)> {
             }
         }
     }
-    for command in PROVIDER_COMMANDS {
-        for value in A_LIST {
-            table.push((command, "providers", value.to_string(), true));
-        }
-        for value in NOT_A_LIST {
-            table.push((command, "providers", value.to_string(), false));
-        }
-    }
     table
 }
 
 #[test]
 fn atip_optionforms_12_the_table_of_values_inside_and_outside_each_domain_agrees_with_the_real_parser() {
     let table = value_table();
-    assert!(table.len() > 300, "{} cells", table.len());
+    assert!(table.len() > 250, "{} cells", table.len());
     for (command, option, value, taken) in &table {
         // The declared domain.
         assert_eq!(admits(command, option, &json!(value)), *taken, "`{command} --{option}` and {value:?}");
         // The parser of the value.
         let parsed = match *option {
             "approval-at" => canon_cli::timestamp::parse_date_time(value).is_ok(),
-            "providers" => canon_cli::skills::parse_provider_list(value).is_ok(),
             _ => canon_cli::timestamp::parse(value).is_ok(),
         };
         assert_eq!(parsed, *taken, "the parser of `--{option}` and {value:?}");
@@ -695,10 +692,6 @@ fn atip_optionforms_12_the_table_of_values_inside_and_outside_each_domain_agrees
     let found = seed("strategy rollback", "approval-at", Some(json!({ "pattern": TIMESTAMP })));
     assert!(found.iter().any(|problem| problem.contains("`strategy rollback --approval-at`") && problem.contains("declares")), "{found:?}");
     assert!(found.iter().any(|problem| problem.contains("`--approval-at` has 2 domains")), "{found:?}");
-    let found = seed("skills doctor", "providers", None);
-    assert!(found.iter().any(|problem| problem.contains("`skills doctor --providers`")), "{found:?}");
-    let found = seed("init", "providers", Some(json!({ "pattern": "^[a-z,]+$" })));
-    assert!(found.iter().any(|problem| problem.contains("`--providers` has 2 domains")), "{found:?}");
     let found = seed("export", "after", Some(json!({ "pattern": DATE_TIME })));
     assert!(found.iter().any(|problem| problem.contains("`export --after` declares")), "{found:?}");
     let found = seed("divergence add", "expiry", Some(json!({ "pattern": DATE_TIME })));
@@ -759,7 +752,7 @@ fn breaking_rows(changelog: &str) -> Vec<Vec<String>> {
 }
 
 fn is_of_this_change(option: &str) -> bool {
-    option == "approval-at" || option == "providers" || DATE_OPTIONS.iter().any(|(name, _)| *name == option)
+    option == "approval-at" || DATE_OPTIONS.iter().any(|(name, _)| *name == option)
 }
 
 fn backticked(cell: &str) -> BTreeSet<String> {
@@ -796,9 +789,9 @@ fn changelog_problems(changelog: &str, refused: &BTreeSet<(String, String, Strin
 fn atip_optionforms_13_the_changelog_has_a_row_for_every_spelling_0_36_took_and_this_build_refuses() {
     let accepted = entries("accepted");
     let refused = refused_now(&accepted);
-    assert!(refused.len() > 100, "the golden file reaches many cells ({})", refused.len());
+    assert!(refused.len() > 90, "the golden file reaches many cells ({})", refused.len());
     // The cells: every option is reached, and the spellings 0.36.0 took that 0.37 still takes need no row.
-    for option in ["approval-at", "expiry", "as-of", "before", "after", "since", "providers"] {
+    for option in ["approval-at", "expiry", "as-of", "before", "after", "since"] {
         assert!(refused.iter().any(|(name, _, _)| name == option), "`--{option}` has a value that was taken and is refused");
     }
     for entry in accepted.iter().filter(|entry| KEPT.contains(&entry.class.as_str())) {
@@ -823,7 +816,7 @@ fn atip_optionforms_13_the_changelog_has_a_row_for_every_spelling_0_36_took_and_
     assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
     // The table has no row that no refusal needs, and one row for each class of each group of options.
     let rows = breaking_rows(&changelog);
-    assert_eq!(rows.len(), 9 + 8 + 5, "one row per class: nine for --approval-at, eight for the date options, five for --providers");
+    assert_eq!(rows.len(), 9 + 8, "one row per class: nine for --approval-at, eight for the date options (the rows of --providers are history: the 0.38 table has its own)");
     for row in &rows {
         let (options, commands, classes) = (backticked(&row[0]), backticked(&row[1]), backticked(&row[2]));
         let needed = refused.iter().any(|(option, command, class)| options.contains(&format!("--{option}")) && commands.contains(command) && classes.contains(class));
@@ -842,8 +835,8 @@ fn atip_optionforms_14_the_check_of_the_changelog_fails_for_a_missing_row_a_miss
     let changelog = read("CHANGELOG.md");
     assert!(changelog_problems(&changelog, &refused).is_empty());
     let lines: Vec<&str> = changelog.lines().collect();
-    // A row taken out: the first that names `--approval-at` and `one-digit-month`, and the first that names `--providers` and `uppercase`.
-    for (option, class) in [("`--approval-at`", "`one-digit-month`"), ("`--providers`", "`uppercase`"), ("`--expiry`, `--as-of`, `--before`, `--after`, `--since`", "`unicode-minus`")] {
+    // A row taken out: the first that names `--approval-at` and `one-digit-month`, and the first that names the date options and `unicode-minus`.
+    for (option, class) in [("`--approval-at`", "`one-digit-month`"), ("`--expiry`, `--as-of`, `--before`, `--after`, `--since`", "`unicode-minus`")] {
         let at = lines.iter().position(|line| line.starts_with(&format!("| {option}")) && line.contains(class)).unwrap_or_else(|| panic!("a row names {option} and {class}"));
         let without: String = lines.iter().enumerate().filter(|(index, _)| *index != at).map(|(_, line)| *line).collect::<Vec<_>>().join("\n");
         let problems = changelog_problems(&without, &refused);
@@ -860,7 +853,7 @@ fn atip_optionforms_14_the_check_of_the_changelog_fails_for_a_missing_row_a_miss
     assert!(changelog_problems(&without_entry, &refused).iter().any(|problem| problem.contains("RFC 3339 and nothing else")));
     // A refused value of a class no row names needs its row.
     let mut seeded = refused.clone();
-    seeded.insert(("providers".to_string(), "init".to_string(), "no-such-class".to_string()));
+    seeded.insert(("expiry".to_string(), "divergence add".to_string(), "no-such-class".to_string()));
     assert!(changelog_problems(&changelog, &seeded).iter().any(|problem| problem.contains("no-such-class")));
 }
 
@@ -911,6 +904,11 @@ fn atip_optionforms_16_the_golden_file_is_the_measure_of_0_36_and_its_classes_ar
     // The measure says what the brief says 0.36.0 took.
     let took = |option: &str, value: &str| entries("accepted").iter().any(|entry| entry.option == option && entry.value == json!(value));
     assert!(took("approval-at", "2030-01-01") && took("approval-at", " 2030-01-01") && took("approval-at", "2030-1-01") && took("approval-at", "2030-01-01 10:00:00Z") && took("approval-at", "2030-01-01T10:00:00\u{2212}02:00"));
-    assert!(took("providers", "Claude") && took("providers", "claude,,pi") && took("providers", "") && took("providers", "claude, pi") && took("providers", "NONE"));
-    assert!(!took("providers", "none,claude") && !took("providers", "gemini"));
-}
+    // `--providers` is not read here: its entries are under `supersededBy038`, which holds what 0.36.0 took of it as the record.
+    assert!(entries("accepted").iter().all(|entry| entry.option != "providers") && entries("refused").iter().all(|entry| entry.option != "providers"));
+    let superseded: Value = serde_json::from_str(&read(GOLDEN)).expect("the golden file is JSON");
+    let kept = &superseded["supersededBy038"];
+    assert_eq!((kept["change"].as_str(), kept["option"].as_str()), (Some("canon-0-38-provider-option"), Some("providers")));
+    let held = |key: &str, value: &str| kept[key].as_array().expect("entries").iter().any(|entry| entry["value"] == value);
+    assert!(held("accepted", "Claude") && held("accepted", "claude,,pi") && held("accepted", "") && held("accepted", "claude, pi") && held("accepted", "NONE"));
+    assert!(!held("accepted", "none,claude") && !held("accepted", "gemini") && held("refused", "gemini"));}

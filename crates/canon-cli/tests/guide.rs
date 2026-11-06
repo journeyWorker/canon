@@ -101,7 +101,7 @@ fn skills_show_ignores_the_declared_role() {
 fn init_installs_the_stub_without_a_skills_tree() {
     let repo = tempfile::tempdir().unwrap();
     assert!(!repo.path().join("canon").exists());
-    let out = canon(repo.path(), &["init", "--providers", "claude,codex", "--json"]);
+    let out = canon(repo.path(), &["init", "--harness", "claude", "--harness", "codex", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert!(!repo.path().join("canon").exists(), "init writes no canon/skills tree");
     for projection in [".claude/skills/canon", ".agents/skills/canon"] {
@@ -125,7 +125,7 @@ fn init_installs_the_stub_without_a_skills_tree() {
 #[test]
 fn skills_check_reports_an_older_lock_as_outdated() {
     let repo = tempfile::tempdir().unwrap();
-    assert_eq!(canon(repo.path(), &["init", "--providers", "claude"]).status.code(), Some(0));
+    assert_eq!(canon(repo.path(), &["init", "--harness", "claude"]).status.code(), Some(0));
     assert_eq!(canon(repo.path(), &["skills", "check"]).status.code(), Some(0));
     let lock_path = repo.path().join(".canon/skills/.install-lock.json");
     let mut lock: Value = serde_json::from_slice(&std::fs::read(&lock_path).unwrap()).unwrap();

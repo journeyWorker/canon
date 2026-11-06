@@ -47,7 +47,7 @@ fn repo() -> TempDir {
         let out = Command::new("git").args(args).current_dir(d).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
     }
-    ok(d, &["init", "--providers", "none"]);
+    ok(d, &["init", "--no-harness"]);
     dir
 }
 

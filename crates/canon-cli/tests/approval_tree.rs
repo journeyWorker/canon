@@ -258,7 +258,7 @@ fn gate_approval_tree_02_an_approval_without_a_git_work_tree_or_a_commit_records
         if init_git {
             git(r, &["init", "-q", "-b", "main"]);
         }
-        ok(r, &["init", "--providers", "none"]);
+        ok(r, &["init", "--no-harness"]);
         ok(r, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
         ok(r, &["change", "new", "bump-client", "--subject", "demo", "--title", "Bump the client", "--change-kind", "chore"]);
         write(r, CHORE_BRIEF, CHORE);

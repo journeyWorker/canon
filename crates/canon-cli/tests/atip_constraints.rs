@@ -79,7 +79,7 @@ fn refused(run: &Run, code: &str, field: &str) {
 #[test]
 fn atip_constraints_01_clap_relations_are_constraints_of_the_document() {
     let init = leaf("init");
-    for other in ["no-agents-md", "policy", "no-policy", "providers", "language", "dry-run"] {
+    for other in ["no-agents-md", "policy", "no-policy", "harness", "no-harness", "language", "dry-run"] {
         assert!(has_names(init, "atMostOne", &["check", other]), "init: --check and --{other} are one atMostOne: {:?}", init["constraints"]);
     }
     assert!(has_names(init, "atMostOne", &["policy", "no-policy"]), "init: {:?}", init["constraints"]);

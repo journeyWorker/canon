@@ -56,7 +56,7 @@ fn git(repo: &Path, args: &[&str]) {
 fn repo_with_scenario() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-q"]);
-    ok(dir.path(), &["init", "--repo", ".", "--no-policy", "--providers", "none"]);
+    ok(dir.path(), &["init", "--repo", ".", "--no-policy", "--no-harness"]);
     ok(dir.path(), &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
     git(dir.path(), &["add", "-A"]);
     git(dir.path(), &["commit", "-q", "-m", "seed"]);
@@ -158,7 +158,7 @@ fn subject_move_is_a_write_and_subject_show_is_a_read() {
 
 fn subject_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    ok(dir.path(), &["init", "--repo", ".", "--no-policy", "--providers", "none"]);
+    ok(dir.path(), &["init", "--repo", ".", "--no-policy", "--no-harness"]);
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     dir
 }

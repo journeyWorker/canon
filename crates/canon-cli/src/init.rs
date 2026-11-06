@@ -24,7 +24,7 @@
 //!
 //! # Harness choice (0.17 D5)
 //! A fresh `init` also picks the harnesses the canon skill is installed
-//! for ([`SkillsChoice`]): `--providers` answers; otherwise it takes the
+//! for ([`SkillsChoice`]): `--harness` (once per name) or `--no-harness` answers; otherwise it takes the
 //! detected ones (`.claude`, `.codex`, `.omp`, `.pi` directories), on a
 //! terminal as well as off one: `init` never asks (spec 5.5, 0.35). The
 //! answer is written as `canon.yaml` `skills.providers` and the
@@ -489,10 +489,10 @@ pub struct InitOptions {
 /// How a fresh `canon init` picks the harnesses (0.17 D5; since 0.35 it never asks).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkillsChoice {
-    /// No `--providers`: the detected harnesses.
+    /// Neither `--harness` nor `--no-harness`: the detected harnesses.
     Detected,
-    /// `--providers <list>`: this list (`none` or empty for none).
-    Providers(String),
+    /// `--harness <name>` for each name, or `--no-harness`: this list (empty for none), sorted, without duplicates.
+    Providers(Vec<Provider>),
     /// Record and install nothing (`canon demo init`).
     Skip,
 }
@@ -505,20 +505,17 @@ struct InitSkills {
     recorded: bool,
 }
 
-/// Resolves [`InitOptions::skills`] for a fresh `init` in `repo`. `Err`
-/// for an unknown `--providers` name, before anything is written. Nothing
-/// is asked: without `--providers` the detected harnesses are the choice,
+/// Resolves [`InitOptions::skills`] for a fresh `init` in `repo`. Nothing
+/// is asked: without `--harness` or `--no-harness` the detected harnesses are the choice,
 /// on a terminal and off one (spec 5.5: a tool never prompts).
-fn choose_skills(repo: &Path, choice: &SkillsChoice) -> Result<Option<InitSkills>, String> {
+fn choose_skills(repo: &Path, choice: &SkillsChoice) -> Option<InitSkills> {
     match choice {
-        SkillsChoice::Skip => Ok(None),
-        SkillsChoice::Providers(list) => skills::parse_provider_list(list)
-            .map(|providers| Some(InitSkills { providers, recorded: true }))
-            .map_err(|e| e.to_string()),
+        SkillsChoice::Skip => None,
+        SkillsChoice::Providers(providers) => Some(InitSkills { providers: providers.clone(), recorded: true }),
         SkillsChoice::Detected => {
             let detected = skills::detected_providers(repo);
             let recorded = !detected.is_empty();
-            Ok(Some(InitSkills { providers: detected, recorded }))
+            Some(InitSkills { providers: detected, recorded })
         }
     }
 }
@@ -551,7 +548,7 @@ fn language_section(language: Option<&crate::language::Language>) -> String {
 fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills, dry_run: bool, log: &mut InitLog) -> Result<(), u8> {
     if chosen.providers.is_empty() {
         if chosen.recorded {
-            log.step("skills-none", "skills.providers is []", "canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`".to_string());
+            log.step("skills-none", "skills.providers is []", format!("canon init: skills.providers is [] — no canon skill installed; {}", skills::CHOOSE_PROVIDERS));
         } else {
             log.step("skills-none", "no harness detected", format!("canon init: no harness detected (no .claude, .codex, .omp or .pi directory), so no canon skill is installed; {}", skills::CHOOSE_PROVIDERS));
         }
@@ -559,8 +556,7 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
     }
     let source = skills::resolve_source(None);
     // A preview has not written `skills.providers` yet, so it names the choice.
-    let names = chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(",");
-    match skills::install_canonical(source.as_deref(), repo, dry_run.then_some(names.as_str()), dry_run) {
+    match skills::install_canonical(source.as_deref(), repo, dry_run.then_some(chosen.providers.as_slice()), dry_run) {
         Ok(report) => {
             let dirs = report
                 .providers
@@ -578,10 +574,10 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
 }
 
 /// What a failed skill install of a fresh `init` is. `canon skills install` says of the same error a refusal before its work
-/// (`SKILLS_SOURCE_NOT_FOUND`: the skill source, `SKILLS_ARGUMENT_INVALID`: the providers, `CONFIG_INVALID`: the `skills:` section; `WRITE_DENIED` or `WRITE_INVALID`: a target that
+/// (`SKILLS_SOURCE_NOT_FOUND`: the skill source, `CONFIG_INVALID`: the `skills:` section; `WRITE_DENIED` or `WRITE_INVALID`: a target that
 /// cannot be written) or a failure (`SKILLS_FAILED`), and `init` says the same with what its step order changes (spec 8.3,
 /// 8.3.2): by this step the run has written `canon.yaml` and the files beside it, so nothing can be an exit 2 any more.
-/// - the refusal of an argument (`SKILLS_SOURCE_NOT_FOUND`, `SKILLS_ARGUMENT_INVALID`, `CONFIG_INVALID`) is `INIT_INCOMPLETE` with that code as its reason;
+/// - the refusal of an argument (`SKILLS_SOURCE_NOT_FOUND`, `CONFIG_INVALID`) is `INIT_INCOMPLETE` with that code as its reason;
 /// - a target that cannot be written is the I/O category's code for the work, `WRITE_FAILED`, which keeps its name;
 /// - any other failure is `SKILLS_FAILED`.
 ///
@@ -593,7 +589,7 @@ fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chos
         let hint = format!("fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset), then run the command again", skills::CANONICAL_SOURCE_ENV);
         return match said {
             "CONFIG_INVALID" => CliError::refused("CONFIG_INVALID", error.to_string()).reason("SKILLS").hint(hint),
-            code @ ("SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" | "WRITE_DENIED" | "WRITE_INVALID") => CliError::refused(code, error.to_string()).hint(hint),
+            code @ ("SKILLS_SOURCE_NOT_FOUND" | "WRITE_DENIED" | "WRITE_INVALID") => CliError::refused(code, error.to_string()).hint(hint),
             _ => CliError::failed("SKILLS_FAILED", error.to_string()).hint(hint),
         };
     }
@@ -616,7 +612,7 @@ fn skill_install_error(error: &skills::SkillsError, canon_yaml_path: &Path, chos
     });
     let hint = format!("read what init wrote with `canon status`, fix what the message names (the override {} must name a directory with a SKILL.src.md, or be unset; the skill directories must be writable), then run `canon skills install`; it follows skills.providers", skills::CANONICAL_SOURCE_ENV);
     match said {
-        "CONFIG_INVALID" | "SKILLS_ARGUMENT_INVALID" | "SKILLS_SOURCE_NOT_FOUND" => CliError::failed("INIT_INCOMPLETE", message).hint(hint).reason(said),
+        "CONFIG_INVALID" | "SKILLS_SOURCE_NOT_FOUND" => CliError::failed("INIT_INCOMPLETE", message).hint(hint).reason(said),
         "WRITE_DENIED" | "WRITE_INVALID" => CliError::failed("WRITE_FAILED", message).hint(hint),
         _ => CliError::failed("SKILLS_FAILED", message).hint(hint),
     }
@@ -695,8 +691,7 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut Ini
 ///   (#35, a repo initialized by an older canon): exit `0`. With
 ///   `--no-agents-md` and no line missing there is nothing left to do,
 ///   so that is the pre-0.14 refusal, exit `2`.
-/// - Unbalanced `AGENTS.md` markers, or an unknown `--providers` name,
-///   refuse (exit `2`) before anything is written.
+/// - Unbalanced `AGENTS.md` markers refuse (exit `2`) before anything is written.
 /// - A fresh repo also records and installs the harness choice
 ///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
 ///   exits `1`: `INIT_INCOMPLETE` when `canon skills install` would have
@@ -742,12 +737,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
     let skills = if canon_yaml_path.exists() {
         None
     } else {
-        match choose_skills(repo, &options.skills) {
-            Ok(skills) => skills,
-            Err(e) => {
-                return CliError::refused("INIT_ARGUMENT_INVALID", e.clone()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
-            }
-        }
+        choose_skills(repo, &options.skills)
     };
 
     // Everything this run will write is checked before the first write (the repo directory included): an unwritable target refuses with nothing changed.
@@ -803,7 +793,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             let refreshed = if dry_run { format!("{what} would be refreshed") } else { format!("{what} are refreshed") };
             log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display()));
             if matches!(options.skills, SkillsChoice::Providers(_)) {
-                log.step("providers-ignored", "--providers", "canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers".to_string());
+                log.step("providers-ignored", "--harness", "canon init: --harness and --no-harness are not applied to an existing canon.yaml; run `canon skills install` with them, which records the list in skills.providers".to_string());
             }
             if options.language.is_some() {
                 log.step("language-ignored", "--language", "canon init: --language is not applied to an existing canon.yaml; add `language: <tag>` to it by hand".to_string());

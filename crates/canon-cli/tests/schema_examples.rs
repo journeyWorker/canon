@@ -59,7 +59,7 @@ fn fixture(home: &Path) -> TempDir {
         let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
         assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
     }
-    ok(repo, home, &["init", "--providers", "none"]);
+    ok(repo, home, &["init", "--no-harness"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);

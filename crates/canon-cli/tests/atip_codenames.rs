@@ -92,7 +92,7 @@ fn repo() -> TempDir {
         let out = Command::new("git").args(args).current_dir(d).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
     }
-    let out = canon(d, &["init", "--providers", "none"], None);
+    let out = canon(d, &["init", "--no-harness"], None);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
     dir
 }
@@ -205,7 +205,7 @@ fn atip_codenames_01_a_task_of_a_plan_dialect_that_cannot_be_flipped_is_task_uns
 fn atip_codenames_01_skills_check_that_finds_drift_is_skills_check_failed_with_the_reason_drift() {
     let dir = repo();
     let d = dir.path();
-    let out = canon(d, &["skills", "check", "--providers", "claude"], None);
+    let out = canon(d, &["skills", "check", "--harness", "claude"], None);
     let b = body(&out);
     assert_eq!(out.status.code(), Some(1), "{b}");
     assert_eq!((b["error"]["code"].as_str(), b["error"]["reason"].as_str(), b["error"]["retryable"].as_bool()), (Some("SKILLS_CHECK_FAILED"), Some("DRIFT"), Some(false)), "{b}");
@@ -357,7 +357,7 @@ fn atip_codenames_01_retrieve_with_a_domain_that_makes_no_regime_key_is_retrieve
         let out = Command::new("git").args(args).current_dir(&d).output().unwrap();
         assert!(out.status.success(), "git {args:?}");
     }
-    let out = canon(&d, &["init", "--providers", "none"], None);
+    let out = canon(&d, &["init", "--no-harness"], None);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
     fails(&d, Some("implementer"), &["retrieve", "--for-role", "implementer", "--domain", "dev"], 2, "RETRIEVE_INVALID", None, None);
     // A domain that is no slug is the usage of the option now.

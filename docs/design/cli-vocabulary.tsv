@@ -47,6 +47,7 @@ file-ref	TEXT	place in the tree a finding points at
 flow	FLOW_ID	flow of the original spec
 for-role	ROLE	role the retrieved guidance is for
 full	-	mode: re-hash every blob
+harness	NAME	a harness the canon skill is installed for (repeatable, one per name: init and skills)
 hash	HASH	regime hash segment
 history	-	mode: every version of a record
 home	DIR	home directory sessions are scanned under
@@ -66,6 +67,7 @@ matcher	TEXT	hook matcher
 max-artifact-mib	N	size cap of one bound artifact in MiB
 model	NAME	declared model
 no-agents-md	-	mode: leave AGENTS.md alone
+no-harness	-	mode: choose no harness for the canon skill
 no-policy	-	mode: write no starter policy
 no-promote	-	mode: keep a staged record staged
 note	TEXT	free-text note on a record
@@ -84,7 +86,6 @@ project	PROJECT_ID	spec root a record belongs to
 promote	-	mode: promote the record staged in this run
 prompt-bundle	NAME@VERSION	prompt bundle version
 provider	NAME	declared provider
-providers	LIST	comma list of harness providers
 reason	TEXT	why a record or refusal waiver exists
 ref	TEXT	what the evidence refers to
 regime	KEY	full regime key

@@ -75,7 +75,7 @@ fn git(dir: &Path, args: &[&str]) {
 fn scratch_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["subject", "new", "demo-two", "--domain", "dev", "--title", "Demo two"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
@@ -373,7 +373,7 @@ fn atip_l0_24_export_into_a_read_only_canon_directory_is_refused() {
 fn atip_l0_24_skills_install_into_a_read_only_repo_is_refused() {
     let dir = scratch_repo();
     let repo = dir.path().to_path_buf();
-    assert_refused(&repo, &[&repo], &["skills", "install", "--providers", "claude"], WRITE_DENIED, "read-only");
+    assert_refused(&repo, &[&repo], &["skills", "install", "--harness", "claude"], WRITE_DENIED, "read-only");
 }
 
 #[test]

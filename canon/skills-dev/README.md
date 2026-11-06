@@ -24,5 +24,5 @@ source `.install-lock.json`. Its lock records source hashes, not output
 hashes, so it cannot prove which `.codex/skills/<name>.md` files an earlier
 release wrote; delete those by hand after reinstalling.
 The canonical installer never mutates this source or its lock. Do not use
-`--providers` with this legacy source; provider selection applies to the
+`--harness` with this legacy source; harness selection applies to the
 canonical `SKILL.src.md` bundle only.

@@ -23,7 +23,7 @@ fn repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     git(root, &["init", "-q"]);
-    let init = canon(root, &["init", "--no-agents-md", "--policy", "light", "--providers", "none"]);
+    let init = canon(root, &["init", "--no-agents-md", "--policy", "light", "--no-harness"]);
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     let policy = root.join(".canon/policy.yaml");
     let text = std::fs::read_to_string(&policy).unwrap();

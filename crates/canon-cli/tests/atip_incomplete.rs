@@ -201,7 +201,6 @@ const INCOMPLETE: &[(&str, bool, &[&str])] = &[
         false,
         &[
             "CONFIG_INVALID",
-            "SKILLS_ARGUMENT_INVALID",
             "SKILLS_SOURCE_NOT_FOUND",
         ],
     ),
@@ -800,15 +799,15 @@ fn atip_midway_06_a_refusal_with_no_effect_is_exit_2_with_the_refusals_own_code(
         1,
         "only the .pi directory the test made"
     );
-    // And a refusal before any step is exit 2 too: an unknown provider names the refusal and writes nothing.
+    // And a refusal before any step is exit 2 too: an unknown harness names the refusal and writes nothing.
     let unknown = pi_repo(dir.path(), "unknown");
     let refused = canon(
         &unknown,
-        &["init", "--providers", "gemini", "--json"],
+        &["init", "--harness", "gemini", "--json"],
         &dir.path().join("missing"),
     );
     assert_eq!(refused.status.code(), Some(2));
-    assert_eq!(document(&refused)["error"]["code"], "INIT_ARGUMENT_INVALID");
+    assert_eq!(document(&refused)["error"]["code"], "USAGE");
     assert!(!unknown.join("canon.yaml").exists());
 }
 
@@ -879,7 +878,7 @@ fn atip_midway_08_a_batch_element_that_stops_part_way_is_failed_with_its_reason_
     let dir = tempfile::tempdir().expect("a temp dir");
     let repo = pi_repo(dir.path(), "repo");
     let input =
-        serde_json::json!([{"providers": "pi"}, {"providers": "pi", "language": "en"}]).to_string();
+        serde_json::json!([{"harness": ["pi"]}, {"harness": ["pi"], "language": "en"}]).to_string();
     let out = canon(
         &repo,
         &["init", "--input", &input, "--json"],
@@ -1480,7 +1479,7 @@ fn repo_with_scenario() -> tempfile::TempDir {
     git(repo, &["init", "-q", "-b", "main"]);
     git(repo, &["commit", "-q", "--allow-empty", "-m", "seed"]);
     for args in [
-        &["init", "--providers", "none"][..],
+        &["init", "--no-harness"][..],
         &["feature", "new", "world.a", "--title", "A"],
         &["scenario", "new", "world.a.01", "--title", "one"],
         &["inventory", "sync"],

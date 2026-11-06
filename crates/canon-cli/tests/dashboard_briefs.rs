@@ -60,7 +60,7 @@ fn brief_path(repo: &Path, change: &str) -> PathBuf {
 fn repo_with_briefs() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     for change in ["ready", "blocked", "settled"] {
         ok(repo, &["change", "new", change, "--subject", "demo", "--title", change]);

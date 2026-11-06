@@ -151,7 +151,7 @@ fn en_brief(extra: &str) -> String {
 fn repo_with_clean_brief() -> TempDir {
     let dir = git_repo();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["init", "--no-harness"], None);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"], Some("planner"));
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"], Some("planner"));
     std::fs::write(brief_path(repo), en_brief("")).unwrap();
@@ -168,7 +168,7 @@ const ATTEST: [&str; 12] = ["evidence", "add", "--task", "add-login#1", "--class
 /// A repo `canon init`ed on a commit, with a run of `dev` begun; returns the repo and the run id.
 fn repo_with_run() -> (TempDir, String) {
     let dir = git_repo();
-    ok(dir.path(), &["init", "--providers", "none"], None);
+    ok(dir.path(), &["init", "--no-harness"], None);
     let begun = ok(dir.path(), &["dispatch", "begin", "--role", "dev", "--regime", "dev/canon/join-spine/9c93d024b1a2"], None);
     let run_id = begun["data"]["runId"].as_str().expect("a run id").to_string();
     (dir, run_id)
@@ -178,7 +178,7 @@ fn repo_with_run() -> (TempDir, String) {
 fn repo_with_dashboard() -> TempDir {
     let dir = git_repo();
     let l = dir.path();
-    ok(l, &["init", "--providers", "none"], None);
+    ok(l, &["init", "--no-harness"], None);
     let app = l.join("packages/dashboard");
     std::fs::create_dir_all(app.join("dist/snapshot")).unwrap();
     std::fs::write(app.join("package.json"), r#"{"name":"@canon-dev/dashboard"}"#).unwrap();
@@ -283,7 +283,7 @@ fn atip_codeexit_01_the_evidence_add_refusals_are_exit_2_and_write_nothing() {
 fn atip_codeexit_01_gate_promote_with_a_refused_record_is_exit_2_and_leaves_it_staged() {
     let dir = git_repo();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["init", "--no-harness"], None);
     ok(repo, &["finding", "add", "--change", "c1", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "a1", "--summary", "first", "--promote"], Some("reviewer"));
     let ledger = repo.join(".canon/ledger/kind=finding");
     let mut committed = std::fs::read_dir(&ledger).unwrap().map(|entry| entry.unwrap().path());
@@ -304,7 +304,7 @@ fn atip_codeexit_01_gate_promote_with_a_refused_record_is_exit_2_and_leaves_it_s
 fn atip_codeexit_01_a_subject_move_without_its_approval_is_exit_2_and_changes_no_status() {
     let dir = git_repo();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["init", "--no-harness"], None);
     ok(repo, &["subject", "new", "demo", "--domain", "d", "--title", "T"], Some("planner"));
     for to in ["specced", "building", "verifying"] {
         ok(repo, &["subject", "move", "demo", "--to", to], Some("planner"));
@@ -343,7 +343,7 @@ fn atip_codeexit_01_a_policy_edited_after_its_approval_refuses_the_ship_with_exi
 fn atip_codeexit_01_a_divergence_the_gate_refuses_is_exit_2_and_writes_nothing() {
     let dir = git_repo();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"], None);
+    ok(repo, &["init", "--no-harness"], None);
     // A file where the committed ledger holds the kind's directory: the candidate stages, and its promotion is refused.
     std::fs::create_dir_all(repo.join(".canon/ledger")).unwrap();
     std::fs::write(repo.join(".canon/ledger/kind=divergence"), "not a directory\n").unwrap();
@@ -422,7 +422,7 @@ fn atip_codeexit_01_the_strategy_refusals_are_exit_2_and_write_nothing() {
 fn atip_codeexit_01_context_git_required_is_exit_2_and_writes_nothing() {
     let dir = git_repo();
     let p = dir.path();
-    ok(p, &["init", "--providers", "none"], None);
+    ok(p, &["init", "--no-harness"], None);
     std::fs::write(p.join("doc.md"), "hi\n").unwrap();
     std::fs::write(p.join("m.json"), r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":["doc.md"],"examples":[],"toolSchemas":[],"injectedGuidance":[]}"#).unwrap();
     let no_git = TempDir::new().unwrap();
@@ -436,7 +436,7 @@ fn atip_codeexit_01_context_git_required_is_exit_2_and_writes_nothing() {
 fn atip_codeexit_01_context_object_conflict_is_exit_2_and_writes_nothing() {
     let dir = git_repo();
     let d = dir.path();
-    ok(d, &["init", "--providers", "none"], None);
+    ok(d, &["init", "--no-harness"], None);
     std::fs::write(d.join("doc.md"), "hi\n").unwrap();
     std::fs::write(d.join("m.json"), r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":["doc.md"],"examples":[],"toolSchemas":[],"injectedGuidance":[]}"#).unwrap();
     let objects = d.join(".canon/context-packs/objects");
@@ -466,7 +466,7 @@ fn atip_codeexit_01_ingest_source_invalid_is_exit_2_and_writes_nothing() {
 fn atip_codeexit_01_the_dashboard_refusals_are_exit_2_and_write_nothing() {
     let dir = git_repo();
     let d = dir.path();
-    ok(d, &["init", "--providers", "none"], None);
+    ok(d, &["init", "--no-harness"], None);
     let package = d.join("packages/dashboard");
     std::fs::create_dir_all(package.join("dist")).unwrap();
     std::fs::write(package.join("package.json"), r#"{"name":"@acme/dashboard"}"#).unwrap();

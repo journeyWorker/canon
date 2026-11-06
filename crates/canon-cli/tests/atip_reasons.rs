@@ -42,7 +42,7 @@ fn git(dir: &Path, args: &[&str]) {
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     git(repo, &["init", "-q"]);
@@ -117,7 +117,6 @@ const AUDIT: &[Row] = &[
     ("FINDING_INCOMPLETE", "PROMOTION_INVALID", "fix the staged record, then run gate promote"),
     ("HOOKS_INSTALL_INCOMPLETE", "WRITE_FAILED", "finish the write the message names, then install the hooks again"),
     ("INIT_INCOMPLETE", "CONFIG_INVALID", "fix the skills: section, then run skills install"),
-    ("INIT_INCOMPLETE", "SKILLS_ARGUMENT_INVALID", "name a known provider, then run skills install"),
     ("INIT_INCOMPLETE", "SKILLS_SOURCE_NOT_FOUND", "name the skill source directory, then run skills install"),
     ("INPUT_INVALID", "BATCH_UNSUPPORTED", "pass one object and run once per item"),
     ("INPUT_INVALID", "EMPTY", "pass a document"),
@@ -652,6 +651,9 @@ fn atip_reasons_08_no_source_sets_an_exit_or_a_retryable_value_beside_the_regist
 
 // ── F6: the changelog ──
 
+/// The `(code, reason)` pairs the table of the CHANGELOG lists that a later release removed from the registry.
+const REMOVED_LATER: [(&str, &str); 1] = [("INIT_INCOMPLETE", "SKILLS_ARGUMENT_INVALID")];
+
 /// The rows `| `CODE` | `A`, `B` | … |` of the table whose header starts with `| Code | Reasons now |`.
 fn changelog_reason_rows() -> BTreeMap<String, BTreeSet<String>> {
     let text = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
@@ -687,7 +689,9 @@ fn atip_reasons_09_the_changelog_table_is_the_registry_and_stopped_midway_and_it
     assert!(rows.len() >= 14, "the CHANGELOG lists the codes whose reasons the change settled: {rows:?}");
     for (code, reasons) in &rows {
         let info = code_info(code).unwrap_or_else(|| panic!("the CHANGELOG names {code}, which is no registered code"));
-        let registered: BTreeSet<String> = info.reasons.iter().map(|r| r.reason.to_string()).collect();
+        let mut registered: BTreeSet<String> = info.reasons.iter().map(|r| r.reason.to_string()).collect();
+        // A reason a later release removed stays in the table of the release that made it (`canon-0-38-provider-option` removed the reason of `--providers`).
+        registered.extend(REMOVED_LATER.iter().filter(|(removed_from, _)| *removed_from == code.as_str()).map(|(_, reason)| (*reason).to_string()));
         assert_eq!(&registered, reasons, "{code}: the CHANGELOG and the registry list different reasons");
     }
     // Each code of the brief's table of F2 is in the CHANGELOG table.

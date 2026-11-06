@@ -23,9 +23,12 @@ pub struct InitArgs {
     /// Do not write the starter .canon/policy.yaml
     #[arg(long)]
     pub no_policy: bool,
-    /// Harnesses to install the canon skill for, without asking: `none`, or `claude`, `codex`, `omp`, `pi` in lowercase joined by single commas (no space, no empty item)
-    #[arg(long, value_name = "LIST")]
-    pub providers: Option<String>,
+    /// A harness to install the canon skill for, without asking (repeatable, once per name): `claude`, `codex`, `omp` or `pi`. Omitted, and no `--no-harness`: the detected harnesses
+    #[arg(long, value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::skills::harness_option_names()))]
+    pub harness: Vec<String>,
+    /// Install the canon skill for no harness: records an empty `skills.providers`
+    #[arg(long)]
+    pub no_harness: bool,
     /// Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml
     #[arg(long, value_name = "TAG")]
     pub language: Option<String>,

@@ -429,7 +429,7 @@ fn search_index_09_the_read_leaves_name_the_cache_in_their_effect_note_init_igno
     let traced = with_home(&["trace", "abcdef1", "--json"]);
     assert!(warnings(&traced).iter().any(|w| w.contains("canon init")), "trace warns too: {:?}", warnings(&traced));
 
-    let init = with_home(&["init", "--providers", "none", "--no-agents-md", "--no-policy"]);
+    let init = with_home(&["init", "--no-harness", "--no-agents-md", "--no-policy"]);
     assert!(init.status.success(), "{}", text(&init));
     assert!(std::fs::read_to_string(r.join(".gitignore")).unwrap().lines().any(|l| l == ".canon/index/"));
     let after = with_home(&["search", "loop", "--json"]);

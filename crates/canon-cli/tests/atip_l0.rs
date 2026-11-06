@@ -42,7 +42,7 @@ fn ok(dir: &Path, args: &[&str]) {
 fn scratch_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["subject", "new", "demo-two", "--domain", "dev", "--title", "Demo two"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
@@ -100,7 +100,7 @@ fn atip_l0_01_status_json_names_the_tool_its_version_and_the_contract() {
 #[test]
 fn atip_l0_02_an_output_is_named_when_the_command_declares_several() {
     let dir = TempDir::new().unwrap();
-    let init = json(&canon(dir.path(), &["init", "--providers", "none", "--json"]));
+    let init = json(&canon(dir.path(), &["init", "--no-harness", "--json"]));
     assert_eq!(init["meta"]["output"], "InitReport");
     let check = json(&canon(dir.path(), &["init", "--check", "--json"]));
     assert_eq!(check["meta"]["output"], "InitCheckReport");

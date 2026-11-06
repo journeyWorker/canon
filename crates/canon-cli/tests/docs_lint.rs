@@ -461,7 +461,7 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
     let home = TempDir::new().unwrap();
     let base = TempDir::new().unwrap();
     let repo = base.path();
-    ok(repo, home.path(), &["init", "--providers", "none"]);
+    ok(repo, home.path(), &["init", "--no-harness"]);
     ok(repo, home.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, home.path(), &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home.path(), &["feature", "new", "auth.login", "--title", "Login"]);

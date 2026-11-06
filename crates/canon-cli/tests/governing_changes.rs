@@ -73,7 +73,7 @@ fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     git_seed(dir.path());
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none", "--no-agents-md", "--no-policy"]);
+    ok(repo, &["init", "--no-harness", "--no-agents-md", "--no-policy"]);
     for id in ["s", "t"] {
         ok(repo, &["subject", "new", id, "--domain", "dev", "--title", id]);
     }

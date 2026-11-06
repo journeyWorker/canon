@@ -37,7 +37,7 @@ fn fixture(name: &str) -> String {
 /// subject `demo` and change `add-login`.
 fn repo_with_change(lang: Option<&str>) -> TempDir {
     let dir = TempDir::new().unwrap();
-    let mut init = vec!["init", "--providers", "none"];
+    let mut init = vec!["init", "--no-harness"];
     if let Some(lang) = lang {
         init.extend(["--language", lang]);
     }

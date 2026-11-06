@@ -1,0 +1,4 @@
+canon: USAGE: --providers was removed in 0.38.0
+  field: --providers
+  expected: --harness
+  hint: --providers was removed in 0.38.0; use `canon skills check --harness claude --harness omp`

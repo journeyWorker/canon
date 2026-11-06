@@ -34,7 +34,7 @@ fn unchanged(answer: &Value) -> Option<bool> {
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let r = dir.path();
-    ok(r, &["init", "--providers", "none"]);
+    ok(r, &["init", "--no-harness"]);
     ok(r, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(r, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(r, &["feature", "new", "auth.login", "--title", "Login"]);
@@ -382,7 +382,7 @@ fn an_identical_repeat_of_a_write_leaf_is_unchanged_and_writes_nothing() {
     let home_dir = home.path().to_str().unwrap();
     for args in [
         &["inventory", "sync"][..],
-        &["init", "--providers", "none"],
+        &["init", "--no-harness"],
         &["gate", "install-hooks"],
         &["gate", "promote"],
         &["report", "build"],

@@ -60,7 +60,7 @@ fn repo() -> TempDir {
         assert!(out.status.success(), "{program} {args:?}: {}{}", stdout(&out), stderr(&out));
     };
     run("git", &["init", "-q"]);
-    run(env!("CARGO_BIN_EXE_canon"), &["init", "--providers", "none"]);
+    run(env!("CARGO_BIN_EXE_canon"), &["init", "--no-harness"]);
     run("git", &["add", "-A"]);
     run("git", &["-c", "user.name=canon", "-c", "user.email=canon@example.invalid", "commit", "-q", "-m", "fixture"]);
     run(env!("CARGO_BIN_EXE_canon"), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
@@ -166,17 +166,21 @@ fn golden() -> Vec<(String, Vec<String>)> {
 /// `white_space_0_36.json` names the same list under `changedBy037`.
 const OPTION_VALUES_OPTIONS: [&str; 6] = ["actor", "approver", "relayed-via", "reason", "summary", "override-reason"];
 
-/// The time options and the provider list that `canon-0-37-option-forms` narrowed to RFC 3339 and to the exact names. A place of the golden file that holds one has a
-/// pattern that deliberately refuses what 0.36.0 took (white space, a one-digit month, a sign on the year, a date alone for `--approval-at`, a capital in a provider),
+/// The time options that `canon-0-37-option-forms` narrowed to RFC 3339. A place of the golden file that holds one has a
+/// pattern that deliberately refuses what 0.36.0 took (white space, a one-digit month, a sign on the year, a date alone for `--approval-at`),
 /// and says it without the white-space property, so it is not held to the old pattern (`atip.optionforms.*` hold it; `white_space_0_36.json` names the list under
 /// `changedBy037Forms`).
-const OPTION_FORMS_OPTIONS: [&str; 7] = ["approval-at", "expiry", "as-of", "before", "after", "since", "providers"];
+const OPTION_FORMS_OPTIONS: [&str; 6] = ["approval-at", "expiry", "as-of", "before", "after", "since"];
+
+/// The option `canon-0-38-provider-option` removed: `--providers` is declared nowhere in 0.38, so its places of the golden file (`changedBy038`) have no pattern to hold.
+const REMOVED_OPTIONS: [&str; 1] = ["providers"];
 
 /// How many of the 59 places of the golden file hold an option of each change, how many distinct patterns of the unchanged places are compared with their new spelling,
 /// and how many distinct patterns that name white space the build declares now.
 const VALUES_PLACES: usize = 17;
-const FORMS_PLACES: usize = 13;
-const CHANGED_PLACES: usize = VALUES_PLACES + FORMS_PLACES;
+const FORMS_PLACES: usize = 11;
+const REMOVED_PLACES: usize = 2;
+const CHANGED_PLACES: usize = VALUES_PLACES + FORMS_PLACES + REMOVED_PLACES;
 const DISTINCT_COMPARED: usize = 10;
 const DISTINCT_NOW: usize = 11;
 
@@ -188,9 +192,13 @@ fn changed_by_option_forms(place: &str) -> bool {
     place.rsplit_once(" --").is_some_and(|(_, option)| OPTION_FORMS_OPTIONS.contains(&option))
 }
 
-/// A place of the golden file that a 0.37 change re-declared on purpose.
+fn removed_by_038(place: &str) -> bool {
+    place.rsplit_once(" --").is_some_and(|(_, option)| REMOVED_OPTIONS.contains(&option))
+}
+
+/// A place of the golden file that a 0.37 change re-declared on purpose, or the 0.38 change removed.
 fn changed_by_037(place: &str) -> bool {
-    changed_by_option_values(place) || changed_by_option_forms(place)
+    changed_by_option_values(place) || changed_by_option_forms(place) || removed_by_038(place)
 }
 
 /// The places that had no pattern with white space in 0.36.0 and have the text pattern or the regime key now.
@@ -491,18 +499,18 @@ fn atip_claim15_03_no_declared_pattern_lists_white_space_and_each_says_it_as_the
     assert_eq!((golden.iter().map(|(_, places)| places.len()).sum::<usize>(), golden.len()), (59, 17), "59 declarations, 17 distinct patterns of 0.36.0");
     assert_eq!(golden.iter().flat_map(|(_, places)| places).filter(|place| changed_by_option_values(place)).count(), VALUES_PLACES);
     assert_eq!(golden.iter().flat_map(|(_, places)| places).filter(|place| changed_by_option_forms(place)).count(), FORMS_PLACES);
+    assert_eq!(golden.iter().flat_map(|(_, places)| places).filter(|place| removed_by_038(place)).count(), REMOVED_PLACES);
+    assert!(!declared.keys().any(|place| removed_by_038(place)), "`--providers` is declared nowhere in 0.38");
     for (place, pattern) in declared.iter().filter(|(place, _)| changed_by_option_values(place)) {
         assert!(pattern.contains("[^\\p{Cc}\\p{Zl}\\p{Zp}]"), "`{place}` declares the one text pattern of 0.37: {pattern}");
     }
     for (place, pattern) in declared.iter().filter(|(place, _)| changed_by_option_forms(place)) {
-        let want = if place.ends_with("--providers") {
-            canon_cli::arg_rules::PROVIDERS
-        } else if place.ends_with("--approval-at") {
+        let want = if place.ends_with("--approval-at") {
             canon_cli::arg_rules::DATE_TIME
         } else {
             canon_cli::arg_rules::TIMESTAMP
         };
-        assert_eq!(pattern, want, "`{place}` declares the RFC 3339 or the provider pattern of 0.37");
+        assert_eq!(pattern, want, "`{place}` declares the RFC 3339 pattern of 0.37");
     }
     let distinct: BTreeSet<&String> = declared.iter().filter(|(_, pattern)| pattern.contains("White_Space")).map(|(_, pattern)| pattern).collect();
     assert_eq!(distinct.len(), DISTINCT_NOW, "the distinct patterns now: {distinct:#?}");

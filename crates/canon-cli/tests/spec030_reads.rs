@@ -55,7 +55,7 @@ fn repo_with_subject() -> tempfile::TempDir {
         let out = Command::new("git").args(args).current_dir(dir.path()).output().unwrap();
         assert!(out.status.success());
     }
-    assert!(canon(dir.path(), &["init", "--providers", "none"]).status.success());
+    assert!(canon(dir.path(), &["init", "--no-harness"]).status.success());
     assert!(canon(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]).status.success());
     dir
 }

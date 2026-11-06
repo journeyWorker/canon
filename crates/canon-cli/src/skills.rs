@@ -28,12 +28,12 @@
 //! (#10, [`build_claims`]); it only reports them.
 //!
 //! Which providers `install`, `check` and `doctor` serve (0.17 D5,
-//! [`select_providers`]): an explicit `--providers`, else `canon.yaml`'s
+//! [`select_providers`]): an explicit `--harness` or `--no-harness`, else `canon.yaml`'s
 //! `skills: { providers: [...] }`, else the providers the install lock
 //! records (a repo from before 0.17), else the harnesses whose marker
 //! directory (`.claude`, `.codex`, `.omp`, `.pi`) exists. Nothing is ever
 //! added by default: with no marker, nothing is selected and the commands
-//! say how to choose. `install --providers` also rewrites
+//! say how to choose. `install --harness` also rewrites
 //! `skills.providers` in an existing `canon.yaml`. `doctor` names a canon
 //! projection directory left behind for a provider that is not selected.
 //!
@@ -102,7 +102,7 @@ struct ProviderDescriptor {
     /// `<root>/skills/canon/`.
     root: &'static str,
     /// Directories whose presence selects the provider when neither
-    /// `--providers`, `canon.yaml` `skills.providers` nor an install lock
+    /// `--harness`, `canon.yaml` `skills.providers` nor an install lock
     /// names the providers.
     markers: &'static [&'static str],
 }
@@ -162,7 +162,7 @@ impl Provider {
 /// Where [`select_providers`] took the providers from (0.17 D5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderOrigin {
-    /// An explicit `--providers`.
+    /// An explicit `--harness` or `--no-harness`.
     Flag,
     /// `canon.yaml`'s `skills.providers`.
     Config,
@@ -184,7 +184,7 @@ impl ProviderSelection {
     /// "from canon.yaml skills.providers", "detected: .claude, .omp", ….
     pub fn describe(&self) -> String {
         match self.origin {
-            ProviderOrigin::Flag => "from --providers".into(),
+            ProviderOrigin::Flag => "from --harness or --no-harness".into(),
             ProviderOrigin::Config => "from canon.yaml skills.providers".into(),
             ProviderOrigin::Lock => "from the install lock; canon.yaml has no skills: key".into(),
             ProviderOrigin::Detected if self.providers.is_empty() => {
@@ -212,7 +212,7 @@ const MARKER_LIST: &str = ".claude, .codex, .omp or .pi";
 
 /// How to choose providers when none is selected.
 pub const CHOOSE_PROVIDERS: &str =
-    "choose with `canon skills install --providers=<list>` (any of claude, codex, omp, pi)";
+    "choose with `canon skills install --harness claude` (once for each of claude, codex, omp, pi) or `canon skills install --no-harness`";
 
 /// `claude,omp`, or `none` for an empty list.
 pub fn provider_names(providers: &[Provider]) -> String {
@@ -220,6 +220,14 @@ pub fn provider_names(providers: &[Provider]) -> String {
         return "none".into();
     }
     providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(",")
+}
+
+/// The options that choose `providers`: `--harness claude --harness omp`, or `--no-harness` for an empty list.
+pub fn harness_flags_text(providers: &[Provider]) -> String {
+    if providers.is_empty() {
+        return "--no-harness".into();
+    }
+    providers.iter().map(|p| format!("--harness {}", p.as_str())).collect::<Vec<_>>().join(" ")
 }
 
 /// A projected file the install lock lists and the bundle no longer ships
@@ -266,7 +274,7 @@ pub struct CanonicalInstallReport {
     pub origin: ProviderOrigin,
     pub source_hash: String,
     pub changed: bool,
-    /// The `canon.yaml` whose `skills.providers` an explicit `--providers`
+    /// The `canon.yaml` whose `skills.providers` an explicit `--harness`
     /// rewrote; `None` when it already held that list or does not exist.
     pub config_written: Option<PathBuf>,
     /// Files the previous lock listed and the new bundle no longer ships,
@@ -342,7 +350,7 @@ pub enum SkillsError {
     SourceNotFound(PathBuf),
     #[error("canonical skill source is missing SKILL.src.md under {0}")]
     CanonicalSourceMissing(PathBuf),
-    #[error("invalid provider `{0}`; expected one of: claude, codex, omp, pi, or none")]
+    #[error("unknown provider `{0}`; expected one of: claude, codex, omp, pi")]
     InvalidProvider(String),
     #[error(transparent)]
     Config(#[from] SkillsConfigError),
@@ -658,20 +666,28 @@ pub fn provider_bundle_root(target_dir: &Path, provider: Provider) -> PathBuf {
     provider_skill_root(target_dir, provider).join("canon")
 }
 
-/// A `--providers` value (0.37 `canon-0-37-option-forms`): `none` for none, else one or more of the provider names (`claude`, `codex`, `omp`,
-/// `pi`, lowercase) joined by single commas, with no white space and no empty item. Sorted, without duplicates (a name written twice is taken).
-pub fn parse_provider_list(value: &str) -> Result<Vec<Provider>, SkillsError> {
-    if value == "none" {
-        return Ok(Vec::new());
+/// The provider names an option takes: `claude`, `codex`, `omp`, `pi`, in stable order (the `possibleValues` of `--harness`).
+pub fn harness_option_names() -> Vec<&'static str> {
+    ALL_PROVIDERS.into_iter().map(Provider::as_str).collect()
+}
+
+/// The providers `--harness` and `--no-harness` choose (`canon-0-38-provider-option`): `None` when neither is given, `Some` of an empty list for
+/// `--no-harness`, else the names given, sorted, without duplicates (a name written twice is taken once). The argument stage admits only
+/// the four names, so a name that is none of them is the caller's own error, not a value to take.
+pub fn harness_flags(names: &[String], none: bool) -> Result<Option<Vec<Provider>>, SkillsError> {
+    if none {
+        return Ok(Some(Vec::new()));
+    }
+    if names.is_empty() {
+        return Ok(None);
     }
     let mut providers = Vec::new();
-    for part in value.split(',') {
-        let provider = ALL_PROVIDERS.into_iter().find(|provider| provider.descriptor().name == part).ok_or_else(|| SkillsError::InvalidProvider(part.to_string()))?;
-        providers.push(provider);
+    for name in names {
+        providers.push(ALL_PROVIDERS.into_iter().find(|provider| provider.descriptor().name == name).ok_or_else(|| SkillsError::InvalidProvider(name.clone()))?);
     }
     providers.sort();
     providers.dedup();
-    Ok(providers)
+    Ok(Some(providers))
 }
 
 /// The providers whose marker directory (`.claude`, `.codex`, `.omp`,
@@ -748,7 +764,7 @@ pub fn configured_providers(canon_yaml: &Path) -> Result<Option<Vec<Provider>>, 
 pub const SKILLS_CONFIG_COMMENT: &str = "\
 # Harnesses the canon skill is installed for: any of claude, codex, omp, pi
 # (`[]` for none). `canon skills install|check|doctor` follow this list;
-# `canon skills install --providers=<list>` rewrites it.
+# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.
 ";
 
 /// `skills:\n  providers: [claude, omp]\n`.
@@ -832,13 +848,13 @@ fn planned_config(target_dir: &Path, providers: &[Provider]) -> Result<Option<(P
 }
 
 /// The providers a skills command serves (0.17 D5), first match wins:
-/// an explicit `--providers`; `canon.yaml`'s `skills.providers`; the
+/// an explicit `--harness` or `--no-harness`; `canon.yaml`'s `skills.providers`; the
 /// providers the install lock records (a repo set up before 0.17); the
 /// marker directories present. Nothing undetected is ever added, so the
 /// result may be empty.
-pub fn select_providers(target_dir: &Path, flag: Option<&str>) -> Result<ProviderSelection, SkillsError> {
-    if let Some(value) = flag {
-        return Ok(ProviderSelection { providers: parse_provider_list(value)?, origin: ProviderOrigin::Flag });
+pub fn select_providers(target_dir: &Path, flag: Option<&[Provider]>) -> Result<ProviderSelection, SkillsError> {
+    if let Some(providers) = flag {
+        return Ok(ProviderSelection { providers: providers.to_vec(), origin: ProviderOrigin::Flag });
     }
     if let Some(providers) = configured_providers(&target_dir.join("canon.yaml"))? {
         return Ok(ProviderSelection { providers, origin: ProviderOrigin::Config });
@@ -873,7 +889,7 @@ struct CanonicalManifest {
     source_hash: String,
     providers: Vec<String>,
     files: BTreeMap<String, String>,
-    /// Files of providers an explicit `--providers` install did not select
+    /// Files of providers an explicit `--harness` install did not select
     /// (0.25): their projections are untouched, so the lock keeps what it
     /// recorded for them, and a later install for that provider still
     /// prunes what its bundle dropped. Never part of the projection.
@@ -1459,7 +1475,7 @@ fn legacy_codex_remnants(target_dir: &Path) -> Vec<PathBuf> {
 /// The install command for `providers`: what rewrites an outdated lock or
 /// migrates a legacy Codex projection.
 pub fn install_command(providers: &[Provider]) -> String {
-    format!("canon skills install --providers={}", provider_names(providers))
+    format!("canon skills install {}", harness_flags_text(providers))
 }
 
 /// Build verbs, in every form [`build_claims`] matches.
@@ -1602,7 +1618,7 @@ pub fn competing_skills(target_dir: &Path) -> Vec<CompetingSkill> {
 pub fn install_canonical(
     source_dir: Option<&Path>,
     target_dir: &Path,
-    providers: Option<&str>,
+    providers: Option<&[Provider]>,
     dry_run: bool,
 ) -> Result<CanonicalInstallReport, SkillsError> {
     let selection = select_providers(target_dir, providers)?;
@@ -1752,7 +1768,7 @@ const STUB_SINCE: (u64, u64) = (0, 28);
 pub fn check(
     source_dir: Option<&Path>,
     target_dir: &Path,
-    providers: Option<&str>,
+    providers: Option<&[Provider]>,
 ) -> Result<SkillsCheckOutcome, SkillsError> {
     let selection = select_providers(target_dir, providers)?;
     let selected = selection.providers;
@@ -1815,7 +1831,7 @@ pub fn stray_projections(target_dir: &Path, selected: &[Provider]) -> Vec<(Provi
 pub fn doctor(
     source_dir: Option<&Path>,
     target_dir: &Path,
-    providers: Option<&str>,
+    providers: Option<&[Provider]>,
 ) -> Result<Vec<String>, SkillsError> {
     let selection = select_providers(target_dir, providers)?;
     let mut lines = vec![match selection.origin {

@@ -38,7 +38,7 @@ fn ok(dir: &Path, args: &[&str]) -> Value {
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     for subject in ["demo", "demo-two", "demo-three"] {
         ok(repo, &["subject", "new", subject, "--domain", "dev", "--title", &format!("Title {subject}")]);
     }

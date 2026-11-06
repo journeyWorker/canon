@@ -30,7 +30,7 @@ fn ok(repo: &Path, args: &[&str], role_flag: Option<&str>, role_env: Option<&str
 
 fn repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    ok(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--providers", "none"], None, None);
+    ok(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--no-harness"], None, None);
     dir
 }
 

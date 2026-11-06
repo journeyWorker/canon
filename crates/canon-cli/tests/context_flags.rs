@@ -38,7 +38,7 @@ fn strings(value: &Value) -> Vec<&str> {
 /// A repo `canon init` set up, with nothing authored in it.
 fn fresh_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-harness"]);
     dir
 }
 

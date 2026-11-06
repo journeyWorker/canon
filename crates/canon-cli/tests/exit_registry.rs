@@ -245,7 +245,7 @@ fn atip_l0_24_a_directory_that_cannot_be_written_refuses_with_exit_2_and_changes
 
     let dir = TempDir::new().expect("a temp dir under std::env::temp_dir()");
     let repo = dir.path();
-    let init = canon(repo, &["init", "--providers", "none"]);
+    let init = canon(repo, &["init", "--no-harness"]);
     assert!(init.status.success(), "{}{}", String::from_utf8_lossy(&init.stdout), String::from_utf8_lossy(&init.stderr));
 
     let original = fs::metadata(repo).unwrap().permissions();

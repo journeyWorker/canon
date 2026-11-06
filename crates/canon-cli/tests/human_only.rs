@@ -31,7 +31,7 @@ fn run(repo: &Path, args: &[&str], role_flag: Option<&str>, role_env: Option<&st
 
 fn repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    let init = run(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--providers", "none"], None, None);
+    let init = run(dir.path(), &["init", "--no-agents-md", "--policy", "light", "--no-harness"], None, None);
     assert!(init.status.success(), "{}{}", String::from_utf8_lossy(&init.stdout), String::from_utf8_lossy(&init.stderr));
     dir
 }

@@ -103,11 +103,11 @@ is attributed, and is fresh — never on a self-report. See
      standalone lines outside code fences; a duplicate or unmatched marker
      is refused and nothing is written.
    - **The canon skill, for the harnesses you pick.** `init` never asks:
-     `--providers claude,codex` (or `none`) is the answer. Without the
-     flag it takes the detected harnesses, the ones whose `.claude`,
+     `--harness claude --harness codex` (or `--no-harness` for none) is the
+     answer. Without those flags it takes the detected harnesses, the ones whose `.claude`,
      `.codex`, `.omp` or `.pi` directory exists, on a terminal or not,
      and with none detected it
-     installs nothing and names `canon skills install --providers=<list>`.
+     installs nothing and names `canon skills install --harness claude` and `--no-harness`.
      The answer is recorded as `skills: { providers: [...] }` in
      `canon.yaml`. `.agents` alone does not select Codex.
 
@@ -251,7 +251,7 @@ canon skills show role-reviewer  # one reference, by name
 ```
 
 `canon skills install` writes only a **stub** `SKILL.md` per selected
-provider: Claude gets `.claude/skills/canon/SKILL.md`, Codex gets
+harness: Claude gets `.claude/skills/canon/SKILL.md`, Codex gets
 `.agents/skills/canon/SKILL.md` (Codex scans `.agents/skills`, never
 `.codex/skills`), OMP gets `.omp/skills/canon/SKILL.md`, and Pi gets
 `.pi/skills/canon/SKILL.md`. The stub carries the skill's frontmatter, so the
@@ -262,13 +262,13 @@ retrieve pre-dispatch script is a sidecar only, not a native hook.
 `canon init` already installed the stub for the harnesses you picked.
 `skills install`, `check` and `doctor` follow `canon.yaml`'s
 `skills.providers`; a repo without that key (set up before 0.17) uses the
-providers its install lock records, then the detected `.claude`, `.codex`,
+harnesses its install lock records, then the detected `.claude`, `.codex`,
 `.omp` and `.pi` directories. Nothing undetected is ever added. Pass
-`--providers` to change the list; install records it in `canon.yaml`:
+`--harness` once for each name (or `--no-harness` for none) to change the list; install records it in `canon.yaml`:
 
 ```bash
-# write the stub for all four providers and record the list
-bunx @journeykit/canon skills install --providers=claude,codex,omp,pi
+# write the stub for all four harnesses and record the list
+bunx @journeykit/canon skills install --harness claude --harness codex --harness omp --harness pi
 
 # inspect projections without writing
 bunx @journeykit/canon skills check

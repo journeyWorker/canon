@@ -22,7 +22,7 @@ fn json(output: &Output) -> Value {
 
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
-    let out = canon(dir.path(), &["init", "--providers", "none"]);
+    let out = canon(dir.path(), &["init", "--no-harness"]);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     dir
 }

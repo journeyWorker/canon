@@ -172,9 +172,9 @@ const DEFAULT_NOTES: &[(&str, &str, &str)] = &[
     ("skills check", "skills-source", "CANON_SKILLS_SOURCE, else canon/skills"),
     ("skills doctor", "skills-source", "CANON_SKILLS_SOURCE, else canon/skills"),
     ("skills install", "skills-source", "CANON_SKILLS_SOURCE, else the text built into the binary"),
-    ("skills install", "providers", "canon.yaml `skills.providers`, else the install lock's providers, else the detected provider directories"),
-    ("skills check", "providers", "the providers `skills install` would use"),
-    ("skills doctor", "providers", "the providers `skills install` would use"),
+    ("skills install", "harness", "canon.yaml `skills.providers`, else the install lock's harnesses, else the detected harness directories"),
+    ("skills check", "harness", "the harnesses `skills install` would use"),
+    ("skills doctor", "harness", "the harnesses `skills install` would use"),
     ("skills show", "name", "the default guide, `canon`"),
 ];
 

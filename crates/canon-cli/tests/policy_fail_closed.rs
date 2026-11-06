@@ -131,7 +131,7 @@ fn policy_show_reads_back_the_approval() {
 fn a_fresh_change_is_the_planners_step_until_its_brief_is_clean() {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    for args in [&["init", "--providers", "none"][..], &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..]] {
+    for args in [&["init", "--no-harness"][..], &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..]] {
         assert!(canon(repo, args).status.success(), "{args:?}");
     }
     let created = canon(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login", "--json"]);

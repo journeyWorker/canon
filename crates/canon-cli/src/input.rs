@@ -1295,11 +1295,11 @@ mod tests {
     /// batch is `BATCH_INCOMPLETE` (spec 8.3.2, 11.11); a reason the registry does not hold under the code is not carried.
     #[test]
     fn atip_midway_08_an_element_that_stopped_midway_keeps_its_code_and_reason_in_its_item_error() {
-        let child = json!({"ok": false, "error": {"code": "INIT_INCOMPLETE", "reason": "SKILLS_ARGUMENT_INVALID", "message": "wrote canon.yaml, then the install was refused", "retryable": false}});
+        let child = json!({"ok": false, "error": {"code": "INIT_INCOMPLETE", "reason": "SKILLS_SOURCE_NOT_FOUND", "message": "wrote canon.yaml, then the install was refused", "retryable": false}});
         let element = error_of(&child, &map(), "/items/0");
-        assert_eq!((element.code, element.reason_name(), element.exit, element.retryable), ("INIT_INCOMPLETE", Some("SKILLS_ARGUMENT_INVALID"), 1, false));
+        assert_eq!((element.code, element.reason_name(), element.exit, element.retryable), ("INIT_INCOMPLETE", Some("SKILLS_SOURCE_NOT_FOUND"), 1, false));
         let item = serde_json::to_value(element.body()).expect("an error body serializes");
-        assert_eq!((item["code"].clone(), item["reason"].clone()), (json!("INIT_INCOMPLETE"), json!("SKILLS_ARGUMENT_INVALID")), "{item}");
+        assert_eq!((item["code"].clone(), item["reason"].clone()), (json!("INIT_INCOMPLETE"), json!("SKILLS_SOURCE_NOT_FOUND")), "{item}");
         let batch = incomplete(&element, 0);
         assert_eq!((batch.code, batch.exit), ("BATCH_INCOMPLETE", 1));
         assert!(batch.message.contains("INIT_INCOMPLETE"), "{}", batch.message);

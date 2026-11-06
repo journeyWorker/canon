@@ -37,7 +37,7 @@ fn ok(dir: &Path, args: &[&str]) {
 fn scratch_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, &["feature", "new", "auth.login", "--title", "Login"]);
@@ -110,7 +110,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
 fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
     let path = |p: &str| scratch.join(p).display().to_string();
     match command {
-        "init" => vec!["--repo".into(), path("fresh"), "--providers".into(), "none".into()],
+        "init" => vec!["--repo".into(), path("fresh"), "--no-harness".into()],
         "demo init" => vec!["--repo".into(), path("demo")],
         // `--role` is optional in the schema (a declared role supplies it), but the sweep declares none.
         "divergence accept" | "divergence add" | "divergence defer" | "divergence resolve" | "dispatch begin" | "evidence audit" | "review scenario" | "review change" => vec!["--role".into(), "reviewer".into()],
@@ -235,7 +235,7 @@ fn gate_check_reports_its_violations_as_json_and_keeps_its_exit_code() {
 #[test]
 fn a_clean_gate_is_data_with_exit_zero() {
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-harness"]);
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     let out = run(dir.path(), &["gate", "check", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
@@ -268,7 +268,7 @@ fn progress_and_refresh_notices_stay_off_stdout_in_json_mode() {
 #[test]
 fn a_failing_format_check_is_an_error_with_the_violations_as_data() {
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["init", "--no-harness"]);
     std::fs::create_dir_all(dir.path().join("corpus/kind=feature")).unwrap();
     std::fs::write(dir.path().join("corpus/kind=feature/bad.feature"), "Feature: no provenance\n  Scenario: s\n    Given x\n").unwrap();
     let out = run(dir.path(), &["format", "corpus", "--json"]);

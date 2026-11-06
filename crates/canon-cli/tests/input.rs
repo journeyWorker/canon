@@ -60,7 +60,7 @@ fn fixture(home: &Path, second: bool) -> TempDir {
         assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
     };
     git(&["init", "-q"]);
-    ok(repo, home, &["init", "--providers", "none"]);
+    ok(repo, home, &["init", "--no-harness"]);
     git(&["add", "-A"]);
     git(&["commit", "-q", "-m", "fixture"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
@@ -411,7 +411,7 @@ fn split_words(line: &str) -> Vec<String> {
 
 fn init_repo(home: &Path) -> TempDir {
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), home, &["init", "--providers", "none"]);
+    ok(dir.path(), home, &["init", "--no-harness"]);
     dir
 }
 

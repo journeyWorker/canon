@@ -133,7 +133,7 @@ fn repo_with(canon_yaml: &str) -> tempfile::TempDir {
 #[test]
 fn init_dry_run_previews_what_it_would_create() {
     let dir = tempfile::tempdir().unwrap();
-    let data = valid_preview(&["init", "--providers", "none"], dir.path(), &[dir.path()]);
+    let data = valid_preview(&["init", "--no-harness"], dir.path(), &[dir.path()]);
     assert!(data["steps"].as_array().is_some_and(|steps| steps.iter().any(|s| s["step"] == "config")), "{data}");
 }
 
@@ -141,7 +141,7 @@ fn init_dry_run_previews_what_it_would_create() {
 fn init_dry_run_refuses_like_the_real_run() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("AGENTS.md"), "<!-- canon:begin -->\nunterminated\n").unwrap();
-    assert_eq!(bad_preview(&["init", "--providers", "none"], dir.path(), &[dir.path()]), "INIT_AGENTS_MD_CONFLICT");
+    assert_eq!(bad_preview(&["init", "--no-harness"], dir.path(), &[dir.path()]), "INIT_AGENTS_MD_CONFLICT");
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn skills_install_dry_run_previews_without_writing() {
     let target = tmp.path().join("target");
     std::fs::create_dir_all(&target).unwrap();
     let data = valid_preview(
-        &["skills", "install", "--skills-source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--providers", "claude"],
+        &["skills", "install", "--skills-source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--harness", "claude"],
         tmp.path(),
         &[tmp.path()],
     );
@@ -184,8 +184,8 @@ fn skills_install_dry_run_refuses_like_the_real_run() {
     let target = tmp.path().join("target");
     std::fs::create_dir_all(&target).unwrap();
     assert_eq!(
-        bad_preview(&["skills", "install", "--skills-source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--providers", "bogus"], tmp.path(), &[tmp.path()]),
-        "SKILLS_ARGUMENT_INVALID"
+        bad_preview(&["skills", "install", "--skills-source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--harness", "bogus"], tmp.path(), &[tmp.path()]),
+        "USAGE"
     );
 }
 

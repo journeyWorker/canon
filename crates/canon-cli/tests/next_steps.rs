@@ -121,7 +121,7 @@ fn repo_with_change() -> (TempDir, Value) {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
     git_seed(repo);
-    ok(repo, &["init", "--providers", "none", "--json"]);
+    ok(repo, &["init", "--no-harness", "--json"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo", "--json"]);
     let created = ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login", "--json"]);
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief()).unwrap();

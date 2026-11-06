@@ -197,7 +197,7 @@ fn repo_with_change() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-q"]);
     for args in [
-        &["init", "--repo", ".", "--no-policy", "--providers", "none"][..],
+        &["init", "--repo", ".", "--no-policy", "--no-harness"][..],
         &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"],
         &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"],
     ] {

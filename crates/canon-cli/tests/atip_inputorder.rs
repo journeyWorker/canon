@@ -59,7 +59,7 @@ fn fixture() -> TempDir {
         assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
     };
     git(&["init", "-q"]);
-    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["init", "--no-harness"]);
     git(&["add", "-A"]);
     git(&["commit", "-q", "-m", "fixture"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);

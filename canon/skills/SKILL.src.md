@@ -361,12 +361,12 @@ and `canon context` warn when the repo holds 0.27-era state and put
 ```bash
 # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
 canon init
-# harnesses for the canon skill; without it init takes the detected .claude/.codex/.omp/.pi (it never asks)
-canon init --providers=claude,codex
+# harnesses for the canon skill, one --harness each (--no-harness for none); without them init takes the detected .claude/.codex/.omp/.pi (it never asks)
+canon init --harness claude --harness codex
 # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing); prunes projected files the bundle no longer ships when their bytes match the lock, keeps a modified one and reports `kept:`
 canon skills install
-# any subset or none; rewrites skills.providers
-canon skills install --providers=claude,codex,omp,pi
+# any subset; rewrites skills.providers (--no-harness records none)
+canon skills install --harness claude --harness codex --harness omp --harness pi
 # read-only drift check; exit 1 (SKILLS_CHECK_FAILED) names each orphan, a projected file the bundle no longer ships
 canon skills check
 # diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
@@ -380,7 +380,7 @@ Claude gets `.claude/skills/canon/`, Codex `.agents/skills/canon/`, OMP
 `.omp/skills/canon/`, Pi `.pi/skills/canon/` (the retrieve script is a sidecar,
 not an installed hook). `check` reports a stub written by another canon
 version; `install` rewrites it. The harness list lives in `canon.yaml` as
-`skills: { providers: [...] }`; change it with `canon skills install --providers=<list>`,
+`skills: { providers: [...] }`; change it with `canon skills install --harness <name>` once for each name (or `--no-harness`),
 never by assuming a default.
 
 `install` and `doctor` end with `owned-paths:`, the globs of every path

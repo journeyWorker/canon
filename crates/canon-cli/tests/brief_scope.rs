@@ -72,8 +72,7 @@ fn repo_with_subject(status: &str) -> TempDir {
         repo,
         &[
             "init",
-            "--providers",
-            "none",
+            "--no-harness",
             "--no-agents-md",
             "--no-policy",
         ],

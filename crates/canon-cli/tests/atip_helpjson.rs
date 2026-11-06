@@ -40,7 +40,7 @@ fn repo() -> TempDir {
         assert!(out.status.success(), "{program} {args:?}: {}{}", stdout(&out), stderr(&out));
     };
     run("git", &["init", "-q"]);
-    run(env!("CARGO_BIN_EXE_canon"), &["init", "--providers", "none"]);
+    run(env!("CARGO_BIN_EXE_canon"), &["init", "--no-harness"]);
     run("git", &["add", "-A"]);
     run("git", &["-c", "user.name=canon", "-c", "user.email=canon@example.invalid", "commit", "-q", "-m", "fixture"]);
     run(env!("CARGO_BIN_EXE_canon"), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);

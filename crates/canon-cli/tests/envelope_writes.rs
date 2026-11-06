@@ -34,7 +34,7 @@ fn body(out: &Output) -> Value {
 fn export_json_is_the_manifest_as_data_with_its_page_in_meta_and_a_next_step() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
-    for args in [&["init", "--providers", "none"][..], &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..]] {
+    for args in [&["init", "--no-harness"][..], &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..]] {
         assert!(canon(repo, args).status.success());
     }
     let out = canon(repo, &["export", "--kind", "evidence", "--json"]);

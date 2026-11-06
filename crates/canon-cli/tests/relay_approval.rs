@@ -78,7 +78,7 @@ fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     git_seed(dir.path());
     let repo = dir.path();
-    ok(repo, &["init", "--providers", "none", "--no-agents-md"]);
+    ok(repo, &["init", "--no-harness", "--no-agents-md"]);
     ok(repo, &["subject", "new", "s", "--domain", "dev", "--title", "S"]);
     for change in ["a", "b", "c"] {
         ok(repo, &["change", "new", change, "--subject", "s", "--title", change]);
@@ -519,7 +519,7 @@ fn subject_lifecycle_51_conditional_answers_are_revisions_and_no_guide_says_repo
     }
     assert!(!stops_and_hands_off("Show the brief, ask, and record an explicit approval."));
     let dir = TempDir::new().unwrap();
-    ok(dir.path(), &["init", "--providers", "claude", "--no-agents-md"]);
+    ok(dir.path(), &["init", "--harness", "claude", "--no-agents-md"]);
     let check = run(dir.path(), &["skills", "check"]);
     assert!(check.status.success(), "{}", text(&check));
 }

@@ -38,8 +38,8 @@ Feature: atip codesplit
   @atip.codesplit.04
   Scenario: A broken section of canon.yaml and a bad provider answer with CONFIG_INVALID and its reason, or with the argument's own code
     Given a repository whose canon.yaml has a malformed skills section and one whose specs section is malformed
-    When skills install, inventory sync and plugin sync run, and skills install --providers bogus runs
-    Then the malformed sections exit 2 with CONFIG_INVALID and the reason SKILLS or SPECS, the unknown provider with SKILLS_ARGUMENT_INVALID, and nothing is written; with the section mended plugin sync goes on to its own check and is not refused for a scenario index another process holds
+    When skills install, inventory sync and plugin sync run, and skills install --harness bogus runs
+    Then the malformed sections exit 2 with CONFIG_INVALID and the reason SKILLS or SPECS, the unknown provider with USAGE (the enumeration of --harness refuses it), and nothing is written; with the section mended plugin sync goes on to its own check and is not refused for a scenario index another process holds
 
   # canon: {"schema":1,"at":"2026-11-04T04:06:52Z","actor":{"agent_id":"impl-codes-refusals","role":"implementer","session_id":"s-0-36-codes-refusals"}}
   @subject:atip-contract
