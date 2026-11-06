@@ -51,7 +51,6 @@ use canon_store::tier::{Tier as _, TierQuery};
 use chrono::{DateTime, Duration, Utc};
 use schemars::JsonSchema;
 use serde::Serialize;
-use serde_json::json;
 
 use crate::artifacts::local_blobs;
 use crate::cli_error::{CliError, CliErrorExt as _};
@@ -370,11 +369,11 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
     let mut effects = Vec::new();
     if delete.local_copies > 0 {
         let bytes: u64 = doomed.iter().filter_map(|blob| blob.local.as_ref().map(|(_, bytes)| *bytes)).sum();
-        effects.push(Effect::path("delete", format!("{}/", canon_model::paths::ARTIFACTS_SHA256_DIR)).detail(json!({ "blobs": delete.local_copies, "bytes": bytes })));
+        effects.push(Effect::path("delete", format!("{}/", canon_model::paths::ARTIFACTS_SHA256_DIR)).detail(format!("{} blob(s), {bytes} bytes; data.blobs lists them", delete.local_copies)));
     }
     if delete.tier_objects > 0 {
         let bytes: u64 = doomed.iter().filter_map(|blob| blob.object).sum();
-        effects.push(Effect::record("delete", store.display("")).detail(json!({ "objects": delete.tier_objects, "bytes": bytes, "irreversible": true })));
+        effects.push(Effect::record("delete", store.display("")).detail(format!("{} object(s), {bytes} bytes; data.blobs lists them; cannot be undone", delete.tier_objects)));
     }
     let reads = Reads::new()
         .path(&repo, "canon.yaml")
@@ -473,12 +472,11 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
             actor: crate::status::StepActor::Agent,
             role: Some(crate::role::Role::Orchestrator),
         });
-        let incomplete = CliError::failed("ARTIFACTS_PRUNE_INCOMPLETE", format!("stopped after deleting {} of {} blob(s): {}", done.blobs, delete.blobs, stop.message));
+        let incomplete = CliError::failed("ARTIFACTS_PRUNE_INCOMPLETE", format!("stopped after deleting {} of {} blob(s): {}", done.blobs, delete.blobs, stop.message))
+            .hint("what was deleted stays deleted and no blob a record binds was touched; read the state, deal with what the message names, then preview and commit a new plan (the same --plan-digest is stale now)");
         // The reason is the code of the part that failed.
         let incomplete = if stop.object { incomplete.reason("ARTIFACTS_STORE_FAILED") } else { incomplete.reason("WRITE_FAILED") };
-        return incomplete
-            .hint("what was deleted stays deleted and no blob a record binds was touched; read the state, deal with what the message names, then preview and commit a new plan (the same --plan-digest is stale now)")
-            .emit_with_data("canon artifacts prune", json, &report);
+        return incomplete.emit_with_data("canon artifacts prune", json, &report);
     }
 
     crate::say!(
