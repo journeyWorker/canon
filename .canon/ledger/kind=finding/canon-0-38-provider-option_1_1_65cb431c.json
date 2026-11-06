@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-provider-option",
+    "role": "reviewer",
+    "session_id": "s-0-38-provider-rev"
+  },
+  "at": "2026-11-06T16:01:12.084399Z",
+  "change_id": "canon-0-38-provider-option",
+  "code_tree": "8a252e1cbceee75036a06bcb5a4d605274152096",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/skills.rs:1852",
+  "kind": "finding",
+  "reviewed_sha": "a82e2ed3bda0f3c460f91cf4dbffb650a1f2ec68",
+  "reviewer": "rev-0-38-provider-option",
+  "round": 1,
+  "scenario_ids": [
+    "atip.provideroption.11"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Vocabulary and names left by the rename, none wrong: the doctor `stray:` line says \"is not a selected provider (from --harness or --no-harness)\" while the help of the same command says harness, SkillsError::InvalidProvider says \"unknown provider\", and three bound tests are spelt atip_provideroption_05/09/10_..._harnesss_... (a doubled s from the bulk rename; they are the case names the evidence binds, so a rename means a re-bind).",
+  "worktree_dirty": false
+}

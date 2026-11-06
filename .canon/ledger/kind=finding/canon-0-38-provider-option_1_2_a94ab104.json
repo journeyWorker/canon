@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-provider-option",
+    "role": "reviewer",
+    "session_id": "s-0-38-provider-rev"
+  },
+  "at": "2026-11-06T16:01:13.116371Z",
+  "change_id": "canon-0-38-provider-option",
+  "code_tree": "8a252e1cbceee75036a06bcb5a4d605274152096",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/input.rs",
+  "kind": "finding",
+  "reviewed_sha": "a82e2ed3bda0f3c460f91cf4dbffb650a1f2ec68",
+  "reviewer": "rev-0-38-provider-option",
+  "round": 1,
+  "scenario_ids": [
+    "atip.provideroption.07",
+    "atip.provideroption.09"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Two edges that are 0.37 parity and the brief does not decide, found by probe: (1) INPUT_CONFLICT compares the raw list, so `init --harness omp --harness omp --input {\"harness\":[\"omp\"]}` and the same names in another order are a conflict although the selection is equal (skills install takes {\"harness\":[\"omp\",\"omp\"]} with --harness omp --harness omp); (2) when the typed --providers line was itself a clash (`--providers claude --no-harness`, `init --check --providers claude`), the hint is the corrected line and that line is refused as a clash, so \"the hint runs as it stands\" holds for every line that was valid before.",
+  "worktree_dirty": false
+}
