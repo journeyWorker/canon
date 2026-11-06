@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-test-determinism",
+    "role": "reviewer",
+    "session_id": "s-0-38-td-rev"
+  },
+  "at": "2026-11-06T07:58:30.713822Z",
+  "change_id": "canon-0-38-test-determinism",
+  "code_tree": "a58a3c2b88cf1b42d407a8368a012ce999ec7491",
+  "kind": "review",
+  "pin": "1c840ef58844cc3b280216cde3c18c0b1081e03c",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "70e25a2e613943db5dbd57e2eb6ad5cb0534478ec5913ee1fe592e51902c5183",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-test-determinism/brief.md"
+  },
+  "review_id": "01M6QXVJSSN4YBX05WTPP5ND89",
+  "reviewer": "rev-0-38-test-determinism",
+  "schema": 2,
+  "worktree_dirty": false
+}
