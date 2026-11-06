@@ -227,6 +227,24 @@ fn artifacts_case() -> Case {
     Case { leaf: "artifacts move", root, args: words(&["artifacts", "move", "--tier", "cold"]), env, change: Some(change), _keep: vec![Box::new(dir), Box::new(store)] }
 }
 
+/// `artifacts prune` with one blob no record binds: a line added to canon.yaml, which the plan read, leaves its effects alone.
+fn prune_case() -> Case {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    init_repo(&root, false);
+    let bytes: &[u8] = br#"{"checks":15}"#;
+    let blobs = root.join(".canon/artifacts/sha256");
+    std::fs::create_dir_all(&blobs).unwrap();
+    std::fs::write(blobs.join(sha256_hex(bytes)), bytes).unwrap();
+    let change_root = root.clone();
+    let change: Box<dyn Fn()> = Box::new(move || {
+        let mut text = std::fs::read_to_string(change_root.join("canon.yaml")).unwrap();
+        text.push_str("# a line the plan did not list\n");
+        std::fs::write(change_root.join("canon.yaml"), text).unwrap();
+    });
+    Case { leaf: "artifacts prune", root, args: words(&["artifacts", "prune"]), env: Vec::new(), change: Some(change), _keep: vec![Box::new(dir)] }
+}
+
 /// A git repo set up by `canon init` that lacks one of the managed `.gitignore` lines, so a migrate has one rewrite to make.
 fn gitignore_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
@@ -265,8 +283,8 @@ fn revert_case() -> Case {
     Case { leaf: "migrate", root, args: words(&["migrate", "--revert"]), env: Vec::new(), change: None, _keep: vec![Box::new(dir)] }
 }
 
-fn six() -> Vec<Case> {
-    vec![purge_case(), artifacts_case(), migrate_case(), revert_case(), compact_case(), tier_case()]
+fn cases() -> Vec<Case> {
+    vec![purge_case(), artifacts_case(), prune_case(), migrate_case(), revert_case(), compact_case(), tier_case()]
 }
 
 fn is_digest(text: &str) -> bool {
@@ -281,7 +299,7 @@ fn next_argv(body: &Value) -> Vec<String> {
 /// `meta.next[0]` commits it.
 #[test]
 fn atip_planjcs_01_the_preview_digest_is_prefixed_and_stable_and_its_next_call_commits() {
-    for case in six() {
+    for case in cases() {
         let first = case.preview();
         let digest = first["data"]["planDigest"].as_str().unwrap().to_string();
         assert!(is_digest(&digest), "{}: {digest}", case.leaf);
@@ -303,7 +321,7 @@ fn atip_planjcs_01_the_preview_digest_is_prefixed_and_stable_and_its_next_call_c
 /// atip.planjcs.02: a digest without the prefix and one that differs in one character are PLAN_STALE.
 #[test]
 fn atip_planjcs_02_an_unprefixed_digest_and_a_changed_character_are_plan_stale_and_change_nothing() {
-    for case in six() {
+    for case in cases() {
         let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
         let hex = digest.strip_prefix("sha256:").unwrap();
         let last = hex.chars().last().unwrap();
@@ -389,7 +407,7 @@ fn atip_planjcs_04_the_arguments_are_in_the_digest() {
 /// atip.planjcs.05: a file or record the plan read, changed after the preview, makes the commit PLAN_STALE.
 #[test]
 fn atip_planjcs_05_a_change_to_what_the_plan_read_is_plan_stale_though_its_effects_are_the_same() {
-    for case in six().into_iter().filter(|case| case.change.is_some()) {
+    for case in cases().into_iter().filter(|case| case.change.is_some()) {
         let preview = case.preview();
         let digest = preview["data"]["planDigest"].as_str().unwrap().to_string();
         (case.change.as_ref().unwrap())();
@@ -734,7 +752,7 @@ fn digest_034(effects: &Value) -> String {
 /// atip.planjcs.11: a digest made the 0.34 way is PLAN_STALE, and the hint says to run the preview again.
 #[test]
 fn atip_planjcs_11_a_digest_of_0_34_is_plan_stale_on_the_six_commands() {
-    for case in six() {
+    for case in cases() {
         let preview = case.preview();
         let old = digest_034(&preview["data"]["effects"]);
         assert_eq!(old.len(), 64);
@@ -845,7 +863,7 @@ fn atip_planjcs_16_an_upgrade_note_without_a_part_and_code_without_the_prefix_fa
 /// atip.planjcs.13: the report schemas take their preview members from the contract's Effect and raise the minor.
 #[test]
 fn atip_planjcs_13_the_report_schemas_hold_the_preview_and_their_minor_is_raised() {
-    for command in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
+    for command in ["purge", "artifacts move", "artifacts prune", "migrate", "ledger compact", "tier age"] {
         let mut args = words(&["schema"]);
         args.extend(command.split(' ').map(ToString::to_string));
         args.push("--json".to_string());
@@ -968,11 +986,11 @@ fn atip_planjcs_17_the_commit_call_of_a_preview_carries_a_document_as_argv_optio
     }
 }
 
-/// atip.planjcs.18: `--commit` without `--plan-digest` and `--plan-digest` without `--commit` are refused on each of the six commands, naming the option that
+/// atip.planjcs.18: `--commit` without `--plan-digest` and `--plan-digest` without `--commit` are refused on each of the destructive commands, naming the option that
 /// is missing, and write nothing; both with the digest of the plan commits, and neither previews.
 #[test]
 fn atip_planjcs_18_a_commit_without_a_digest_and_a_digest_without_a_commit_are_refused_naming_the_missing_option() {
-    for case in six() {
+    for case in cases() {
         let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
         let before = tree(&case.root);
         for (what, extra, missing) in [("--commit alone", vec!["--commit".to_string()], "--plan-digest"), ("--plan-digest alone", vec![format!("--plan-digest={digest}")], "--commit")] {
@@ -1019,7 +1037,7 @@ fn options_reversed(args: &[String], joined: bool) -> Vec<String> {
 #[test]
 fn atip_planjcs_19_a_digest_covers_every_input_and_only_the_order_and_spelling_of_the_options_leave_it_alone() {
     // The same call in another order or spelling is the same plan: one digest, and that digest commits it.
-    for case in six() {
+    for case in cases() {
         let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
         let variants = [("options reversed", options_reversed(&case.args, false)), ("--name=value", options_reversed(&case.args, true))];
         for (what, args) in &variants {
@@ -1049,7 +1067,7 @@ fn atip_planjcs_19_a_digest_covers_every_input_and_only_the_order_and_spelling_o
     assert_eq!(tree(&case.root), before, "a changed value writes nothing");
     // A changed state the plan read is another plan on every command that has such a state, though the effects are the same.
     let mut changed = 0;
-    for case in six().into_iter().filter(|case| case.change.is_some()) {
+    for case in cases().into_iter().filter(|case| case.change.is_some()) {
         let digest = case.preview()["data"]["planDigest"].as_str().unwrap().to_string();
         (case.change.as_ref().unwrap())();
         let before = tree(&case.root);

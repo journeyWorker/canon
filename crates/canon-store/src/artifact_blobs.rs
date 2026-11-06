@@ -285,21 +285,37 @@ impl ObjectBlobStore {
 
     /// Every digest the store holds under the prefix, sorted.
     pub fn list(&self) -> Result<Vec<String>, BlobError> {
+        Ok(self.list_sized()?.into_iter().map(|(digest, _)| digest).collect())
+    }
+
+    /// Every digest the store holds under the prefix with the size of its object, sorted by digest.
+    pub fn list_sized(&self) -> Result<Vec<(String, u64)>, BlobError> {
         use futures::StreamExt;
         let dir = ObjectPath::from(format!("{}sha256", self.prefix));
-        let mut digests: Vec<String> = self.rt.block_on(async {
+        let mut blobs: Vec<(String, u64)> = self.rt.block_on(async {
             let mut stream = self.store.list(Some(&dir));
             let mut out = Vec::new();
             while let Some(meta) = stream.next().await {
                 let meta = meta.map_err(store_err)?;
                 if let Some(name) = meta.location.filename().filter(|n| is_digest(n)) {
-                    out.push(name.to_string());
+                    out.push((name.to_string(), meta.size));
                 }
             }
             Ok::<_, BlobError>(out)
         })?;
-        digests.sort();
-        Ok(digests)
+        blobs.sort();
+        Ok(blobs)
+    }
+
+    /// Delete the object for `digest`. An object the store already lacks is no error (a repeat of an interrupted run; an object store
+    /// answers a delete of nothing with success as often as with "not found"). `Err` when the store could not be reached or refused the
+    /// delete; nothing else is touched.
+    pub fn delete(&self, digest: &str) -> Result<(), BlobError> {
+        let path = self.path(digest)?;
+        match self.rt.block_on(self.store.delete(&path)) {
+            Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
+            Err(e) => Err(store_err(e)),
+        }
     }
 }
 
@@ -416,6 +432,23 @@ mod tests {
         // And put heals it: the size differs from the bound bytes.
         assert!(blobs.put(&d, bytes.clone()).unwrap());
         assert_eq!(blobs.verify_full(&d).unwrap(), Probe::Present { size: bytes.len() as u64 });
+    }
+
+    #[test]
+    fn list_sized_names_every_object_with_its_size_and_delete_removes_only_the_named_one() {
+        let (_, blobs) = store();
+        let (a, b) = (b"first report".to_vec(), b"second, longer report".to_vec());
+        let (da, db) = (digest(&a), digest(&b));
+        blobs.put(&da, a.clone()).unwrap();
+        blobs.put(&db, b.clone()).unwrap();
+        let mut expected = vec![(da.clone(), a.len() as u64), (db.clone(), b.len() as u64)];
+        expected.sort();
+        assert_eq!(blobs.list_sized().unwrap(), expected);
+        blobs.delete(&da).unwrap();
+        assert_eq!(blobs.list().unwrap(), vec![db.clone()], "the other object stays");
+        blobs.delete(&da).unwrap();
+        assert_eq!(blobs.probe(&da).unwrap(), Probe::Missing);
+        assert!(matches!(blobs.delete("../x"), Err(BlobError::InvalidDigest(_))));
     }
 
     #[test]

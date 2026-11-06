@@ -160,7 +160,15 @@ an object-store tier, in which case `evidence add`, `review scenario`, `review c
 `canon artifacts verify` (`--full` re-hashes every blob) ask the store and
 refuse, never pass, when it cannot be reached. Moving an existing store with
 `canon artifacts move --tier <tier>` is the repo owner's decision, not a step
-of the loop.
+of the loop. So is `canon artifacts prune`, which deletes the blobs no record
+binds any more (the store only grows: a report written anew on every run adds a
+blob per run). A blob stays while the latest evidence or a current review binds
+it (what the gate and `artifacts verify` read), while a record not promoted yet
+binds it, and, with `--keep-days N`, while any evidence or review of the last
+`N` days binds it; the bare run previews the blobs it deletes and why the rest
+stay, and `--commit --plan-digest` deletes. A deleted local blob stays in git
+history (shrinking that history is the repo owner's call, not the command's); a
+deleted object of an object-store tier is gone for good.
 
 ### Search and trace
 
@@ -316,9 +324,9 @@ leaves below take one object only.
 
 ### Preview, then `--commit`
 
-The five commands that delete or rewrite existing data (`canon purge`,
+The six commands that delete or rewrite existing data (`canon purge`,
 `canon tier age`, `canon ledger compact`, `canon artifacts move`,
-`canon migrate`) act in two steps. The bare run previews: it writes nothing,
+`canon artifacts prune`, `canon migrate`) act in two steps. The bare run previews: it writes nothing,
 exits 0 and prints the effects and a `planDigest`. Read the effects, then act
 with `--commit --plan-digest <planDigest>`. It refuses (`PLAN_STALE`) when
 the plan differs from the one you previewed, so run the preview again. Appends

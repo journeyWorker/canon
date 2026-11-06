@@ -677,8 +677,8 @@ fn atip_claim15_06_the_rules_of_1_4_hold_at_1_5_compact_documents_usage_for_help
         assert_eq!(document["error"]["code"], "USAGE", "canon {args:?}");
         assert_eq!(document["meta"]["contractVersion"], MINOR);
     }
-    // The five destructive commands list `commit` and `plan-digest`, and a bare call is a preview.
-    for name in ["artifacts move", "ledger compact", "migrate", "purge", "tier age"] {
+    // The six destructive commands list `commit` and `plan-digest`, and a bare call is a preview.
+    for name in ["artifacts move", "artifacts prune", "ledger compact", "migrate", "purge", "tier age"] {
         let options: Vec<&str> = surface.docs[name].value["data"]["options"].as_array().expect("options").iter().map(|option| option.as_str().or_else(|| option["name"].as_str()).expect("a name")).collect();
         assert!(options.contains(&"commit") && options.contains(&"plan-digest"), "{name}: {options:?}");
     }

@@ -436,7 +436,7 @@ fn form_problems(tree: &Value, commands: &[Value], schemas: &Value) -> Vec<Strin
 // ----------------------------------------------------------------------------------------------------------
 // atip.schemadoc.01 — F1: the tree
 
-/// atip.schemadoc.01: `canon schema --json` is a `tree` that claims L2, lists 27 groups and 78 commands once, a
+/// atip.schemadoc.01: `canon schema --json` is a `tree` that claims L2, lists 27 groups and 79 commands once, a
 /// group before its commands, byte-identically twice; `--as` filters and `CANON_ROLE` does not.
 #[test]
 fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2() {
@@ -452,7 +452,7 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
     let entries = first["data"]["commands"].as_array().expect("commands");
     let kinds: Vec<&str> = entries.iter().map(|entry| if entry["kind"] == "group" { "group" } else { "command" }).collect();
     assert!(entries.iter().all(|entry| entry["kind"] != "command" && entry.get("path").is_none()), "a 1.4 tree entry has no `kind: command` and no `path`");
-    assert_eq!((kinds.iter().filter(|kind| **kind == "group").count(), kinds.iter().filter(|kind| **kind == "command").count()), (27, 78));
+    assert_eq!((kinds.iter().filter(|kind| **kind == "group").count(), kinds.iter().filter(|kind| **kind == "command").count()), (27, 79));
     let ids: Vec<&str> = entries.iter().map(|entry| entry["command"].as_str().expect("command")).collect();
     assert_eq!(ids.iter().collect::<BTreeSet<_>>().len(), ids.len(), "every id once");
     for (at, entry) in entries.iter().enumerate() {
@@ -877,7 +877,7 @@ fn atip_schemadoc_07_errors_outputs_and_schemas_hold_together_in_every_command_d
     assert!(command_doc("completion")["outputs"][0]["mediaType"].is_string());
     let list = command_doc("finding list");
     assert!(names(list, "errors").contains(&"CURSOR_INVALID".to_string()));
-    for command in ["purge", "migrate", "ledger compact", "tier age", "artifacts move"] {
+    for command in ["purge", "migrate", "ledger compact", "tier age", "artifacts move", "artifacts prune"] {
         assert!(names(command_doc(command), "errors").contains(&"PLAN_STALE".to_string()), "{command}");
     }
 }
@@ -909,7 +909,7 @@ fn atip_schemadoc_08_a_dangling_ref_and_a_schema_that_does_not_compile_are_found
 #[test]
 fn atip_schemadoc_09_the_input_fragment_and_every_example_hold() {
     let with_input: Vec<&Value> = COMMANDS.iter().filter(|doc| doc["input"].is_object()).collect();
-    assert_eq!(with_input.len(), 47);
+    assert_eq!(with_input.len(), 48);
     let mut problems = Vec::new();
     for doc in &with_input {
         problems.extend(example_problems(doc));
@@ -1028,7 +1028,7 @@ fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command(
     assert_eq!(file["contractVersion"], "1.5");
     // The file is the 1.4 form: the tree and the command documents hold no `path`, and the schemas live in their own map.
     let commands = file["commands"].as_array().expect("commands");
-    assert_eq!(commands.len(), 78);
+    assert_eq!(commands.len(), 79);
     let dir = tempfile::tempdir().expect("tempdir");
     let mut problems = form_problems(&file["tree"], commands, &file["schemas"]);
     for doc in commands {

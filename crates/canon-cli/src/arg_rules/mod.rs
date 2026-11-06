@@ -246,12 +246,13 @@ pub const SHA256_HEX: &str = "^[0-9a-f]{64}$";
 
 // -------------------------------------------------------------------- shared
 
-/// The rows every command shares: the safety pair of the five destructive leaves, the id grammars by value name, and
+/// The rows every command shares: the safety pair of the six destructive leaves, the id grammars by value name, and
 /// the time grammar.
 static SHARED: Tables = Tables {
     rules: &[
         ("purge", SAFETY),
         ("artifacts move", SAFETY),
+        ("artifacts prune", SAFETY),
         ("migrate", SAFETY),
         ("ledger compact", SAFETY),
         ("tier age", SAFETY),
@@ -278,8 +279,9 @@ static SHARED: Tables = Tables {
             .inside(&["2030-01-01T00:00:00Z", "2030-01-01t10:00:00z", "2030-01-01T10:00:00.123456789+09:00", "2030-01-01T10:00:00-02:00"])
             .outside(&["tomorrow", "2030-01-01", "2030-1-1T10:00:00Z", " 2030-01-01T10:00:00Z", "2030-01-01T10:00:00Z ", "+2030-01-01T10:00:00Z", "2030-01-01 10:00:00Z", "2030-01-01T10:00", "2030-01-01T10:00:00", "2030-01-01T10:00:00+0200", "2030-01-01T10:00:00\u{2212}02:00"]),
         // The most records or hits per page, and the size limit of a bound file: at least 1 (clap's `range(1..)`).
-        DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search", "retrieve"], "limit"), Domain::at_least(1), "USAGE"),
+        DomainRow::new(Scope::Arguments(&["query", "export", "finding list", "divergence list", "search", "retrieve", "artifacts prune"], "limit"), Domain::at_least(1), "USAGE"),
         DomainRow::new(Scope::Everywhere("max-artifact-mib"), Domain::at_least(1), "USAGE"),
+        DomainRow::new(Scope::Everywhere("keep-days"), Domain::at_least(1), "USAGE"),
     ],
 };
 

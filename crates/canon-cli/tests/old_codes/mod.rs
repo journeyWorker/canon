@@ -26,6 +26,10 @@ static CODES_0_35: LazyLock<Vec<&'static str>> = LazyLock::new(|| REGISTRY_0_35.
 static GONE: LazyLock<Vec<&'static str>> =
     LazyLock::new(|| CODES_0_35.iter().copied().filter(|code| canon_cli::cli_error::code_info(code).is_none() && canon_cli::cli_error::warning_info(code).is_none()).collect());
 
+/// The error codes the registry gained after the 0.36 table closed (the table lists the 179 codes of 0.35 and what became of each): a code born later
+/// has no row and the CHANGELOG section of 0.36 does not say it; the CHANGELOG entry of the release that added it does.
+pub const ADDED_AFTER_0_36: &[&str] = &["ARTIFACTS_PRUNE_INCOMPLETE"];
+
 /// The 0.35 registry: `(code, exit, retryable)`, in the order of the fixture.
 pub fn registry_0_35() -> &'static [(&'static str, u8, bool)] {
     &REGISTRY_0_35

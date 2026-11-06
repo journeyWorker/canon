@@ -306,7 +306,8 @@ canon evidence add --input '[{"scenario":"auth.login.01","class":"test-run","ref
    re-checks them, so the working-tree report may be gitignored. Run
    `canon artifacts verify` to ask the store yourself; it refuses, never
    passes, when an object store cannot be reached. Moving an existing store
-   (`canon artifacts move --tier`) is the repo owner's call: do not run it.
+   (`canon artifacts move --tier`) and deleting the blobs no record binds
+   (`canon artifacts prune`) are the repo owner's call: do not run them.
    For a scenario about what users see, let the test report carry its
    screenshots: Playwright's JUnit reporter attaches, per test case, what a
    test attaches (`testInfo.attach(name, {path})`, or `screenshot: 'on'`), and

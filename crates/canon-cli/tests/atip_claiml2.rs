@@ -167,7 +167,7 @@ fn fixture_problems(fixture: &Value, destructive: &[String]) -> Vec<String> {
         return problems;
     };
     let has = |id: &str, key: &str| commands.get(id).is_some_and(|entry| entry[key].as_array().is_some_and(|cases| !cases.is_empty()));
-    for id in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
+    for id in ["purge", "artifacts move", "artifacts prune", "migrate", "ledger compact", "tier age"] {
         if !has(id, "preview") {
             problems.push(format!("{id} has no preview"));
         }
@@ -217,7 +217,7 @@ fn atip_claiml2_19_a_fixture_missing_a_required_item_is_refused_by_the_fixture_t
     without("notRun removed", "notRun", &|f| drop(f.as_object_mut().expect("object").remove("notRun")));
     without("notRun without dashboard", "notRun", &|f| f["notRun"] = json!([]));
     without("commands removed", "commands", &|f| drop(f.as_object_mut().expect("object").remove("commands")));
-    for id in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
+    for id in ["purge", "artifacts move", "artifacts prune", "migrate", "ledger compact", "tier age"] {
         without(&format!("the preview of {id} removed"), "has no preview", &move |f| drop(f["commands"][id].as_object_mut().expect("command").remove("preview")));
     }
     for id in ["export", "finding close"] {

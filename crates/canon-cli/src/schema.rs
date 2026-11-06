@@ -85,6 +85,7 @@ pub const META: &[CommandMeta] = &[
     row("adapter authorize", Read, &[O]),
     row("adapter validate", Read, &[O]),
     row("artifacts move", Destructive, &[O]),
+    row("artifacts prune", Destructive, &[O]),
     row("artifacts verify", Read, &[O]),
     row("brief approve", Write, HUMAN),
     row("brief show", Read, &[P, R]),

@@ -44,6 +44,14 @@ usage: canon artifacts move --tier <TIER> [--commit --plan-digest <PLAN_DIGEST>]
 canon artifacts move --tier cold --json
 ```
 ```text
+# Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes)
+usage: canon artifacts prune [--keep-days <N>] [--limit <N> | --all] [--cursor <CURSOR>] [--commit --plan-digest <PLAN_DIGEST>] [--input]
+# a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
+```
+```bash
+canon artifacts prune --keep-days 30 --json
+```
+```text
 # Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)
 usage: canon artifacts store [--max-artifact-mib <N>] [--dry-run] [--input]
 ```
@@ -631,7 +639,7 @@ read that changed since is `PLAN_STALE` too, and `meta.next[0]` is the preview
 to run again. A commit holds the repository write lock for its whole run:
 another command that writes waits for it, and one that waited 30 seconds
 answers `REPO_LOCK_UNAVAILABLE` (exit 2, retryable): run it again. A document passed
-with `--input` never carries `--commit` or `--plan-digest`, and these five
+with `--input` never carries `--commit` or `--plan-digest`, and these six
 leaves take one object only (`INPUT_INVALID`).
 
 ```bash
@@ -641,7 +649,9 @@ canon ledger compact
 ```
 
 `canon artifacts move --tier <tier>` moves the local artifact store to an
-object store and removes the local blobs, and `purge` deletes records. They
+object store and removes the local blobs, `canon artifacts prune` deletes the
+blobs no record binds any more (a deleted local blob stays in git history; a
+deleted object of a tier is gone for good), and `purge` deletes records. They
 are the repo owner's decisions, not steps of the loop: run the preview, give
 the human the effects, and run the commit only on their answer. If the repo is
 large, the store is slow or the human has not asked for it, do not run it.

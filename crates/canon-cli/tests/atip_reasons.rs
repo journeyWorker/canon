@@ -85,6 +85,8 @@ const AUDIT: &[Row] = &[
     ("ARTIFACTS_MOVE_INCOMPLETE", "ARTIFACTS_STORE_INVALID", "replace the thing that is no blob, then preview and commit a new plan"),
     ("ARTIFACTS_MOVE_INCOMPLETE", "ARTIFACTS_STORE_REQUIRED", "set the tier's endpoint, credentials and bucket, then preview and commit a new plan"),
     ("ARTIFACTS_MOVE_INCOMPLETE", "ARTIFACTS_STORE_UNAVAILABLE", "wait for the object store, then preview and commit a new plan"),
+    ("ARTIFACTS_PRUNE_INCOMPLETE", "ARTIFACTS_STORE_FAILED", "make the object store accept the delete, then preview and commit a new plan"),
+    ("ARTIFACTS_PRUNE_INCOMPLETE", "WRITE_FAILED", "make the blob directory writable, then preview and commit a new plan"),
     ("ARTIFACTS_STORE_INCOMPLETE", "ARTIFACTS_STORE_FAILED", "find why the write stopped, then write again"),
     ("ARTIFACTS_STORE_INCOMPLETE", "ARTIFACTS_STORE_UNAVAILABLE", "wait for the store, then write again"),
     ("BRIEF_CHECK_FAILED", "BLOCKERS", "resolve every blocker finding of the check"),

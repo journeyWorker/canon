@@ -145,7 +145,7 @@ pub const SCENARIO_INDEX_LOCK_FILE: &str = ".canon/scenario-index.lock";
 /// state, so `canon init` ignores it.
 pub const ARTIFACT_STORE_LOCK_FILE: &str = ".canon/artifact-store.lock";
 
-/// The advisory lock every committed destructive command (`purge`, `artifacts move`, `migrate`, `ledger compact`, `tier age`)
+/// The advisory lock every committed destructive command (`purge`, `artifacts move`, `artifacts prune`, `migrate`, `ledger compact`, `tier age`)
 /// holds from the moment it recomputes its plan to its last effect, and every other command that writes what such a plan reads
 /// holds while it writes, so the plan cannot change between the check of its digest and the effects it makes (atip/1 12.7). An
 /// OS file lock (`flock`/`LockFileEx`), released when the holder exits — even when it is killed — so the file never goes stale

@@ -67,6 +67,7 @@ Check or move the evidence artifact store (local, or an object-store tier).
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
 | `canon artifacts move` | none | `--tier <TIER>` | 파괴적 (미리보기 후 `--commit --plan-digest`): Move the local artifact blobs to an object-store tier, verify them, and remove the local copies | `canon artifacts move --tier cold --json` |
+| `canon artifacts prune` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes) | `canon artifacts prune --keep-days 30 --json` |
 | `canon artifacts store` | none | none | 쓰기: Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/) | `canon artifacts store --json` |
 | `canon artifacts verify` | none | none | 읽기: Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes) | `canon artifacts verify --json` |
 {/* canon:generated cli-artifacts end */}
@@ -392,7 +393,7 @@ canon schema --warnings --json    # 모든 경고 코드(meta.warnings)와 의�
 `INPUT_CONFLICT`, `INPUT_TOO_LARGE`, `BATCH_INCOMPLETE`, `PLAN_STALE`(`--commit`이 있을
 때), `CURSOR_INVALID`(`--cursor`가 있을 때)는 내재되어 `errors`에 없습니다.
 `--commit`과 `--plan-digest`는 그것을 제공하는 명령(`purge`, `artifacts move`,
-`migrate`, `ledger compact`, `tier age`)에만 이름으로 실려, 문서만 보고 맨 호출이
+`artifacts prune`, `migrate`, `ledger compact`, `tier age`)에만 이름으로 실려, 문서만 보고 맨 호출이
 미리보기인지 알 수 있습니다. 출력마다 JSON Schema 이름(`schemaRef`, `#/schemas/<Name>`)이
 있고, 배열이나 NDJSON `--input`의 보고서는 `batch: true`입니다. `input`에는 병합 뒤
 인수의 스키마(`argumentsRef`)와 완전한 `example` 하나가 있습니다. `examples`는 `--json`으로
@@ -588,7 +589,7 @@ canon skills show role-implementer
 ### 파괴적 명령은 계획이 먼저입니다
 
 삭제하거나 기존 데이터를 다시 쓰는 `purge`, `tier age`, `ledger compact`,
-`artifacts move`, `migrate`는 **미리보기가 기본**입니다. `--commit` 없이 실행하면
+`artifacts move`, `artifacts prune`, `migrate`는 **미리보기가 기본**입니다. `--commit` 없이 실행하면
 `planDigest`와 `effects`를 출력하고 아무것도 바꾸지 않으며 exit `0`입니다.
 실제로 실행하려면 `--commit --plan-digest <planDigest>`를 줍니다. 지금 다시 계산한
 plan의 digest가 같을 때만 실행하고, 아니면 `PLAN_STALE`입니다. 이 명령들에

@@ -1079,7 +1079,7 @@ fn atip_claim14_02_schema_answers_the_same_bytes_without_a_repository_and_the_fo
 // ===========================================================================
 // atip.claim14.03 - 06 (F2)
 
-const DESTRUCTIVE: [&str; 5] = ["artifacts move", "ledger compact", "migrate", "purge", "tier age"];
+const DESTRUCTIVE: [&str; 6] = ["artifacts move", "artifacts prune", "ledger compact", "migrate", "purge", "tier age"];
 
 fn option_names(doc: &Value) -> Vec<String> {
     doc["options"].as_array().map(Vec::as_slice).unwrap_or_default().iter().map(|option| option_name(option).to_string()).collect()
@@ -1103,7 +1103,7 @@ fn atip_claim14_03_a_command_document_carries_the_call_surface_only() {
     assert!(!codes.is_empty() && codes.iter().all(|code| !matches!(*code, "USAGE" | "INTERNAL") && !code.starts_with("INPUT_")), "no implied code is listed: {codes:?}");
     assert_eq!(form_problems(close), Vec::<String>::new(), "finding close is in the 1.4 form");
 
-    // The five destructive commands, and only they, list `commit` and `plan-digest` by name.
+    // The six destructive commands, and only they, list `commit` and `plan-digest` by name.
     let destructive: Vec<&str> = surface.docs.iter().filter(|(_, doc)| doc.value["data"]["effect"] == "destructive").map(|(name, _)| name.as_str()).collect();
     assert_eq!(destructive, DESTRUCTIVE, "the destructive commands");
     for name in DESTRUCTIVE {
@@ -1548,7 +1548,7 @@ fn atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fi
     let fixture: Value = serde_json::from_str(&read(FIXTURE)).expect("the fixture is JSON");
     assert_eq!(fixture["contractVersion"], MINOR, "the fixture claims {MINOR}");
     // The fixture holds what the checks read.
-    assert!(fixture["commands"].as_object().is_some_and(|commands| DESTRUCTIVE.iter().all(|name| commands[*name]["preview"].is_array())), "the fixture previews the five destructive commands");
+    assert!(fixture["commands"].as_object().is_some_and(|commands| DESTRUCTIVE.iter().all(|name| commands[*name]["preview"].is_array())), "the fixture previews the six destructive commands");
 }
 
 // ===========================================================================

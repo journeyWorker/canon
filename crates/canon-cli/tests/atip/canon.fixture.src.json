@@ -111,6 +111,7 @@
       }
     },
     "artifacts move": {"preview": [["artifacts", "move", "--tier", "local", "--json"]]},
+    "artifacts prune": {"preview": [["artifacts", "prune", "--json"]]},
 
     "ledger compact": {"preview": [["ledger", "compact", "--json"]]},
     "migrate": {"preview": [["migrate", "--json"]]},
@@ -386,6 +387,11 @@
       "sh",
       "-c",
       "mkdir -p packages/dashboard/dist && echo '{\"name\":\"@canon-dev/dashboard\"}' > packages/dashboard/package.json && echo '<!doctype html><title>stub</title>' > packages/dashboard/dist/index.html"
+    ],
+    [
+      "sh",
+      "-c",
+      "mkdir -p .canon/artifacts/sha256 && printf x > .canon/artifacts/sha256/2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
     ]
   ],
   "probe": "status",

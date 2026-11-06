@@ -468,7 +468,9 @@ fn build_meta(command: &str, schema_version: String, output: Option<String>, aft
         next = entries;
     }
     if let Some(step) = page.as_ref().and_then(|page| page.next_cursor.as_deref()).and_then(next_page_step) {
-        next.insert(0, step);
+        // The commit of a destructive preview leads `meta.next` (spec 11.5): the next page follows it.
+        let behind_commit = next.first().is_some_and(|lead| lead.argv.iter().any(|word| word == "--commit"));
+        next.insert(usize::from(behind_commit), step);
     }
     let meta = Meta {
         command,

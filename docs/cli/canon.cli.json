@@ -166,6 +166,101 @@
       }
     },
     {
+      "command": "artifacts prune",
+      "constraints": [
+        {
+          "names": [
+            "limit",
+            "all"
+          ],
+          "rule": "atMostOne"
+        },
+        {
+          "if": {
+            "name": "commit"
+          },
+          "rule": "requires",
+          "then": [
+            "plan-digest"
+          ]
+        },
+        {
+          "if": {
+            "name": "plan-digest"
+          },
+          "rule": "requires",
+          "then": [
+            "commit"
+          ]
+        }
+      ],
+      "effect": "destructive",
+      "errors": [
+        "ARTIFACTS_DIGEST_INVALID",
+        "ARTIFACTS_PRUNE_INCOMPLETE",
+        "ARTIFACTS_STORE_DENIED",
+        "ARTIFACTS_STORE_FAILED",
+        "ARTIFACTS_STORE_INVALID",
+        "ARTIFACTS_STORE_REQUIRED",
+        "ARTIFACTS_STORE_UNAVAILABLE",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
+        "CONFIG_REQUIRED",
+        "CONFIG_UNAVAILABLE",
+        "LAYOUT_MIGRATION_REQUIRED",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
+        "REPO_UNAVAILABLE",
+        "ROLE_INVALID",
+        "WRITE_DENIED",
+        "WRITE_FAILED",
+        "WRITE_INVALID"
+      ],
+      "examples": [
+        "canon artifacts prune --keep-days 30 --json"
+      ],
+      "idempotency": "replay-safe",
+      "input": {
+        "argumentsRef": "#/schemas/ArtifactsPruneArguments",
+        "example": {
+          "keepDays": 30
+        },
+        "maxBytes": 8388608
+      },
+      "kind": "command",
+      "options": [
+        {
+          "domain": {
+            "minimum": 1
+          },
+          "help": "Also keep the blobs that evidence and reviews written in the last N days bind",
+          "name": "keep-days",
+          "valueName": "N",
+          "valueType": "integer"
+        },
+        "limit",
+        "cursor",
+        "all",
+        "commit",
+        "plan-digest",
+        "repo",
+        "as"
+      ],
+      "outputs": [
+        {
+          "schemaRef": "#/schemas/ArtifactsPruneReport",
+          "schemaVersion": "1.2"
+        }
+      ],
+      "summary": "Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes)",
+      "x-canon": {
+        "roles": [
+          "orchestrator"
+        ]
+      }
+    },
+    {
       "command": "artifacts store",
       "effect": "write",
       "effectNote": "refreshes stale scenario-index records once nothing refuses the call; a refused call writes nothing",
@@ -7666,6 +7761,25 @@
       "retryable": false
     },
     {
+      "code": "ARTIFACTS_PRUNE_INCOMPLETE",
+      "exit": 1,
+      "fix": "Read what was done first (the first `meta.next` step), deal with what the reason names, then preview and commit a new plan; the same `--commit --plan-digest` is refused as `PLAN_STALE`.",
+      "meaning": "`artifacts prune --commit` deleted some blobs and then stopped, because the object store failed or refused a later delete, or a later local blob could not be removed; what it deleted stays deleted and no blob a record binds was touched (`data` says what was deleted, the reason says what stopped it)",
+      "reasons": [
+        {
+          "fix": "Read what was done (`canon artifacts verify`), check that the object store is reachable and that its credentials may delete objects, then preview and commit a new plan.",
+          "meaning": "`canon artifacts prune --commit` deleted some blobs, then the object store failed or refused the delete of a later object; what it deleted stays deleted, no blob a record binds was touched (`data` says what was deleted)",
+          "reason": "ARTIFACTS_STORE_FAILED"
+        },
+        {
+          "fix": "Read what was done (`canon artifacts verify`), make `.canon/artifacts/sha256` writable, then preview and commit a new plan.",
+          "meaning": "`canon artifacts prune --commit` deleted some blobs, then a later local blob could not be removed; what it deleted stays deleted, no blob a record binds was touched (`data` says what was deleted)",
+          "reason": "WRITE_FAILED"
+        }
+      ],
+      "retryable": false
+    },
+    {
       "code": "ARTIFACTS_STORE_DENIED",
       "exit": 2,
       "fix": "Make `.canon/artifacts/sha256` and the directory above it readable and writable by this user, then run the command again.",
@@ -7676,7 +7790,7 @@
       "code": "ARTIFACTS_STORE_FAILED",
       "exit": 1,
       "fix": "Check that the artifact store is writable and reachable and has space, then run the command again.",
-      "meaning": "writing or uploading a blob to the artifact store failed and nothing it wrote was kept: a record or batch that bound the file was rolled back, or no blob had been stored yet",
+      "meaning": "writing or uploading a blob to the artifact store failed and nothing it wrote was kept: a record or batch that bound the file was rolled back, or no blob had been stored yet; `artifacts prune --commit` got an object-store delete refused before it had deleted anything",
       "retryable": true
     },
     {
@@ -11205,6 +11319,293 @@
               "type": "string"
             }
           },
+          "type": "object"
+        }
+      }
+    },
+    "artifacts prune": {
+      "command": "artifacts prune",
+      "kind": "schemas",
+      "schemas": {
+        "ArtifactsPruneArguments": {
+          "additionalProperties": false,
+          "properties": {
+            "keepDays": {
+              "description": "Also keep the blobs that evidence and reviews written in the last N days bind",
+              "pattern": "^-?(0|[1-9][0-9]*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          },
+          "title": "`canon artifacts prune` arguments after the --input document is merged with the command line",
+          "type": "object"
+        },
+        "ArtifactsPruneReport": {
+          "description": "`canon artifacts prune`'s `data`: what the plan deletes and keeps, the page of the blobs to delete, and what a commit did.",
+          "properties": {
+            "backend": {
+              "description": "`local`, or the name of the artifact store tier the blobs live in.",
+              "type": "string"
+            },
+            "blobs": {
+              "description": "One page of the blobs the plan deletes, in digest order: empty in a commit (`meta.page` pages a preview).",
+              "items": {
+                "$ref": "#/schemas/PruneBlob"
+              },
+              "type": "array"
+            },
+            "committed": {
+              "description": "`false` for a preview, `true` after the commit.",
+              "type": "boolean"
+            },
+            "delete": {
+              "$ref": "#/schemas/PruneCounts",
+              "description": "What the plan deletes, over the whole store (not only the page below)."
+            },
+            "deleted": {
+              "$ref": "#/schemas/PruneCounts",
+              "description": "What this run deleted: all zero in a preview."
+            },
+            "effects": {
+              "description": "Every effect the commit would make, in the order it makes them.",
+              "items": {
+                "$ref": "#/schemas/Effect"
+              },
+              "type": "array"
+            },
+            "gitNote": {
+              "description": "Present when the plan deletes local blobs: what stays in git.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "irreversible": {
+              "description": "Present when the plan deletes objects of a tier, which cannot be undone.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "keep": {
+              "$ref": "#/schemas/PruneKeep",
+              "description": "What the plan keeps, each blob with every reason it stays."
+            },
+            "keepDays": {
+              "description": "`--keep-days`, when it was given.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "planDigest": {
+              "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
+              "type": "string"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "backend",
+            "delete",
+            "keep",
+            "deleted",
+            "blobs",
+            "planDigest",
+            "effects",
+            "committed"
+          ],
+          "title": "ArtifactsPruneReport",
+          "type": "object"
+        },
+        "Effect": {
+          "description": "One thing a commit would do (spec 12.4): the `action` and its target, precise enough that a caller can decide from the\neffects alone. `path` is a file (relative to the tool's root), `record` a record that is not a file, `detail` where it goes or\nwhy. A tool may add members of its own ([`Effect::with`]); they are part of the digest.",
+          "properties": {
+            "action": {
+              "description": "What happens: `delete`, `move`, `upload`, `rewrite`, `append`, ...",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why: a sentence, or a JSON value the tool structures (`{\"from\": 1, \"to\": 2}`)."
+            },
+            "path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        "Input": {
+          "additionalProperties": false,
+          "properties": {
+            "keepDays": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "pattern": "^-?(0|[1-9][0-9]*)$",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "KeptBlob": {
+          "description": "One blob that stays.",
+          "properties": {
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reasons": {
+              "description": "`latest-evidence`, `current-review`, `staged`, `within-keep-days`: every one that holds.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "sha256": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sha256",
+            "bytes",
+            "reasons"
+          ],
+          "type": "object"
+        },
+        "PruneBlob": {
+          "description": "One blob a plan deletes.",
+          "properties": {
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "sha256": {
+              "type": "string"
+            },
+            "storedIn": {
+              "description": "Where it is deleted from: `local`, the tier's name, or both.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "sha256",
+            "bytes",
+            "storedIn"
+          ],
+          "type": "object"
+        },
+        "PruneCounts": {
+          "description": "Blobs and bytes of a set of blobs of the store.",
+          "properties": {
+            "blobs": {
+              "description": "Distinct blobs (digests).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "bytes": {
+              "description": "Bytes of every copy of them.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "localCopies": {
+              "description": "Copies in the local directory.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "tierObjects": {
+              "description": "Objects in the tier.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blobs",
+            "bytes",
+            "localCopies",
+            "tierObjects"
+          ],
+          "type": "object"
+        },
+        "PruneKeep": {
+          "description": "The blobs a plan keeps.",
+          "properties": {
+            "blobs": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "items": {
+              "description": "Every kept blob, in digest order.",
+              "items": {
+                "$ref": "#/schemas/KeptBlob"
+              },
+              "type": "array"
+            },
+            "reasons": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "How many kept blobs each reason holds (a blob with several reasons is counted under each).",
+              "type": "object"
+            }
+          },
+          "required": [
+            "blobs",
+            "bytes",
+            "reasons",
+            "items"
+          ],
           "type": "object"
         }
       }
@@ -38035,6 +38436,16 @@
         }
       },
       {
+        "command": "artifacts prune",
+        "effect": "destructive",
+        "summary": "Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes)",
+        "x-canon": {
+          "roles": [
+            "orchestrator"
+          ]
+        }
+      },
+      {
         "command": "artifacts store",
         "effect": "write",
         "summary": "Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)",
@@ -38984,6 +39395,28 @@
         "valueType": "enum"
       },
       {
+        "default": 100,
+        "domain": {
+          "minimum": 1
+        },
+        "flagOnly": true,
+        "help": "Return at most this many records per page",
+        "name": "limit",
+        "valueName": "N",
+        "valueType": "integer"
+      },
+      {
+        "flagOnly": true,
+        "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
+        "name": "cursor"
+      },
+      {
+        "flagOnly": true,
+        "help": "Return every record from the cursor on, not one page",
+        "name": "all",
+        "valueType": "switch"
+      },
+      {
         "help": "Validate fully and report what would be written, without writing anything",
         "name": "dry-run",
         "valueType": "switch"
@@ -39072,28 +39505,6 @@
       {
         "help": "Keep this write staged even under canon.yaml `write: { promote: auto }`",
         "name": "no-promote",
-        "valueType": "switch"
-      },
-      {
-        "default": 100,
-        "domain": {
-          "minimum": 1
-        },
-        "flagOnly": true,
-        "help": "Return at most this many records per page",
-        "name": "limit",
-        "valueName": "N",
-        "valueType": "integer"
-      },
-      {
-        "flagOnly": true,
-        "help": "Resume after the last record of the previous page (the `nextCursor` it reported)",
-        "name": "cursor"
-      },
-      {
-        "flagOnly": true,
-        "help": "Return every record from the cursor on, not one page",
-        "name": "all",
         "valueType": "switch"
       },
       {

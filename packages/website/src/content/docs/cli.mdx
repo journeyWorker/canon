@@ -64,6 +64,7 @@ Check or move the evidence artifact store (local, or an object-store tier).
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
 | `canon artifacts move` | none | `--tier <TIER>` | destructive (preview, then `--commit --plan-digest`): Move the local artifact blobs to an object-store tier, verify them, and remove the local copies | `canon artifacts move --tier cold --json` |
+| `canon artifacts prune` | none | none | destructive (preview, then `--commit --plan-digest`): Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes) | `canon artifacts prune --keep-days 30 --json` |
 | `canon artifacts store` | none | none | write: Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/) | `canon artifacts store --json` |
 | `canon artifacts verify` | none | none | read: Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes) | `canon artifacts verify --json` |
 {/* canon:generated cli-artifacts end */}
@@ -392,7 +393,7 @@ What every command accepts is not listed: `--json`; `--input` when the command h
 `INPUT_CONFLICT`, `INPUT_TOO_LARGE`, `BATCH_INCOMPLETE`, `PLAN_STALE` (with `--commit`)
 and `CURSOR_INVALID` (with `--cursor`) are implied and not in `errors`. `--commit` and
 `--plan-digest` are listed, by name, on exactly the commands that offer them (`purge`,
-`artifacts move`, `migrate`, `ledger compact`, `tier age`), so the document says
+`artifacts move`, `artifacts prune`, `migrate`, `ledger compact`, `tier age`), so the document says
 whether a bare run previews. Each output names its JSON Schema (`schemaRef`,
 `#/schemas/<Name>`) and says `batch: true` for the report of an array or NDJSON
 `--input`; `input` has `argumentsRef`, the schema of the arguments after the merge,
@@ -590,11 +591,11 @@ status`.
 
 ### Destructive commands preview first
 
-`purge`, `tier age`, `ledger compact`, `artifacts move` and `migrate` change or
-delete data. Run bare, each prints a report with `planDigest` and `effects[]`
+`purge`, `tier age`, `ledger compact`, `artifacts move`, `artifacts prune` and
+`migrate` change or delete data. Run bare, each prints a report with `planDigest` and `effects[]`
 and changes nothing. `--commit --plan-digest <planDigest>` acts only if the
 plan recomputed now has the same digest (`PLAN_STALE`, exit `2`, otherwise).
-`--dry-run` is gone from these five, and a document given to `--input` can
+`--dry-run` is gone from these six, and a document given to `--input` can
 never carry `--commit` or `--plan-digest`.
 
 ```bash

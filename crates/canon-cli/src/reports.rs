@@ -143,7 +143,7 @@ fn report_rows() -> &'static [ReportRow] {
 }
 
 fn build_rows() -> Vec<ReportRow> {
-    use crate::{adapter, artifact_ingest, artifacts, brief_approve, brief_check, change, completion, context, context_pack, demo, dispatch, divergence, evidence, finding, gate, learn, ledger, migrate, plans, policy_approval, retention, retrieve, review, scaffold, selftest, status, subject, tier};
+    use crate::{adapter, artifact_ingest, artifacts, artifacts_prune, brief_approve, brief_check, change, completion, context, context_pack, demo, dispatch, divergence, evidence, finding, gate, learn, ledger, migrate, plans, policy_approval, retention, retrieve, review, scaffold, selftest, status, subject, tier};
     let mut schemas: Vec<ReportRow> = vec![
         entry::<change::ChangeNewReport<'static>>("change new", "ChangeNewReport"),
         entry::<demo::DemoReviewReport>("demo review", "DemoReviewReport"),
@@ -190,6 +190,7 @@ fn build_rows() -> Vec<ReportRow> {
         entry::<artifact_ingest::ArtifactIngestOutcome>("ingest records", "IngestRecordsReport"),
         entry::<plans::PlansOutcome>("ingest plans", "IngestPlansReport"),
         entry::<artifacts::ArtifactsMoveReport>("artifacts move", "ArtifactsMoveReport"),
+        entry::<artifacts_prune::ArtifactsPruneReport>("artifacts prune", "ArtifactsPruneReport"),
         entry::<ledger::LedgerCompactReport>("ledger compact", "LedgerCompactReport"),
         entry::<migrate::MigrateReport>("migrate", "MigrateReport"),
         entry::<retention::PurgeReport>("purge", "PurgeReport"),

@@ -599,7 +599,10 @@ git-tracked, no credentials). With an object-store tier, `evidence add`,
 `canon artifacts verify [--full]` ask the store (a HEAD per digest; `--full`
 downloads and re-hashes) and refuse, never pass, when it cannot be reached.
 `canon artifacts move --tier <tier>` (a preview; `--commit --plan-digest` acts) moves an existing local
-store; it is the repo owner's decision. See `canon-storage`.
+store; it is the repo owner's decision. `canon artifacts prune` (a preview;
+`--commit --plan-digest` acts) deletes the blobs no record binds any more and
+leaves what `gate check` and `artifacts verify` read, so their answers do not
+change; it is the repo owner's decision too. See `canon-storage`.
 
 `canon gate check` re-checks every file bound to a LATEST evidence record
 (the latest per task and per `(project_id, scenario_id)`):

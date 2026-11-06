@@ -388,7 +388,7 @@ impl PromoteArgs {
 /// `--dry-run`, declared once with one help string and flattened into every
 /// writing leaf that offers a preview (0.28 D6): full validation (it refuses
 /// with the code the real run would), nothing written, a report of what the
-/// run would write. The five destructive leaves take [`SafetyArgs`] instead.
+/// run would write. The six destructive leaves take [`SafetyArgs`] instead.
 #[derive(clap::Args, Clone, Copy, Debug, Default)]
 pub struct DryRunArgs {
     /// Validate fully and report what would be written, without writing anything
@@ -407,9 +407,9 @@ pub struct InputArgs {
     pub input: Option<String>,
 }
 
-/// `--commit --plan-digest <PLAN_DIGEST>`, flattened into exactly the five
-/// destructive leaves (`purge`, `artifacts move`, `migrate`, `ledger compact`,
-/// `tier age`; 0.28 D6). The bare run is the preview: it prints the plan with
+/// `--commit --plan-digest <PLAN_DIGEST>`, flattened into exactly the six
+/// destructive leaves (`purge`, `artifacts move`, `artifacts prune`, `migrate`,
+/// `ledger compact`, `tier age`; 0.28 D6). The bare run is the preview: it prints the plan with
 /// its `planDigest`, exits 0 and writes nothing. `--commit` acts only when the
 /// plan recomputed now still has `--plan-digest` (`PLAN_STALE`, exit 2).
 /// [`SafetyArgs::mode`] is what a handler reads.

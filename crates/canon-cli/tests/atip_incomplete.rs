@@ -189,6 +189,7 @@ const INCOMPLETE: &[(&str, bool, &[&str])] = &[
             "ARTIFACTS_STORE_UNAVAILABLE",
         ],
     ),
+    ("ARTIFACTS_PRUNE_INCOMPLETE", false, &["ARTIFACTS_STORE_FAILED", "WRITE_FAILED"]),
     ("ARTIFACTS_STORE_INCOMPLETE", true, &["ARTIFACTS_STORE_FAILED", "ARTIFACTS_STORE_UNAVAILABLE"]),
     ("CHANGE_ADOPTION_INCOMPLETE", false, &["WRITE_FAILED"]),
     ("DIVERGENCE_INCOMPLETE", false, &["PROMOTION_INVALID"]),
@@ -609,6 +610,7 @@ fn atip_incomplete_11_a_leaf_lists_one_incomplete_code_of_its_own_and_two_fail_t
         ("divergence add", "DIVERGENCE_INCOMPLETE"),
         ("strategy promote", "STRATEGY_INCOMPLETE"),
         ("artifacts move", "ARTIFACTS_MOVE_INCOMPLETE"),
+        ("artifacts prune", "ARTIFACTS_PRUNE_INCOMPLETE"),
         ("artifacts store", "ARTIFACTS_STORE_INCOMPLETE"),
         ("gate install-hooks", "HOOKS_INSTALL_INCOMPLETE"),
         ("purge", "RETENTION_PURGE_INCOMPLETE"),
@@ -935,7 +937,8 @@ const AUDIT: &[(&str, Class, &str)] = &[
     ("ADAPTER_AUTHORIZATION_FAILED", Class::Answer, "`adapter authorize` answered that the response does not authorize execution"),
     ("ADAPTER_VALIDATION_FAILED", Class::Answer, "`adapter validate`'s negative answer on an envelope"),
     ("ARTIFACTS_MOVE_INCOMPLETE", Class::Incomplete, "`artifacts move --commit` uploaded blobs, then a later blob changed, could not be read or the store stopped answering: the uploads stay, nothing was removed, canon.yaml is unchanged"),
-    ("ARTIFACTS_STORE_FAILED", Class::Failed, "a blob write or upload failed and nothing was kept: `evidence add` rolled the record or batch back (the code `EVIDENCE_STORE_FAILED` merged into), `artifacts store` and `artifacts move` had stored nothing yet"),
+    ("ARTIFACTS_PRUNE_INCOMPLETE", Class::Incomplete, "`artifacts prune --commit` deleted blobs, then the object store failed or refused a later delete, or a later local blob could not be removed: what was deleted stays deleted and no blob a record binds was touched"),
+    ("ARTIFACTS_STORE_FAILED", Class::Failed, "a blob write or upload failed and nothing was kept: `evidence add` rolled the record or batch back (the code `EVIDENCE_STORE_FAILED` merged into), `artifacts store` and `artifacts move` had stored nothing yet, `artifacts prune` had deleted nothing yet"),
     ("ARTIFACTS_STORE_INCOMPLETE", Class::Incomplete, "`artifacts store` stored some blobs, then a later write or check of the store failed: the stored blobs stay and a repeat of the same call stores the rest"),
     ("ARTIFACTS_VERIFY_FAILED", Class::Answer, "`artifacts verify` found a bound file missing or altered"),
     ("BATCH_INCOMPLETE", Class::Batch, "the batch's own core code; an element that stops part-way is its item error"),
@@ -2584,7 +2587,7 @@ fn changelog_problems(section: &str) -> Vec<String> {
             problems.push(format!("the table has no row for the replaced code {old}"));
         }
     }
-    for (code, _, _) in INCOMPLETE {
+    for (code, _, _) in INCOMPLETE.iter().filter(|(code, _, _)| !old_codes::ADDED_AFTER_0_36.contains(code)) {
         if !section.contains(&format!("`{code}`")) {
             problems.push(format!("the section never says {code}"));
         }

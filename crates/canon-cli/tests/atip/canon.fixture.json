@@ -11,6 +11,15 @@
         ]
       ]
     },
+    "artifacts prune": {
+      "preview": [
+        [
+          "artifacts",
+          "prune",
+          "--json"
+        ]
+      ]
+    },
     "brief check": {
       "domainRejects": {
         "change": [
@@ -750,6 +759,11 @@
       "sh",
       "-c",
       "mkdir -p packages/dashboard/dist && echo '{\"name\":\"@canon-dev/dashboard\"}' > packages/dashboard/package.json && echo '<!doctype html><title>stub</title>' > packages/dashboard/dist/index.html"
+    ],
+    [
+      "sh",
+      "-c",
+      "mkdir -p .canon/artifacts/sha256 && printf x > .canon/artifacts/sha256/2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
     ]
   ],
   "probe": "status",
@@ -818,6 +832,15 @@
         "ARTIFACTS_STORE_INVALID",
         "ARTIFACTS_STORE_REQUIRED",
         "ARTIFACTS_STORE_UNAVAILABLE"
+      ],
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_PRUNE_INCOMPLETE",
+      "exit": 1,
+      "reasons": [
+        "ARTIFACTS_STORE_FAILED",
+        "WRITE_FAILED"
       ],
       "retryable": false
     },

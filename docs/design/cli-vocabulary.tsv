@@ -56,6 +56,7 @@ interval-secs	N	seconds between polls
 introduced-rev	REV	commit that introduced a defect
 introduced-unknown	-	mode: the introducing commit is not known
 json	-	mode: print the enveloped document
+keep-days	N	keep the blobs the records of the last N days bind
 kind	KIND	record kind
 lane	NAME	lane tag of a scenario
 language	TAG	language of generated prose

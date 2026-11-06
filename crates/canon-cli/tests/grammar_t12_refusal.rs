@@ -90,6 +90,7 @@ const DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789
 #[rustfmt::skip]
 const REFUSALS: &[Row] = &[
     lit("artifacts move", &["artifacts", "move", "--tier", "cold"], "ARTIFACTS_TIER_INVALID"),
+    lit("artifacts prune", &["artifacts", "prune", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("artifacts store", &["artifacts", "store"], "CONFIG_INVALID").setup(BROKEN_CONFIG),
     lit("brief approve", &["brief", "approve", "no-such-change", "--approver", "alice", "--note", "ok"], "BRIEF_NOT_FOUND"),
     lit("change new", &["change", "new", "add-login", "--subject", "demo", "--title", "Again"], "CHANGE_EXISTS"),

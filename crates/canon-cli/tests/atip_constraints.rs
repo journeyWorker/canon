@@ -579,6 +579,7 @@ fn atip_constraints_16_the_shape_of_input_is_the_parsers_and_no_document_declare
     }
     for line in [
         "canon artifacts move --tier cold --input '[{},{}]'",
+        "canon artifacts prune --input '[{},{}]'",
         "canon dashboard --input '[{},{}]'",
         "canon ledger compact --input '[{},{}]'",
         "canon migrate --input '[{},{}]'",
