@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-date-refusals",
+    "role": "reviewer",
+    "session_id": "s-0-38-date-rev"
+  },
+  "at": "2026-11-06T17:34:00.353507Z",
+  "code_tree": "ca57826d766b036bf5441d11c4f7f646f7454fb5",
+  "kind": "review",
+  "pin": "66d909b855034a340270a82ee40a2527a50ccc56",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_daterefusals_03_a_misspelled_value_keeps_the_spelling_refusal_of_0_37"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "1c5f1d4a52111abd6dd9bf0892e0aa4de2cf4c8d179256addac397be7ebf3922",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-date-refusals/brief.md"
+  },
+  "review_id": "01M6RYSB51D8S4VH283Y7N29SA",
+  "reviewer": "rev-0-38-date-refusals",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "atip.daterefusals.03",
+  "schema": 2,
+  "worktree_dirty": false
+}
