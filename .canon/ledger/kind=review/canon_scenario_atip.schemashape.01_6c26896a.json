@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-schema-shape",
+    "role": "reviewer",
+    "session_id": "s-0-38-shape-rev"
+  },
+  "at": "2026-11-06T16:50:54.883703Z",
+  "code_tree": "639c82a391de1dd0b94e927f8b17260d0b1fe9d6",
+  "kind": "review",
+  "pin": "41d01f1943f98a5e79e7722c376062163bee63f7",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_schemashape_01_the_trace_operand_is_named_for_what_it_takes"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "89b9c33657ad31b9e0661344d1ee673be7a1ea8a847d6c17bbdbe2b33ed60ab9",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-schema-shape/brief.md"
+  },
+  "review_id": "01M6RWAE934G8EPBANNRHZ143A",
+  "reviewer": "rev-0-38-schema-shape",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "atip.schemashape.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

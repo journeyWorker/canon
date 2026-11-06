@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-38-schema-shape",
+    "role": "reviewer",
+    "session_id": "s-0-38-shape-rev"
+  },
+  "at": "2026-11-06T16:50:54.883703Z",
+  "code_tree": "639c82a391de1dd0b94e927f8b17260d0b1fe9d6",
+  "kind": "review",
+  "pin": "41d01f1943f98a5e79e7722c376062163bee63f7",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_schemashape_09_a_roles_value_that_is_not_all_or_an_array_of_role_names_or_a_missing_member_fails_the_check"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "9b1130409a0567647b98f1118b201737e324eee91a02991aa6d56d3d841a4c26",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-38-schema-shape/brief.md"
+  },
+  "review_id": "01M6RWAE934G8EPBANNRHZ143A",
+  "reviewer": "rev-0-38-schema-shape",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "atip.schemashape.09",
+  "schema": 2,
+  "worktree_dirty": false
+}
