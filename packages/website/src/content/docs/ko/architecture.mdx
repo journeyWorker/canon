@@ -30,7 +30,7 @@ canon은 **하나의 Rust 코어**를 단일 책임 크레이트로 나눈 뒤, 
 ```
 
 - **canon-model** — canon의 닫힌 버전 관리 아티팩트 패밀리 타입입니다.
-  envelope, 열네 개 레코드 종류, 아홉 개 조인 스파인 키 newtype, 그리고
+  envelope, 열두 개 레코드 종류, 아홉 개 조인 스파인 키 newtype, 그리고
   생성된 JSON 스키마 + 조인 스파인 문서 출력을 담당합니다. 실행 계보도
   함께 담습니다: `Run.parent_run_id`는 서브에이전트 run을 부모 run에
   연결하고, `Handoff.from_role`/`to_role`은 핸드오프의 양쪽 끝에 역할
@@ -59,8 +59,8 @@ canon은 **하나의 Rust 코어**를 단일 책임 크레이트로 나눈 뒤, 
   않으면서 query가 투영할 수 있는 필드를 확장합니다.
 - **canon-report** — canon-store의 DuckDB 뷰 레이어 위에서 생성되며
   절대 수동 편집하지 않는 markdown 상태 리포트와, 대시보드가 읽는
-  `--snapshot` Parquet export를 담당합니다. 리포트에는 10개 mart가
-  포함되고 대시보드는 의도적으로 7개 패널만 렌더링합니다.
+  `--snapshot` Parquet export를 담당합니다. 리포트에는 9개 mart가
+  포함되고 대시보드는 의도적으로 6개 패널만 렌더링합니다.
   [CLI surface](/ko/cli/#surface)를 참고하세요.
 - **canon-cli** — 위 모든 것이 연결되는 단일 엔트리포인트 바이너리입니다.
   CLI 문법은 하나이고 명세 하나(`docs/cli/canon.cli.json`)에서 생성됩니다: 그룹과
@@ -83,7 +83,7 @@ canon-store는 기본적으로 모든 레코드 종류를 자격 증명이 필�
 │ local (Git)          │ hot (SQLite, default)    │ optional scale-up      │
 ├──────────────────────┼──────────────────────────┼────────────────────────┤
 │ authored specs       │ task / handoff /         │ Postgres — hot swap    │
-│ promoted strategies  │ session / run / event    │ for shared, concurrent │
+│ promoted strategies  │ run                      │ for shared, concurrent │
 │ evidence ledger      │ (.canon/hot.db,          │ R2 / S3 — cold, bulk   │
 │ (Hive, append-only)  │ gitignored)              │ data (credentialed)    │
 └──────────────────────┴──────────────────────────┴────────────────────────┘

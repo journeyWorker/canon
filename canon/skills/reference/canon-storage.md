@@ -223,7 +223,11 @@ is the canonical data-lifecycle boundary: the bare run previews: it prints the r
 its `planDigest` and deletes nothing; `--commit --plan-digest <planDigest>` deletes only if
 the plan recomputed now has the same digest (`PLAN_STALE`, exit 2, when the
 data moved). The only purgeable kinds are
-`session`, `run`, `event`, and `trajectory`; the cutoff applies to every
+`run` and `trajectory`, plus the retired `session` and `event` (kept for this
+release only so stored rows can be deleted — delete them now, after the next
+release only direct database access remains; they read no routing, so they
+find rows in every configured tier even after `canon migrate` removes the
+`routing:`/`aging:` keys); the cutoff applies to every
 routed rung and every configured aging destination, including retained
 historical versions. For `trajectory`, the command also purges the
 operator-local Parquet learn store under `learn.root` in `canon.yaml`;

@@ -12,8 +12,8 @@ respect.
 
 ## The record-kind set is closed — review before extending
 
-`RecordKind` (`src/envelope.rs`) has exactly fourteen variants (design
-D1): `Change`, `Task`, `Scenario`, `Session`, `Run`, `Event`, `Handoff`,
+`RecordKind` (`src/envelope.rs`) has exactly twelve variants (design
+D1): `Change`, `Task`, `Scenario`, `Run`, `Handoff`,
 `Review`, `Divergence`, `Trajectory`, `StrategyItem`, `EvidenceRecord`,
 `Subject`, `Finding`.
 This is deliberate friction, not an oversight — an open `kind: String` +
@@ -21,7 +21,7 @@ untyped `payload` escape hatch is exactly what let an internal monorepo accumula
 uncoordinated management systems before canon existed (design D1's
 rejected alternative).
 
-Before adding a fifteenth kind:
+Before adding a thirteenth kind:
 
 1. Confirm the new artifact family genuinely doesn't fit an existing
    kind's fields (extending an existing kind's `schema` version, below,
@@ -30,7 +30,7 @@ Before adding a fifteenth kind:
    `canon-model` change — not a drive-by addition inside an unrelated
    spec's implementation. Add the variant to `RecordKind` AND to
    `RecordKind::ALL` (both are asserted in sync by
-   `envelope::tests::all_fourteen_kinds_present_exactly_once`), add the
+   `envelope::tests::all_twelve_kinds_present_exactly_once`), add the
    struct in `src/records.rs` (or its own module, for something
    `Handoff`-sized), implement `CanonRecord` for it, add it to
    `schema_export::record_schemas()`, and add a well-formed fixture
@@ -75,8 +75,7 @@ So for `Task`/`Change` (and any future kind projected from a source
 document), a field addition IS a generation change and MUST bump
 `schema`. `Task` is at `2` for exactly this reason.
 
-Kinds whose `at` is derivation-time (`Run`, `Handoff`, `Session`,
-`Event`, …) cannot tie this way, so a purely additive `Option<T>` field
+Kinds whose `at` is derivation-time (`Run`, `Handoff`, …) cannot tie this way, so a purely additive `Option<T>` field
 with `#[serde(default)]` needs no bump there — `schema_export`'s own
 scenario ("a field addition is reflected without a second registration
 site") still holds for them.

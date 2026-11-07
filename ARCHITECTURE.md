@@ -219,7 +219,7 @@ described as improving agent outcomes.
 
 `canon.yaml` is the repository configuration source. Durable authored specs,
 reviews, divergences, evidence, findings, and strategies route to the local
-Git tier; live task/handoff/session/run/event state routes to the hot tier; raw
+Git tier; live task/handoff/run state routes to the hot tier; raw
 trajectories route to the cold tier. The exact routing is resolved by
 `canon-store`'s `TierPolicy`, not by callers branching on backend names.
 

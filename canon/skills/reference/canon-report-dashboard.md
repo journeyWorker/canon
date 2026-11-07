@@ -1,9 +1,9 @@
 # canon-report-dashboard
 
-canon's single status surface: `canon report build` renders TEN panels to
-markdown, `canon report snapshot` exports the same ten marts to
+canon's single status surface: `canon report build` renders NINE panels to
+markdown, `canon report snapshot` exports the same nine marts to
 Parquet, and `canon dashboard` serves a small zero-network web app that
-renders SEVEN of them from such a snapshot. Neither surface computes an
+renders SIX of them from such a snapshot. Neither surface computes an
 aggregate itself — both read canon's precomputed
 `crates/canon-store/sql/views.sql` marts, and each run reads the corpus
 ONCE (`crates/canon-report/src/query.rs`'s `PIN_CORPUS_SQL`), so no two
@@ -35,7 +35,7 @@ drift-checked.
 
 ## `canon report build [--repo <dir>]`
 
-Renders the current ten-panel report to `<repo>/.canon/REPORT.md`.
+Renders the current nine-panel report to `<repo>/.canon/REPORT.md`.
 `--repo` resolves through the nearest-`canon.yaml`-ancestor walk every
 subcommand uses — omit it (or pass `.`) to run from any subdirectory.
 
@@ -82,7 +82,7 @@ and commit the result.
 
 ## `canon report snapshot <dir>`
 
-Exports all ten views to `<dir>/<table>.parquet` plus a
+Exports all nine views to `<dir>/<table>.parquet` plus a
 `<dir>/manifest.json`. One explicit `COPY` per view — the exported
 columns are each view's own `SELECT` list, wider than the curated column
 subset the markdown tables render. `file` is always
@@ -98,7 +98,6 @@ existing consumer's order never moves:
   "source_digest": "...",
   "tables": [
     { "table": "mart_trust_matrix", "file": "mart_trust_matrix.parquet" },
-    { "table": "mart_session_costs", "file": "mart_session_costs.parquet" },
     { "table": "mart_role_memory", "file": "mart_role_memory.parquet" },
     { "table": "mart_flywheel_funnel", "file": "mart_flywheel_funnel.parquet" },
     { "table": "mart_review_burndown", "file": "mart_review_burndown.parquet" },
@@ -174,7 +173,7 @@ human's explicit answer, with `--relayed-via`. The page lists the approvals an
 agent recorded for the human under "Approved through an agent" (`relayed` in
 `GET /api/briefs`), with the role, actor and tool of each.
 
-The dashboard renders SEVEN panels — trust matrix, session costs, role
+The dashboard renders SIX panels — trust matrix, role
 memory, flywheel funnel, review burn-down, review rounds, review totals.
 **Scope status
 and subjects are exported to the snapshot but have no dashboard panel**;
@@ -186,7 +185,7 @@ The dashboard's freshness banner shows the snapshot's
 snapshot, not necessarily the live checkout" note — treat "matches
 `canon report`" as "matches the inputs that produced THIS snapshot".
 
-## Reading the ten panels
+## Reading the nine panels
 
 In `canon report`'s own render order. Each panel names the view that
 computes it; nothing here is derived a second time.
@@ -201,17 +200,6 @@ computes it; nothing here is derived a second time.
   versions included, because a re-attestation can only arrive as a new
   version; `green` and `who` are read off one whole winner row, so they can
   never come from two different attestations.
-
-- **Session costs** (`mart_session_costs`) — token/cost per
-  `(session, client, role, workspace_label)`. Every `run`/`session`/
-  `token_usage` record is folded to its latest version first, so
-  a re-ingested corrected cost REPLACES the superseded figure instead of being summed with it.
-  `workspace_label` is NOT a repo identity: it is the last non-empty path
-  segment of the `token_usage` event's workspace key and nothing more, so it
-  SPLITS one repo whose worktrees sit in differently-named directories and
-  MERGES two different repos sharing a directory name. Two stronger fields
-  exist and this mart reads neither — the event's own `workspace_key`, and
-  `Session.project_key`, which `canon-cli` stamps to the main worktree's key.
 
 - **Role memory** (`mart_role_memory`) — per-`(role, regime_key)` strategy
   counts. `hit_rate` is NOT a retrieval hit rate: it is the fraction of that
@@ -355,25 +343,28 @@ computes it; nothing here is derived a second time.
   a row is one change's review history, and `findings` moves with how
   much reviewing happened rather than with the change.
 
-Two marts in `views.sql` are NOT report panels and are not exported by
-`--snapshot`: `mart_records_by_kind` and `mart_session_run_handoff`.
-Read them with DuckDB directly against `views.sql`.
+One mart in `views.sql` is NOT a report panel and is not exported by
+`--snapshot`: `mart_records_by_kind`. It counts records per stored kind, so
+rows of the retired `session`/`event` kinds that remain in a store still show
+there until `canon purge` deletes them. Read it with DuckDB directly against
+`views.sql`.
 
 - **Run observability** (`mart_run_observability`) — one row per folded
-  `run_id`, appended as the tenth report/snapshot table after the established
-  nine tables. It reports lifecycle identifiers/status/timestamps, latency
-  only when both timestamps exist, event and label counts, child-run count,
-  guidance count, lineage provider/model, and token/cost source totals. These
-  are bounded observations and proxies: event counts do not infer tool calls,
-  retries, or human interventions, and no field claims guidance caused an
-  outcome. `directive_event_count` and `guidance_count` are counts only;
-  directive and guidance text is never emitted. `*_unknown` columns explicitly
-  expose missing joins/coverage, including missing session/project/task/lineage,
-  end timestamps, event times, costs, and guidance. Workspace absolute paths
-  and verbatim directives/guidance are intentionally omitted. The adapter
-  contract is strict read-only validation; this panel does not execute
-  adapters or enforce provider sandbox capabilities. Privacy-safe omission of
-  paths and directive/guidance text is part of the current semantics.
+  `run_id`, the ninth and last report/snapshot table after the established
+  eight tables. It reports lifecycle identifiers/status/timestamps, latency
+  only when both timestamps exist, child-run count, guidance count, and
+  lineage provider/model, all read from the `Run` record alone. These are
+  bounded observations and proxies: no field claims guidance caused an
+  outcome. `guidance_count` is a count only; guidance text is never emitted.
+  `*_unknown` columns explicitly expose missing values, including missing
+  session/project/task/parent-run lineage, end timestamps, provider/model and
+  guidance; a `Run` stored without `project_key` reads `project_key_unknown`.
+  There are no cost, token or event columns: canon has no cost or token
+  report and no replacement for it. Workspace absolute paths and verbatim
+  guidance are intentionally omitted. The adapter contract is strict
+  read-only validation; this panel does not execute adapters or enforce
+  provider sandbox capabilities. Privacy-safe omission of paths and guidance
+  text is part of the current semantics.
 
 ## What this skill does NOT cover
 

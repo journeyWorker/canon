@@ -30,7 +30,7 @@ toolchain required.
 ```
 
 - **canon-model** — canon's closed, versioned artifact-family types: the
-  envelope, the fourteen record kinds, the nine join-spine key newtypes, and
+  envelope, the twelve record kinds, the nine join-spine key newtypes, and
   generated JSON-schema + join-spine doc output. It also carries execution
   lineage: `Run.parent_run_id` links a subagent run to its parent and
   `Handoff.from_role`/`to_role` type a handoff's endpoints, while
@@ -62,8 +62,8 @@ toolchain required.
   widening canon-model's frozen record-kind set.
 - **canon-report** — the generated-never-edited markdown status report over
   canon-store's DuckDB view layer, plus the `canon report snapshot` Parquet export the
-  dashboard reads. The report contains 10 marts; the dashboard intentionally
-  renders 7 panels. See [CLI surface](/cli/#surface).
+  dashboard reads. The report contains 9 marts; the dashboard intentionally
+  renders 6 panels. See [CLI surface](/cli/#surface).
 
 ## Storage tiers
 
@@ -76,7 +76,7 @@ schedule (`canon tier age`):
 │ local (Git)          │ hot (SQLite, default)    │ optional scale-up      │
 ├──────────────────────┼──────────────────────────┼────────────────────────┤
 │ authored specs       │ task / handoff /         │ Postgres — hot swap    │
-│ promoted strategies  │ session / run / event    │ for shared, concurrent │
+│ promoted strategies  │ run                      │ for shared, concurrent │
 │ evidence ledger      │ (.canon/hot.db,          │ R2 / S3 — cold, bulk   │
 │ (Hive, append-only)  │ gitignored)              │ data (credentialed)    │
 └──────────────────────┴──────────────────────────┴────────────────────────┘
