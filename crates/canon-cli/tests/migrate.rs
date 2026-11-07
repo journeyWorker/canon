@@ -505,6 +505,31 @@ fn set_mode(path: &Path, mode: u32) {
     std::fs::set_permissions(path, std::os::unix::fs::PermissionsExt::from_mode(mode)).unwrap();
 }
 
+/// A repo root that cannot take a new entry: `canon.yaml` is written through a temp file in it and renamed over it, so that write fails while the
+/// moves into `.canon/` (and the in-place writes of files already there) still work. Restores the mode when dropped. `None`, saying so, for a user
+/// who can write there anyway (root): the test that asked for it then does not run its failure half.
+struct ReadOnlyRoot(std::path::PathBuf);
+
+impl ReadOnlyRoot {
+    fn new(repo: &Path) -> Option<Self> {
+        set_mode(repo, 0o555);
+        let probe = repo.join(".root-probe");
+        if std::fs::write(&probe, b"").is_ok() {
+            let _ = std::fs::remove_file(&probe);
+            set_mode(repo, 0o755);
+            eprintln!("skipped: running as a user who can write a read-only directory (root)");
+            return None;
+        }
+        Some(Self(repo.to_path_buf()))
+    }
+}
+
+impl Drop for ReadOnlyRoot {
+    fn drop(&mut self) {
+        set_mode(&self.0, 0o755);
+    }
+}
+
 /// The latest stored version of change `id`.
 fn latest_change(repo: &Path, id: &str) -> serde_json::Value {
     query(repo, "change").into_iter().filter(|c| c["change_id"] == id).max_by_key(|c| c["at"].as_str().unwrap().to_string()).unwrap()
@@ -520,8 +545,8 @@ fn latest_change(repo: &Path, id: &str) -> serde_json::Value {
 fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by_the_next() {
     let dir = old_repo();
     let repo = dir.path();
-    // The temp file canon.yaml is written through cannot be created.
-    std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
+    // The repo root takes no new entry, so canon.yaml cannot be replaced (skipped as root).
+    let Some(blocked) = ReadOnlyRoot::new(repo) else { return };
     let out = commit(repo);
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
     assert!(text(&out).contains("canon: MIGRATION_INCOMPLETE: failed to write"), "{}", text(&out));
@@ -529,7 +554,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     assert_eq!(read(repo, "canon.yaml"), OLD_YAML, "never half-written");
     assert!(repo.join(NEW_FEATURE).is_file() && repo.join(".canon/changes/add-cart/brief.md").is_file(), "the moves happened before the write failed");
 
-    std::fs::remove_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
+    drop(blocked);
     let out = ok_commit(repo);
     assert!(
         out.contains("  spec root `root` is already at .canon/specs/kind=feature (an earlier run stopped before writing canon.yaml); canon.yaml root: .canon/specs, former_roots: [specs]\n"),
@@ -761,35 +786,36 @@ fn commit_json(repo: &Path, env: &[(&str, &str)]) -> (Output, serde_json::Value)
 #[test]
 fn atip_incomplete_10_a_migrate_that_stopped_after_it_began_is_incomplete_with_the_reason_where_it_stopped(
 ) {
-    // STOPPED: the canon.yaml temp file cannot be created, after the corpus and the change moved (authoring.migrate.09).
+    // STOPPED: canon.yaml cannot be replaced (the repo root takes no new entry; skipped as root), after the corpus and the change moved (authoring.migrate.09).
     let dir = old_repo();
     let repo = dir.path();
-    std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
-    let (out, body) = commit_json(repo, &[]);
-    assert_eq!(out.status.code(), Some(1), "{body}");
-    assert_eq!(
-        (
-            body["error"]["code"].as_str(),
-            body["error"]["reason"].as_str(),
-            body["error"]["retryable"].as_bool()
-        ),
-        (Some("MIGRATION_INCOMPLETE"), Some("STOPPED"), Some(false)),
-        "{body}"
-    );
-    assert_eq!(
-        body["meta"]["next"][0]["argv"],
-        serde_json::json!(["status", "--json"]),
-        "{body}"
-    );
-    assert!(repo.join(".canon/specs").is_dir(), "what moved stays moved");
-    std::fs::remove_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
-    let finished = commit(repo);
-    assert_eq!(
-        finished.status.code(),
-        Some(0),
-        "running it again finishes the rest: {}",
-        text(&finished)
-    );
+    if let Some(blocked) = ReadOnlyRoot::new(repo) {
+        let (out, body) = commit_json(repo, &[]);
+        assert_eq!(out.status.code(), Some(1), "{body}");
+        assert_eq!(
+            (
+                body["error"]["code"].as_str(),
+                body["error"]["reason"].as_str(),
+                body["error"]["retryable"].as_bool()
+            ),
+            (Some("MIGRATION_INCOMPLETE"), Some("STOPPED"), Some(false)),
+            "{body}"
+        );
+        assert_eq!(
+            body["meta"]["next"][0]["argv"],
+            serde_json::json!(["status", "--json"]),
+            "{body}"
+        );
+        assert!(repo.join(".canon/specs").is_dir(), "what moved stays moved");
+        drop(blocked);
+        let finished = commit(repo);
+        assert_eq!(
+            finished.status.code(),
+            Some(0),
+            "running it again finishes the rest: {}",
+            text(&finished)
+        );
+    }
 
     // PINS: the reviews could not be pinned after the index was rebuilt (the seam).
     let other = old_repo();

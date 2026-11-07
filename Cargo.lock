@@ -618,6 +618,7 @@ dependencies = [
  "canon-gate",
  "canon-ingest",
  "canon-model",
+ "canon-store",
  "chrono",
  "parquet",
  "serde",

@@ -184,18 +184,10 @@ pub fn promote_strategy_approved(
     if path.exists() {
         return Err(PromotionEvidenceError::ActivationTargetExists.into());
     }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
     // Write the target atomically before changing the durable lifecycle.  A
-    // failed rename/write leaves the candidate quarantined and unreachable.
+    // failed write leaves the candidate quarantined and unreachable.
     let rendered = render_strategy_file(&item, Some(evaluation.digest()), Some(approval.integrity_digest.clone()))?;
-    let temporary = path.with_extension("md.activation");
-    fs::write(&temporary, &rendered)?;
-    if let Err(error) = fs::rename(&temporary, &path) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error.into());
-    }
+    canon_store::write_atomic(&path, rendered.as_bytes())?;
     if let Err(error) = strategy_store.set_lifecycle(strategy_id, StrategyLifecycle::Active) {
         let _ = fs::remove_file(&path);
         return Err(error);

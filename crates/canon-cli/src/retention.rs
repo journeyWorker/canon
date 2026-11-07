@@ -157,7 +157,15 @@ pub fn append_access_audit(
         "result_counts": {"matched": matched, "deleted": deleted},
         "at": Utc::now().to_rfc3339(),
     });
-    writeln!(options.open(path)?, "{}", serde_json::to_string(&line)?)?;
+    write_audit_line(&mut options.open(path)?, &line)
+}
+
+/// Put one audit line, its `\n` included, into `out` with a single `write_all`: one `write` call on the append-mode file, so no
+/// interrupt can leave the JSON without its newline and the next line glued onto it.
+fn write_audit_line(out: &mut impl Write, line: &serde_json::Value) -> Result<(), RetentionError> {
+    let mut text = serde_json::to_string(line)?;
+    text.push('\n');
+    out.write_all(text.as_bytes())?;
     Ok(())
 }
 
@@ -795,6 +803,55 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let mode = fs::metadata(audit_path(dir.path()).unwrap()).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
+    }
+
+    /// Counts the `write` calls the sink receives and keeps what they carried.
+    #[derive(Default)]
+    struct CountingSink {
+        calls: usize,
+        bytes: Vec<u8>,
+    }
+
+    impl Write for CountingSink {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.calls += 1;
+            self.bytes.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn an_audit_line_and_its_newline_leave_in_one_write_call() {
+        let mut sink = CountingSink::default();
+        write_audit_line(&mut sink, &json!({"operation": "query", "result_counts": {"matched": 3, "deleted": 0}})).unwrap();
+        assert_eq!(sink.calls, 1, "the JSON and the newline go out together");
+        assert!(sink.bytes.ends_with(b"\n") && sink.bytes.iter().filter(|b| **b == b'\n').count() == 1);
+        let parsed: serde_json::Value = serde_json::from_slice(&sink.bytes).unwrap();
+        assert_eq!(parsed["operation"], "query");
+    }
+
+    #[test]
+    fn two_audit_lines_stay_two_lines_in_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("canon.yaml"), "").unwrap();
+        for _ in 0..2 {
+            append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        }
+        let text = fs::read_to_string(audit_path(dir.path()).unwrap()).unwrap();
+        assert_eq!(text.lines().count(), 2);
+        assert!(text.lines().all(|line| serde_json::from_str::<serde_json::Value>(line).is_ok()), "{text}");
+    }
+
+    #[test]
+    fn an_unopenable_audit_file_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("canon.yaml"), "").unwrap();
+        fs::create_dir_all(audit_path(dir.path()).unwrap()).unwrap();
+        assert!(append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).is_err(), "a directory where the audit file belongs");
     }
 
     #[test]

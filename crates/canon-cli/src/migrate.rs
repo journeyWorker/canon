@@ -521,7 +521,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let drop_source = applied.error.is_none() && applied.briefs_done;
     let written = render_config(&renamed_config, &plan, applied.roots, drop_source)
         .map_err(|e| format!("could not rewrite canon.yaml: {e}"))
-        .and_then(|config| if config == text { Ok(()) } else { write_atomic(&canon_yaml, &config) });
+        .and_then(|config| if config == text { Ok(()) } else { canon_store::write_atomic(&canon_yaml, config.as_bytes()).map_err(|e| format!("failed to write {}: {e}", canon_yaml.display())) });
     if let Err(e) = written {
         return stopped("STOPPED", format!("{e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "fix what the message names, then run `canon migrate` again; canon.yaml is unchanged").emit("canon migrate", json);
     }
@@ -1364,18 +1364,6 @@ fn move_file(repo: &Path, from: &Path, to: &Path, git: bool) -> Result<(), Strin
         return Err(format!("{} already exists", rel(repo, to)));
     }
     move_dir(repo, from, to, git)
-}
-
-/// Write `path` whole or not at all: a temp file beside it, then a rename.
-fn write_atomic(path: &Path, text: &str) -> Result<(), String> {
-    let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("canon.yaml");
-    let temp = path.with_file_name(format!(".{name}.canon-migrate.tmp"));
-    let written = fs::write(&temp, text).and_then(|()| fs::rename(&temp, path));
-    if let Err(e) = written {
-        let _ = fs::remove_file(&temp);
-        return Err(format!("failed to write {}: {e}", path.display()));
-    }
-    Ok(())
 }
 
 fn git_run(repo: &Path, args: &[&str]) -> Result<(), String> {
