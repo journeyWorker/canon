@@ -4,6 +4,31 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+canon no longer ingests agent transcripts: `canon ingest sessions` and everything that served it are gone, and `ingest plans`, `ingest records` and `canon dispatch` are unchanged.
+
+### Breaking
+
+**`canon ingest sessions` is removed** (`canon-0-39-session-ingest-removal`, scenarios `ingest.sessions.01-16` retired with their `.feature` file; `ingest.sessions.16` is now `ingest.plans.14`): there is no replacement command. canon is the workflow from intent to evidence and gate; reading another product's transcript files (omp/pi, Claude Code, Codex, Hermes) is not part of it.
+
+- `canon ingest sessions`, with or without options, is refused as an unknown subcommand: `UNKNOWN_COMMAND`, exit 2, `expected` `plans` and `records`. The removed-spelling table gets no row, as there is no name to point to.
+- `canon selftest --suite session-ingest` is refused as a value outside the closed set of `--suite` (exit 2); a run with no `--suite` runs the other suites.
+- `canon-ingest` keeps the plan dialects, `brief`, `markdown`, `task_rows`, the record adapters of `ingest records`, `verdict` and `scanner`, and drops the transcript adapters, their normalization, registry and tests (8,479 lines with `canon-cli`'s collector). The dependencies only they used (`simd-json`, `ulid`, `rusqlite`) leave its manifest. `content_digest` (12 hex characters; it names the plan cursor files `.canon/ingest/cursors/plan-<dialect>-<digest>.json` and is part of every `regime_key`) moved to `canon_ingest::digest` byte for byte, pinned by fixed vectors; `persist_idempotent`, which `canon dispatch begin` and `end` write their `Run` with, moved to `crate::tiers`.
+- A `canon.yaml` still holding an `ingest:` section runs as before: nothing reads it, and `migrate` does not remove it.
+- Token and cost reports lose their data source; there is no other one.
+
+| removed | 0.38 | 0.39 |
+|---|---|---|
+| `canon ingest sessions` | wrote `session`, `run` and `event` records from agent transcripts | refused: `UNKNOWN_COMMAND`, exit 2; no replacement |
+| `CANON_INGEST_CLAUDE_SESSIONS_DIR` | an extra directory `ingest sessions` scanned for Claude Code | not read |
+| `CANON_INGEST_OMP_SESSIONS_DIR` | an extra directory `ingest sessions` scanned for omp | not read |
+| `ingest.sources.<id>.roots` in `canon.yaml` | the scan roots of one adapter | not read; no error, no warning |
+| `ingest.sessions.privacy` in `canon.yaml` | `capture_user_directives` and `max_directive_chars` | not read; no error, no warning |
+| `selftest --suite session-ingest` | the transcript adapters' self test | refused (exit 2); the suite is gone |
+| skill `canon-session-ingest` | the guide to `ingest sessions` | not in the bundle: `skills install` removes the installed file that still equals its lock entry and keeps (`kept:`) one you edited; `skills check` on a repository not yet updated names it as an orphan, exit 1 |
+| page Data & Privacy (`/privacy/`, `/ko/privacy/`) | what `ingest sessions` captured and how | deleted |
+
+Session, run and event records already stored, and `.canon/ingest/cursors/omp.json` and `codex.json`, are not read or deleted by canon; delete them by hand if you wish. The record kinds `session` and `event` and the reports built on them stay for now.
+
 ## 0.38.0 — 2026-11-07
 
 canon takes the harnesses with a repeatable `--harness` and `--no-harness` (and refuses `--providers`), names every operand and option value for what it is and declares `x-canon.roles: "all"` for a command all four roles use, refuses a leap second and names the date or time that does not exist, gives a scenario area or surface the code paths its evidence is about (`code_scopes` in the policy, #130; a scope an agent widens holds the policy approval), records the role that closes a finding (only a reviewer closes one `rejected` or `deferred`), adds `canon artifacts prune` (#138, part), and makes two tests deterministic. It is BREAKING for callers: the `### Breaking` tables below name every spelling, value and code that moved.
@@ -1449,7 +1474,7 @@ One grammar for the whole CLI, generated from one command spec. Old spellings fa
 | `--repo` on `canon regime show` | `--repo-name` | the repo segment of the key; `--repo` names a directory on other commands |
 | `--to` on `canon artifacts move` | `--tier` |  |
 | `--target` on `canon skills install`, `canon skills check`, `canon skills doctor` | `--repo` | the repo is `--repo` on every command; omit it to use the nearest directory holding canon.yaml |
-| `--canon-yaml` on `canon ingest sessions`, `canon query`, `canon tier age` | `--repo` | the repo's canon.yaml is found from `--repo`, or from the nearest directory holding one when it is omitted |
+| `--canon-yaml` on `canon query`, `canon tier age` | `--repo` | the repo's canon.yaml is found from `--repo`, or from the nearest directory holding one when it is omitted |
 | `--dry-run` on `canon artifacts move`, `canon ledger compact`, `canon migrate`, `canon purge`, `canon tier age` | `--commit --plan-digest` | the bare run previews; `--commit --plan-digest` acts |
 | `--plan` on `canon purge` | `canon purge` | the bare run previews; `--commit --plan-digest` acts |
 | `--confirm` on `canon purge` | `--commit --plan-digest` | the bare run previews; `--commit --plan-digest` acts |

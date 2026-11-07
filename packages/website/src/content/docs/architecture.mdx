@@ -14,7 +14,7 @@ toolchain required.
 │ crates/                                               │
 │    canon-model   types + versioned JSON schemas       │
 │    canon-store   git / pg / r2 tier adapters          │
-│    canon-ingest  session + artifact adapters          │
+│    canon-ingest  plan + artifact adapters             │
 │    canon-gate    trust spine (covered/green)          │
 │    canon-learn   role-namespaced strategy memory      │
 │    canon-policy  CEL policy-expression engine         │
@@ -40,11 +40,9 @@ toolchain required.
   lineage; see [`context-pack`](/cli/#setup).
 - **canon-store** — one storage trait behind git / Postgres / R2 tier
   adapters.
-- **canon-ingest** — the adapter registry that turns raw agent-CLI session
-  transcripts and artifact evidence (ledger, divergences, openspec tasks,
-  handoffs) into canon-model records. Its session adapters write one root
-  run per session plus one child run per subagent, so a delegation tree is
-  a queryable shape rather than a flat run list.
+- **canon-ingest** — the adapter registry that turns artifact evidence
+  (ledger, divergences, openspec tasks, handoffs) and plan dialects into
+  canon-model records.
 - **canon-gate** — the trust spine: covered/green evidence gating,
   `FAILURE_CLASSES`, the trust ladder, policy resolution, and signed,
   effect-aware risk bindings.
@@ -93,21 +91,20 @@ require operator-supplied credentials. See
 
 Retention is a separate lifecycle boundary: `canon purge` removes only the
 allowlisted operational records from every configured routed/aging destination.
-It does not rewrite Git history or delete operator-owned source transcripts.
+It does not rewrite Git history.
 `canon export` produces a redacted manifest, and access to query/export/purge
 is appended to `.canon/audit/access.jsonl` of the repository whose
 `canon.yaml` was read (nothing is written where there is no `canon.yaml`); backend credentials and deployment
 RBAC remain external prerequisites.
 
-Privacy and retention are explicit boundaries: session adapters read local
-transcripts, while `canon purge` only removes allowlisted operational records;
-source transcripts and Git history remain outside that lifecycle. See
-[Data & Privacy](/privacy/) and [the CLI reference](/cli/#surface).
+Retention is bounded by `canon purge`, which removes only allowlisted
+operational records; Git history remains outside that lifecycle. See
+[the CLI reference](/cli/#surface).
 
 ## The flywheel
 
 ```
-team runs agents → ingest (sessions, reviews, handoffs, CI/PR)
+team runs agents → ingest (plans, reviews, handoffs, CI/PR)
                  → trajectories + verdicts (per role)
                  → distill (success → quarantined strategy, review-finding → guardrail)
                  → occurrence/paired-CRN eligibility

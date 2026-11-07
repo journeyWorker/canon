@@ -29,7 +29,7 @@ import { CardGrid, Card, Aside } from "@astrojs/starlight/components";
     Postgres로 교체하세요(같은 클래스, 한 줄만 바꾸면 됩니다).
   </Card>
   <Card title="cold — S3/R2" icon="seti:folder">
-    대용량, 공유, 분석용. 원시 트랜스크립트, 전체 이벤트 로그, Parquet
+    대용량, 공유, 분석용. 전체 이벤트 로그, Parquet
     마트, 원시 트래젝토리가 여기 있습니다.
   </Card>
 </CardGrid>
@@ -38,7 +38,7 @@ import { CardGrid, Card, Aside } from "@astrojs/starlight/components";
 `routing.*`, `aging.*.to`, `tiers.*` 키 — 에 쓰면 명시적인 힌트와 함께
 거부됩니다. 조용히 별칭 처리되는 일은 없습니다. `canon init`은 새
 레포의 `hot` 단을 기본적으로 sqlite로 스캐폴딩합니다
-(`path: .canon/hot.db`) — 첫 `canon ingest sessions`에 어떤 서비스도
+(`path: .canon/hot.db`) — 첫 `canon dispatch begin` 같은 Run 기록 명령에 어떤 서비스도
 필요하지 않습니다. 아래 예시는 이 레포 자신의 팀 규모 설정입니다
 (`hot: postgres`).
 
