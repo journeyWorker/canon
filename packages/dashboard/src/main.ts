@@ -4,7 +4,6 @@ import { renderNav } from "./nav";
 import { fetchSnapshotStatus } from "./status";
 import { renderFreshnessBanner, renderErrorBanner, renderUnavailableBanner as renderUnavailable } from "./banner";
 import { renderTrustMatrix } from "./panels/trust-matrix";
-import { renderSessionCosts } from "./panels/session-costs";
 import { renderRoleMemory } from "./panels/role-memory";
 import { renderFlywheelFunnel } from "./panels/flywheel-funnel";
 import { renderReviewBurndown } from "./panels/review-burndown";
@@ -51,10 +50,9 @@ async function main(): Promise<void> {
     // Sequential, not Promise.all: DuckDB-Wasm serializes commands over
     // one Worker message channel per connection, so overlapping queries
     // on the same AsyncDuckDBConnection are not a supported concurrency
-    // pattern — seven small SELECTs have no meaningful latency cost from
+    // pattern — six small SELECTs have no meaningful latency cost from
     // running one after another.
     await renderTrustMatrix(conn, panelBody("panel-trust-matrix"));
-    await renderSessionCosts(conn, panelBody("panel-session-costs"));
     await renderRoleMemory(conn, panelBody("panel-role-memory"));
     await renderFlywheelFunnel(conn, panelBody("panel-flywheel-funnel"));
     await renderReviewBurndown(conn, panelBody("panel-review-burndown"));

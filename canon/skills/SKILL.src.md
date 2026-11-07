@@ -344,7 +344,7 @@ preview helps elsewhere (`init`, `skills install`, `export`, `inventory sync`,
 `subject adopt`, …) `--dry-run` validates fully and writes nothing.
 
 ```bash
-canon purge --kind session --before 2026-01-01
+canon purge --kind run --before 2026-01-01
 ```
 
 ## Upgrading a repo from 0.27

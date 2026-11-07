@@ -36,7 +36,7 @@
 //! matches, confirmed by direct `duckdb` experimentation).
 //!
 //! # The sqlite hot tier (0.18, #29)
-//! `canon init` routes `task`/`handoff`/`session`/`run`/`event` to a
+//! `canon init` routes `task`/`handoff`/`run` to a
 //! sqlite `hot` rung. Its db is a local file that needs no credential,
 //! so the report reads it: [`Roots::hot_db`] names the file
 //! ([`hot_db_from_canon_yaml`]), and [`Roots::materialize_hot`] writes

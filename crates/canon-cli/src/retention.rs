@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use canon_learn::{LearnConfig, ParquetTrajectoryStore, TrajectoryStore};
 use canon_model::envelope::RecordKind;
 use canon_store::registry::{PurgeOutcome, RetentionService, TierRegistry};
-use canon_store::tier::{raw_record_at, TierQuery};
+use canon_store::tier::{raw_record_at, PurgeKind, TierQuery};
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
@@ -123,7 +123,7 @@ fn audit_path(repo: &Path) -> Option<PathBuf> {
 pub fn append_access_audit(
     repo: &Path,
     operation: &str,
-    kind: Option<RecordKind>,
+    kind: Option<&str>,
     scope: &str,
     sensitive: bool,
     matched: usize,
@@ -151,7 +151,7 @@ pub fn append_access_audit(
     let line = json!({
         "actor": actor(),
         "operation": operation,
-        "kind": kind.map(RecordKind::as_str),
+        "kind": kind,
         "scope": scope,
         "sensitive": sensitive,
         "result_counts": {"matched": matched, "deleted": deleted},
@@ -189,10 +189,16 @@ fn ensure_sensitive(repo: &Path, requested: bool) -> Result<(), RetentionError> 
     Ok(())
 }
 
-/// The registry of the tiers `kind` lives in. `read_only`: an absent sqlite hot db is read as empty and not created.
-fn loaded_registry(repo: &Path, kind: RecordKind, read_only: bool) -> Result<(PathBuf, TierRegistry), RetentionError> {
+/// The registry of the tiers `kind` lives in; a retired kind has no routing, so it gets every tier `canon.yaml` configures.
+/// `read_only`: an absent sqlite hot db is read as empty and not created.
+fn loaded_registry(repo: &Path, kind: PurgeKind, read_only: bool) -> Result<(PathBuf, TierRegistry), RetentionError> {
     let yaml = resolve_canon_yaml(repo);
-    let loaded = if read_only { tiers::build_lenient_tiers_for_kind_read(&yaml, kind)? } else { tiers::build_lenient_tiers_for_kind(&yaml, kind)? };
+    let loaded = match (kind, read_only) {
+        (PurgeKind::Current(kind), true) => tiers::build_lenient_tiers_for_kind_read(&yaml, kind)?,
+        (PurgeKind::Current(kind), false) => tiers::build_lenient_tiers_for_kind(&yaml, kind)?,
+        (PurgeKind::Retired(_), true) => tiers::build_lenient_tiers_all_rungs_read(&yaml)?,
+        (PurgeKind::Retired(_), false) => tiers::build_lenient_tiers_all_rungs(&yaml)?,
+    };
     let registry = loaded.into_registry();
     Ok((yaml, registry))
 }
@@ -288,7 +294,7 @@ fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, pl
     }
 }
 
-fn partial_purge_report(kind: RecordKind, before: DateTime<Utc>, matched: usize, deleted: usize, error: &str) -> PartialPurgeReport {
+fn partial_purge_report(kind: PurgeKind, before: DateTime<Utc>, matched: usize, deleted: usize, error: &str) -> PartialPurgeReport {
     PartialPurgeReport { kind: kind.as_str().to_string(), before: before.to_rfc3339(), status: "partial", matched, deleted, error: error.to_string(), atomic: false }
 }
 
@@ -303,7 +309,7 @@ fn purge_effects(outcome: &PurgeOutcome, keys: &[String], learn_keys: Option<&[S
 }
 
 /// The record a purge's audit line is made of, as far as it is known when the plan is made: everything but `actor` and `at`.
-fn audit_effect(repo: &Path, kind: RecordKind, matched: usize) -> Option<Effect> {
+fn audit_effect(repo: &Path, kind: PurgeKind, matched: usize) -> Option<Effect> {
     let path = audit_path(repo)?;
     let label = path.strip_prefix(repo).unwrap_or(&path).display().to_string();
     let line = json!({"operation": "purge", "kind": kind.as_str(), "scope": PURGE_SCOPE, "sensitive": false, "result_counts": {"matched": matched, "deleted": matched}});
@@ -322,12 +328,12 @@ fn after_every_record() -> DateTime<Utc> {
 /// previews and writes nothing, not even the access-audit line; `--commit`
 /// deletes only when the plan recomputed now has the digest given. The plan lists the audit line a commit
 /// appends (when it deletes anything) as its last effect, and reads the whole kind in every rung it lives in.
-pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, json_output: bool) -> u8 {
+pub fn run_purge(repo: &Path, kind: PurgeKind, before: DateTime<Utc>, mode: &Mode, json_output: bool) -> u8 {
     let base = crate::safety::preview_command("purge");
     let deleting = std::cell::Cell::new(false);
     let result = (|| -> Result<(), RetentionError> {
         let (yaml, registry) = loaded_registry(repo, kind, true)?;
-        let learn_store = if kind == RecordKind::Trajectory { Some(loaded_trajectory_store(repo, &yaml)?) } else { None };
+        let learn_store = if kind == PurgeKind::Current(RecordKind::Trajectory) { Some(loaded_trajectory_store(repo, &yaml)?) } else { None };
         let learn_preflight = if let Some(store) = &learn_store { Some(store.purge_before(before, true)?) } else { None };
         let preflight = RetentionService::new(&registry).purge(kind, before, true)?;
         let keys = RetentionService::new(&registry).purge_plan_keys(kind, before)?;
@@ -347,7 +353,10 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         let commit = plan.gate(mode).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
         // Deleting touches every rung the kind lives in, and a committed run appends an audit line: each must take the change before the first removal. A plan that removes nothing writes nothing and is not refused.
         if commit && (preflight.rungs.iter().any(|rung| rung.matched > 0) || learn_preflight.unwrap_or(0) > 0) {
-            let mut targets = crate::write_mode::resident_targets(&yaml, kind);
+            let mut targets = match kind {
+                PurgeKind::Current(kind) => crate::write_mode::resident_targets(&yaml, kind),
+                PurgeKind::Retired(kind) => crate::write_mode::retired_resident_targets(&yaml, kind.as_str()),
+            };
             targets.extend(audit_path(repo));
             if learn_store.is_some() {
                 let learn = LearnConfig::from_manifest(&fs::read_to_string(&yaml).unwrap_or_default()).ok();
@@ -390,7 +399,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             // Nothing was in the removal set, so nothing was read or deleted: no audit line, an unchanged run.
             crate::json_out::mark_unchanged();
         } else if commit {
-            append_access_audit(repo, "purge", Some(kind), PURGE_SCOPE, false, matched, deleted)?;
+            append_access_audit(repo, "purge", Some(kind.as_str()), PURGE_SCOPE, false, matched, deleted)?;
         }
         let report = purge_report(&outcome, learn_counts, if commit { plan.committed() } else { plan.preview() });
         if commit {
@@ -414,7 +423,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
             };
             // A refusal that read and deleted nothing leaves no audit line (O7).
             if matched > 0 || deleted > 0 {
-                let _ = append_access_audit(repo, "purge", Some(kind), PURGE_SCOPE, false, matched, deleted);
+                let _ = append_access_audit(repo, "purge", Some(kind.as_str()), PURGE_SCOPE, false, matched, deleted);
             }
             // The tiers are opened and the plan is read and gated before anything is deleted (exit 2). A commit that stops after it deleted something is
             // `RETENTION_PURGE_INCOMPLETE` (exit 1, what was deleted stays deleted); one that stopped before the first record was deleted (the error carries the
@@ -570,7 +579,7 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
             RetentionError::Message(message) => ExportFailure::Refused(CliError::refused("RETENTION_EXPORT_DENIED", message).hint("ask the human to set `query.allow_sensitive: true` in .canon/policy.yaml, or export without --include-sensitive")),
             other => ExportFailure::from(other),
         })?;
-        let (_, registry) = loaded_registry(repo, kind, true)?;
+        let (_, registry) = loaded_registry(repo, PurgeKind::Current(kind), true)?;
         let mut query = TierQuery::kind(kind);
         if let Some(after) = after { query = query.since(after); }
         let rows = registry.query(&query)?.records;
@@ -649,7 +658,7 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
         } else if !json_output {
             println!("{}", String::from_utf8_lossy(&encoded));
         }
-        append_access_audit(repo, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
+        append_access_audit(repo, "export", Some(kind.as_str()), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
         if json_output {
             // The manifest is the result; with `--output` it went to the file, and the result names it.
             if let Some(chosen) = &chosen {
@@ -704,7 +713,7 @@ impl<E: Into<RetentionError>> From<E> for ExportFailure {
 /// event ([`audit_path`]). Written only for a query that reached the store: a
 /// refused one leaves no line (O7).
 pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
-    append_access_audit(repo, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
+    append_access_audit(repo, "query", Some(kind.as_str()), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
 }
 
 #[cfg(test)]
@@ -749,21 +758,21 @@ mod tests {
     #[test]
     fn export_metadata_never_contains_record_body() {
         let raw = canon_model::evidence::RawRecord(json!({
-            "kind": "event",
+            "kind": "handoff",
             "schema": 1,
             "at": "2026-01-01T00:00:00Z",
-            "event_id": "evt-1",
-            "detail": {"text": "secret"},
+            "id": "20260101-0000-topic-aaaa",
+            "body": "secret",
         }));
-        let metadata = serde_json::to_value(ExportRecord::of(RecordKind::Event, &raw)).unwrap();
-        assert!(metadata.get("detail").is_none());
+        let metadata = serde_json::to_value(ExportRecord::of(RecordKind::Handoff, &raw)).unwrap();
+        assert!(metadata.get("body").is_none());
         assert!(metadata.get("digest").is_some());
     }
 
     #[test]
     fn trajectory_purge_manifest_reports_parquet_learn_store_counts() {
         let outcome = PurgeOutcome {
-            kind: RecordKind::Trajectory,
+            kind: PurgeKind::Current(RecordKind::Trajectory),
             before: Utc::now(),
             dry_run: false,
             rungs: vec![],
@@ -778,7 +787,7 @@ mod tests {
 
     #[test]
     fn partial_purge_manifest_preserves_non_atomic_counts() {
-        let value = serde_json::to_value(partial_purge_report(RecordKind::Event, Utc::now(), 8, 3, "cold failed")).unwrap();
+        let value = serde_json::to_value(partial_purge_report(PurgeKind::Retired(canon_store::tier::RetiredKind::Event), Utc::now(), 8, 3, "cold failed")).unwrap();
         assert_eq!(value["status"], "partial");
         assert_eq!(value["matched"], 8);
         assert_eq!(value["deleted"], 3);
@@ -799,7 +808,7 @@ mod tests {
     fn audit_file_is_created_restrictively() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("canon.yaml"), "").unwrap();
-        append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        append_access_audit(dir.path(), "query", Some("run"), "all", false, 0, 0).unwrap();
         use std::os::unix::fs::PermissionsExt;
         let mode = fs::metadata(audit_path(dir.path()).unwrap()).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
@@ -857,7 +866,7 @@ mod tests {
     #[test]
     fn no_canon_yaml_means_no_audit_write() {
         let dir = tempfile::tempdir().unwrap();
-        append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        append_access_audit(dir.path(), "query", Some("run"), "all", false, 0, 0).unwrap();
         assert!(fs::read_dir(dir.path()).unwrap().next().is_none(), "a directory without canon.yaml must be left untouched");
     }
 }

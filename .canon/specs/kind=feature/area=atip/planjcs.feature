@@ -100,7 +100,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @flow:canon-0-35-plan-jcs.F3
   @atip.planjcs.09
   Scenario: The purge preview lists the audit line as an append effect with its path, the commit writes that file and that line, and a purge with nothing to delete has neither
-    Given a repo with session records before a cutoff and one after
+    Given a repo with Run records before a cutoff and one after
     When purge is previewed and committed, and again with nothing before the cutoff
     Then the preview's effects end with an append effect naming the audit file by path and the line's operation, kind, scope and counts, the commit appends exactly that line to exactly that file, and the empty purge has neither an effect nor a line
 

@@ -13,7 +13,7 @@
 // clearly-synthetic placeholders (not tied to any real commit or wall
 // clock) — this manifest is never drift-checked (D3), it only has to be a
 // stable, reviewable dev/test fixture. `source_digest` IS real:
-// sha256 over the concatenated bytes of the ten parquet files, in table order,
+// sha256 over the concatenated bytes of the nine parquet files, in table order,
 // 12 hex chars — the same `digest12` shape
 // `crates/canon-report/src/digest.rs` uses.
 
@@ -31,7 +31,6 @@ const SQL_FILE = join(PKG_ROOT, "scripts", "build-fixture-snapshot.sql");
 // reads at runtime (design.md D3's "never enumerate the directory").
 const TABLES = [
   "mart_trust_matrix",
-  "mart_session_costs",
   "mart_role_memory",
   "mart_flywheel_funnel",
   "mart_review_burndown",

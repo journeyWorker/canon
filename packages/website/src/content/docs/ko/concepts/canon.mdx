@@ -11,8 +11,8 @@ description: 도구 이름이 음악의 캐논에서 온 이유 — 하나의 �
 
 **공유된 주제** (하나의 백본, canon-model + canon-store + canon-gate):
 
-- 모든 아티팩트 종류(`Change`, `Task`, `Scenario`, `Subject`, `Session`,
-  `Run`, `Event`, `Handoff`, `Review`, `Divergence`, `Trajectory`,
+- 모든 아티팩트 종류(`Change`, `Task`, `Scenario`, `Subject`,
+  `Run`, `Handoff`, `Review`, `Divergence`, `Trajectory`,
   `StrategyItem`, `EvidenceRecord`)에 대한 하나의 버전 있는 레코드 스키마
 - 모든 역할에 대해 동일한 방식으로 완료를 게이팅하는 하나의 트러스트
   스파인(`canon gate`)
@@ -93,7 +93,7 @@ canon의 핵심 설계 결정:
 - **Rust 코어 + Bun 런처.** 프리빌트 플랫폼 바이너리가 npm
   `optionalDependencies`로 배포되고, 얇은 JS 런처가 알맞은 것을 고릅니다.
 - **canon이 포맷 권위입니다.** 레저 레코드, 다이버전스 로그, 트래젝토리,
-  전략, 세션 등 모든 아티팩트 종류가 버전 있는 스키마를 가집니다. 기존
+  전략 등 모든 아티팩트 종류가 버전 있는 스키마를 가집니다. 기존
   코퍼스가 canon 검증 포맷으로 마이그레이션되며, 그 반대는 아닙니다.
 - **스토리지는 티어드입니다**: git(버전 관리, 레포 로컬), Postgres(hot,
   팀 공유), R2(cold, append-only, 분석용) — [티어드 스토리지](/ko/concepts/tiered-storage/)

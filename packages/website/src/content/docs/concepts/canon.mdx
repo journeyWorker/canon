@@ -12,7 +12,7 @@ all of them stand on one shared backbone.
 **Shared subject** (one backbone, canon-model + canon-store + canon-gate):
 
 - one versioned record schema for every artifact kind (`Change`, `Task`,
-  `Scenario`, `Subject`, `Session`, `Run`, `Event`, `Handoff`, `Review`,
+  `Scenario`, `Subject`, `Run`, `Handoff`, `Review`,
   `Divergence`, `Trajectory`, `StrategyItem`, `EvidenceRecord`)
 - one trust spine (`canon gate`) that gates completion the same way for
   every role
@@ -96,7 +96,7 @@ canon's core design decisions:
 - **Rust core + Bun launcher.** Prebuilt platform binaries ship as npm
   `optionalDependencies`; a thin JS launcher resolves the right one.
 - **canon is the format authority.** Every artifact kind — ledger records,
-  divergence logs, trajectories, strategies, sessions — has a versioned
+  divergence logs, trajectories, strategies — has a versioned
   schema. Existing corpora migrate onto canon-validated formats, not the
   other way around.
 - **Storage is tiered**: git (versioned, repo-local), Postgres (hot,

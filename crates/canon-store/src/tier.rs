@@ -224,10 +224,75 @@ pub struct PurgeCount {
 
 /// The stable allowlist for canonical retention. Git history and authored
 /// evidence are intentionally not represented here.
-pub const PURGEABLE_KINDS: &[RecordKind] = &[RecordKind::Session, RecordKind::Run, RecordKind::Event, RecordKind::Trajectory];
+pub const PURGEABLE_KINDS: &[RecordKind] = &[RecordKind::Run, RecordKind::Trajectory];
 
 pub fn is_purgeable_kind(kind: RecordKind) -> bool {
     PURGEABLE_KINDS.contains(&kind)
+}
+
+/// A record kind canon 0.39 retired. Rows of these kinds may still sit in a
+/// store, and for one release `canon purge --kind session|event` is the only
+/// way to delete them. This is a closed list that only purge knows: it is not
+/// a [`RecordKind`] and never returns to the schema, query, export or search.
+/// The release after 0.39 removes it, with the `canon.yaml` key tolerance
+/// ([`crate::policy::RETIRED_KIND_NAMES`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RetiredKind {
+    Session,
+    Event,
+}
+
+impl RetiredKind {
+    pub const ALL: [RetiredKind; 2] = [RetiredKind::Session, RetiredKind::Event];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            RetiredKind::Session => "session",
+            RetiredKind::Event => "event",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|k| k.as_str() == s)
+    }
+}
+
+/// What `canon purge --kind` names: a current record kind, or one of the two
+/// retired ones.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PurgeKind {
+    Current(RecordKind),
+    Retired(RetiredKind),
+}
+
+impl PurgeKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PurgeKind::Current(kind) => kind.as_str(),
+            PurgeKind::Retired(kind) => kind.as_str(),
+        }
+    }
+
+    /// `Some` for a name purge accepts; `None` for any other.
+    pub fn parse(s: &str) -> Option<Self> {
+        PURGEABLE_KINDS.iter().copied().find(|k| k.as_str() == s).map(PurgeKind::Current).or_else(|| RetiredKind::parse(s).map(PurgeKind::Retired))
+    }
+
+    /// Every name purge accepts, current kinds first.
+    pub fn names() -> Vec<&'static str> {
+        PURGEABLE_KINDS.iter().map(|k| k.as_str()).chain(RetiredKind::ALL.iter().map(|k| k.as_str())).collect()
+    }
+}
+
+/// The identity a purge of a retired kind reports for one row: `<kind>:<key>:<digest8>`.
+pub fn retired_purge_id(kind: RetiredKind, key: &str, body: &serde_json::Value) -> String {
+    format!("{}:{key}:{}", kind.as_str(), crate::partition::content_digest(body))
+}
+
+/// A retired row's `at`, or `None` when the body has no readable one (such a
+/// row is never purged: nothing says it is older than the cutoff).
+pub fn retired_record_at(body: &serde_json::Value) -> Option<DateTime<Utc>> {
+    body.get("at").and_then(|v| v.as_str()).and_then(|s| DateTime::parse_from_rfc3339(s).ok()).map(|dt| dt.with_timezone(&Utc))
 }
 
 /// The outcome of one [`Tier::age`] call (tier-policy spec: "a record past
@@ -260,7 +325,7 @@ pub enum StoreError {
     KeyConflict { location: String },
     #[error("{kind:?}: no `TierPolicy.routing` entry (canon.yaml) — every write/read must resolve through the declarative policy, never a hardcoded default")]
     UnroutedKind { kind: RecordKind },
-    #[error("purge kind `{kind}` is not allowed; allowed kinds: session, run, event, trajectory")]
+    #[error("purge kind `{kind}` is not allowed; allowed kinds: run, trajectory, session (retired), event (retired)")]
     PurgeKindUnsupported { kind: String },
     #[error("{}", partial_purge_message(*rung, *backend, *matched, *deleted, reason))]
     PurgePartial {
@@ -384,6 +449,13 @@ pub trait Tier: Send + Sync {
     /// set from an unchanged one at equal count. Read-only; reads no more
     /// than the dry-run count already does.
     fn purge_keys(&self, kind: RecordKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError>;
+
+    /// [`Self::purge_before`] for a [`RetiredKind`]: rows are found by the kind's
+    /// name and body `at` alone, never validated as a record (the kind has no type).
+    fn purge_retired_before(&self, kind: RetiredKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError>;
+
+    /// [`Self::purge_keys`] for a [`RetiredKind`].
+    fn purge_retired_keys(&self, kind: RetiredKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError>;
 
     /// Move every `rule.kind` record older than `rule.after` (by `at`)
     /// from this tier to `rule.destination`, deleting the source copy

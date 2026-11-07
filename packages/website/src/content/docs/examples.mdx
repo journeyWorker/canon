@@ -24,9 +24,9 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
    Writes a working `canon.yaml`. `canon init` uses Git for durable,
    reviewable records and local SQLite for high-volume operational
    records. PostgreSQL and S3-compatible storage are optional scale-up
-   backends. Nine of canon-model's fourteen record kinds route to the
-   zero-env-var `local` (git-backed) rung; `task`, `handoff`, `session`,
-   `run`, and `event` route to `hot` (SQLite by default, at
+   backends. Nine of canon-model's twelve record kinds route to the
+   zero-env-var `local` (git-backed) rung; `task`, `handoff`, and
+   `run` route to `hot` (SQLite by default, at
    `.canon/hot.db`, gitignored). Commented `postgres`/`s3` stanzas show
    the scale-up swap, plus one real `specs.roots[]` entry and an empty
    `plans: { sources: [] }`:
@@ -51,9 +51,7 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
      change: local
      task: hot
      scenario: local
-     session: hot
      run: hot
-     event: hot
      handoff: hot
      review: local
      divergence: local
@@ -179,7 +177,7 @@ the status report.
    bunx @journeykit/canon report
    ```
 
-   Renders 10 report marts (trust matrix, session costs, role memory,
+   Renders 9 report marts (trust matrix, role memory,
    flywheel funnel, review burn-down, and five additional operational
    marts including `mart_run_observability`) to `.canon/REPORT.md` —
    generated, never hand-edited. Scope status and subjects are included in

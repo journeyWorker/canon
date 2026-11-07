@@ -59,7 +59,7 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("policy show", "canon policy show"),
     ("prompt add", "canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json"),
     ("prompt show", "canon prompt show reviewer@v1"),
-    ("purge", "canon purge --kind session --before 2020-01-01T00:00:00Z"),
+    ("purge", "canon purge --kind run --before 2020-01-01T00:00:00Z"),
     ("query", "canon query --kind evidence"),
     ("search", "canon search timeout --kind finding"),
     ("trace", "canon trace add-login_1_1"),

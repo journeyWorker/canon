@@ -278,13 +278,6 @@ exit 0
 
 --- stderr
 
-$ canon query --kind session --all --json
-exit 0
---- stdout
-{"ok":true,"data":{"kind":"session","since":null,"count":0,"violations":0,"records":[]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":0,"total":0}}
-
---- stderr
-
 $ canon query --kind run --all --json
 exit 0
 --- stdout

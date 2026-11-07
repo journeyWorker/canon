@@ -19,7 +19,7 @@
 //! and two lowercase hex digits: reversible ([`unescape`]), safe on
 //! case-insensitive file systems, and left alone by the R2 object-store
 //! client. Typed ids of the kebab/dot grammars never need it; a free-text
-//! id (session id, regime key) and a task id's `#` do. A name whose stem
+//! id (handoff id, regime key) and a task id's `#` do. A name whose stem
 //! (key and digest) is over [`MAX_STEM_BYTES`] bytes replaces its
 //! free-text components with `h` and the first 16 hex digits of the
 //! SHA-256 of the value (the value stays in the body).
@@ -221,9 +221,7 @@ pub fn components(kind: RecordKind, json: &Value) -> Result<Vec<Component>, Evid
         RecordKind::Change => vec![id(json, "change_id")?],
         RecordKind::Task => vec![id(json, "task_id")?],
         RecordKind::Scenario => vec![id(json, "project_id")?, id(json, "scenario_id")?],
-        RecordKind::Session => vec![Component::Text(text(json, "session_id")?.to_string())],
         RecordKind::Run => vec![run_id(json, "run_id")?],
-        RecordKind::Event => vec![run_id(json, "run_id")?, Component::Int(int(json, "seq")?)],
         RecordKind::Handoff => vec![Component::Text(text(json, "id")?.to_string())],
         RecordKind::Review => {
             let project = id(json, "project_id")?;
@@ -264,9 +262,7 @@ pub fn template(kind: RecordKind) -> String {
         RecordKind::Change => "{change_id}",
         RecordKind::Task => "{task_id}",
         RecordKind::Scenario => "{project_id}_{scenario_id}",
-        RecordKind::Session => "{session_id}",
         RecordKind::Run | RecordKind::Trajectory => "{run_id}",
-        RecordKind::Event => "{run_id}_{seq}",
         RecordKind::Handoff => "{id}",
         RecordKind::Review => "{project_id}_(scenario_{scenario_id}|change_{change_id})",
         RecordKind::Divergence => "{project_id}_{scenario_id}_{run_seq}_{round}",
@@ -310,19 +306,19 @@ mod tests {
 
     #[test]
     fn run_ids_are_written_lowercase() {
-        let body = json!({"run_id": "01HZ0000000000000000000000", "seq": 7});
-        let c = components(RecordKind::Event, &body).unwrap();
-        assert_eq!(name(&c, "00000000").stem(), "01hz0000000000000000000000_7_00000000");
+        let body = json!({"run_id": "01HZ0000000000000000000000"});
+        let c = components(RecordKind::Run, &body).unwrap();
+        assert_eq!(name(&c, "00000000").stem(), "01hz0000000000000000000000_00000000");
     }
 
     #[test]
     fn a_long_free_text_component_becomes_a_hash() {
         let long = "S".repeat(300);
-        let c = components(RecordKind::Session, &json!({"session_id": long})).unwrap();
+        let c = components(RecordKind::Handoff, &json!({"id": long})).unwrap();
         let n = name(&c, "00000000");
         assert_eq!(n.key.len(), 17);
         assert!(n.key.starts_with('h'));
-        assert!(name(&components(RecordKind::Session, &json!({"session_id": "Short/one"})).unwrap(), "00000000").key == "+53hort+2fone");
+        assert!(name(&components(RecordKind::Handoff, &json!({"id": "Short/one"})).unwrap(), "00000000").key == "+53hort+2fone");
     }
 
     #[test]

@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn the_arguments_leave_out_what_acts_on_a_plan_and_what_is_flag_only() {
         let given = vec![
-            Given::option("kind", "session"),
+            Given::option("kind", "run"),
             Given::option("before", "2020-01-01"),
             Given::switch("commit", true),
             Given::option("plan-digest", "sha256:x"),
@@ -415,7 +415,7 @@ mod tests {
             Given::option("actor", "me"),
         ];
         let purge = arguments_of("purge", &given);
-        assert_eq!(serde_json::Value::Object(purge), serde_json::json!({"actor": "me", "before": "2020-01-01", "kind": "session"}));
+        assert_eq!(serde_json::Value::Object(purge), serde_json::json!({"actor": "me", "before": "2020-01-01", "kind": "run"}));
         let migrate = arguments_of("migrate", &given);
         assert!(!migrate.contains_key("actor"), "a relay option is not part of the plan of `migrate`");
     }

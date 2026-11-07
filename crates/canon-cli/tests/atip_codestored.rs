@@ -729,7 +729,7 @@ fn atip_codestored_13_an_unattached_tier_is_required_and_a_stored_object_that_do
     fs::write(&canon_yaml, good.replace(hot, "  hot:\n    backend: postgres\n    dsn_env: CANON_PG_DSN\n    schema: canon_v1\n")).unwrap();
     let before = listing(repo);
     let export = hermetic::canon()
-        .args(["export", "--kind", "session", "--output", "out.json", "--json"])
+        .args(["export", "--kind", "run", "--output", "out.json", "--json"])
         .current_dir(repo)
         .env_remove("CANON_ROLE")
         .env_remove("CANON_PG_DSN")

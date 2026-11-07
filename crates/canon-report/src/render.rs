@@ -22,36 +22,6 @@ use crate::tier_boundary;
 /// convention (`DEFAULT_LEARN_ROOT`, `DEFAULT_STRATEGIES_ROOT`).
 pub const DEFAULT_REPORT_PATH: &str = canon_model::paths::REPORT_FILE;
 
-/// The `## Session costs` panel's prose.
-///
-/// s42 (`close-the-open-loops`) round-9 re-review, two corrections:
-///
-/// 1. The fold. All three of `mart_session_costs`' CTEs are folded to
-///    the latest version per natural key precisely so a re-ingested
-///    CORRECTION supersedes the figure it corrects instead of being
-///    summed with it. That is the panel's headline number changing
-///    meaning, and it had reached only a SQL comment.
-/// 2. `workspace_label`. This paragraph used to call it "the closest
-///    available stand-in" for a repo. It is not, and it is not even
-///    the strongest field available here. It is
-///    `canon_ingest::normalize::workspace_label_from_key` — the last
-///    non-empty path segment of the `token_usage` event's workspace
-///    key and nothing more — so it SPLITS one repo whose worktrees sit
-///    in differently-named directories (`/a/canon` vs
-///    `/a/canon-wt/review`) and MERGES two different repos sharing a
-///    directory name (`/a/canon` vs `/b/canon`). Two stronger fields
-///    are in reach and neither is read: the same event's own
-///    `workspace_key` (the full key, at this panel's exact grain), and
-///    `Session.project_key`, which `canon-cli` stamps to the MAIN
-///    worktree's key precisely so linked worktrees aggregate as one
-///    project (`crates/canon-model/src/records.rs`' `Session` doc).
-///    Naming the better fields is the honest ending; softening the
-///    adjective would not be. The GROUP BY deliberately stays on
-///    `workspace_label` — `mart_session_costs`' multi-workspace row
-///    split is pinned by its own test — so this is a named, explicit
-///    gap, not a pending change.
-pub const SESSION_COSTS_PANEL: &str = "Token/cost grouped by session/client/role/`workspace_label` (`mart_session_costs`). Totals fold each `run`/`session`/`token_usage` record to its latest version first, so a re-ingested corrected cost REPLACES the superseded figure instead of being summed with it. `workspace_label` is NOT a repo identity: it is the last non-empty path segment of the `token_usage` event's workspace key and nothing more, so it SPLITS one repo whose worktrees sit in differently-named directories and MERGES two different repos sharing a directory name. Two stronger fields exist and this mart reads neither: the same event's own `workspace_key`, at this panel's exact grain, and `Session.project_key`, which `canon-cli` stamps to the main worktree's key so a repo's linked worktrees aggregate as one project.\n\n";
-
 /// The `## Role memory` panel's prose.
 ///
 /// s42 (`close-the-open-loops`) re-review: the one-liner used to read
@@ -288,8 +258,8 @@ pub const REVIEW_ROUNDS_PANEL: &str = "Findings per review round (`mart_review_r
 pub const REVIEW_TOTALS_PANEL: &str = "Per-change review totals (`mart_review_totals`) — one row per `change_id`, and every column a `sum()`, `count(*)` or `max()` over the `mart_review_rounds` rows above. That view is this one's only `FROM`, and every panel in one report — or one `--snapshot` export — is computed in a single DuckDB process over one materialized read of the corpus, so the total and the rows it totals are one computation over one input and cannot disagree: a record written to the ledger mid-run reaches BOTH tables or neither, never one and not the other — though the digest header beside these panels is a SEPARATE read outside that pin, taken before it in a report and after it in a `--snapshot`, so header and panels can still describe the corpus a moment apart. This panel exists so a release note is a COPY rather than a computation: the sentence a release note wants — how many findings a change drew, over how many rounds — is two cells of one row here, and adding a per-round table up by hand is the operation that put four wrong figures into this release line's published notes.\n\n`rounds_recorded` is `count(*)` over those rows, and `mart_review_rounds` holds a row only for a round that RECORDED a finding — a round that found nothing wrote no `Finding` and is in neither table. So this column counts the rounds that FOUND something, never the rounds RUN, and a release note copying it has to say which: s42's round 12 returned MERGEABLE with zero findings and is absent from both. canon has no record kind for a review round — `Review` is a per-scenario attestation, not a round — so the rounds-RUN number is not derivable from this corpus, by this view or any other. `highest_round` is `max(round)` over the same rows, the greatest round NUMBER that recorded a finding, and it witnesses nothing about rounds. A `highest_round` above `rounds_recorded` says only that some round number below it has no row, and canon cannot say why: `round` is a number the author supplies and nothing requires a change's rounds to be numbered from 1 or without gaps, so a change whose only finding is labelled round 7 shows the same gap six silent rounds would. Neither the gap nor its absence evidences a round that RAN — a round that found nothing writes no `Finding`, and canon records nothing else about one. Neither column is the rounds-RUN count: `highest_round` is a round NUMBER rather than a count, and it equals the rounds run only if a change's rounds are numbered from 1 without gaps AND its last round found something — canon requires neither.\n\nEach split is a `sum()` of the per-round `count(*) FILTER` columns over a closed `Finding` enum, so it partitions the change's findings exactly as the per-round columns partition each round's: `severity_blocker + severity_should_fix + severity_note = findings`, `disposition_open + disposition_fixed + disposition_rejected + disposition_deferred = findings`, and `introduced_by_sourced + introduced_by_unsourced = findings`, all by construction. The dispositions are the LATEST recorded state of each finding, never its history — the fold underneath keeps one version per `{change_id}__{round}__{seq}`, so `disposition_open` is what is open NOW and not what was ever opened.\n\n`fix_of_fix` is `sum(fix_of_fix)`, and the relationship is DERIVED, never recorded: no `Finding` carries a fix-of-fix field, and the only place the edge exists is the round view's commit-id equality join between a finding's SOURCED `introduced_by` and the `resolution_sha` of a finding earlier in the SAME change, ordered strictly by `(round, seq)`. That join is already scoped to one `change_id`, so summing it per change changes the grain and nothing else — the total counts exactly the findings the rows above count, and the cross-change case is as invisible here as it is there. `fix_of_fix` bounds NOTHING — not from below, not from above: it UNDER-counts, because an unsourced finding is never counted and a fix in one change that breaks something first found while reviewing a DIFFERENT change is not counted at all; it OVER-counts, because a `resolution_sha` commit may carry work BEYOND the fix and every finding recording that commit is counted regardless; and for any individual match the data cannot say whether the fix or the other work in that commit introduced the defect.\n\nNone of these columns is a claim about the change. `findings` is how many findings reviewers RECORDED against it, which moves with how many rounds it got and how freely its reviewers wrote findings down; this view cannot tell a change reviewed hard from a change barely reviewed. `severity_blocker` is the severity a reviewer TYPED, which canon stores and never checks. `disposition_rejected` records that a finding was rejected, not that it was wrong. There is no defect rate, no quality score and no comparison between changes here: a row is one change's review HISTORY, and the denominator that would turn any of it into a rate is not in this corpus. `reviewed_sha` is deliberately absent — `max()` over one round's findings is a documented deterministic pick, but over a whole change's it would be a hex string standing for nothing, and a column a reader could take for the commit the change was reviewed at.\n\n";
 
 /// The run observability panel reports bounded co-occurrence/count proxies.
-/// It never emits directive or guidance text and never claims causation.
-pub const RUN_OBSERVABILITY_PANEL: &str = "Folded run lifecycle and event observability (`mart_run_observability`) — one row per folded `run_id`, with lineage identifiers, lifecycle timestamps, event counts, guidance count, and token/cost source counts. `latency_ms` is present only when both lifecycle timestamps exist; null/unknown indicator columns make missing coverage explicit. Event and guidance counts are observations, not tool-call, retry, intervention, or causal-outcome claims. Directive and guidance text are intentionally omitted for privacy and bounded report output.\n\n";
+/// It never emits guidance text and never claims causation.
+pub const RUN_OBSERVABILITY_PANEL: &str = "Folded run lifecycle observability (`mart_run_observability`) — one row per folded `run_id`, with lineage identifiers, lifecycle timestamps, child run count and guidance count. `latency_ms` is present only when both lifecycle timestamps exist; null/unknown indicator columns make missing coverage explicit. `project_key` is the Run's own value, so a run stored without one reads `project_key_unknown`. Counts are observations, not tool-call, retry, intervention, or causal-outcome claims. Guidance text is intentionally omitted for privacy and bounded report output.\n\n";
 
 
 fn cell(row: &crate::query::Row, column: &str) -> String {
@@ -357,10 +327,6 @@ pub fn render(digest: &DigestHeader, marts: &ReportMarts, kinds_not_read_directl
     out.push_str("## Trust matrix\n\n");
     out.push_str("Change/task coverage × green × who (`mart_trust_matrix`).\n\n");
     render_table(&mut out, &marts.trust_matrix);
-
-    out.push_str("## Session costs\n\n");
-    out.push_str(SESSION_COSTS_PANEL);
-    render_table(&mut out, &marts.session_costs);
 
     out.push_str("## Role memory\n\n");
     out.push_str(ROLE_MEMORY_PANEL);
@@ -537,7 +503,6 @@ mod tests {
     fn empty_marts() -> ReportMarts {
         ReportMarts {
             trust_matrix: empty(marts::TRUST_MATRIX_COLUMNS),
-            session_costs: empty(marts::SESSION_COSTS_COLUMNS),
             role_memory: empty(marts::ROLE_MEMORY_COLUMNS),
             flywheel_funnel: empty(marts::FLYWHEEL_FUNNEL_COLUMNS),
             review_burndown: empty(marts::REVIEW_BURNDOWN_COLUMNS),
@@ -649,7 +614,6 @@ mod tests {
     fn every_named_panel_constant_reaches_the_rendered_report_verbatim() {
         let report = rendered();
         for (name, panel) in [
-            ("SESSION_COSTS_PANEL", SESSION_COSTS_PANEL),
             ("ROLE_MEMORY_PANEL", ROLE_MEMORY_PANEL),
             ("FLYWHEEL_FUNNEL_PANEL", FLYWHEEL_FUNNEL_PANEL),
             ("REVIEW_BURNDOWN_PANEL", REVIEW_BURNDOWN_PANEL),
@@ -986,37 +950,6 @@ mod tests {
         assert!(
             panel.contains("the LATEST recorded state of each finding, never its history"),
             "the totals panel must say the disposition split is current state, not a lifecycle tally"
-        );
-    }
-
-    /// `workspace_label` is `workspace_label_from_key`'s last non-empty
-    /// path segment, so it SPLITS one repo across differently-named
-    /// worktree directories and MERGES two repos sharing a directory
-    /// name. It is not "the closest available stand-in" for a repo and
-    /// not even the strongest field on this join: the same `token_usage`
-    /// event carries `workspace_key` at the identical grain, and
-    /// `Session.project_key` carries repo identity outright. The panel
-    /// must also state the fold, which is what makes its totals a
-    /// corrected figure rather than a sum over superseded versions.
-    #[test]
-    fn session_costs_panel_never_calls_workspace_label_a_repo_identity() {
-        let report = rendered();
-        assert!(!report.contains("the closest available stand-in"), "the session costs panel must not rank `workspace_label` as the best available repo proxy");
-        assert!(report.contains("`workspace_label` is NOT a repo identity"), "the session costs panel must deny `workspace_label` repo identity");
-        assert!(
-            report.contains("SPLITS one repo whose worktrees sit in differently-named directories"),
-            "the session costs panel must name the split limitation, and condition it on the directory names"
-        );
-        assert!(report.contains("MERGES two different repos sharing a directory name"), "the session costs panel must name the merge limitation");
-        assert!(report.contains("Two stronger fields exist and this mart reads neither"), "the session costs panel must say better fields are in reach and unread");
-        assert!(report.contains("the same event's own `workspace_key`, at this panel's exact grain"), "the session costs panel must name `workspace_key`, the stronger field at this grain");
-        assert!(
-            report.contains("`Session.project_key`, which `canon-cli` stamps to the main worktree's key"),
-            "the session costs panel must name the field that carries repo identity outright"
-        );
-        assert!(
-            report.contains("a re-ingested corrected cost REPLACES the superseded figure"),
-            "the session costs panel must state the fold that makes its totals a corrected figure"
         );
     }
 }

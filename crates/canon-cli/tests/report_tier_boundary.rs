@@ -39,7 +39,7 @@ fn multi_tier_repo_emits_a_warn_line_matching_the_reports_own_note() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  task: hot\n  session: hot\n  event: hot\n  change: local\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  task: hot\n  run: hot\n  handoff: hot\n  change: local\n",
     );
 
     let output = run_canon(&["report", "build", "--repo", "."], dir.path());
@@ -47,7 +47,7 @@ fn multi_tier_repo_emits_a_warn_line_matching_the_reports_own_note() {
     assert!(output.status.success(), "canon report must still exit 0; stderr: {}", stderr(&output));
     let err = stderr(&output);
     assert!(err.contains("canon report: WARN"), "{err}");
-    for kind in ["task", "session", "event"] {
+    for kind in ["task", "run", "handoff"] {
         assert!(err.contains(kind), "WARN line must name `{kind}`: {err}");
     }
     assert!(!err.contains("change"), "WARN must never name a git-routed kind: {err}");
@@ -55,7 +55,7 @@ fn multi_tier_repo_emits_a_warn_line_matching_the_reports_own_note() {
     let report_path = dir.path().join(".canon/REPORT.md");
     let content = std::fs::read_to_string(&report_path).unwrap();
     assert!(content.contains("## Kinds not read directly"), "{content}");
-    for kind in ["task", "session", "event"] {
+    for kind in ["task", "run", "handoff"] {
         assert!(content.contains(&format!("`{kind}`")), "REPORT.md must name `{kind}`:\n{content}");
     }
 }

@@ -63,17 +63,6 @@ export const EXPECTED_MART_SCHEMA: Record<string, ParquetColumn[]> = {
     { name: "evidence_count", type: "BIGINT" },
     { name: "latest_at", type: "TIMESTAMP" },
   ],
-  mart_session_costs: [
-    { name: "session_id", type: "VARCHAR" },
-    { name: "client", type: "VARCHAR" },
-    { name: "role", type: "VARCHAR" },
-    { name: "workspace_label", type: "VARCHAR" },
-    { name: "run_count", type: "BIGINT" },
-    { name: "total_cost", type: "DOUBLE" },
-    { name: "total_tokens", type: "BIGINT" },
-    { name: "first_event_at", type: "TIMESTAMP" },
-    { name: "last_event_at", type: "TIMESTAMP" },
-  ],
   mart_role_memory: [
     { name: "role", type: "VARCHAR" },
     { name: "regime_key", type: "VARCHAR" },

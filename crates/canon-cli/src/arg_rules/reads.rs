@@ -21,9 +21,9 @@ const REGIME_HASH: &str = concat!("^", white_space!(), "*[0-9A-Fa-f]{6,64}", whi
 /// alone, before any read; a pattern is a necessary condition: it admits some text (` _1_2`) that the parser then calls unrecognised.
 const TRACE_OPERAND: &str = concat!("^", white_space!(), "*([0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}|[0-9A-Fa-f]{7,40}|", any_char!(), "+_[0-9]+_[0-9]+)", white_space!(), "*$");
 
-const NOT_CHANGE_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "subject", "finding"];
-const NOT_STATUS_KINDS: &[&str] = &["scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
-const NOT_DOMAIN_KINDS: &[&str] = &["change", "task", "scenario", "session", "run", "event", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
+const NOT_CHANGE_KINDS: &[&str] = &["scenario", "run", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "subject", "finding"];
+const NOT_STATUS_KINDS: &[&str] = &["scenario", "run", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
+const NOT_DOMAIN_KINDS: &[&str] = &["change", "task", "scenario", "run", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
 
 pub(crate) static TABLES: Tables = Tables {
     rules: &[
@@ -96,7 +96,7 @@ pub(crate) static TABLES: Tables = Tables {
                 },
             ],
         ),
-        ("purge", &[Validator { arguments: &["before"], code: "USAGE", description: CALENDAR, rejects: &["canon purge --kind session --before 2026-02-30 --json"] }]),
+        ("purge", &[Validator { arguments: &["before"], code: "USAGE", description: CALENDAR, rejects: &["canon purge --kind run --before 2026-02-30 --json"] }]),
         (
             "schema",
             &[Validator {

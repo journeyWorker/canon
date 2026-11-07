@@ -706,7 +706,7 @@ fn init_repo(yaml: &str) -> tempfile::TempDir {
     dir
 }
 
-const ROUTED_HOT: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  session: hot\n  run: hot\n  event: hot\n  change: hot\n  task: hot\n  trajectory: hot\n";
+const ROUTED_HOT: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  run: hot\n  change: hot\n  task: hot\n  trajectory: hot\n";
 
 const WITH_HOT: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\n";
 

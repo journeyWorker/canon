@@ -101,7 +101,7 @@ plain number 1. Example: today's review path is 48 tokens, the new one 18.
 - **R6. Canonical text, then escape.** A typed component is written in its
   canonical lowercase form (a ULID such as `RunId` is case-insensitive
   Crockford, so it is written lowercase and stays 26 characters). A
-  free-text component (session id, regime key segment, handoff id) has every
+  free-text component (regime key segment, handoff id) has every
   byte outside `[a-z0-9.-]` (uppercase and `_` included) replaced by `+` and
   two lowercase hex digits; a typed id with such a character (a task id's
   `#`) is escaped the same way. `+` is chosen because R2's object-store client
@@ -141,9 +141,7 @@ plain number 1. Example: today's review path is 48 tokens, the new one 18.
 | change | `change_id` |
 | task | `task_id` |
 | scenario | `project_id`, `scenario_id` |
-| session | `session_id` |
 | run | `run_id` |
-| event | `run_id`, `seq` |
 | handoff | `id` |
 | review | `project_id`, `scenario` + `scenario_id` \| `change` + `change_id` |
 | divergence | `project_id`, `scenario_id`, `run_seq`, `round` |
@@ -165,8 +163,6 @@ separates two reviews of the same target.
 | review (scenario) | `kind=review/area=gate/canon__gate.check.104__addf4e86…f9ae__e7f52dd152fe.json` | `kind=review/canon_scenario_gate.check.104_e7f52dd1.json` |
 | review (change) | `kind=review/area=change/canon__change-canon-0-28__<pin>__<d12>.json` | `kind=review/canon_change_canon-0-28_<d8>.json` |
 | finding | `kind=finding/canon-0-28__0002__0002__b10258db7621.json` | `kind=finding/canon-0-28_2_2_b10258db.json` |
-| event | `kind=event/<run_id>-0000000007__<d12>.json` | `kind=event/<run_id>_7_<d8>.json` |
-| session | `kind=session/<id with / → _>__<d12>.json` | `kind=session/<id, R6-escaped>_<d8>.json` |
 
 (The evidence digest is recomputed because R8 changes the body.)
 

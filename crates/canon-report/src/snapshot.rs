@@ -25,7 +25,7 @@ use crate::manifest::{git_head_sha, Manifest, ManifestTable};
 use crate::query;
 use crate::ReportInputs;
 
-/// The ten S9/S24/S36/s43-owned marts, in the order the report declares
+/// The nine S9/S24/S36/s43-owned marts, in the order the report declares
 /// them — [`crate::marts::REPORT_MARTS`]'s own order, duplicated here
 /// as a bare name list (`packages/dashboard/test/panel-copy.test.ts`
 /// parses this literal out of the source, so it stays a literal;
@@ -36,7 +36,6 @@ use crate::ReportInputs;
 /// table order never moves.
 pub const SNAPSHOT_TABLES: &[&str] = &[
     "mart_trust_matrix",
-    "mart_session_costs",
     "mart_role_memory",
     "mart_flywheel_funnel",
     "mart_review_burndown",

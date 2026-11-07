@@ -403,7 +403,7 @@ Feature: context capability
     When canon context is run
     Then its kinds are every record kind under the one name every surface uses, evidence included, and its cel section names the same kinds
     And its families are every artifact family in order, and the capability version is 6
-    And every closed --kind value of query, export and purge is one of those kinds
+    And every closed --kind value of query and export is one of those kinds, and purge's closed values are two of those kinds plus the retired session and event
 
   # canon: {"schema":1,"at":"2026-10-23T11:51:38Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
   @subject:context-capability

@@ -213,10 +213,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_canon_yaml(
             dir.path(),
-            "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }\nrouting:\n  task: hot\n  change: local\n  session: hot\n  event: hot\n",
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }\nrouting:\n  task: hot\n  change: local\n  run: hot\n  handoff: hot\n",
         );
         let kinds = kinds_not_read_directly(dir.path());
-        assert_eq!(kinds.iter().map(|k| k.as_str()).collect::<Vec<_>>(), vec!["event", "session", "task"]);
+        assert_eq!(kinds.iter().map(|k| k.as_str()).collect::<Vec<_>>(), vec!["handoff", "run", "task"]);
     }
 
     /// s28 `rung-backend-capability` spec scenario: a `cold` rung
@@ -253,14 +253,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_canon_yaml(
             dir.path(),
-            "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n  session: hot\n  change: local\n",
+            "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n  run: hot\n  change: local\n",
         );
         assert!(kinds_not_read_directly(dir.path()).is_empty(), "the sqlite hot db is a local file the report reads");
     }
 
     #[test]
     fn render_note_and_warn_line_name_the_identical_sorted_kinds() {
-        let kinds = vec![RecordKind::Event, RecordKind::Session, RecordKind::Task];
+        let kinds = vec![RecordKind::Handoff, RecordKind::Run, RecordKind::Task];
         let note = render_note(&kinds).unwrap();
         let warn = warn_line(&kinds).unwrap();
         for kind in &kinds {

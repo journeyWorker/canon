@@ -21,10 +21,6 @@ use parquet::file::reader::{FileReader, SerializedFileReader};
 const EXPECTED_CONTRACT: &[(&str, &[&str])] = &[
     ("mart_trust_matrix", &["task_id", "change_id", "title", "task_status", "covered", "green", "who", "evidence_count", "latest_at"]),
     (
-        "mart_session_costs",
-        &["session_id", "client", "role", "workspace_label", "run_count", "total_cost", "total_tokens", "first_event_at", "last_event_at"],
-    ),
-    (
         "mart_role_memory",
         &["role", "regime_key", "strategy_count", "active_count", "demoted_count", "hit_rate", "avg_source_trajectories", "latest_recorded_at"],
     ),
@@ -87,12 +83,10 @@ const EXPECTED_CONTRACT: &[(&str, &[&str])] = &[
         "mart_run_observability",
         &[
             "run_id", "session_id", "project_key", "task_id", "parent_run_id", "status",
-            "started_at", "ended_at", "latency_ms", "event_count", "token_event_count",
-            "directive_event_count", "child_run_count", "guidance_count", "provider",
-            "model", "cost_source_count", "total_cost", "total_tokens", "first_event_at",
-            "last_event_at", "session_id_unknown", "project_key_unknown", "task_id_unknown",
-            "parent_run_id_unknown", "ended_at_unknown", "provider_unknown", "model_unknown",
-            "event_times_unknown", "cost_unknown", "guidance_unknown",
+            "started_at", "ended_at", "latency_ms", "child_run_count", "guidance_count",
+            "provider", "model", "session_id_unknown", "project_key_unknown",
+            "task_id_unknown", "parent_run_id_unknown", "ended_at_unknown", "provider_unknown",
+            "model_unknown", "guidance_unknown",
         ],
     ),
 ];
@@ -116,22 +110,22 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_listing_exactly_them() {
 
     let manifest = snapshot(&inputs, &out_dir).unwrap();
 
-    // Exactly the 10 contracted tables, in the report's declared order
+    // Exactly the 9 contracted tables, in the report's declared order
     // — never a superset/subset, never reordered.
-    assert_eq!(manifest.tables.len(), 10, "manifest.tables must list exactly 10 marts, got {:?}", manifest.tables);
+    assert_eq!(manifest.tables.len(), 9, "manifest.tables must list exactly 9 marts, got {:?}", manifest.tables);
     for (entry, (table, _columns)) in manifest.tables.iter().zip(EXPECTED_CONTRACT) {
         assert_eq!(entry.table, *table);
         assert_eq!(entry.file, format!("{table}.parquet"), "filename must be byte-identical to the table name (design D3)");
     }
 
     // "exactly them": no stray parquet files in the output dir beyond
-    // the 10 declared ones.
+    // the 9 declared ones.
     let parquet_files: Vec<_> = std::fs::read_dir(&out_dir)
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|name| name.ends_with(".parquet"))
         .collect();
-    assert_eq!(parquet_files.len(), 10, "expected exactly 10 parquet files, found {parquet_files:?}");
+    assert_eq!(parquet_files.len(), 9, "expected exactly 9 parquet files, found {parquet_files:?}");
 
     // manifest.json on disk round-trips to the identical declared shape.
     let manifest_path = out_dir.join("manifest.json");
@@ -142,7 +136,7 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_listing_exactly_them() {
     assert!(parsed["source_git_sha"].is_string());
     assert!(parsed["source_digest"].is_string());
     let tables = parsed["tables"].as_array().unwrap();
-    assert_eq!(tables.len(), 10);
+    assert_eq!(tables.len(), 9);
 
     // The CONTRACT: per-mart column set (name + order) matches
     // views.sql's own SELECT list exactly — a writer/reader schema
@@ -180,7 +174,7 @@ fn snapshot_into_a_directory_whose_path_contains_an_apostrophe_succeeds() {
 
     let manifest = snapshot(&inputs, &out_dir).unwrap();
 
-    assert_eq!(manifest.tables.len(), 10, "manifest.tables must list exactly 10 marts, got {:?}", manifest.tables);
+    assert_eq!(manifest.tables.len(), 9, "manifest.tables must list exactly 9 marts, got {:?}", manifest.tables);
     for (entry, (table, _columns)) in manifest.tables.iter().zip(EXPECTED_CONTRACT) {
         assert_eq!(entry.table, *table);
         let parquet_path = out_dir.join(&entry.file);
@@ -191,6 +185,6 @@ fn snapshot_into_a_directory_whose_path_contains_an_apostrophe_succeeds() {
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|name| name.ends_with(".parquet"))
         .collect();
-    assert_eq!(parquet_files.len(), 10, "expected exactly 10 parquet files, found {parquet_files:?}");
+    assert_eq!(parquet_files.len(), 9, "expected exactly 9 parquet files, found {parquet_files:?}");
     assert!(out_dir.join("manifest.json").is_file());
 }

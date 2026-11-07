@@ -367,6 +367,18 @@ pub(crate) fn build_lenient_tiers_for_kinds(canon_yaml_path: &Path, kinds: &[Rec
     build_lenient_tiers_for_kinds_with(canon_yaml_path, kinds, false)
 }
 
+/// [`build_lenient_tiers_for_kinds`] for `canon purge --kind session|event`: a retired kind has no `routing`
+/// entry (`canon migrate` deletes the keys), so every rung `tiers:` configures is attempted, not the rungs
+/// of any kind's routing.
+pub(crate) fn build_lenient_tiers_all_rungs(canon_yaml_path: &Path) -> Result<LoadedTiers, TierCliError> {
+    build_lenient_tiers_with(canon_yaml_path, |policy| policy.tiers.keys().copied().collect(), false)
+}
+
+/// [`build_lenient_tiers_all_rungs`] for a run that only reads.
+pub(crate) fn build_lenient_tiers_all_rungs_read(canon_yaml_path: &Path) -> Result<LoadedTiers, TierCliError> {
+    build_lenient_tiers_with(canon_yaml_path, |policy| policy.tiers.keys().copied().collect(), true)
+}
+
 /// [`build_lenient_tiers_for_kinds`] for a command that only reads: a
 /// sqlite rung whose db file does not exist yet is answered from an empty
 /// in-memory table instead of creating the file ([`SqliteTier::connect_for_read`]).
@@ -375,6 +387,27 @@ pub(crate) fn build_lenient_tiers_for_kinds_read(canon_yaml_path: &Path, kinds: 
 }
 
 fn build_lenient_tiers_for_kinds_with(canon_yaml_path: &Path, kinds: &[RecordKind], read_only: bool) -> Result<LoadedTiers, TierCliError> {
+    // The UNION of every rung ANY of `kinds` needs -- an individually
+    // unrouted kind contributes nothing (see doc comment above),
+    // never a hard failure; a rung shared between two kinds is
+    // de-duplicated so it is never attempted twice.
+    let needed_for = |policy: &TierPolicy| {
+        let mut needed: Vec<Rung> = Vec::new();
+        for kind in kinds {
+            if let Ok(rungs) = tiers_needed_for(policy, *kind) {
+                for rung in rungs {
+                    if !needed.contains(&rung) {
+                        needed.push(rung);
+                    }
+                }
+            }
+        }
+        needed
+    };
+    build_lenient_tiers_with(canon_yaml_path, needed_for, read_only)
+}
+
+fn build_lenient_tiers_with(canon_yaml_path: &Path, needed_for: impl FnOnce(&TierPolicy) -> Vec<Rung>, read_only: bool) -> Result<LoadedTiers, TierCliError> {
     let display_path = canon_yaml_path.display().to_string();
     let yaml = canon_store::eio::read_to_string(canon_yaml_path)
         .map_err(|source| TierCliError::ReadCanonYaml { path: display_path.clone(), source })?;
@@ -419,22 +452,9 @@ fn build_lenient_tiers_for_kinds_with(canon_yaml_path: &Path, kinds: &[RecordKin
         None => {}
     }
 
-    // The UNION of every rung ANY of `kinds` needs -- an individually
-    // unrouted kind contributes nothing (see doc comment above),
-    // never a hard failure; a rung already resolved (`local` above,
-    // or shared between two kinds) is de-duplicated so it is never
-    // attempted twice.
-    let mut needed: Vec<Rung> = Vec::new();
-    for kind in kinds {
-        if let Ok(rungs) = tiers_needed_for(&policy, *kind) {
-            for rung in rungs {
-                if !needed.contains(&rung) {
-                    needed.push(rung);
-                }
-            }
-        }
-    }
-
+    // A rung already resolved (`local` above) is never attempted twice.
+    let mut needed = needed_for(&policy);
+    needed.sort();
     for rung in needed {
         if rung == Rung::Local {
             continue;
@@ -629,7 +649,7 @@ mod lenient_tier_tests {
         for (kind, to) in aging {
             aging_map.insert(*kind, AgingRuleConfig { after: chrono::Duration::days(30), to: *to });
         }
-        TierPolicy { tiers: std::collections::HashMap::new(), routing: routing_map, aging: aging_map, legacy_kind_keys: Vec::new() }
+        TierPolicy { tiers: std::collections::HashMap::new(), routing: routing_map, aging: aging_map, legacy_kind_keys: Vec::new(), retired_kind_keys: Vec::new() }
     }
 
     /// design.md D2/task 2.3: a local-routed, never-aged kind

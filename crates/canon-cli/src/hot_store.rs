@@ -85,7 +85,7 @@ impl HotStore {
         let HotStore::Sqlite { path } = self else { return Ok(()) };
         // The open alone does not read the file: a query that matches nothing (`since` in the future) does.
         let tier = SqliteTier::connect_read_only(&repo.join(path)).map_err(|e| format!("cannot open {path}: {e}"))?;
-        let query = TierQuery::kind(RecordKind::Session).since(chrono::Utc::now() + chrono::Duration::days(1));
+        let query = TierQuery::kind(RecordKind::Task).since(chrono::Utc::now() + chrono::Duration::days(1));
         tier.read(&query).map(drop).map_err(|e| format!("cannot open {path}: {e}"))
     }
 }

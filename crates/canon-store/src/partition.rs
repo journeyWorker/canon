@@ -193,7 +193,7 @@ pub fn old_layout(actual_path: &std::path::Path) -> EvidenceViolation {
 /// `canon_model::fixtures::round_trip_well_formed`'s per-kind dispatch
 /// (S1), reused here as the git-tier read path's content-malformed gate.
 pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceViolation> {
-    use canon_model::records::{Change, Task, Scenario, Session, Run, Event, Review, Divergence, Trajectory, StrategyItem, Subject, Finding};
+    use canon_model::records::{Change, Task, Scenario, Run, Review, Divergence, Trajectory, StrategyItem, Subject, Finding};
     use canon_model::{Handoff};
 
     macro_rules! try_deserialize {
@@ -208,9 +208,7 @@ pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceVi
         RecordKind::Change => try_deserialize!(Change),
         RecordKind::Task => try_deserialize!(Task),
         RecordKind::Scenario => try_deserialize!(Scenario),
-        RecordKind::Session => try_deserialize!(Session),
         RecordKind::Run => try_deserialize!(Run),
-        RecordKind::Event => try_deserialize!(Event),
         RecordKind::Handoff => try_deserialize!(Handoff),
         RecordKind::Review => try_deserialize!(Review),
         RecordKind::Divergence => try_deserialize!(Divergence),
@@ -454,8 +452,8 @@ mod tests {
         let key = resolve_partition(RecordKind::StrategyItem, &json).unwrap();
         assert_eq!(key.natural_key, "implementer/canon/join-spine/9c93d024b1a2", "typed value, never escaped");
         assert!(stem(RecordKind::StrategyItem, &json).starts_with("implementer+2fcanon+2fjoin-spine+2f9c93d024b1a2_"));
-        let session = json!({"kind": "session", "session_id": "Sess_1/x"});
-        assert!(stem(RecordKind::Session, &session).starts_with("+53ess+5f1+2fx_"));
+        let handoff = json!({"kind": "handoff", "id": "Sess_1/x"});
+        assert!(stem(RecordKind::Handoff, &handoff).starts_with("+53ess+5f1+2fx_"));
     }
 
     #[test]
