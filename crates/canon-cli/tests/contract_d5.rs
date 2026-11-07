@@ -366,7 +366,6 @@ fn commit_repeats_unchanged(dir: &Path, args: &[&str]) {
 #[test]
 fn an_identical_repeat_of_a_write_leaf_is_unchanged_and_writes_nothing() {
     let dir = repo();
-    let home = TempDir::new().unwrap();
     let d = dir.path();
     std::fs::write(d.join("README.md"), "hello\n").unwrap();
     std::fs::write(
@@ -379,7 +378,6 @@ fn an_identical_repeat_of_a_write_leaf_is_unchanged_and_writes_nothing() {
         r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":[],"prompt":"README.md","examples":[],"toolSchemas":[],"injectedGuidance":[]}"#,
     )
     .unwrap();
-    let home_dir = home.path().to_str().unwrap();
     for args in [
         &["inventory", "sync"][..],
         &["init", "--no-harness"],
@@ -396,7 +394,6 @@ fn an_identical_repeat_of_a_write_leaf_is_unchanged_and_writes_nothing() {
         &["export", "--kind", "evidence", "--output", "evidence.json"],
         &["ingest", "records"],
         &["ingest", "plans"],
-        &["ingest", "sessions", "--home", home_dir],
     ] {
         repeats_unchanged(d, args);
     }

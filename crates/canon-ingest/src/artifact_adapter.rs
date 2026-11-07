@@ -2,9 +2,7 @@
 //! (S4 FOUNDATION wave, frozen for Wave 2's ledger/divergence/handoff/
 //! openspec-task adapters).
 //!
-//! Distinct from [`crate::adapter::SessionAdapter`] (S3): a
-//! `SessionAdapter` normalizes billable-model-call token rows keyed by
-//! `session_id`; an `ArtifactAdapter` is a **verdict-deriving** adapter
+//! An `ArtifactAdapter` is a **verdict-deriving** adapter
 //! — it reads a review/CI/handoff/task-state artifact and normalizes it
 //! into an [`ArtifactEvent`] keyed by the S1 join spine's
 //! `scenario_id`/`handoff_id`/`task_id`, which `crate::verdict` then
@@ -43,8 +41,8 @@ use serde::{Deserialize, Serialize};
 /// same reason — a native source is never silently scanned either.
 ///
 /// Parsing this struct out of a repo's actual `canon.yaml` file is
-/// wave-2/CLI wiring (mirrors how `SessionAdapter::scan_roots` takes an
-/// already-resolved `home: &Path` rather than reading YAML itself) —
+/// wave-2/CLI wiring (adapters take already-resolved paths rather than
+/// reading YAML themselves) —
 /// this type is the frozen SHAPE that wiring populates, deriving
 /// `Deserialize` so a future `serde_yaml::from_str::<ArtifactSourceConfig>`
 /// (or a field nested inside a larger `canon.yaml` document) needs no
@@ -201,8 +199,7 @@ impl ArtifactEventKind {
 }
 
 /// The shared normalization target every [`ArtifactAdapter::parse`]
-/// call emits — mirrors [`crate::adapter::UnifiedRow`]'s role for
-/// `SessionAdapter`, one event per artifact-ingest record.
+/// call emits, one event per artifact-ingest record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArtifactEvent {
     /// The emitting adapter's stable identity (`"ledger"` |
@@ -517,7 +514,7 @@ fn compact_evidence_text(raw: &str) -> String {
 
 /// The result of one [`ArtifactAdapter::parse`] call: the events it
 /// successfully extracted, plus a count of records it could not parse
-/// at all — mirrors [`crate::adapter::ParseOutcome`]'s "malformed
+/// at all — the "malformed
 /// evidence is no evidence" discipline (design §7): a record this
 /// adapter's format doesn't recognize is skipped AND counted, never
 /// silently dropped, never a panic.
@@ -534,9 +531,8 @@ impl ArtifactParseOutcome {
 }
 
 /// One artifact-ingest adapter (S4 FOUNDATION, frozen for Wave 2's
-/// ledger/divergence/handoff/openspec-task adapters — mirrors
-/// `SessionAdapter`'s "trait + static table" shape, S3 design D1,
-/// generalized to a source that is sometimes a path and sometimes an
+/// ledger/divergence/handoff/openspec-task adapters — a "trait +
+/// static table" shape over a source that is sometimes a path and sometimes an
 /// already-fetched record batch). `adapter_id()` names the adapter;
 /// `resolve_source` turns the generic, `canon.yaml`-sourced
 /// [`ArtifactSourceConfig`] into this adapter's own
@@ -567,11 +563,9 @@ pub trait ArtifactAdapter: Send + Sync {
     fn parse(&self, source: &ArtifactSourceHandle) -> ArtifactParseOutcome;
 }
 
-/// Trivial accessor mirroring `SessionAdapter::scan_roots`'s
-/// `home`-join convenience for a path-based [`ArtifactSourceConfig`]
+/// Trivial accessor for a path-based [`ArtifactSourceConfig`]
 /// field — joins a configured root against nothing (it is already
-/// absolute or repo-root-relative, unlike `SessionAdapter`'s
-/// `home`-relative roots) and simply clones it into an owned
+/// absolute or repo-root-relative) and simply clones it into an owned
 /// [`PathBuf`], the shape [`ArtifactSourceHandle::Path`] wraps.
 pub fn resolve_path_source(root: &Option<PathBuf>) -> Option<ArtifactSourceHandle> {
     root.as_ref().map(|p| ArtifactSourceHandle::Path(p.clone()))

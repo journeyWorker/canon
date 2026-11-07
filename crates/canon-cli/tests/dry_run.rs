@@ -29,8 +29,6 @@ fn run(args: &[&str], cwd: &Path) -> Output {
         .args(args)
         .current_dir(cwd)
         .env_remove("CODEX_HOME")
-        .env_remove("CANON_INGEST_CLAUDE_SESSIONS_DIR")
-        .env_remove("CANON_INGEST_OMP_SESSIONS_DIR")
         .env_remove("HERMES_HOME")
         .output()
         .expect("spawn canon binary")
@@ -318,42 +316,6 @@ fn ingest_plans_dry_run_counts_the_records_it_would_persist() {
 fn ingest_plans_dry_run_refuses_like_the_real_run() {
     let dir = plans_repo();
     assert_eq!(bad_preview(&["ingest", "plans", "--dialect", "nosuch", "--plan-source", "plans"], dir.path(), &[dir.path()]), "INGEST_FAILED");
-}
-
-// ── ingest sessions ──
-
-fn sessions_fixture() -> (support::Fixture, tempfile::TempDir) {
-    let fixture = support::Fixture::new("  session: local\n  run: local\n  event: local\n", "");
-    let home = tempfile::tempdir().unwrap();
-    let session_dir = home.path().join(".omp/agent/sessions/-tmp-proj");
-    std::fs::create_dir_all(&session_dir).unwrap();
-    std::fs::write(
-        session_dir.join("s1.jsonl"),
-        "{\"type\":\"session\",\"id\":\"dry_run_ses_1\",\"cwd\":\"/tmp/proj\"}\n\
-         {\"type\":\"message\",\"timestamp\":\"2026-07-01T00:00:00Z\",\"message\":{\"role\":\"user\",\"content\":\"a directive\"}}\n\
-         {\"type\":\"message\",\"timestamp\":\"2026-07-01T00:00:01Z\",\"message\":{\"role\":\"assistant\",\"model\":\"gpt-4o-mini\",\"provider\":\"openai\",\"usage\":{\"input\":10,\"output\":5}}}\n",
-    )
-    .unwrap();
-    (fixture, home)
-}
-
-#[test]
-fn ingest_sessions_dry_run_counts_what_it_would_write() {
-    let (fixture, home) = sessions_fixture();
-    let root = fixture.root.path();
-    let data = valid_preview(&["ingest", "sessions", "--home", home.path().to_str().unwrap(), "--all-workspaces"], root, &[root, home.path()]);
-    assert_eq!(data["runsWritten"], 1, "{data}");
-}
-
-#[test]
-fn ingest_sessions_dry_run_refuses_like_the_real_run() {
-    let (fixture, home) = sessions_fixture();
-    let root = fixture.root.path();
-    std::fs::write(root.join("canon.yaml"), "tiers: [unclosed\n").unwrap();
-    assert_eq!(
-        bad_preview(&["ingest", "sessions", "--home", home.path().to_str().unwrap(), "--all-workspaces"], root, &[root, home.path()]),
-        "CONFIG_INVALID"
-    );
 }
 
 // ── export ──

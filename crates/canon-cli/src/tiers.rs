@@ -23,7 +23,7 @@
 //!
 //! Two families of builder live here: the STRICT, all-or-nothing
 //! [`build_tiers`] (`canon tier age`'s only caller — s29 design D6
-//! moved `canon ingest sessions`/`canon ingest records` OFF this
+//! moved `canon ingest records` OFF this
 //! strict path onto the kind-scoped lenient one below, so `canon tier
 //! age`'s destructive move+delete remains the sole caller with no
 //! partial-success story, hence a declared-but-unreachable tier stays
@@ -33,8 +33,8 @@
 //! relocated from `plans.rs`/added respectively by s22
 //! `query-tier-degradation`/`uniform-lenient-tier-build`, generalized
 //! to a kind SET by s29 design D6) — `canon ingest plans`/`canon
-//! query` (single-kind) and `canon ingest sessions`/`canon ingest
-//! artifacts` (kind-SET) all share it: an unreachable-but-not-needed
+//! query` (single-kind) and `canon ingest
+//! records` (kind-SET) all share it: an unreachable-but-not-needed
 //! `hot`/`cold` rung degrades to `None` instead of failing the whole
 //! command, and [`LoadedTiers::unavailable_reasons`] carries WHY (the
 //! configured env-var name, design D6) for a rung that WAS needed and
@@ -90,8 +90,7 @@ pub struct LoadedTiers {
     /// never a rung that was simply never attempted. The STRICT
     /// [`build_tiers`] never populates this (a strict failure aborts
     /// loud with `Err` instead of degrading, so there is nothing to
-    /// carry). A caller (`canon ingest sessions`/`canon ingest
-    /// artifacts`) reads this to print WHY a needed rung degraded —
+    /// carry). A caller (`canon ingest records`) reads this to print WHY a needed rung degraded —
     /// the configured env-var name — instead of a bare "tiers
     /// unreachable" guess.
     pub unavailable_reasons: BTreeMap<Rung, String>,
@@ -348,12 +347,10 @@ pub(crate) fn tiers_needed_for(policy: &TierPolicy, kind: RecordKind) -> Result<
 /// don't route (or age) to it, exactly like the single-kind sibling.
 ///
 /// An INDIVIDUAL kind with no `routing` entry contributes NO rungs
-/// (never a hard `Err`) -- this is the SAME "policy hasn't routed
-/// session/run/event yet" degrade `crate::ingest`'s own module doc
-/// documents, a legitimate config state, never a malformed-config
+/// (never a hard `Err`) -- this is a "policy hasn't routed
+/// this kind yet" degrade, a legitimate config state, never a malformed-config
 /// failure; a caller that needs every one of `kinds` to be routed
-/// checks `loaded.policy.tier_for(kind)` itself afterward (`crate::
-/// ingest::run`'s own `fully_routed` check is exactly this). Only a
+/// checks `loaded.policy.tier_for(kind)` itself afterward (as the ingest drivers do). Only a
 /// genuinely malformed `canon.yaml` (unreadable, bad YAML/policy
 /// syntax, an invalid pg schema, a non-forward aging rule, …)
 /// propagates `Err` here -- "lenient" describes RUNG reachability
@@ -363,7 +360,7 @@ pub(crate) fn tiers_needed_for(policy: &TierPolicy, kind: RecordKind) -> Result<
 /// for every rung that WAS attempted (because some kind in `kinds`
 /// needs it) and degraded -- e.g. the configured `dsn_env`/`bucket_env`
 /// name for an unset var, or a live connect/attach error's own text
-/// (s29 design D6) -- so a caller (`canon ingest sessions`/`canon
+/// (s29 design D6) -- so a caller (`canon
 /// ingest records`) can print WHY a needed rung is unwritten instead
 /// of a bare "tiers unreachable" guess.
 pub(crate) fn build_lenient_tiers_for_kinds(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<LoadedTiers, TierCliError> {
@@ -494,6 +491,26 @@ pub(crate) fn build_lenient_tiers_for_kind_read(canon_yaml_path: &Path, kind: Re
 /// unrouted contract.
 pub(crate) fn build_lenient_tiers_for_kind(canon_yaml_path: &Path, kind: RecordKind) -> Result<LoadedTiers, TierCliError> {
     build_lenient_tiers_for_kinds(canon_yaml_path, &[kind])
+}
+
+/// Write `record` through `store`, treating a byte-identical record
+/// that is already stored as success ("idempotent: a re-write of a
+/// record already stored is not an error") for tiers whose
+/// `Tier::write` REJECTS a byte-identical duplicate path instead of
+/// silently deduping it (`canon_store::partition` module doc: the
+/// git tier's Hive path is `{natural_key}__{digest12}`, so a
+/// byte-identical resubmission resolves to the SAME path and
+/// `GitTier::write` hard-errors on it by design, "never silently
+/// overwriting"). PG/R2 tiers instead report `WriteReceipt::deduped`
+/// and never raise `DuplicatePath`, so this helper is safe
+/// unconditionally. `canon dispatch begin`/`end` persist their `Run`
+/// through it ([`crate::dispatch::persist_run`]).
+pub(crate) fn persist_idempotent<T: canon_model::envelope::CanonRecord>(store: &canon_store::registry::TierRegistry, record: &T) -> Result<(), StoreError> {
+    match store.persist(record) {
+        Ok(_) => Ok(()),
+        Err(StoreError::DuplicatePath { .. }) => Ok(()),
+        Err(err) => Err(err),
+    }
 }
 
 /// Dispatch a read-only [`Tier::read`] to whichever backend `rung`'s

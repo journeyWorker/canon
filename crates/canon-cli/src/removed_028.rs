@@ -158,7 +158,7 @@ pub const ROWS: &[Row] = &[
     option("--repo", &["regime show"], "--repo-name", "the repo segment of the key; `--repo` names a directory on other commands", "D1 Renames, D5"),
     option("--to", &["artifacts move"], "--tier", "", "D1 Renames"),
     option("--target", SKILLS, "--repo", "the repo is `--repo` on every command; omit it to use the nearest directory holding canon.yaml", "D5"),
-    option("--canon-yaml", &["ingest sessions", "query", "tier age"], "--repo", "the repo's canon.yaml is found from `--repo`, or from the nearest directory holding one when it is omitted", "D5"),
+    option("--canon-yaml", &["query", "tier age"], "--repo", "the repo's canon.yaml is found from `--repo`, or from the nearest directory holding one when it is omitted", "D5"),
     // ── Destructive leaves preview by default ──
     option("--dry-run", DESTRUCTIVE, "--commit --plan-digest", "the bare run previews; `--commit --plan-digest` acts", "D6"),
     option("--plan", &["purge"], "purge", "the bare run previews; `--commit --plan-digest` acts", "D6"),

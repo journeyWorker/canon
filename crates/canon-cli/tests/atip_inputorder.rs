@@ -313,10 +313,10 @@ fn atip_inputorder_08_integers_are_compared_by_the_number_they_denote() {
         let out = canon(repo, &["finding", "close", "add-login", "--round", argv_round, "--seq", "1", "--disposition", "fixed", "--input", doc, "--json"]);
         assert_eq!(out.status.code(), Some(0), "--round {argv_round} with {doc}: {}", json_of(&out));
     }
-    // zero, which `ingest sessions --interval-secs` takes (`--round` starts at 1): -0, "-0", 0 and "0" are one value
+    // zero, which `ingest records --interval-secs` takes (`--round` starts at 1): -0, "-0", 0 and "0" are one value
     for doc in [r#"{"intervalSecs":-0}"#, r#"{"intervalSecs":"-0"}"#, r#"{"intervalSecs":0}"#, r#"{"intervalSecs":"0"}"#] {
         for argv_zero in ["0", "+0", "-0"] {
-            let out = canon(repo, &["ingest", "sessions", "--dry-run", "--interval-secs", argv_zero, "--input", doc, "--json"]);
+            let out = canon(repo, &["ingest", "records", "--dry-run", "--interval-secs", argv_zero, "--input", doc, "--json"]);
             let body = json_of(&out);
             assert_ne!(body["error"]["code"], "INPUT_CONFLICT", "--interval-secs {argv_zero} with {doc}: {body}");
             assert_ne!(body["error"]["code"], "INPUT_INVALID", "--interval-secs {argv_zero} with {doc}: {body}");

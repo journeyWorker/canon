@@ -7,9 +7,8 @@
 //! derives a verdict EVENT keyed by the S1 join spine; a `PlanAdapter`
 //! reads a foreign PLAN dialect (an openspec change dir, s17's
 //! reference dialect) and normalizes it into `Change`/`Task` record
-//! CANDIDATES — plan STATE, not verdict events. Both families sit
-//! beside `SessionAdapter`/`registry` (S3) as canon-ingest's third
-//! trait-plus-static-registry connector pair (design D1): a static
+//! CANDIDATES — plan STATE, not verdict events. Both families are
+//! trait-plus-static-registry connectors (design D1): a static
 //! table, no dynamic plugin loading, and — the load-bearing boundary
 //! this crate holds for all three families — no `canon-store`
 //! dependency. `canon-ingest` is pure scan/parse/normalize domain
@@ -187,7 +186,7 @@ impl PlanParseOutcome {
 /// One plan-dialect adapter (s17 P1 FOUNDATION, frozen for P2's
 /// openspec adapter and any dialect after it — mirrors
 /// [`crate::artifact_adapter::ArtifactAdapter`]'s "trait + static
-/// table" shape, itself mirroring `SessionAdapter`'s S3 design D1).
+/// table" shape).
 /// `dialect_id()` names the dialect (`"openspec"`, the reference
 /// dialect s17 shipped; `"superpowers"`, s30's `plan-dialect-
 /// superpowers` shipped against the superpowers `writing-plans`

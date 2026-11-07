@@ -116,7 +116,6 @@ const REFUSALS: &[Row] = &[
     lit("gate promote", &["gate", "promote"], "CONFIG_INVALID").setup(BROKEN_CONFIG),
     lit("ingest plans", &["ingest", "plans", "--repo", "@empty"], "CONFIG_REQUIRED"),
     lit("ingest records", &["ingest", "records", "--repo", "@empty"], "CONFIG_REQUIRED"),
-    lit("ingest sessions", &["ingest", "sessions", "--repo", "@empty"], "CONFIG_REQUIRED"),
     lit("init", &["init", "--language", "e", "--repo", "@empty"], "INIT_ARGUMENT_INVALID"),
     lit("inventory sync", &["inventory", "sync"], "CONFIG_INVALID").setup(BROKEN_CONFIG),
     lit("ledger compact", &["ledger", "compact", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),

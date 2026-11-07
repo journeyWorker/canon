@@ -142,9 +142,6 @@
   "ingest records": [
    "orchestrator"
   ],
-  "ingest sessions": [
-   "orchestrator"
-  ],
   "init": [
    "orchestrator"
   ],

@@ -1,8 +1,7 @@
 //! `canon ingest plans [--dialect <id> --source <path>] [--repo <dir>]
 //! [--json]` (s17 P3 `s17-plan-import`): the plan-import connector
-//! meets canon-store — the THIRD instance of `crate::ingest`/
-//! `crate::artifact_ingest`'s adapter -> normalize -> persist shape,
-//! generalized from `SessionAdapter`/`ArtifactAdapter` to
+//! meets canon-store — the sibling of `crate::artifact_ingest`'s
+//! adapter -> normalize -> persist shape, over
 //! `canon_ingest::plan_registry`'s `PlanAdapter`s (`openspec`, s17's
 //! reference dialect). `canon-ingest` itself has no `canon-store`
 //! dependency (pure scan/parse/normalize domain logic, P1/P2); this
@@ -38,9 +37,8 @@
 //!
 //! # Watermark cursor (S3 §3 generalized, task 3.4)
 //! One [`SourceCursor`] per configured `(dialect, root)` source, under
-//! the SAME `<repo>/.canon/ingest/cursors/` root session-ingest already
-//! uses (a distinct filename per source, [`plan_source_cursor_id`], so
-//! the two families never collide). The gate digests exactly the files
+//! the `<repo>/.canon/ingest/cursors/` root (a distinct filename per
+//! source, [`plan_source_cursor_id`]). The gate digests exactly the files
 //! the source's dialect reads ([`canon_ingest::PlanAdapter::source_files`];
 //! for `openspec`, the change dirs under `openspec/changes/`), never
 //! a walk of the whole root: `canon init` writes `root: .`, and a
@@ -81,9 +79,9 @@
 //! directly, bypasses validation, or introduces a second write path
 //! (connector-never-authority). A `StoreError::DuplicatePath` (an
 //! already-identical git-tier resubmission) is treated as a successful
-//! no-op, mirroring `crate::ingest`'s own `persist_idempotent`
-//! discipline. Unlike `crate::ingest`'s whole-batch unwritten
-//! fallback (which triggers on ANY `canon.yaml`/tier-build failure),
+//! no-op, mirroring `crate::tiers::persist_idempotent`'s
+//! discipline. Unlike a whole-batch unwritten
+//! fallback (which would trigger on ANY `canon.yaml`/tier-build failure),
 //! this driver degrades PER RECORD: a `StoreError::TierUnavailable`
 //! (e.g. `task: pg` routed but `CANON_PG_DSN` unset) or
 //! `StoreError::UnroutedKind` (a kind with no `routing` entry at all)
@@ -529,7 +527,7 @@ fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_r
     }
 
     // Durable-write succeeded for these sources: advance their
-    // cursors. Best-effort, mirrors `crate::ingest::run` — a cursor
+    // cursors. Best-effort — a cursor
     // write failure only costs a re-parse next pass, never the
     // records this pass already persisted.
     for cursor in pending_cursors {
@@ -853,8 +851,7 @@ pub(crate) fn declared_ids(repo: &Path) -> Result<(BTreeSet<String>, BTreeSet<St
 }
 
 /// Parse `canon.yaml`'s `plans:` section (task 3.2; see module doc for
-/// the fail-soft-on-absent vs fail-loud-on-present split, mirroring
-/// `crate::ingest::IngestSourceConfig::load`'s established pattern).
+/// the fail-soft-on-absent vs fail-loud-on-present split).
 fn configured_plan_sources(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
     // A canon.yaml that is not there: fail-soft (no config at all is a
     // legitimate first-run state) -- zero sources, same as an absent
@@ -869,8 +866,7 @@ fn configured_plan_sources(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<Pl
     };
     // A PRESENT but non-YAML canon.yaml fails LOUD -- a syntax typo in
     // a canon.yaml meant to set `plans.sources` must never silently
-    // resolve to zero sources (mirrors `crate::ingest`'s identical
-    // discipline).
+    // resolve to zero sources.
     let doc: serde_yaml::Value = serde_yaml::from_str(&text)
         .map_err(|e| PlansError::Config(format!("canon.yaml is not valid YAML (fail-loud so an intended `plans:` section is never silently dropped to zero sources): {e}")))?;
     let Some(plans_val) = doc.get("plans") else {
@@ -966,7 +962,7 @@ fn validate_source_roots(sources: &[PlanSource]) -> Result<(), PlansError> {
 
 /// One `SourceCursor` id per configured `(dialect, parse_version, root)`
 /// source (task 3.4) -- `plan-<dialect>-v<parse_version>-<digest12>`,
-/// where `<digest12>` is `canon_ingest::normalize::content_digest` of
+/// where `<digest12>` is `canon_ingest::digest::content_digest` of
 /// the root's own path string: two sources naming the same dialect at
 /// DIFFERENT roots (or vice versa) never collide on one cursor file, and
 /// the id stays a safe bare filename component regardless of what the
@@ -985,12 +981,12 @@ fn validate_source_roots(sources: &[PlanSource]) -> Result<(), PlansError> {
 /// re-read, re-parsed, and re-persisted, and the stale cursor is simply
 /// orphaned rather than mutated.
 fn plan_source_cursor_id(dialect: &str, parse_version: u32, root: &Path) -> String {
-    let digest = canon_ingest::normalize::content_digest(&serde_json::json!(root.to_string_lossy()));
+    let digest = canon_ingest::digest::content_digest(&serde_json::json!(root.to_string_lossy()));
     format!("plan-{dialect}-v{parse_version}-{digest}")
 }
 
 /// A file's `(mtime_ms, size)` for the cursor's informational summary
-/// fields -- best-effort, mirrors `crate::ingest::file_stat` (the gate
+/// fields -- best-effort (the gate
 /// itself decides on the content digest alone, never these).
 fn file_stat(path: &Path) -> (i64, u64) {
     match std::fs::metadata(path) {
@@ -1016,7 +1012,7 @@ fn canonicalize_or(path: &Path) -> PathBuf {
 /// connector-never-authority's ONE write path, never bypassed. `Ok(None)`
 /// = durably persisted, OR an idempotent `StoreError::DuplicatePath`
 /// no-op (an already-identical git-tier resubmission -- mirrors
-/// `crate::ingest::persist_idempotent`'s established discipline).
+/// `crate::tiers::persist_idempotent`'s established discipline).
 /// `Ok(Some(record))` = the routed tier is unreachable
 /// (`TierUnavailable`) or the kind has no routing entry at all
 /// (`UnroutedKind`) -- task 3.5's documented `unwritten` seam,
@@ -1091,7 +1087,7 @@ pub fn format_json(outcome: &PlansOutcome) -> String {
 }
 
 /// The documented `unwritten` seam's own body (module doc), printed by
-/// default regardless of `--json` -- mirrors `crate::ingest`'s
+/// default regardless of `--json` -- the
 /// "the only copy of the normalized output must never be silently
 /// discarded" fix (ReviewS3Full finding 4). `None` when nothing
 /// degraded this pass.

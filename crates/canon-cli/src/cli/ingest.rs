@@ -6,40 +6,10 @@ use std::path::PathBuf;
 
 #[derive(Debug, Subcommand)]
 pub enum IngestCommand {
-    /// Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)
-    Sessions(IngestSessionsArgs),
     /// Import review/divergence/task/handoff records and derive verdicts
     Records(IngestRecordsArgs),
     /// Import plans as Change/Task records: canon's own .canon/changes, then the configured external sources (openspec, superpowers)
     Plans(IngestPlansArgs),
-}
-
-#[derive(Debug, Args)]
-pub struct IngestSessionsArgs {
-    /// Keep polling instead of exiting after one pass
-    #[arg(long)]
-    pub watch: bool,
-    /// Seconds between polls
-    #[arg(long, default_value_t = 30, value_name = "N", value_parser = crate::cli::safe_min0)]
-    pub interval_secs: u64,
-    /// The scan root's home directory (defaults to $HOME)
-    #[arg(long, value_name = "DIR")]
-    pub home: Option<PathBuf>,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Ignore watermark cursors and re-parse every in-scope file
-    #[arg(long)]
-    pub full: bool,
-    /// Scan every workspace on this machine, not just this project
-    #[arg(long)]
-    pub all_workspaces: bool,
-    #[command(flatten)]
-    pub dry_run: crate::cli::DryRunArgs,
-    /// Output JSON instead of the human-readable form
-    #[arg(long)]
-    pub json: bool,
-    #[command(flatten)]
-    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Debug, Args)]

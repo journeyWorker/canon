@@ -7,7 +7,7 @@
 //! exists"; this provides it. The command itself unblocks all six; a
 //! given row is SATISFIED only once its crate's suite is registered
 //! below — today that is S11 (`format-authority`), S13
-//! (`policy-expressions`), S2/S5/S10, plus S3 (`session-ingest`), S4
+//! (`policy-expressions`), S2/S5/S10, plus S4
 //! (`artifact-ingest`), and S12 (`canon-context`). Only S9's
 //! duckdb-dependent `canon-report` fixtures remain unregistered.
 //!
@@ -146,7 +146,6 @@ fn suites() -> Vec<Suite> {
         ("typed-authoring-vocabulary", canon_vocab::selftest),
         ("policy-expressions", canon_policy::selftest),
         ("format-authority", canon_fmt::selftest),
-        ("session-ingest", canon_ingest::selftest),
         ("canon-context", crate::context::selftest),
         ("artifact-ingest", crate::artifact_ingest::selftest),
         ("spec-ledger-selftest", crate::inventory_selftest::selftest),
@@ -162,7 +161,6 @@ pub const SUITE_NAMES: &[&str] = &[
     "typed-authoring-vocabulary",
     "policy-expressions",
     "format-authority",
-    "session-ingest",
     "canon-context",
     "artifact-ingest",
     "spec-ledger-selftest",

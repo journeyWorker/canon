@@ -50,7 +50,6 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("gate promote", "canon gate promote --kind evidence"),
     ("ingest records", "canon ingest records"),
     ("ingest plans", "canon ingest plans"),
-    ("ingest sessions", "canon ingest sessions"),
     ("init", "canon init"),
     ("inventory sync", "canon inventory sync"),
     ("ledger compact", "canon ledger compact"),

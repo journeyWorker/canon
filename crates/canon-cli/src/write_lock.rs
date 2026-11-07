@@ -100,7 +100,6 @@ pub const POLICY: &[(&str, Holds, &str)] = &[
     ("task done", Holds::Always, "flips a task checkbox in a plan file and records its evidence"),
     ("ingest records", Holds::Unless("watch"), "appends records to the ledger; `--watch` polls until stopped, so it holds the lock for each pass, not for the polling"),
     ("ingest plans", Holds::Always, RECORD_WRITER),
-    ("ingest sessions", Holds::Unless("watch"), "appends records to the ledger; `--watch` polls until stopped, so it holds the lock for each pass, not for the polling"),
     ("init", Holds::Always, "writes canon.yaml, .gitignore and the skill files, which `artifacts move` and `migrate` read; `init --check` and `--dry-run` write nothing"),
     ("inventory sync", Holds::Always, "rewrites the scenario index records in the ledger; `--dry-run` writes nothing"),
     ("strategy promote", Holds::Always, RECORD_WRITER),
@@ -507,7 +506,6 @@ mod tests {
         assert_eq!(holds("export", given(&[])), Some(false));
         assert_eq!(holds("ingest records", given(&[])), Some(true));
         assert_eq!(holds("ingest records", given(&["watch"])), Some(false), "a watcher holds it per pass");
-        assert_eq!(holds("ingest sessions", given(&["watch", "dry_run"])), Some(false));
         assert_eq!(holds("status", given(&[])), None);
     }
 }

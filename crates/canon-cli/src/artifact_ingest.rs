@@ -4,15 +4,12 @@
 //! CLI wiring" `crates/canon-ingest/src/artifact_registry.rs`'s own doc
 //! comment and `openspec/changes/{s4-artifact-ingest,s6-role-strategy-
 //! memory}/tasks.md`'s honesty notes name as a DEFERRED residual —
-//! mirrors [`crate::ingest`]'s already-proven `canon ingest sessions`
-//! shape (adapters -> normalize/derive -> persist, with a documented
-//! seam for whatever couldn't be persisted), generalized from
-//! `SessionAdapter`/canon-store to `ArtifactAdapter`/canon-learn.
+//! (adapters -> derive -> persist, with a documented seam for whatever
+//! couldn't be persisted) over `ArtifactAdapter`/canon-learn.
 //!
 //! # The S4 dependency boundary (frozen, never crossed here)
 //! `canon-ingest` stays canon-store-free at runtime (S4 task 0.1) —
-//! this module is where the two meet, exactly like `crate::ingest` is
-//! for `SessionAdapter`/canon-store. Two adapter shapes, fed two
+//! this module is where the two meet. Two adapter shapes, fed two
 //! different ways:
 //! - **`Path`-source adapters** (`ledger`/`divergence`/`openspec-task`)
 //!   resolve their own root from the `canon.yaml`-configured
@@ -70,12 +67,11 @@
 //! ingest, defeating this whole change's purpose.
 //!
 //! `regime_key`'s `<hash>` component is
-//! [`canon_ingest::normalize::content_digest`] of the source event's
+//! [`canon_ingest::digest::content_digest`] of the source event's
 //! own [`event_identity`] (`scenario:<id>@<project_id>` /
 //! `scenario:<id>@-` when the event names no project /
-//! `handoff:<id>` / `task:<id>`) — the SAME digest primitive S3
-//! session-ingest already uses for its own write-identity, reused here
-//! (not a new hashing scheme) to give related events sharing one
+//! `handoff:<id>` / `task:<id>`) — the same digest primitive plan cursor
+//! file names use (not a new hashing scheme) to give related events sharing one
 //! identity (e.g. an open review finding and its later remediation on
 //! ONE project's scenario) the identical `regime_key`, folding them
 //! onto ONE trajectory exactly as [`canon_learn::Trajectory`]'s own doc
@@ -244,12 +240,12 @@
 //! MALFORMED `canon.yaml` (bad YAML/policy syntax, an invalid pg
 //! schema, a non-forward aging rule, …) is NOT this per-adapter
 //! degrade, though (s29 design D6): it fails the WHOLE `canon ingest
-//! artifacts` command loud, exactly like `crate::ingest`'s own
+//! artifacts` command loud, exactly like every other write command's
 //! contract — "lenient" describes rung reachability only, config
 //! correctness always stays loud. `canon-learn`'s own parquet store
 //! has no analogous "unreachable" failure mode (`ParquetTrajectoryStore::open`
 //! never fails — it is a bare `PathBuf`, directories are created lazily
-//! on write), so unlike `crate::ingest`'s whole-batch unwritten
+//! on write), so, with no whole-batch unwritten
 //! fallback, this driver's persistence step degrades per-trajectory: an
 //! unregistered role (`canon.yaml` `learn.roles`) is skipped and
 //! counted (`ArtifactIngestOutcome::trajectories_skipped_unregistered_role`),
@@ -347,7 +343,7 @@ use std::path::Path;
 
 use canon_ingest::artifact_adapter::{ArtifactEvent, ArtifactJoinKey, ArtifactSourceConfig, ArtifactSourceHandle};
 use canon_ingest::artifact_registry::{ArtifactDispatchOutcome, ArtifactSourceKind};
-use canon_ingest::normalize::content_digest;
+use canon_ingest::digest::content_digest;
 use canon_ingest::verdict::{VerdictRow, attach_regime_key, derive_native_divergence_verdict, derive_native_review_verdict, derive_verdict};
 use canon_learn::{
     LearnConfig, LearnError, ParquetStrategyStore, ParquetTrajectoryStore, RewardRegistry, RoleRegistry, StrategyItem, StrategyStore, Trajectory,
@@ -466,7 +462,7 @@ pub enum ArtifactIngestError {
 }
 
 /// One registered adapter's contribution to this pass — mirrors
-/// `crate::ingest::AdapterSummary`'s per-adapter shape, generalized
+/// a per-adapter summary shape, generalized
 /// with a `status` field so a `Records`-source read failure is a
 /// visible, distinct outcome (module doc's "documented seam"), never
 /// collapsed into the same zero-events shape an unconfigured
@@ -2344,7 +2340,7 @@ fn run_pass(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<Artifa
     // true` entry with the switch off needs no live tier at all) --
     // malformed config (bad YAML/policy syntax, an invalid pg schema,
     // a non-forward aging rule, …) fails the WHOLE command loud here,
-    // matching `crate::ingest`'s own contract; `canon.yaml` missing/
+    // matching the contract of the other ingest drivers; `canon.yaml` missing/
     // unreadable degrades every `Records`-source adapter to
     // "unavailable" (the pre-existing "documented seam" posture); an
     // individually unrouted kind (e.g. `handoff` with no

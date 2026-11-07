@@ -1,98 +1,20 @@
 //! `canon ingest` — the handlers of the group.
 
 use canon_model::{RunId};
-use crate::cli::ingest::{IngestCommand, IngestSessionsArgs, IngestRecordsArgs, IngestPlansArgs};
+use crate::cli::ingest::{IngestCommand, IngestRecordsArgs, IngestPlansArgs};
 use crate::cli_error::{CliError, CliErrorExt as _};
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 pub fn run(cmd: IngestCommand) -> ExitCode {
     match cmd {
-        IngestCommand::Sessions(IngestSessionsArgs { watch, interval_secs, home, repo, full, all_workspaces, dry_run, json, .. }) => run_ingest_sessions(&repo.join("canon.yaml"), home.as_deref(), SessionsOptions { watch, interval_secs, full, all_workspaces, dry_run: dry_run.dry_run, json }),
         IngestCommand::Records(IngestRecordsArgs { watch, interval_secs, repo, dry_run, json, run_id, .. }) => run_ingest_records(&repo, watch, interval_secs, dry_run.dry_run, json, run_id.as_ref()),
         IngestCommand::Plans(IngestPlansArgs { dialect, plan_source, repo, dry_run, json, .. }) => run_ingest_plans(&repo, dialect.as_deref(), plan_source.as_deref(), dry_run.dry_run, json),
     }
 }
 
-/// The flags of `canon ingest sessions` that shape one run.
-#[derive(Debug, Clone, Copy)]
-struct SessionsOptions {
-    watch: bool,
-    interval_secs: u64,
-    full: bool,
-    all_workspaces: bool,
-    dry_run: bool,
-    json: bool,
-}
-
-fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Path>, options: SessionsOptions) -> ExitCode {
-    let SessionsOptions { watch, interval_secs, full, all_workspaces, dry_run, json } = options;
-    let home = match home {
-        Some(h) => h.to_path_buf(),
-        None => match std::env::var_os("HOME") {
-            Some(h) => PathBuf::from(h),
-            None => {
-                return ExitCode::from(CliError::failed("INGEST_FAILED", "no `--home` given and $HOME is unset").hint("check that the source is readable and run the command again").emit("canon ingest sessions", json));
-            }
-        },
-    };
-
-    let root = canon_yaml.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
-    loop {
-        // The repository write lock for this pass alone: a polling run must not hold it while it sleeps.
-        let pass = match crate::write_lock::hold_pass(root, dry_run) {
-            Ok(pass) => pass,
-            Err(error) => return ExitCode::from(error.emit("canon ingest sessions", json)),
-        };
-        match crate::ingest::run(canon_yaml, &home, true, full, all_workspaces, dry_run) {
-            Ok(outcome) if json => {
-                // One document per pass (one per poll under `--watch`); the human summary is for human mode.
-                crate::json_out::data("ingest sessions", &crate::ingest::summary_json(&outcome, crate::hot_store::location(canon_yaml)));
-            }
-            Ok(outcome) => {
-                print!("{}", crate::ingest::format_human(&outcome));
-                if !outcome.dry_run {
-                    if let Some(hot) = crate::hot_store::HotStore::of(canon_yaml) {
-                        println!("{}", hot.line());
-                    }
-                }
-                // The documented JSON fallback (`crate::ingest`'s
-                // module doc: "the CLI prints it as JSON rather than
-                // failing the whole ingest pass") must actually fire
-                // whenever there's unwritten output — ReviewS3Full
-                // finding 4: this used to be gated behind a `--json`
-                // flag the human-readable summary line ABOVE already
-                // unconditionally claims happened ("printing JSON
-                // instead"), so a default (flagless) run whose tiers
-                // were unreachable discarded the only normalized
-                // output. `format_json` already returns `None` when
-                // every record was persisted, so this is a no-op on
-                // the common path.
-                if let Some(body) = crate::ingest::format_json(&outcome) {
-                    println!("{body}");
-                }
-            }
-            Err(err) => {
-                let error = match &err {
-                    crate::ingest::IngestError::Config(message) => crate::read_cause::config_error(message.clone()).hint("fix the `ingest:` section of canon.yaml the message names, then run the command again"),
-                    crate::ingest::IngestError::Unavailable(error) => error.clone(),
-                    _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),
-                };
-                return ExitCode::from(error.emit("canon ingest sessions", json));
-            }
-        }
-        if !watch {
-            return ExitCode::SUCCESS;
-        }
-        drop(pass);
-        std::thread::sleep(std::time::Duration::from_secs(interval_secs));
-    }
-}
-
 /// `canon ingest records` (S14 `s14-artifact-ingest-cli`): see
 /// `crate::artifact_ingest`'s module doc — the artifact/verdict
-/// half of canon's join spine, mirroring `run_ingest_sessions`'s
-/// scan-loop shape one level up (`--repo`-resolved, never `--home`).
+/// half of canon's join spine, `--repo`-resolved scan loop.
 ///
 /// `--run` is the explicit attribution edge (s42
 /// `close-the-open-loops`, task 3.2) — omitted, a trajectory records no
