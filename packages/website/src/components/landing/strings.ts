@@ -482,7 +482,7 @@ const en = {
       {
         name: "run",
         lines: [
-          "Session adapters write one root run per session plus one child run per subagent.",
+          "Subagent runs link to their parent run, so a delegation tree is a queryable shape.",
         ],
         href: "/architecture/",
       },
@@ -562,7 +562,7 @@ const en = {
       "# one Rust core, distributed through npm",
       "bunx @journeykit/canon report          # where does this repo stand?",
       "bunx @journeykit/canon gate check      # is \"done\" actually done?",
-      "bunx @journeykit/canon ingest sessions # fold agent transcripts into the ledger",
+      "bunx @journeykit/canon ingest plans    # import change plans into the ledger",
     ],
   },
 
@@ -643,7 +643,7 @@ const ko: Strings = {
       },
       {
         name: "실행",
-        lines: ["세션 어댑터는 세션마다 루트 run 하나와 서브에이전트마다 자식 run 하나를 씁니다."],
+        lines: ["서브에이전트 run은 부모 run에 연결되어, 위임 트리가 조회 가능한 구조가 됩니다."],
         href: "/ko/architecture/",
       },
       {
@@ -709,7 +709,7 @@ const ko: Strings = {
       "# 하나의 Rust 코어, npm으로 배포",
       "bunx @journeykit/canon report          # 이 레포는 지금 어디까지 왔나?",
       "bunx @journeykit/canon gate check      # \"done\"이 진짜 done인가?",
-      "bunx @journeykit/canon ingest sessions # 에이전트 트랜스크립트를 레저로",
+      "bunx @journeykit/canon ingest plans    # 변경 플랜을 레저로 가져오기",
     ],
   },
 

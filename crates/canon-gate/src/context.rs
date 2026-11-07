@@ -1,8 +1,4 @@
-//! The gate-context seam (design decisions 1/9, S3's `SessionAdapter`
-//! precedent for freezing a wave-2 contract,
-//! `crates/canon-ingest/src/adapter.rs`'s module doc: "the
-//! `SessionAdapter` trait + `UnifiedRow` normalization target ... Wave
-//! 1, frozen for Wave 2's ... adapters"). [`GateCtx`] names every
+//! The gate-context seam (design decisions 1/9). [`GateCtx`] names every
 //! rebindable root a check reads — the direct Rust port of
 //! `tools/parity.py`'s `GateCtx` frozen dataclass
 //! (the donor parity-harness audit's fixtures-selftest notes §3.1:
@@ -12,8 +8,7 @@
 //! fixture-dir constructor"). [`GateContext`] is the LOADED bundle
 //! (resolved policy + evidence corpus) every S5 wave-2 [`GateCheck`]
 //! consumes — the shared input coverage/verdict-ledger/staleness/
-//! trust-ladder/checkbox-grammar checks build against, mirroring how
-//! `UnifiedRow` froze what every Wave-2 session adapter emits into.
+//! trust-ladder/checkbox-grammar checks build against.
 //!
 //! This module implements ONLY the loading seam (task 1.1's "Scaffold
 //! `crates/canon-gate` consuming canon-model's ... types and
@@ -125,7 +120,7 @@ fn load_tier_policy(repo: &Path) -> Result<Option<canon_store::policy::TierPolic
 }
 
 /// Every piece an S5 wave-2 [`GateCheck`] needs, loaded once per gate
-/// run (module doc's `SessionAdapter`/`UnifiedRow` precedent).
+/// run.
 /// `evidence` is every well-formed [`EvidenceRecord`]
 /// [`GateCtx::ledger_root`]'s [`GitTier`] holds; `violations` is
 /// everything the tier's own layout check or

@@ -189,13 +189,12 @@ Run evidence gates, promote staged records, install hooks.
 ### `canon ingest`
 
 {/* canon:generated cli-ingest begin */}
-Import agent sessions, records, and plans into canon's store.
+Import records and plans into canon's store.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
 | `canon ingest plans` | none | none | write: Import plans as Change/Task records | `canon ingest plans --json` |
 | `canon ingest records` | none | none | write: Import review/divergence/task/handoff records and derive verdicts | `canon ingest records --json` |
-| `canon ingest sessions` | none | none | write: Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes) | `canon ingest sessions --json` |
 {/* canon:generated cli-ingest end */}
 
 ### `canon inventory`

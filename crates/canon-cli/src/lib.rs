@@ -38,7 +38,6 @@ pub mod git_rev;
 pub mod guide;
 pub mod hot_store;
 pub(crate) mod incomplete;
-pub mod ingest;
 pub mod init;
 pub mod input;
 pub mod inventory;

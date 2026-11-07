@@ -535,33 +535,24 @@ fn check_config_fails_loud_on_a_sqlite_entry_missing_path() {
     assert!(report.contains("path"), "the parse error must name the missing `path` field: {report}");
 }
 
-/// spec.md "Fresh init ingests without docker" — the s32 headline
+/// spec.md "Fresh init writes without docker" — the s32 headline
 /// scenario: a bare `canon init` repo (no docker, no `CANON_*` env)
-/// immediately `canon ingest sessions`-es cleanly, persisting into the
-/// scaffolded sqlite hot tier. Ambient `CODEX_HOME`/
-/// `CANON_INGEST_*_DIR`/`HERMES_HOME` are cleared for the child
-/// process (mirroring `tests/ingest.rs`'s own isolation) so the empty
-/// `--home` fixture is the ONLY thing scanned — this asserts the
-/// PERSIST path, not merely a clean empty scan.
+/// immediately runs a Run-writing command (`canon dispatch begin`)
+/// cleanly, persisting into the scaffolded sqlite hot tier.
 #[test]
-fn init_then_ingest_sessions_writes_the_sqlite_hot_tier_with_zero_env_or_services() {
+fn init_then_dispatch_begin_writes_the_sqlite_hot_tier_with_zero_env_or_services() {
     let dir = tempfile::tempdir().unwrap();
     assert!(run_canon(&["init", "--repo", "."], dir.path()).status.success());
     assert!(!dir.path().join(".canon/hot.db").exists(), "canon init itself must not eagerly create the hot tier's db file");
 
-    let home = tempfile::tempdir().unwrap();
     let out = hermetic::canon()
-        .args(["ingest", "sessions", "--home", &home.path().display().to_string()])
+        .args(["dispatch", "begin", "--role", "implementer", "--regime", "implementer/app/api/abcdef012345", "--actor", "a"])
         .current_dir(dir.path())
-        .env_remove("CODEX_HOME")
-        .env_remove("CANON_INGEST_CLAUDE_SESSIONS_DIR")
-        .env_remove("CANON_INGEST_OMP_SESSIONS_DIR")
-        .env_remove("HERMES_HOME")
         .output()
         .expect("spawn canon binary");
 
-    assert!(out.status.success(), "canon ingest sessions against a fresh sqlite-hot init must exit 0 with zero services: {}", stderr(&out));
-    assert!(dir.path().join(".canon/hot.db").exists(), "expected the sqlite hot tier's db file to be written by the ingest pass");
+    assert!(out.status.success(), "canon dispatch begin against a fresh sqlite-hot init must exit 0 with zero services: {}", stderr(&out));
+    assert!(dir.path().join(".canon/hot.db").exists(), "expected the sqlite hot tier's db file to be written by the dispatch pass");
 }
 
 // ── harness choice (0.17 D5) ──

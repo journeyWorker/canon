@@ -1,6 +1,6 @@
 ---
 title: Examples
-description: Four end-to-end walkthroughs — wiring a repo, the evidence loop, session telemetry, and importing plans — plus a dogfood case study.
+description: Four end-to-end walkthroughs — wiring a repo, the evidence loop, importing plans — plus a dogfood case study.
 ---
 
 import { Steps } from "@astrojs/starlight/components";
@@ -191,56 +191,7 @@ the status report.
 
 **Done when:** `canon gate check` exits `0` with `clean (0 violations)` and `.canon/REPORT.md` is regenerated; `canon status` has nothing left in `meta.next` for the subject.
 
-## 3. Session telemetry
-
-Fold agent-CLI transcripts into tiered storage, then read them back.
-
-<Steps>
-
-1. **Ingest once, then watch.**
-
-   ```bash
-   bunx @journeykit/canon ingest sessions
-   bunx @journeykit/canon ingest sessions --watch   # poll every 30s (--interval-secs)
-   ```
-
-   Scans every registered adapter (`omp`, `hermes`, `claude`, `codex`),
-   normalizes into `Session` / `Run` / `Event` records, and persists
-   through the same tier resolution `canon query` uses. A per-source
-   watermark cursor skips a source whose transcripts are byte-identical
-   to last pass — a steady-state `--watch` loop only re-parses what
-   changed. Force a full rescan with `--full`.
-
-2. **Query the records back.**
-
-   ```bash
-   bunx @journeykit/canon query --kind session --json
-   bunx @journeykit/canon query --kind run --since 2026-07-01
-   ```
-
-   Fans the read across every tier the kind may live in and merges by
-   `at`. `--json` prints the merged record bodies; omit it for a human
-   table.
-
-3. **Open the dashboard.**
-
-   ```bash
-   bunx @journeykit/canon dashboard
-   ```
-
-   Regenerates a fresh Parquet snapshot (`canon report snapshot .canon/dashboard-snapshot`
-   under the hood) and serves the
-   built `packages/dashboard` app locally, pointed at it. The snapshot
-   contains all 10 report marts, including `mart_run_observability` and
-   scope/subjects status; the dashboard intentionally renders 7 panels,
-   rather than all report marts. Pass `--snapshot <dir>` to `canon dashboard` to serve a
-   snapshot generated elsewhere (e.g. a downloaded CI artifact) as-is.
-
-</Steps>
-
-**Done when:** `canon query --kind session --json` returns the folded sessions, and `canon dashboard` serves them.
-
-## 4. Importing a superpowers plan
+## 3. Importing a superpowers plan
 
 Mirror a superpowers `writing-plans` plan doc into `Change`/`Task` core
 records — no hand-authoring required.
@@ -294,7 +245,7 @@ records — no hand-authoring required.
 
 **Done when:** `canon query --kind change --json` lists each plan as a change and `canon query --kind task --json` its tasks.
 
-## 5. The subject-domain loop
+## 4. The subject-domain loop
 
 Author a subject, adopt an imported change under it, pull subject-scoped
 guidance, then drive it through its evidence-gated lifecycle.

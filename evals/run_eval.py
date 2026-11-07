@@ -35,7 +35,7 @@ TRUSTED_PROBE_SHA256: dict[str, str] = {
     "gate.py": "a507e7fb6ee58a203bf101964b9c0f2b0db0412856b71e1cc48b92ad3be20952",
 }
 SCHEMA_VERSION = 2
-PINNED_TASK_COUNT = 40
+PINNED_TASK_COUNT = 37
 
 
 class EvalError(Exception):

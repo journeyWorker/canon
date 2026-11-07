@@ -13,7 +13,6 @@
 //! | `change new` | `.canon/ledger/kind=change` |
 //! | `inventory sync` | `.canon/ledger/kind=scenario` |
 //! | `ingest plans` | `.canon/ledger/kind=change` |
-//! | `ingest sessions` | `.canon` (the hot db's directory) |
 //! | `ingest records` | `.canon/learn` (the trajectory store) |
 //! | `report build`, `export` | `.canon` (the report file, the audit file) |
 //! | `report snapshot` | the directory holding `<DIR>` |
@@ -209,24 +208,6 @@ fn atip_l0_24_ingest_plans_into_a_read_only_change_store_is_refused() {
     let dir = scratch_repo();
     let kind = dir.path().join(".canon/ledger/kind=change");
     assert_refused(dir.path(), &[&kind], &["ingest", "plans"], WRITE_DENIED, "kind=change");
-}
-
-#[test]
-fn atip_l0_24_ingest_sessions_into_a_read_only_hot_store_is_refused() {
-    let dir = scratch_repo();
-    let home = TempDir::new().unwrap();
-    let sessions = home.path().join(".omp/agent/sessions/-tmp-proj");
-    fs::create_dir_all(&sessions).unwrap();
-    fs::write(
-        sessions.join("s1.jsonl"),
-        "{\"type\":\"session\",\"id\":\"wu_ses_1\",\"cwd\":\"/tmp/proj\"}\n\
-         {\"type\":\"message\",\"timestamp\":\"2026-07-01T00:00:00Z\",\"message\":{\"role\":\"user\",\"content\":\"hello\"}}\n\
-         {\"type\":\"message\",\"timestamp\":\"2026-07-01T00:00:01Z\",\"message\":{\"role\":\"assistant\",\"model\":\"gpt-4o-mini\",\"provider\":\"openai\",\"usage\":{\"input\":10,\"output\":5}}}\n",
-    )
-    .unwrap();
-    let canon_dir = dir.path().join(".canon");
-    let home_arg = home.path().display().to_string();
-    assert_refused(dir.path(), &[&canon_dir], &["ingest", "sessions", "--home", &home_arg, "--all-workspaces"], WRITE_DENIED, "hot.db");
 }
 
 #[test]

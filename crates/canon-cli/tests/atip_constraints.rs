@@ -427,7 +427,7 @@ const INTEGER_OPTIONS: [(&[&str], &str); 5] = [
     (&["evidence", "add", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "x"], "--max-artifact-mib"),
     (&["query", "--kind", "change"], "--limit"),
     (&["retrieve", "--for-role", "reviewer", "--domain", "dev"], "--limit"),
-    (&["ingest", "sessions", "--dry-run"], "--interval-secs"),
+    (&["ingest", "records", "--dry-run"], "--interval-secs"),
 ];
 
 /// atip.constraints.11: an integer option outside ±(2^53-1) is refused, never rounded.
@@ -699,14 +699,14 @@ fn atip_constraints_21_a_negative_integer_names_its_option_and_minus_zero_is_zer
         ("canon query --kind change --limit -9007199254740992", "--limit"),
         ("canon artifacts store --max-artifact-mib -1", "--max-artifact-mib"),
         ("canon artifacts store --max-artifact-mib -9007199254740992", "--max-artifact-mib"),
-        ("canon ingest sessions --interval-secs -1", "--interval-secs"),
+        ("canon ingest records --interval-secs -1", "--interval-secs"),
         ("canon retrieve --for-role reviewer --domain dev --limit -1", "--limit"),
         ("canon finding close add-login --round -1 --seq 1 --disposition fixed", "--round"),
     ] {
         assert_refused(&empty(line, Some("implementer")), "USAGE", field);
     }
     // `-0` is the integer 0: accepted where 0 is, refused for the minimum where it is not.
-    for line in ["canon ingest sessions --interval-secs -0 --dry-run", "canon ingest sessions --interval-secs +0 --dry-run"] {
+    for line in ["canon ingest records --interval-secs -0 --dry-run", "canon ingest records --interval-secs +0 --dry-run"] {
         let outcome = empty(line, Some("implementer"));
         assert_ne!(outcome.code.as_deref(), Some("USAGE"), "{line}: {outcome:?}");
     }
@@ -829,7 +829,6 @@ fn atip_constraints_26_a_stateless_fault_in_a_later_element_beats_the_first_elem
         ("export", r#"[{"kind":"change"},{"kind":"change","after":"2026-02-01","before":"2026-01-02"}]"#, "USAGE", "/1/after"),
         ("artifacts store", r#"[{},{"maxArtifactMib":0}]"#, "USAGE", "/1/maxArtifactMib"),
         ("ingest records", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/1/intervalSecs"),
-        ("ingest sessions", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/1/intervalSecs"),
     ] {
         let outcome = empty(&format!("canon {command} --input '{items}'"), None);
         assert_refused(&outcome, code, field);

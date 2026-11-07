@@ -3,7 +3,7 @@ name = "canon-ingest"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "session ingest adapter registry: raw agent-CLI transcripts -> UnifiedRow -> canon-model Session/Run/Event (S3)."
+description = "plan-dialect and artifact adapters, brief and markdown readers behind canon ingest plans / ingest records."
 
 [lib]
 name = "canon_ingest"
@@ -19,10 +19,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_yaml = "0.9"
 sha2.workspace = true
-simd-json = "0.14"
-ulid = "1.2.1"
 thiserror.workspace = true
-rusqlite = { version = "0.32", features = ["bundled"] }
 walkdir = "2"
 
 [dev-dependencies]

@@ -447,7 +447,6 @@ current step needs.
 | `canon-gate` | Evidence, gates, task checkboxes, hooks. |
 | `canon-review` | Findings and reviews. |
 | `canon-artifact-ingest` | `canon ingest records`: artifacts into verdict trajectories. |
-| `canon-session-ingest` | `canon ingest sessions`: agent transcripts into session records. |
 | `canon-plan-import` | `canon ingest plans`: plan state into change and task records. |
 | `canon-storage` | Storage rungs, tiers, retention, export, purge. |
 | `canon-policy` | The policy and the CEL expressions behind it. |

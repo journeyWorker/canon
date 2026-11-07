@@ -99,7 +99,7 @@ fn accept_json_on_groups(node: clap::Command) -> clap::Command {
     about = "Specs, evidence gates, and agent memory for your repo",
     long_about = "canon keeps a repo's specs, review evidence, and agent strategy \
 memory in one place: author .feature specs, task done completion on real evidence, \
-ingest agent sessions, and retrieve role-scoped guidance.",
+ingest plans and records, and retrieve role-scoped guidance.",
     arg_required_else_help = true,
     propagate_version = true,
     after_help = "\
@@ -248,8 +248,8 @@ pub enum Command {
         action: DivergenceCliCommand,
     },
     // ── Ingest & memory ──
-    /// Import agent sessions, records, and plans into canon's store
-    #[command(after_help = "Examples:\n  canon ingest sessions --watch\n  canon ingest records\n  canon ingest plans")]
+    /// Import records and plans into canon's store
+    #[command(after_help = "Examples:\n  canon ingest records\n  canon ingest plans")]
     Ingest {
         #[command(subcommand)]
         action: IngestCommand,

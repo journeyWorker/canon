@@ -15,11 +15,9 @@ import re
 import sys
 from pathlib import Path
 
-# Files that may start git. The path itself, and the session-ingest code that the 0.39 ingest removal deletes
-# (its git calls are out of scope of the one-path change).
+# Files that may start git: the one path itself.
 ALLOWED = {
     "crates/canon-store/src/git.rs",
-    "crates/canon-cli/src/ingest.rs",
 }
 
 # `Command::new(` (also `std::process::Command::new(`, `tokio::process::Command::new(`), optionally `OsStr::new(`,

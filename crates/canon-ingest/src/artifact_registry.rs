@@ -1,7 +1,6 @@
 //! The static `ArtifactAdapter` registry seam (S4 FOUNDATION wave) —
-//! mirrors [`crate::registry`]'s `SessionAdapter` registry shape (a
-//! static, declaration-ordered table; no dynamic plugin loading, S3
-//! design D1) over [`crate::artifact_adapter::ArtifactAdapter`] instead.
+//! a static, declaration-ordered table (no dynamic plugin loading) over
+//! [`crate::artifact_adapter::ArtifactAdapter`].
 //!
 //! FOUNDATION shipped this registry EMPTY; wave-2 appends four entries
 //! — `ledger`, `divergence`, `handoff`, `openspec-task` (S4 tasks
@@ -89,8 +88,7 @@ impl ArtifactAdapterEntry {
     }
 }
 
-/// The static registry, in declaration order (mirrors
-/// `crate::registry::registry`'s "deterministic order, never
+/// The static registry, in declaration order ("deterministic order, never
 /// `HashMap`-iteration-order dependent"). FOUNDATION shipped zero
 /// entries; wave-2 appended `ledger`/`divergence`/`handoff`/
 /// `openspec-task`, each tagged with its `ArtifactSourceKind`
@@ -138,9 +136,8 @@ pub enum ArtifactDispatchOutcome {
     UnsupportedSource { adapter_id: &'static str, reason: &'static str },
 }
 
-/// One adapter's full resolve+parse pass — mirrors
-/// `crate::registry::scan_and_parse`'s shape over the artifact-adapter
-/// trait, generalized to also cover a `Records`-kind adapter's
+/// One adapter's full resolve+parse pass over the artifact-adapter
+/// trait, also covering a `Records`-kind adapter's
 /// contractual absence from this config-driven scan path (P1,
 /// `ReviewS4Full`). A `Path`-kind entry resolves+parses exactly as
 /// before, `Parsed(ArtifactParseOutcome::empty())` when `resolve_source`

@@ -34,7 +34,7 @@ pub use atomic::write_atomic;
 
 /// Per-source ingest watermark cursors (S3 §3, [`cursor::CursorStore`] /
 /// [`cursor::SourceCursor`]) — canon-store owns the cursor type + atomic
-/// IO; `canon-cli`'s `canon ingest sessions` drives read/gate/advance.
+/// IO; `canon-cli`'s `canon ingest plans` drives read/gate/advance.
 pub use cursor::{CursorDiff, CursorStore, FileSeen, SourceCursor};
 
 /// The generic last-wins-by-`(at, schema, digest)` fold (design D11, s21

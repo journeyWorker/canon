@@ -28,9 +28,8 @@
 //! `Run` through `canon_store::registry::TierRegistry` — the one write
 //! path every other record uses — reached through
 //! [`crate::tiers::build_lenient_tiers_for_kinds`] and
-//! [`crate::ingest::persist_idempotent`], the exact machinery `canon
-//! ingest sessions` writes its own `Run`s with, never a second write
-//! convention for one kind. [`persist_run`] holds that whole contract:
+//! [`crate::tiers::persist_idempotent`], the one write convention for
+//! the `Run` kind. [`persist_run`] holds that whole contract:
 //! which rung, what a re-write at one `run_id` does there, and why an
 //! unreachable rung degrades instead of failing the dispatch.
 //!
@@ -413,10 +412,7 @@ impl TierPersist {
 /// Persist `run` through the SAME `TierRegistry` write path every
 /// other canon record uses (s42 task 1.1): `crate::tiers::
 /// build_lenient_tiers_for_kinds` for the rung `run` routes to, then
-/// [`crate::ingest::persist_idempotent`] — literally the helper
-/// `canon ingest sessions` persists its own `Run`s with, so a
-/// dispatched run and an ingested run cannot drift into two write
-/// conventions for one kind.
+/// [`crate::tiers::persist_idempotent`].
 ///
 /// # What a re-write at one `run_id` does, per backend
 /// `Run`'s partition natural key IS its `run_id`
@@ -453,7 +449,7 @@ impl TierPersist {
 /// Returns [`TierPersist::Degraded`] — never an `Err` — for an
 /// unroutable kind, an unreachable rung, and an unreadable or
 /// malformed `canon.yaml` alike. The last one is a deliberate
-/// departure from `crate::ingest`, where a malformed `canon.yaml`
+/// departure from the `canon ingest` commands, where a malformed `canon.yaml`
 /// fails the command loud: there, the tier write IS the output, so
 /// writing nothing must be loud. Here the manifest — already written,
 /// carrying every field this record has — is the primary artifact and
@@ -481,7 +477,7 @@ pub fn persist_run(repo: &Path, run: &Run) -> TierPersist {
     };
     let configured_reason = loaded.policy.tier_for(RecordKind::Run).ok().and_then(|rung| loaded.unavailable_reasons.get(&rung).cloned());
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
-    match crate::ingest::persist_idempotent(&registry, run) {
+    match crate::tiers::persist_idempotent(&registry, run) {
         Ok(()) => TierPersist::Persisted,
         Err(err) => TierPersist::Degraded {
             reason: match configured_reason {
@@ -1015,9 +1011,8 @@ pub fn parse_run_id(s: &str) -> Result<RunId, canon_model::ids::JoinKeyError> {
 
 /// `canon dispatch end --status`'s clap `value_parser`. The domain is
 /// exactly the two TERMINAL outcomes a dispatcher can report about its
-/// own run: `pending`/`running` are not terminal, and `aborted` is an
-/// ingest-time classification of a transcript that stopped, not
-/// something a closing dispatcher observes about itself.
+/// own run: `pending`/`running` are not terminal, and `aborted` is
+/// not something a closing dispatcher observes about itself.
 pub fn run_status_parser() -> impl clap::builder::TypedValueParser<Value = RunStatus> {
     crate::cli_error::closed_set(["succeeded", "failed"], parse_run_status)
 }
@@ -1225,9 +1220,7 @@ fn close_version_at(recorded: DateTime<Utc>, observed: DateTime<Utc>) -> DateTim
 /// through the SAME atomic write [`begin`] used to create it (s40),
 /// and re-persist the closed `Run` through the SAME [`persist_run`]
 /// path `begin` used (s42 task 1.2). Before s40, `begin` minted
-/// `RunStatus::Running` and nothing in the CLI ever closed it — only
-/// session ingest, reconstructing a finished transcript post hoc, ever
-/// wrote a terminal status — so every dispatched run stayed `Running`
+/// `RunStatus::Running` and nothing in the CLI ever closed it, so every dispatched run stayed `Running`
 /// forever and the flywheel funnel's last stage had nothing to compute
 /// from.
 ///
@@ -1670,9 +1663,8 @@ fn declared_edges(tasks: &[Value]) -> BTreeSet<TaskEdge> {
 /// A run missing EITHER field contributes no edge as a child — which,
 /// on this repo today, is every one of its 5079 ingested runs
 /// (`task_id` on 0 of them). That is a legitimately EMPTY observed
-/// side and a normal zero-edge report, never an error: session ingest
-/// reconstructs a run from a transcript that cannot know a plan task,
-/// and only `canon dispatch begin --task` binds one. A run missing
+/// side and a normal zero-edge report, never an error: only
+/// `canon dispatch begin --task` binds a plan task to a run. A run missing
 /// only `parent_run_id` is still usable as a PARENT — a root dispatch
 /// bound to a task is exactly the far end of the first edge.
 ///
@@ -1908,7 +1900,7 @@ fn reconcile_runs(tier: Vec<Value>, manifests: Vec<Value>, notes: &mut Vec<crate
             if let Some(incumbent) = by_run.get(&run_id) {
                 if incumbent.record != record {
                     divergences.push(format!(
-                        "run `{run_id}` differs between its {} copy (used) and its {source} copy (ignored) on: {} — the two sources are out of sync; re-run `canon dispatch end` (or `canon ingest sessions`) to bring them back together",
+                        "run `{run_id}` differs between its {} copy (used) and its {source} copy (ignored) on: {} — the two sources are out of sync; re-run `canon dispatch end` to bring them back together",
                         incumbent.source,
                         describe_divergence(&incumbent.record, &record)
                     ));
@@ -3381,6 +3373,23 @@ mod tier_tests {
         let round_tripped: Run = serde_json::from_str(&manifest).expect("the manifest deserializes as a Run");
         assert_eq!(round_tripped.envelope.at, ended.run.envelope.at, "RFC3339 `AutoSi` keeps all nine fractional digits");
         assert_eq!(round_tripped.ended_at, Some(ended_at));
+    }
+
+    /// `persist_idempotent` (moved to `crate::tiers` with the removal of
+    /// `canon ingest sessions`): writing a Run the tier already holds,
+    /// byte for byte, is not an error; the same run id with other content
+    /// is a new version the fold ranks, never a silent overwrite.
+    #[test]
+    fn rewriting_the_same_run_is_not_an_error_and_other_content_is_a_new_version() {
+        let tmp = repo_with_git_routed_runs();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
+        assert_eq!(persist_run(tmp.path(), &begun.run), TierPersist::Persisted, "a byte-identical re-write is a no-op, not an error");
+        assert_eq!(queried_runs(tmp.path()).len(), 1, "no second row");
+        let mut other = begun.run.clone();
+        other.envelope.actor.model = Some("another-model".into());
+        assert_eq!(persist_run(tmp.path(), &other), TierPersist::Persisted);
+        let rows = queried_runs(tmp.path());
+        assert_eq!(rows.len(), 1, "one run_id resolves to one row: {rows:?}");
     }
 
     /// [`close_version_at`]'s whole contract, including the two

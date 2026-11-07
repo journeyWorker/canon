@@ -208,30 +208,6 @@
       "gate": {"evidence_path": ".canon/evidence/gate.json", "required_keys": ["status", "checks", "evidence"]}
     },
     {
-      "id": "privacy-secret-redaction-17",
-      "category": "privacy",
-      "instructions": "Detect and redact a credential in an opt-in directive capture before durable evidence is written. Do not use redacted=true as a synonym for truncation, and preserve bounded Unicode handling.",
-      "setup_seed": {"files": [{"path": "transcript.txt", "content": "user: token=ghp_example_secret_should_not_persist\n"}]},
-      "expected_contract": {"checks": [{"name": "ingest-tests", "kind": "command", "command": ["cargo", "test", "-p", "canon-ingest"], "exit_code": 0}]},
-      "allowed_diff_paths": ["crates/canon-ingest/src/normalize.rs", "crates/canon-ingest/src/adapter.rs", "crates/canon-ingest/tests/**"],
-      "forbidden_side_effects": {"paths": ["Cargo.lock", ".github/**", "target/**", ".env*", "*.key", "*.pem"]},
-      "grader": {"command": ["cargo", "test", "-p", "canon-ingest"], "exit_code": 0, "output_schema": {"type": "text"}},
-      "required_evidence": [{"path": ".canon/evidence/privacy-secret.json", "format": "json", "required_keys": ["status", "classification", "redacted", "commands"]}],
-      "gate": {"evidence_path": ".canon/evidence/gate.json", "required_keys": ["status", "checks", "evidence"]}
-    },
-    {
-      "id": "privacy-pii-boundary-18",
-      "category": "privacy",
-      "instructions": "Bound and classify a captured directive containing PII. Disabled capture must omit it; enabled capture must not leak the original value through metadata, errors, or evidence output.",
-      "setup_seed": {"files": [{"path": "transcript.txt", "content": "user: email alice@example.invalid phone 555-0100\n"}]},
-      "expected_contract": {"checks": [{"name": "privacy-tests", "kind": "command", "command": ["cargo", "test", "-p", "canon-ingest"], "exit_code": 0}]},
-      "allowed_diff_paths": ["crates/canon-ingest/src/normalize.rs", "crates/canon-ingest/tests/**"],
-      "forbidden_side_effects": {"paths": ["Cargo.lock", ".github/**", "target/**", "*.log"]},
-      "grader": {"command": ["cargo", "test", "-p", "canon-ingest"], "exit_code": 0, "output_schema": {"type": "text"}},
-      "required_evidence": [{"path": ".canon/evidence/privacy-pii.json", "format": "json", "required_keys": ["status", "classification", "capture_mode", "commands"]}],
-      "gate": {"evidence_path": ".canon/evidence/gate.json", "required_keys": ["status", "checks", "evidence"]}
-    },
-    {
       "id": "artifact-evidence-provenance-19",
       "category": "evidence",
       "instructions": "Normalize an imported review artifact with source digest, commit, author, and bounded evidence text. Reject malformed provenance as a violation, not a panic or fabricated record.",
@@ -385,18 +361,6 @@
       "forbidden_side_effects": {"paths": ["Cargo.lock", ".github/**", "target/**"]},
       "grader": {"command": ["cargo", "test", "-p", "canon-learn"], "exit_code": 0, "output_schema": {"type": "text"}},
       "required_evidence": [{"path": ".canon/evidence/learning-quarantine.json", "format": "json", "required_keys": ["status", "decision", "trajectory_ids", "commands"]}],
-      "gate": {"evidence_path": ".canon/evidence/gate.json", "required_keys": ["status", "checks", "evidence"]}
-    },
-    {
-      "id": "session-deterministic-normalize-32",
-      "category": "ingest-determinism",
-      "instructions": "Ensure repeated session normalization is byte-identical across adapter rows, including deterministic run IDs and event ordering. Deduplicate only according to adapter-scoped keys.",
-      "setup_seed": {"files": [{"path": "session.jsonl", "content": "{\"session_id\":\"s1\",\"client\":\"codex\"}\n"}]},
-      "expected_contract": {"checks": [{"name": "normalize-tests", "kind": "command", "command": ["cargo", "test", "-p", "canon-ingest"], "exit_code": 0}]},
-      "allowed_diff_paths": ["crates/canon-ingest/src/normalize.rs", "crates/canon-ingest/src/adapters/**", "crates/canon-ingest/tests/**"],
-      "forbidden_side_effects": {"paths": ["Cargo.lock", ".github/**", "target/**"]},
-      "grader": {"command": ["cargo", "test", "-p", "canon-ingest"], "exit_code": 0, "output_schema": {"type": "text"}},
-      "required_evidence": [{"path": ".canon/evidence/session-determinism.json", "format": "json", "required_keys": ["status", "first_digest", "second_digest", "commands"]}],
       "gate": {"evidence_path": ".canon/evidence/gate.json", "required_keys": ["status", "checks", "evidence"]}
     },
     {

@@ -94,7 +94,6 @@ pub fn path(cmd: &Command) -> &'static str {
             DivergenceCliCommand::List(_) => "divergence list",
         },
         Command::Ingest { action } => match action {
-            IngestCommand::Sessions(_) => "ingest sessions",
             IngestCommand::Records(_) => "ingest records",
             IngestCommand::Plans(_) => "ingest plans",
         },

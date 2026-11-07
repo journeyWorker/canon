@@ -179,23 +179,14 @@ is attributed, and is fresh — never on a self-report. See
    bunx @journeykit/canon inventory sync   # materialize the scenario ledger index
    ```
 
-4. **Ingest agent sessions.** Fold transcripts from Claude Code, Codex, and
-   other registered agent CLIs into tiered storage — incrementally, via a
-   per-source watermark:
-
-   ```bash
-   bunx @journeykit/canon ingest sessions
-   bunx @journeykit/canon ingest sessions --watch   # keep polling
-   ```
-
-5. **Gate your work.** The trust spine checks coverage, the verdict ledger,
+4. **Gate your work.** The trust spine checks coverage, the verdict ledger,
    and staleness — completion is evidence-gated, never self-reported:
 
    ```bash
    bunx @journeykit/canon gate check
    ```
 
-6. **Read the room.** Generate the repo status report (generated, never
+5. **Read the room.** Generate the repo status report (generated, never
    edited) or open the local dashboard:
 
    ```bash

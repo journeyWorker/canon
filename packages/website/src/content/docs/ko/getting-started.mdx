@@ -201,16 +201,7 @@ canon의 모든 명령은 명세 하나(`docs/cli/canon.cli.json`)에서 생성�
    bunx @journeykit/canon inventory sync  # 시나리오 레저 인덱스를 구체화
    ```
 
-4. **에이전트 세션 적재.** Claude Code, Codex 등 등록된 에이전트
-   CLI의 트랜스크립트를 티어드 스토리지로 접어 넣습니다 — 소스별
-   워터마크를 통해 증분(incremental) 방식으로:
-
-   ```bash
-   bunx @journeykit/canon ingest sessions
-   bunx @journeykit/canon ingest sessions --watch   # 계속 폴링
-   ```
-
-5. **evidence 기록과 작업 게이트 통과.** 시나리오마다 evidence를 남기고(리뷰는
+4. **evidence 기록과 작업 게이트 통과.** 시나리오마다 evidence를 남기고(리뷰는
    독립된 reviewer가 `review scenario`로) gate를 실행합니다. 트러스트
    스파인이 coverage, verdict ledger, staleness를 검사합니다 — 완료는 절대
    자가 보고되지 않고 항상 증거로 게이트됩니다. 기록은 `--rev`(기본 `HEAD`)에
@@ -225,7 +216,7 @@ canon의 모든 명령은 명세 하나(`docs/cli/canon.cli.json`)에서 생성�
    각 쓰기의 출력 끝에 `next:` 줄(`--json`이면 `meta.next`)이 다음 명령을 알려
    줍니다.
 
-6. **현재 상황 읽기.** 레포 상태 리포트를 생성하거나(생성된
+5. **현재 상황 읽기.** 레포 상태 리포트를 생성하거나(생성된
    파일이며 절대 손으로 편집하지 않음) 로컬 대시보드를 엽니다:
 
    ```bash

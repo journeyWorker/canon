@@ -138,7 +138,6 @@ pub const META: &[CommandMeta] = &[
     row("task done", Write, &[I]),
     row("ingest records", Write, &[O]),
     row("ingest plans", Write, &[O]),
-    row("ingest sessions", Write, &[O]),
     row("init", Write, &[O]).note("--check writes nothing"),
     row("inventory sync", Write, &[I, O]),
     row("strategy approval-payload", Read, &[O]),
