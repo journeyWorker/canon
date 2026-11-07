@@ -302,7 +302,7 @@ impl DispatchError {
             | Self::ManifestUnavailable { .. }
             | Self::ContextPack(ContextPackError::UnsafePath(_)
                 | ContextPackError::MissingInput(_)
-                | ContextPackError::SecretDetected(_)
+                | ContextPackError::SecretDetected { .. }
                 | ContextPackError::PromptBundle { .. }) => true,
             Self::ContextPack(_) => false,
             // A concurrent close and a filesystem failure are both

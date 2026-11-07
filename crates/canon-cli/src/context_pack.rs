@@ -10,6 +10,7 @@ use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 
 use canon_model::records::StrategyRef;
+use canon_model::secret_scan;
 use canon_store::git::GitCall;
 use canon_store::write_atomic;
 use schemars::JsonSchema;
@@ -35,8 +36,8 @@ pub enum ContextPackError {
     InvalidManifestVersion(u32),
     #[error("selected context input is missing: {0}")]
     MissingInput(String),
-    #[error("selected context input contains plaintext secret material: {0}")]
-    SecretDetected(String),
+    #[error("selected context input contains plaintext secret material: {label} (line {line}, {rule})")]
+    SecretDetected { label: String, line: usize, rule: &'static str },
     #[error("immutable context object {digest} already contains different bytes")]
     ObjectConflict { digest: String },
     #[error("context pack `{0}` is missing")]
@@ -61,7 +62,7 @@ impl ContextPackError {
             Self::UnsafePath(_) => CliError::refused("CONTEXT_PATH_INVALID", self.to_string()).hint("use a repository-relative path that stays inside the repository (no `..`, no absolute path)"),
             Self::InvalidManifestVersion(_) => CliError::refused("CONTEXT_MANIFEST_INVALID", self.to_string()).hint("set `manifestVersion` in the manifest to the version the message names, then run `canon context-pack add` again"),
             Self::MissingInput(_) => CliError::refused("CONTEXT_INPUT_NOT_FOUND", self.to_string()).hint("create the missing file or remove it from the manifest, then run `canon context-pack add` again"),
-            Self::SecretDetected(_) => CliError::refused("CONTEXT_INPUT_INVALID", self.to_string()).reason("SECRET").hint("remove the secret from the input, or drop the file from the manifest; canon never stores a detected secret"),
+            Self::SecretDetected { .. } => CliError::refused("CONTEXT_INPUT_INVALID", self.to_string()).reason("SECRET").hint("remove the secret from the input, or drop the file from the manifest; canon never stores a detected secret"),
             Self::MissingPack(_) => CliError::refused("CONTEXT_PACK_NOT_FOUND", self.to_string()).hint("check the pack id (sha256:<64 hex digits>), or create the pack with `canon context-pack add --manifest <file>`"),
             Self::PromptBundle { .. } => CliError::refused("PROMPT_BUNDLE_INVALID", self.to_string()).hint("fix the bundle name, version or manifest (`canon schema prompt add` lists them), then run `canon prompt add` again"),
             Self::Serialize(_) => CliError::refused("SERIALIZE_FAILED", self.to_string()).hint("this is a canon bug: report it together with the command line that produced it"),
@@ -340,7 +341,11 @@ pub fn create(repo: &Path, spec: &ContextPackSpec) -> Result<ContextPack, Contex
         injected_guidance: spec.injected_guidance.clone(),
         non_replayable: false,
     };
-    scan_sensitive_json(&pack.injected_guidance, "injected guidance")?;
+    for strategy in &pack.injected_guidance {
+        let label = format!("injected guidance {}", strategy.strategy_id);
+        scan_sensitive_text(&strategy.title, &label)?;
+        scan_sensitive_text(&strategy.content, &label)?;
+    }
     let unsigned = serde_json::to_vec(&pack).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
     pack.id = digest(&unsigned);
     let manifest = serde_json::to_vec_pretty(&pack).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
@@ -470,7 +475,7 @@ fn capture_prompts(repo: &Path, spec: &ContextPackSpec) -> Result<PromptSnapshot
 fn capture_file(repo: &Path, relative: &Path) -> Result<FileSnapshot, ContextPackError> {
     let path = safe_path(repo, relative)?;
     let bytes = std::fs::read(&path).map_err(|e| io(&path, e))?;
-    scan_sensitive_bytes(&bytes, relative.to_string_lossy().as_ref())?;
+    scan_sensitive_text(&String::from_utf8_lossy(&bytes), relative.to_string_lossy().as_ref())?;
     let file_digest = digest(&bytes);
     let object = StoredContent { digest: file_digest.clone(), bytes };
     let object_bytes = serde_json::to_vec(&object).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
@@ -525,12 +530,15 @@ fn ensure_registry(repo: &Path) -> Result<(), ContextPackError> {
 }
 
 
+/// The `git status` entries that are not the pack stores' own files, each followed by one NUL. An empty entry (what splitting empty output, or the
+/// output's last NUL, leaves) is no entry: a clean repository has no entries at all.
 fn filter_registry_status(status: &[u8]) -> Vec<u8> {
     status
         .split(|byte| *byte == 0)
         .filter(|entry| {
             let text = String::from_utf8_lossy(entry);
-            !text.contains(".canon/context-packs/")
+            !entry.is_empty()
+                && !text.contains(".canon/context-packs/")
                 && !text.contains(".canon/prompts/")
                 && !text.contains(".canon/dispatch/")
         })
@@ -543,11 +551,16 @@ fn repo_identity(repo: &Path) -> Result<RepoIdentity, ContextPackError> {
     let diff = git_bytes(repo, &["diff", "--no-ext-diff", "--binary", "HEAD"])?;
     let status = filter_registry_status(&git_bytes(repo, &["status", "--porcelain=v1", "-z"])?);
     let dirty = !diff.is_empty() || !status.is_empty();
-    let mut state = Vec::with_capacity(diff.len() + status.len() + 1);
-    state.extend_from_slice(&diff);
-    state.push(0);
-    state.extend_from_slice(&status);
-    Ok(RepoIdentity { commit, dirty, state_digest: if state.len() == 1 && diff.is_empty() && status.is_empty() { digest(b"clean") } else { digest(&state) } })
+    let state_digest = if dirty {
+        let mut state = Vec::with_capacity(diff.len() + status.len() + 1);
+        state.extend_from_slice(&diff);
+        state.push(0);
+        state.extend_from_slice(&status);
+        digest(&state)
+    } else {
+        digest(b"clean")
+    };
+    Ok(RepoIdentity { commit, dirty, state_digest })
 }
 
 /// A git answer that is a line of text. A call git answered with an exit status is `None` (or an error when
@@ -663,18 +676,12 @@ fn validate_label(value: &str) -> Result<(), ContextPackError> {
     Ok(())
 }
 
-fn scan_sensitive_json<T: Serialize>(value: &T, label: &str) -> Result<(), ContextPackError> {
-    let bytes = serde_json::to_vec(value).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
-    scan_sensitive_bytes(&bytes, label)
-}
-
-fn scan_sensitive_bytes(bytes: &[u8], label: &str) -> Result<(), ContextPackError> {
-    let text = String::from_utf8_lossy(bytes).to_ascii_lowercase();
-    let markers = ["-----begin ", "akia", "ghp_", "github_pat_", "sk-", "api_key=", "apikey=", "access_token=", "secret_key="];
-    if markers.iter().any(|marker| text.contains(marker)) {
-        return Err(ContextPackError::SecretDetected(label.to_string()));
+/// Refuses `text` when the shared scanner finds secret material in it, naming `label`, the line and the rule (never the value).
+fn scan_sensitive_text(text: &str, label: &str) -> Result<(), ContextPackError> {
+    match secret_scan::scan(text).first() {
+        Some(span) => Err(ContextPackError::SecretDetected { label: label.to_string(), line: secret_scan::line_of(text, span.start), rule: span.kind.rule_name() }),
+        None => Ok(()),
     }
-    Ok(())
 }
 
 /// `canon context-pack verify --json`'s `data`.
@@ -756,6 +763,136 @@ mod tests {
         let dir = fixture();
         fs::write(dir.path().join("secret.txt"), b"api_key=do-not-store\n").unwrap();
         let spec = ContextPackSpec { selected_docs: vec![PathBuf::from("secret.txt")], ..Default::default() };
-        assert!(matches!(create(dir.path(), &spec), Err(ContextPackError::SecretDetected(_))));
+        assert!(matches!(create(dir.path(), &spec), Err(ContextPackError::SecretDetected { .. })));
+    }
+
+    #[test]
+    fn a_secret_refusal_names_the_file_the_line_and_the_rule_and_stores_nothing() {
+        let dir = fixture();
+        fs::write(dir.path().join("secret.txt"), b"one\ntwo\nkey AKIAIOSFODNN7EXAMPLE\n").unwrap();
+        let spec = ContextPackSpec { selected_docs: vec![PathBuf::from("secret.txt")], ..Default::default() };
+        let message = create(dir.path(), &spec).unwrap_err().to_string();
+        assert_eq!(message, "selected context input contains plaintext secret material: secret.txt (line 3, aws-access-key-id)");
+        assert!(!message.contains("AKIA"), "the message does not carry the value");
+        assert!(!dir.path().join(CONTEXT_PACK_DIR).exists(), "a refusal stores nothing");
+    }
+
+    /// F3: a text is judged the same whether a file holds it or an injected guidance does (each as written, not as its JSON).
+    #[test]
+    fn a_text_gets_the_same_verdict_as_a_file_and_as_guidance() {
+        let texts = [
+            "risk-high",
+            "task-list disk-usage mask-all Akiashi",
+            "AKIAIOSFODNN7EXAMPLE",
+            "first\nsecond\napi_key=abcd1234",
+            "{\"api_key\": \"abcd1234efgh\"}",
+            "{\"api_key\": \"short\"}",
+            "api_key = 'abcd1234'",
+            "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----",
+        ];
+        for text in texts {
+            let dir = fixture();
+            fs::write(dir.path().join("doc.md"), text).unwrap();
+            let as_file = create(dir.path(), &ContextPackSpec { selected_docs: vec![PathBuf::from("doc.md")], ..Default::default() });
+            let guidance = ContextPackSpec { injected_guidance: vec![StrategyRef::new("s-1", "plain title", text)], ..Default::default() };
+            let as_guidance = create(dir.path(), &guidance);
+            match (as_file, as_guidance) {
+                (Ok(_), Ok(_)) => {}
+                (Err(file), Err(guidance)) => {
+                    assert!(matches!(file, ContextPackError::SecretDetected { .. }), "{text:?}");
+                    assert_eq!(file.to_string().replace("doc.md", "injected guidance s-1"), guidance.to_string(), "{text:?}");
+                }
+                (file, guidance) => panic!("{text:?}: a file says {:?}, guidance says {:?}", file.is_ok(), guidance.is_ok()),
+            }
+        }
+    }
+
+    #[test]
+    fn a_guidance_title_is_scanned_and_the_refusal_names_the_strategy() {
+        let dir = fixture();
+        let guidance = ContextPackSpec { injected_guidance: vec![StrategyRef::new("s-9", "token\nsk-proj-abcdEFGH_ijkl-mnop1234", "plain")], ..Default::default() };
+        let message = create(dir.path(), &guidance).unwrap_err().to_string();
+        assert_eq!(message, "selected context input contains plaintext secret material: injected guidance s-9 (line 2, api-secret-key)");
+        assert!(!dir.path().join(CONTEXT_PACK_DIR).exists());
+    }
+
+    fn git(dir: &Path, args: &[&str]) -> Vec<u8> {
+        let out = Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        out.stdout
+    }
+
+    /// A git repository whose one commit holds the fixture (`.canon/policy.yaml`).
+    fn committed_fixture() -> tempfile::TempDir {
+        let dir = fixture();
+        git(dir.path(), &["init", "-q", "-b", "main"]);
+        git(dir.path(), &["add", "."]);
+        git(dir.path(), &["commit", "-q", "-m", "x"]);
+        dir
+    }
+
+    #[test]
+    fn the_status_entries_of_the_pack_stores_and_the_empty_ones_are_dropped() {
+        assert_eq!(filter_registry_status(b""), b"");
+        assert_eq!(filter_registry_status(b"\0"), b"");
+        assert_eq!(filter_registry_status(b"?? a\0"), b"?? a\0");
+        assert_eq!(filter_registry_status(b"?? .canon/context-packs/\0?? a\0 M b\0?? .canon/dispatch/r.json\0?? .canon/prompts/\0"), b"?? a\0 M b\0");
+    }
+
+    /// F5: a clean repository's pack is not dirty and carries the digest of "clean", also when an earlier pack left files in the pack store.
+    #[test]
+    fn a_clean_repository_is_not_dirty_and_a_pack_it_left_does_not_dirty_it() {
+        let dir = committed_fixture();
+        let first = create(dir.path(), &ContextPackSpec::default()).unwrap();
+        assert!(first.repo.commit.is_some());
+        assert!(!first.repo.dirty);
+        assert_eq!(first.repo.state_digest, digest(b"clean"));
+        assert!(dir.path().join(CONTEXT_PACK_DIR).exists(), "the first pack left its files under the pack store");
+        let second = create(dir.path(), &ContextPackSpec::default()).unwrap();
+        assert_eq!(second.repo, first.repo, "the files the first pack left do not make the repository dirty");
+        assert_eq!(second.id, first.id);
+        assert_eq!(show(dir.path(), &first.id).unwrap(), first, "a stored pack answers as it did");
+        verify(dir.path(), &first.id).unwrap();
+    }
+
+    /// F5: a changed tracked file or an untracked file outside the pack stores is dirty, and the digest is the diff, a NUL and each status entry with one NUL.
+    #[test]
+    fn a_change_outside_the_pack_stores_is_dirty_and_each_status_entry_ends_in_one_nul() {
+        let dir = committed_fixture();
+        create(dir.path(), &ContextPackSpec::default()).unwrap();
+        fs::write(dir.path().join("stray.txt"), b"x\n").unwrap();
+        let untracked = create(dir.path(), &ContextPackSpec::default()).unwrap();
+        assert!(untracked.repo.dirty);
+        assert_eq!(untracked.repo.state_digest, digest(b"\0?? stray.txt\0"));
+        fs::remove_file(dir.path().join("stray.txt")).unwrap();
+
+        fs::write(dir.path().join(".canon/policy.yaml"), b"rules: [a]\n").unwrap();
+        let tracked = create(dir.path(), &ContextPackSpec::default()).unwrap();
+        assert!(tracked.repo.dirty);
+        let mut state = git(dir.path(), &["diff", "--no-ext-diff", "--binary", "HEAD"]);
+        assert!(!state.is_empty());
+        state.push(0);
+        state.extend_from_slice(b" M .canon/policy.yaml\0");
+        assert_eq!(tracked.repo.state_digest, digest(&state));
+    }
+
+    /// F5: no git repository and no commit are read as no change, as before.
+    #[test]
+    fn no_repository_and_no_commit_are_no_change() {
+        let plain = tempdir().unwrap();
+        let pack = create(plain.path(), &ContextPackSpec::default()).unwrap();
+        assert_eq!((pack.repo.commit, pack.repo.dirty), (None, false));
+        assert_eq!(pack.repo.state_digest, digest(b"clean"));
+
+        let unborn = tempdir().unwrap();
+        git(unborn.path(), &["init", "-q", "-b", "main"]);
+        let pack = create(unborn.path(), &ContextPackSpec::default()).unwrap();
+        assert_eq!((pack.repo.commit, pack.repo.dirty), (None, false));
+        assert_eq!(pack.repo.state_digest, digest(b"clean"));
     }
 }

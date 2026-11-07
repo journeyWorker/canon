@@ -28,6 +28,7 @@ pub mod path_glob;
 pub mod paths;
 pub mod records;
 pub mod schema_export;
+pub mod secret_scan;
 pub mod trust;
 
 pub use envelope::{Actor, CanonRecord, Envelope, RecordKind};
