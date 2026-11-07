@@ -128,11 +128,9 @@ fn stuck_git(dir: &Path, pattern: &str, log: &Path) -> std::ffi::OsString {
     let script = format!("#!/bin/sh\ncase \" $* \" in\n  {pattern})\n    echo \"$*\" >> '{}'\n    sleep 30\n    ;;\nesac\nexec '{}' \"$@\"\n", log.display(), real.display());
     let wrapper = dir.join("git");
     std::fs::write(&wrapper, script).unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
-    }
+    // The wrapper is a `/bin/sh` script: this test is for a unix host.
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
     std::env::join_paths(std::iter::once(dir.to_path_buf()).chain(std::env::split_paths(&original))).unwrap()
 }
 

@@ -368,7 +368,7 @@ fn describe_duration(duration: Duration) -> String {
 }
 
 fn describe_size(bytes: usize) -> String {
-    if bytes % MIB == 0 { format!("{} MiB", bytes / MIB) } else { format!("{bytes} bytes") }
+    if bytes.is_multiple_of(MIB) { format!("{} MiB", bytes / MIB) } else { format!("{bytes} bytes") }
 }
 
 /// The deadline of a one-shot call: [`DEADLINE`]. A debug build reads `CANON_TEST_GIT_DEADLINE_MS` (milliseconds)
