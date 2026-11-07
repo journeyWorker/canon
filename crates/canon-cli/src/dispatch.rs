@@ -3386,7 +3386,7 @@ mod tier_tests {
         assert_eq!(persist_run(tmp.path(), &begun.run), TierPersist::Persisted, "a byte-identical re-write is a no-op, not an error");
         assert_eq!(queried_runs(tmp.path()).len(), 1, "no second row");
         let mut other = begun.run.clone();
-        other.model = Some("another-model".into());
+        other.envelope.actor.model = Some("another-model".into());
         assert_eq!(persist_run(tmp.path(), &other), TierPersist::Persisted);
         let rows = queried_runs(tmp.path());
         assert_eq!(rows.len(), 1, "one run_id resolves to one row: {rows:?}");

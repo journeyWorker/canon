@@ -58,8 +58,7 @@ fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, d
 /// `canon ingest plans [--dialect <id> --plan-source <path>] [--repo <dir>]
 /// [--json]` (s17 P3, extended s18 P2/B1): see `crate::plans`'s
 /// module doc. Prints the human summary (or `--json`'s full structured
-/// outcome), then -- mirroring `run_ingest_sessions`'s own ReviewS3Full
-/// finding-4 fix -- ALWAYS also prints the documented `unwritten`
+/// outcome), then ALWAYS also prints the documented `unwritten`
 /// seam's JSON body when non-empty, regardless of `--json`, so a
 /// routed-but-unreachable tier's candidates are never the one copy of
 /// output silently discarded by a flagless default run.

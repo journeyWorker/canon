@@ -334,6 +334,9 @@ fn atip_schemashape_06_a_value_the_three_options_refuse_is_refused_with_the_code
 // ===========================================================================
 // atip.schemashape.07 - 10 (F4): the roles.
 
+/// The commands of the 0.37.0 tree that later releases removed (0.39: `canon ingest sessions`).
+const REMOVED_SINCE_0_37: [&str; 1] = ["ingest sessions"];
+
 /// The tree of 0.37.0 as that binary printed `x-canon.roles`: `(command, roles)` for each of its 78 commands.
 static ROLES_0_37: LazyLock<BTreeMap<String, Vec<String>>> = LazyLock::new(|| {
     let fixture: Value = serde_json::from_str(&read("crates/canon-cli/tests/atip/roles_0_37.json")).expect("the fixture is JSON");
@@ -396,6 +399,10 @@ fn atip_schemashape_07_a_command_all_four_roles_use_says_all_and_every_other_com
     // Every command of 0.37 has the roles it had: the four names became `all`, the other arrays are as they were.
     assert_eq!(ROLES_0_37.len(), 78);
     for (command, before) in ROLES_0_37.iter() {
+        if REMOVED_SINCE_0_37.contains(&command.as_str()) {
+            assert!(!commands.iter().any(|entry| entry["command"] == command.as_str()), "`{command}` was removed and is not listed");
+            continue;
+        }
         let entry = commands.iter().find(|entry| entry["command"] == command.as_str()).unwrap_or_else(|| panic!("`{command}` is still listed"));
         let now = &entry["x-canon"]["roles"];
         let is_all = ROLES.iter().all(|role| before.iter().any(|name| name == role));
@@ -443,7 +450,7 @@ fn atip_schemashape_08_the_listings_of_a_role_are_the_commands_it_had_and_the_gu
         let by_table: BTreeSet<String> = canon_cli::schema::META.iter().filter(|meta| meta.roles.iter().any(|name| name.as_str() == role)).map(|meta| meta.path.to_string()).collect();
         assert_eq!(by_schema, by_table, "schema --as {role}");
         // What 0.37 listed for the role: every command of that tree whose roles array held the role.
-        let before: BTreeSet<String> = ROLES_0_37.iter().filter(|(_, roles)| roles.iter().any(|name| name == role)).map(|(command, _)| command.clone()).collect();
+        let before: BTreeSet<String> = ROLES_0_37.iter().filter(|(command, roles)| !REMOVED_SINCE_0_37.contains(&command.as_str()) && roles.iter().any(|name| name == role)).map(|(command, _)| command.clone()).collect();
         assert!(before.is_subset(&by_schema), "{role}: a command 0.37 listed is gone: {:?}", before.difference(&by_schema).collect::<Vec<_>>());
         assert!(by_schema.difference(&before).all(|command| !ROLES_0_37.contains_key(command)), "{role}: a command 0.37 did not list for the role is listed: {:?}", by_schema.difference(&before).collect::<Vec<_>>());
         assert!(ALL_ROLES.iter().all(|command| by_schema.contains(*command)), "{role} lists the thirteen commands of all four roles");

@@ -192,7 +192,9 @@ fn an_old_ingest_section_in_canon_yaml_is_not_read() {
         assert_eq!(a.status.code(), b.status.code(), "canon {args:?}");
         let strip = |out: &Output| {
             let mut doc = json_of(out);
-            doc["data"].as_object_mut().map(|data| data.retain(|key, _| key != "generatedAt" && key != "at"));
+            if let Some(data) = doc["data"].as_object_mut() {
+                data.retain(|key, _| key != "generatedAt" && key != "at");
+            }
             doc["data"].clone()
         };
         assert_eq!(strip(&a), strip(&b), "canon {args:?}: the old section changes nothing");

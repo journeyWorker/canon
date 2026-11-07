@@ -539,7 +539,7 @@ fn a_dry_run_refuses_with_the_code_of_the_real_run_and_writes_nothing() {
     }
     let with_dry_run: BTreeSet<&str> = leaves().into_iter().filter(|n| has_option(n, "dry-run")).map(|n| n["command"].as_str().unwrap()).collect();
     assert_eq!(checked, with_dry_run, "every leaf with --dry-run has a recipe");
-    assert!(checked.len() >= 14, "{checked:?}");
+    assert!(checked.len() >= 13, "{checked:?}");
     settle("dry-run", found);
 }
 

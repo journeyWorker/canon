@@ -267,7 +267,7 @@ fn every_writing_leaf_takes_input_and_no_read_leaf_does() {
             assert!(answer["schemas"].get(&report).is_some(), "{report} is published");
         }
     }
-    assert_eq!(writers, 48, "every leaf whose effect is write or destructive");
+    assert_eq!(writers, 47, "every leaf whose effect is write or destructive");
     assert_eq!(write_leaves(dir.path(), home.path()).len(), writers);
 }
 
@@ -285,7 +285,7 @@ fn the_published_input_examples_are_valid_documents() {
         assert!(input.get("batchExample").is_none(), "`{leaf}`");
         seen += 1;
     }
-    assert_eq!(seen, 48);
+    assert_eq!(seen, 47);
 }
 
 // ---------------------------------------------------------------- the example documents equal the flags

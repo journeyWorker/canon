@@ -3,7 +3,6 @@ actor	ACTOR_ID	the actor a record is attributed to
 after	TIMESTAMP	lower time bound, inclusive
 all	-	mode: every record from the cursor on, or every item
 all-scenarios	-	mode: every scenario that has evidence
-all-workspaces	-	mode: every workspace on this machine
 approval	FILE	approval document with the detached signature
 approval-at	TIMESTAMP	when the approval was given
 approval-role	ROLE	role the approval was given in
@@ -50,7 +49,6 @@ full	-	mode: re-hash every blob
 harness	NAME	a harness the canon skill is installed for (repeatable, one per name: init and skills)
 hash	HASH	regime hash segment
 history	-	mode: every version of a record
-home	DIR	home directory sessions are scanned under
 include-sensitive	-	mode: include sensitive records
 input	JSON|FILE|-	the leaf's arguments as one JSON document
 interval-secs	N	seconds between polls
