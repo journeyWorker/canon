@@ -45,6 +45,7 @@ on:
       - "rust-toolchain.toml"
       - ".github/actions/**"
       - "scripts/check_visibility.sh"
+      - "scripts/check_git_boundary.py"
       - ".github/workflows/test.yml"
   pull_request:
     paths:
@@ -62,6 +63,7 @@ on:
       - "rust-toolchain.toml"
       - ".github/actions/**"
       - "scripts/check_visibility.sh"
+      - "scripts/check_git_boundary.py"
       - ".github/workflows/test.yml"
   workflow_dispatch:
 
@@ -171,9 +173,10 @@ jobs:
   # toolchain `rust-toolchain.toml` pins (1.99.1); a floating stable adds lints
   # and would turn a clean tree red with no code change. Bumping the pin
   # re-checks the lint list (the `-D` flags below and `clippy.toml`) in the same
-  # change. Four steps, each fails on its own:
+  # change. Five steps, each fails on its own:
   # everything incl. tests, no `unwrap` in production code, the live-tier test
-  # files (compiled only with `live-pg,live-r2`), and the visibility ban.
+  # files (compiled only with `live-pg,live-r2`), the visibility ban, and the
+  # git boundary (0.39: no git call outside `canon_store::git`).
   clippy:
     name: clippy 1.99.1 and visibility rule
     runs-on: ubuntu-latest
@@ -207,6 +210,9 @@ jobs:
 
       - name: no pub(super) or pub(in ..) in crate sources
         run: scripts/check_visibility.sh
+
+      - name: every git call goes through canon_store::git
+        run: python3 scripts/check_git_boundary.py
 
   # canon claims atip/1 1.5 at L2 (0.37, `canon-0-37-claim-1-5`; 1.4 in 0.36, `canon-0-36-claim-1-4`; L2 since 0.35, `canon-0-35-claim-l2`), and the shared checker holds it to that
   # (approaches/checker.md in https://github.com/journeyWorker/atip). The checker is not canon's since 0.36 (`canon-0-36-atip-dep`): it is built from the atip repo

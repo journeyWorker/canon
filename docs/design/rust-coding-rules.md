@@ -368,3 +368,7 @@ sweep is done.
 Done means the `clippy` job, including the production `unwrap_used` command,
 passes with the configuration above, and the counts in §1, §3, §4 and §5 are
 zero.
+
+## 10. One git path (0.39)
+
+- **Every git call goes through `canon_store::git::GitCall`:** it clears the git environment, pins the configuration, reads names NUL-terminated by the caller's `-z`, and ends within a deadline and an output limit; a `Command::new("git")` in `crates/*/src` anywhere else, `#[cfg(test)]` modules included, is rejected by `scripts/check_git_boundary.py` (`just lint`, the CI `clippy` job); `crates/*/tests` are not scanned.
