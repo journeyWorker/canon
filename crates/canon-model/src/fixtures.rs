@@ -33,9 +33,7 @@ fn round_trip_well_formed(kind: RecordKind, json: &serde_json::Value) {
         RecordKind::Change => check!(Change),
         RecordKind::Task => check!(Task),
         RecordKind::Scenario => check!(Scenario),
-        RecordKind::Session => check!(Session),
         RecordKind::Run => check!(Run),
-        RecordKind::Event => check!(Event),
         RecordKind::Handoff => check!(Handoff),
         RecordKind::Review => check!(Review),
         RecordKind::Divergence => check!(Divergence),
@@ -49,7 +47,7 @@ fn round_trip_well_formed(kind: RecordKind, json: &serde_json::Value) {
 
 /// Validate one malformed fixture, dispatching to whichever
 /// `canon-model` validation entry point that fixture actually exercises
-/// (there is deliberately no single "validate any of the fourteen kinds"
+/// (there is deliberately no single "validate any of the twelve kinds"
 /// function — `validate_evidence` is `EvidenceRecord`-scoped per its own
 /// spec, and a state-transition/template-registry violation isn't an
 /// evidence-shape problem at all). Returns the produced [`FailureClass`].
@@ -84,7 +82,7 @@ fn round_trip_all() {
     let well_formed_dir = fixtures_dir().join("well-formed");
     let mut seen_kinds = std::collections::HashSet::new();
     let entries: Vec<_> = std::fs::read_dir(&well_formed_dir).unwrap().map(|e| e.unwrap()).collect();
-    assert_eq!(entries.len(), 14, "expected exactly one well-formed fixture per record kind");
+    assert_eq!(entries.len(), 12, "expected exactly one well-formed fixture per record kind");
 
     for entry in entries {
         let text = std::fs::read_to_string(entry.path()).unwrap();
@@ -93,7 +91,7 @@ fn round_trip_all() {
         let kind = RecordKind::ALL
             .into_iter()
             .find(|k| k.as_str() == kind_str)
-            .unwrap_or_else(|| panic!("{:?} fixture's kind `{kind_str}` is not one of the fourteen closed kinds", entry.path()));
+            .unwrap_or_else(|| panic!("{:?} fixture's kind `{kind_str}` is not one of the twelve closed kinds", entry.path()));
         assert!(seen_kinds.insert(kind), "{kind:?} has more than one well-formed fixture");
         // A well-formed fixture must model a CURRENT record, so its
         // `schema` must equal its kind's own generation

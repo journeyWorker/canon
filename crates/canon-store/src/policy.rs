@@ -340,9 +340,9 @@ struct TierPolicyRaw {
     #[serde(default)]
     tiers: HashMap<String, serde_yaml::Value>,
     #[serde(default)]
-    routing: HashMap<String, String>,
+    routing: HashMap<String, serde_yaml::Value>,
     #[serde(default)]
-    aging: HashMap<String, AgingRuleRaw>,
+    aging: HashMap<String, serde_yaml::Value>,
 }
 
 /// A `canon.yaml` tier-policy (or `artifact_store:`) refusal. Every
@@ -371,7 +371,7 @@ pub enum TierPolicyError {
     AgingAfterOutOfRange { after: String },
     #[error("canon.yaml TierPolicy: aging `after: {after}` has unknown unit `{unit}` (expected d/h/m/s)")]
     AgingAfterUnknownUnit { after: String, unit: String },
-    #[error("canon.yaml TierPolicy: routing/aging key `{key}` is not one of canon-model's fourteen record kinds")]
+    #[error("canon.yaml TierPolicy: routing/aging key `{key}` is not one of canon-model's twelve record kinds")]
     UnknownRecordKind { key: String },
     #[error("canon.yaml TierPolicy: canon.yaml's `tiers.{rung_key}` block is missing its required `backend: git|postgres|s3|sqlite` key")]
     MissingBackendTag { rung_key: String },
@@ -503,7 +503,19 @@ pub struct TierPolicy {
     /// They are read only far enough to route the kind and to send the user
     /// to `canon migrate`; canon 0.30 itself writes `evidence`.
     pub legacy_kind_keys: Vec<String>,
+    /// The `routing`/`aging` keys naming a record kind canon 0.39 retired
+    /// (`routing.session`, `aging.event`, ...). Their values are neither
+    /// read nor validated and they route nothing; they are listed only so
+    /// the CLI can send the user to `canon migrate`, which deletes the lines.
+    pub retired_kind_keys: Vec<String>,
 }
+
+/// The record kinds canon 0.39 retired (`session`, `event`). A
+/// `canon.yaml` written before 0.39 still names them under `routing:` and
+/// `aging:`; the loader tolerates those keys (see
+/// [`TierPolicy::retired_kind_keys`]) and `purge --kind` keeps accepting
+/// the names for one release. They are NOT [`RecordKind`]s.
+pub const RETIRED_KIND_NAMES: [&str; 2] = ["session", "event"];
 
 /// The one 0.29 kind spelling a `canon.yaml` key may still carry.
 pub const LEGACY_EVIDENCE_KEY: &str = "evidence_record";
@@ -641,7 +653,13 @@ impl TierPolicy {
 
         let mut routing = HashMap::new();
         let mut legacy_kind_keys: Vec<String> = Vec::new();
-        for (kind_str, rung_str) in &raw.routing {
+        let mut retired_kind_keys: Vec<String> = Vec::new();
+        for (kind_str, rung_value) in &raw.routing {
+            if RETIRED_KIND_NAMES.contains(&kind_str.as_str()) {
+                retired_kind_keys.push(format!("routing.{kind_str}"));
+                continue;
+            }
+            let rung_str: String = serde_yaml::from_value(rung_value.clone())?;
             if kind_str == LEGACY_EVIDENCE_KEY {
                 legacy_kind_keys.push(format!("routing.{kind_str}"));
                 // `evidence` itself wins when both are written.
@@ -649,17 +667,22 @@ impl TierPolicy {
                     continue;
                 }
             }
-            routing.insert(parse_kind(kind_str)?, Rung::parse(rung_str)?);
+            routing.insert(parse_kind(kind_str)?, Rung::parse(&rung_str)?);
         }
 
         let mut aging = HashMap::new();
-        for (kind_str, rule) in &raw.aging {
+        for (kind_str, rule_value) in &raw.aging {
+            if RETIRED_KIND_NAMES.contains(&kind_str.as_str()) {
+                retired_kind_keys.push(format!("aging.{kind_str}"));
+                continue;
+            }
             if kind_str == LEGACY_EVIDENCE_KEY {
                 legacy_kind_keys.push(format!("aging.{kind_str}"));
                 if raw.aging.contains_key("evidence") {
                     continue;
                 }
             }
+            let rule: AgingRuleRaw = serde_yaml::from_value(rule_value.clone())?;
             let kind = parse_kind(kind_str)?;
             let to = Rung::parse(&rule.to)?;
             let routed = routing.get(&kind).copied().ok_or_else(|| TierPolicyError::AgingWithoutRouting { kind: kind_str.clone() })?;
@@ -670,7 +693,8 @@ impl TierPolicy {
         }
 
         legacy_kind_keys.sort();
-        Ok(Self { tiers, routing, aging, legacy_kind_keys })
+        retired_kind_keys.sort();
+        Ok(Self { tiers, routing, aging, legacy_kind_keys, retired_kind_keys })
     }
 
     /// The rung `kind` resolves to for a FRESH write — `Err` (never a
@@ -714,12 +738,12 @@ routing:
   evidence: local
   strategy_item: local
   handoff: hot
-  session: hot
-  event: hot
+  task: hot
+  run: hot
   trajectory: cold
 aging:
   handoff: { after: 30d, to: cold }
-  event:   { after: 7d,  to: cold }
+  run:     { after: 7d,  to: cold }
 "#;
 
     #[test]
@@ -737,12 +761,12 @@ aging:
     fn routing_change_requires_no_code_change_it_is_just_a_different_string() {
         // s29 design D2: `handoff` carries an aging rule to `cold`, so
         // moving its routing to `cold` would now be a same-rung aging
-        // rejection (a SEPARATE, correctly-tested case) — `session`
+        // rejection (a SEPARATE, correctly-tested case) — `task`
         // has no aging rule and exercises the same "just a string"
         // routing-change property without colliding with D2.
-        let moved = SAMPLE.replace("session: hot", "session: cold");
+        let moved = SAMPLE.replace("task: hot", "task: cold");
         let policy = TierPolicy::from_yaml(&moved).unwrap();
-        assert_eq!(policy.tier_for(RecordKind::Session).unwrap(), Rung::Cold);
+        assert_eq!(policy.tier_for(RecordKind::Task).unwrap(), Rung::Cold);
     }
 
     #[test]
@@ -817,11 +841,11 @@ aging:
 routing:
   task: hot
 aging:
-  event: { after: 7d, to: cold }
+  run: { after: 7d, to: cold }
 "#;
         let err = TierPolicy::from_yaml(yaml).unwrap_err();
-        assert!(err.to_string().contains("event"), "{err}");
-        assert!(err.to_string().contains("routing.event"), "{err}");
+        assert!(err.to_string().contains("run"), "{err}");
+        assert!(err.to_string().contains("routing.run"), "{err}");
     }
 
     /// s29 design D2 counter-case: a valid forward `hot → cold` aging
@@ -831,18 +855,18 @@ aging:
     fn valid_hot_to_cold_aging_still_parses() {
         let yaml = r#"
 routing:
-  event: hot
+  run: hot
 aging:
-  event: { after: 7d, to: cold }
+  run: { after: 7d, to: cold }
 "#;
         let policy = TierPolicy::from_yaml(yaml).unwrap();
-        assert_eq!(policy.aging.get(&RecordKind::Event).unwrap().to, Rung::Cold);
+        assert_eq!(policy.aging.get(&RecordKind::Run).unwrap().to, Rung::Cold);
     }
 
     /// s29 design D2 regression guard: this repo's own committed
     /// `canon.yaml` (read from the repo root, not a fixture) must
     /// still parse under the new forward-only aging validation — its
-    /// `handoff`/`event` aging rules are both `hot → cold`.
+    /// `handoff` aging rules are both `hot → cold`.
     #[test]
     fn committed_canon_yaml_still_parses_under_forward_only_aging() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../canon.yaml");
@@ -1008,11 +1032,11 @@ routing:
 tiers:
   hot: { backend: sqlite, path: .canon/hot.db }
 routing:
-  session: hot
+  run: hot
 "#;
         let policy = TierPolicy::from_yaml(yaml).unwrap_or_else(|e| panic!("hot/sqlite yaml must parse: {e}"));
         assert_eq!(policy.tiers.get(&Rung::Hot).unwrap().backend(), Backend::Sqlite);
-        assert_eq!(policy.tier_for(RecordKind::Session).unwrap(), Rung::Hot);
+        assert_eq!(policy.tier_for(RecordKind::Run).unwrap(), Rung::Hot);
     }
 
     /// s32 spec scenario "Sqlite on a file-class rung still fails":
@@ -1045,7 +1069,7 @@ routing:
 tiers:
   hot: { backend: sqlite }
 routing:
-  session: hot
+  run: hot
 "#;
         let err = TierPolicy::from_yaml(yaml).unwrap_err();
         assert!(err.to_string().contains("path"), "{err}");
@@ -1063,7 +1087,7 @@ routing:
 tiers:
   hot: { backend: sqlite, path: .canon/hot.db }
 routing:
-  session: hot
+  run: hot
 "#;
         let policy = TierPolicy::from_yaml_at(yaml, dir.path()).unwrap();
         let BackendConfig::Sqlite(cfg) = policy.tiers.get(&Rung::Hot).unwrap() else { panic!("expected a sqlite config") };
@@ -1098,7 +1122,7 @@ routing:
         assert_eq!(Backend::parse("mysql").unwrap_err().to_string(), "canon.yaml TierPolicy: unknown backend `mysql` (expected one of git/postgres/s3/sqlite)");
         assert_eq!(
             msg(TierPolicy::from_yaml("routing:\n  nope: local\n")),
-            "canon.yaml TierPolicy: routing/aging key `nope` is not one of canon-model's fourteen record kinds"
+            "canon.yaml TierPolicy: routing/aging key `nope` is not one of canon-model's twelve record kinds"
         );
         assert_eq!(
             msg(TierPolicy::from_yaml("tiers:\n  hot: { dsn_env: X }\n")),
@@ -1108,7 +1132,7 @@ routing:
             msg(TierPolicy::from_yaml("tiers:\n  cold: { backend: postgres, dsn_env: X, schema: s }\n")),
             "canon.yaml TierPolicy: canon.yaml `tiers.cold`: backend `postgres` is a live-database backend, but the `cold` rung expects an object-store backend (`s3`)"
         );
-        let aging = |after: &str, to: &str| format!("tiers:\n  local: {{ backend: git, root: r }}\n  hot: {{ backend: sqlite, path: h.db }}\nrouting:\n  event: local\naging:\n  event: {{ after: {after}, to: {to} }}\n");
+        let aging = |after: &str, to: &str| format!("tiers:\n  local: {{ backend: git, root: r }}\n  hot: {{ backend: sqlite, path: h.db }}\nrouting:\n  run: local\naging:\n  run: {{ after: {after}, to: {to} }}\n");
         assert_eq!(msg(TierPolicy::from_yaml(&aging("30x", "hot"))), "canon.yaml TierPolicy: aging `after: 30x` has unknown unit `x` (expected d/h/m/s)");
         assert_eq!(msg(TierPolicy::from_yaml(&aging("abcd", "hot"))), "canon.yaml TierPolicy: aging `after: abcd` is not `<integer><d|h|m|s>` (e.g. `30d`)");
         assert_eq!(
@@ -1121,21 +1145,40 @@ routing:
         );
         assert_eq!(
             msg(TierPolicy::from_yaml(&aging("30d", "local"))),
-            "canon.yaml TierPolicy: canon.yaml `aging.event.to: local` is not strictly colder than `routing.event: local` — aging must move forward under the rule `local < hot < cold`"
+            "canon.yaml TierPolicy: canon.yaml `aging.run.to: local` is not strictly colder than `routing.run: local` — aging must move forward under the rule `local < hot < cold`"
         );
         assert_eq!(
-            msg(TierPolicy::from_yaml("aging:\n  event: { after: 30d, to: hot }\n")),
-            "canon.yaml TierPolicy: canon.yaml `aging.event` has no matching `routing.event` entry — an aging rule for an unrouted kind is meaningless"
+            msg(TierPolicy::from_yaml("aging:\n  run: { after: 30d, to: hot }\n")),
+            "canon.yaml TierPolicy: canon.yaml `aging.run` has no matching `routing.run` entry — an aging rule for an unrouted kind is meaningless"
         );
     }
 
     #[test]
     fn tier_policy_error_keeps_the_cause_where_there_is_one() {
-        let not_integer = TierPolicy::from_yaml("routing:\n  event: local\naging:\n  event: { after: abcd, to: hot }\n").unwrap_err();
+        let not_integer = TierPolicy::from_yaml("routing:\n  run: local\naging:\n  run: { after: abcd, to: hot }\n").unwrap_err();
         assert!(matches!(not_integer, TierPolicyError::AgingAfterNotInteger { .. }), "{not_integer}");
         assert!(std::error::Error::source(&not_integer).is_some());
         let yaml = TierPolicy::from_yaml("tiers: [").unwrap_err();
         assert!(yaml.to_string().starts_with("canon.yaml TierPolicy: "), "{yaml}");
         assert!(std::error::Error::source(&yaml).is_some());
+    }
+
+    /// 0.39: a `canon.yaml` written before `session` and `event` left the
+    /// record kinds still loads. The keys route nothing, their values are
+    /// never read, and the loader lists them for `canon migrate`.
+    #[test]
+    fn retired_kind_keys_load_route_nothing_and_are_listed() {
+        let yaml = "routing:\n  session: not-a-rung\n  event: [1, 2]\n  task: hot\naging:\n  event: whatever\n";
+        let policy = TierPolicy::from_yaml(yaml).unwrap();
+        assert_eq!(policy.retired_kind_keys, ["aging.event", "routing.event", "routing.session"]);
+        assert_eq!(policy.routing.len(), 1);
+        assert!(policy.aging.is_empty());
+        assert_eq!(policy.tier_for(RecordKind::Task).unwrap(), Rung::Hot);
+    }
+
+    #[test]
+    fn a_misspelled_retired_kind_is_still_a_config_error() {
+        let err = TierPolicy::from_yaml("routing:\n  sesion: hot\n").unwrap_err();
+        assert!(matches!(err, TierPolicyError::UnknownRecordKind { .. }), "{err}");
     }
 }

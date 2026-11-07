@@ -12,7 +12,7 @@ use canon_model::FailureClass;
 
 use crate::partition::{content_digest, expected_relative_path, validate_body, validate_kind_matches_content, validate_layout};
 use crate::policy::Backend;
-use crate::tier::{AgeReport, AgingRule, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{retired_purge_id, retired_record_at, AgeReport, AgingRule, RetiredKind, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 /// [`GitTier::scan_kind_where`]/[`GitTier::scan_namespaced_kind`]'s
 /// return shape: kept `(path, record)` pairs plus every violation
@@ -258,6 +258,42 @@ impl GitTier {
 
     fn absolute(&self, relative: &Path) -> PathBuf {
         self.root.join(relative)
+    }
+
+    /// The files under a retired kind's `kind=<name>/` directory whose body `at`
+    /// is before `before`, with that body. The kind has no type, so nothing is
+    /// validated: a file that is not JSON, or has no readable `at`, is left alone.
+    /// Links are never followed.
+    fn retired_candidates(&self, kind: RetiredKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<(PathBuf, serde_json::Value)>, StoreError> {
+        let kind_dir = self.absolute(Path::new(&format!("kind={}", kind.as_str())));
+        let metadata = match std::fs::symlink_metadata(&kind_dir) {
+            Ok(metadata) => metadata,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(err) => return Err(err.into()),
+        };
+        if metadata.file_type().is_symlink() {
+            return Err(StoreError::Policy(format!("refusing to traverse symlink `kind={}`", kind.as_str())));
+        }
+        if !metadata.is_dir() {
+            return Ok(Vec::new());
+        }
+        let mut found = Vec::new();
+        for entry in walkdir::WalkDir::new(&kind_dir).sort_by_file_name() {
+            let entry = entry.map_err(|err| StoreError::Policy(format!("failed to scan `{}`: {err}", kind_dir.display())))?;
+            let relative = entry.path().strip_prefix(&self.root).expect("walked entries are under root").to_path_buf();
+            if entry.file_type().is_symlink() {
+                return Err(StoreError::Policy(format!("refusing to traverse symlink `{}`", relative.display())));
+            }
+            if !entry.file_type().is_file() || entry.path().extension().is_none_or(|ext| ext != "json") {
+                continue;
+            }
+            let Ok(bytes) = std::fs::read(entry.path()) else { continue };
+            let Ok(body) = serde_json::from_slice::<serde_json::Value>(&bytes) else { continue };
+            if retired_record_at(&body).is_some_and(|at| at < before) {
+                found.push((relative, body));
+            }
+        }
+        Ok(found)
     }
 
     /// Scan every file under `kind={kind}/`, validating layout+body
@@ -787,6 +823,26 @@ impl Tier for GitTier {
         let mut keys: Vec<String> = candidates.iter().map(|(relative, raw)| crate::partition::purge_id(kind, raw, &relative.display().to_string())).collect();
         keys.sort();
         Ok(keys)
+    }
+
+    fn purge_retired_keys(&self, kind: RetiredKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
+        let mut keys: Vec<String> = self.retired_candidates(kind, before)?.iter().map(|(relative, body)| retired_purge_id(kind, &relative.display().to_string(), body)).collect();
+        keys.sort();
+        Ok(keys)
+    }
+
+    fn purge_retired_before(&self, kind: RetiredKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<crate::tier::PurgeCount, StoreError> {
+        let candidates = self.retired_candidates(kind, before)?;
+        let matched = candidates.len();
+        if dry_run {
+            return Ok(crate::tier::PurgeCount { matched, deleted: 0 });
+        }
+        let mut deleted = 0;
+        for (relative, _) in candidates {
+            std::fs::remove_file(self.absolute(&relative))?;
+            deleted += 1;
+        }
+        Ok(crate::tier::PurgeCount { matched, deleted })
     }
 
     fn purge_before(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<crate::tier::PurgeCount, StoreError> {

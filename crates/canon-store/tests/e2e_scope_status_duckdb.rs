@@ -6,8 +6,7 @@
 //! `covered`, joined structurally through `Task.scenario_refs` /
 //! `int_task_scenario_refs`.
 //!
-//! Mirrors `tests/e2e_session_run_handoff_join_duckdb.rs`'s established
-//! shape (write via a real `canon-store` `GitTier`, then open
+//! Shape: (write via a real `canon-store` `GitTier`, then open
 //! `sql/views.sql` through the real `duckdb` CLI against the same
 //! fixture root) — no local Postgres needed; one throwaway r2-tier
 //! record is still seeded purely so `stg_r2_records`' `read_parquet`
@@ -142,9 +141,7 @@ fn a_declared_covered_evidenced_scenario_resolves_fully_green_in_one_query() {
 /// Seeds a zero-row placeholder parquet file under `<learn_root>/
 /// {strategies,trajectories}` so `sql/views.sql`'s `stg_strategy_items`/
 /// `stg_trajectories` (`read_parquet`-backed, which hard-errors on a
-/// zero-file glob) never abort loading the init script. Duplicated from
-/// `tests/e2e_session_run_handoff_join_duckdb.rs::seed_empty_learn_root`
-/// (private to that file, each integration-test file its own crate).
+/// zero-file glob) never abort loading the init script.
 fn seed_empty_learn_root(learn_root: &std::path::Path) {
     use arrow::array::{ArrayRef, StringArray};
     use arrow::datatypes::{DataType, Field, Schema};

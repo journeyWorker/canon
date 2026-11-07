@@ -1,6 +1,6 @@
 //! The shared record envelope (S1 design D2, task 1.1).
 //!
-//! Every one of canon-model's fourteen record kinds composes [`Envelope`]
+//! Every one of canon-model's twelve record kinds composes [`Envelope`]
 //! via `#[serde(flatten)]` — no record type defines its own ad hoc
 //! actor/`by` field; the only path to attribution is `Envelope.actor`.
 
@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::ids::{RoleId, SessionId};
 
-/// The fourteen closed record kinds `canon-model` recognizes (design D1;
+/// The twelve closed record kinds `canon-model` recognizes (design D1;
 /// `Subject` is the reviewed 13th kind, added by s36, and `Finding` the
 /// reviewed 14th, added by s43 — the "a new kind is a reviewed, breaking
 /// `canon-model` change" process design D1 mandates, exercised twice for
-/// real). A fifteenth kind is again a reviewed, breaking
+/// real). A thirteenth kind is again a reviewed, breaking
 /// change — never a `kind: String` escape hatch (design D1's explicitly
 /// rejected alternative: an untyped `payload: serde_json::Value` would
 /// silently recreate the "no documented join key" problem inside canon
@@ -25,9 +25,7 @@ pub enum RecordKind {
     Change,
     Task,
     Scenario,
-    Session,
     Run,
-    Event,
     Handoff,
     Review,
     Divergence,
@@ -51,18 +49,16 @@ pub enum RecordKind {
 }
 
 impl RecordKind {
-    /// All fourteen kinds, in the same order the proposal/design docs
+    /// All twelve kinds, in the same order the proposal/design docs
     /// list them — the one iteration point schema export (task 3.2) and
-    /// the fixture round-trip test (task 6.2) both walk, so "fourteen
-    /// kinds" is asserted structurally (`RecordKind::ALL.len() == 14`)
+    /// the fixture round-trip test (task 6.2) both walk, so "twelve
+    /// kinds" is asserted structurally (`RecordKind::ALL.len() == 12`)
     /// rather than by a comment that can drift from the enum.
-    pub const ALL: [RecordKind; 14] = [
+    pub const ALL: [RecordKind; 12] = [
         RecordKind::Change,
         RecordKind::Task,
         RecordKind::Scenario,
-        RecordKind::Session,
         RecordKind::Run,
-        RecordKind::Event,
         RecordKind::Handoff,
         RecordKind::Review,
         RecordKind::Divergence,
@@ -82,9 +78,7 @@ impl RecordKind {
             RecordKind::Change => "change",
             RecordKind::Task => "task",
             RecordKind::Scenario => "scenario",
-            RecordKind::Session => "session",
             RecordKind::Run => "run",
-            RecordKind::Event => "event",
             RecordKind::Handoff => "handoff",
             RecordKind::Review => "review",
             RecordKind::Divergence => "divergence",
@@ -149,9 +143,7 @@ impl RecordKind {
         match self {
             RecordKind::Task | RecordKind::Change | RecordKind::Review | RecordKind::Finding => 2,
             RecordKind::Scenario
-            | RecordKind::Session
             | RecordKind::Run
-            | RecordKind::Event
             | RecordKind::Handoff
             | RecordKind::Divergence
             | RecordKind::Trajectory
@@ -258,7 +250,7 @@ impl Envelope {
     }
 }
 
-/// Implemented by every one of the fourteen closed record kinds — the one
+/// Implemented by every one of the twelve closed record kinds — the one
 /// dispatch point schema export, the fixture loader, and the round-trip
 /// tests use instead of re-deriving a kind ↔ type mapping per caller.
 pub trait CanonRecord: Serialize + for<'de> Deserialize<'de> + JsonSchema {
@@ -275,8 +267,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_fourteen_kinds_present_exactly_once() {
-        assert_eq!(RecordKind::ALL.len(), 14);
+    fn all_twelve_kinds_present_exactly_once() {
+        assert_eq!(RecordKind::ALL.len(), 12);
         let mut seen = std::collections::HashSet::new();
         for kind in RecordKind::ALL {
             assert!(seen.insert(kind), "{kind:?} listed twice in RecordKind::ALL");

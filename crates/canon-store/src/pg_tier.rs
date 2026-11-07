@@ -58,7 +58,7 @@ use sqlx::Row;
 
 use crate::partition::resolve_name;
 use crate::policy::{Backend, Rung};
-use crate::tier::{AgeReport, AgingRule, PurgeCount, RawWrite, RowRekey, StoreError, StoredRecord, StoredRow, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{retired_purge_id, AgeReport, AgingRule, PurgeCount, RawWrite, RetiredKind, RowRekey, StoreError, StoredRecord, StoredRow, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 /// `schema` comes from `canon.yaml` (an operator-controlled config
 /// file, not runtime user input) but is still interpolated into DDL/
@@ -525,6 +525,42 @@ impl Tier for PgTier {
             Ok(rows.iter()
                 .map(|r| crate::partition::purge_id(kind, &RawRecord(r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0), &r.get::<String, _>("id")))
                 .collect())
+        })
+    }
+    fn purge_retired_keys(&self, kind: RetiredKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError> {
+        self.rt.block_on(async {
+            let rows = sqlx::query(sqlx::AssertSqlSafe(format!("SELECT id, body FROM {}.records_history WHERE kind = $1 AND at < $2 ORDER BY id, digest", self.schema)))
+                .bind(kind.as_str())
+                .bind(before)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| StoreError::Sql(e.to_string()))?;
+            Ok(rows.iter().map(|r| retired_purge_id(kind, &r.get::<String, _>("id"), &r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0)).collect())
+        })
+    }
+    fn purge_retired_before(&self, kind: RetiredKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
+        self.rt.block_on(async {
+            let matched = usize::try_from(sqlx::query(sqlx::AssertSqlSafe(purge_count_sql(&self.schema)))
+                .bind(kind.as_str())
+                .bind(before)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| StoreError::Sql(e.to_string()))?
+                .get::<i64, _>("count"))
+                .expect("a SQL COUNT is non-negative and fits usize");
+            let deleted = if dry_run {
+                0
+            } else {
+                usize::try_from(sqlx::query(sqlx::AssertSqlSafe(purge_delete_sql(&self.schema)))
+                    .bind(kind.as_str())
+                    .bind(before)
+                    .execute(&self.pool)
+                    .await
+                    .map_err(|e| StoreError::Sql(e.to_string()))?
+                    .rows_affected())
+                    .expect("deleted row count fits usize")
+            };
+            Ok(PurgeCount { matched, deleted })
         })
     }
     fn purge_before(&self, kind: canon_model::envelope::RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {

@@ -1,6 +1,6 @@
 //! This repo's OWN root `canon.yaml` (canon dogfoods itself) parses
 //! cleanly as a `TierPolicy` — every one of the twelve record kinds
-//! routes somewhere, `aging` resolves both entries — AND S1's
+//! routes somewhere, `aging` resolves its one entry — AND S1's
 //! `handoff_templates:` key in the SAME file still parses independently
 //! (tier-policy spec's "S1 owns only this narrow slice" convention:
 //! two specs' sections coexist in one file without either's parser
@@ -23,7 +23,7 @@ fn every_record_kind_routes_somewhere_in_the_shipped_canon_yaml() {
     for kind in RecordKind::ALL {
         policy.tier_for(kind).unwrap_or_else(|e| panic!("{}: {e}", kind.as_str()));
     }
-    assert_eq!(policy.aging.len(), 2, "handoff + event, per D3's worked example");
+    assert_eq!(policy.aging.len(), 1, "handoff, per D3's worked example");
 }
 
 #[test]

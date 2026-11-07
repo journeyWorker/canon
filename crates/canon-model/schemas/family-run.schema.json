@@ -168,7 +168,7 @@
       "type": "string"
     },
     "SessionId": {
-      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
       "type": "string"
     },
     "TaskId": {

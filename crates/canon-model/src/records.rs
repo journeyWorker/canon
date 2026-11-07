@@ -46,8 +46,8 @@ pub enum ChangeStatus {
 /// durable [`Subject`] it was adopted under (0.18 D4: a change may belong
 /// to several subjects; per-task subjects are out of scope). It is a
 /// plain `pub` field left empty by [`Change::new`] and appended to by
-/// `canon-cli`'s `subject adopt` at adoption time (mirroring how
-/// [`Session::project_key`] is set outside this crate), never derived
+/// `canon-cli`'s `subject adopt` at adoption time (a plain field set
+/// outside this crate), never derived
 /// here. Skipped when empty, so an unadopted change carries no key.
 ///
 /// # Old records
@@ -561,55 +561,6 @@ impl CanonRecord for Scenario {
     }
 }
 
-/// An agent-CLI session (join-spine `session_id` row: session ↔ cost ↔
-/// run ↔ trajectory). `client` names the adapter that produced it (e.g.
-/// `"claude-code"`, `"codex"`, `"omp"`) as a plain string, not a closed
-/// enum — S3 (`canon-ingest`) owns the adapter registry; a `Session`
-/// record itself is adapter-agnostic.
-///
-/// `workspace_key`/`workspace_label`/`project_key` (s31 D3, additive —
-/// `#[serde(default, skip_serializing_if = "Option::is_none")]` on all
-/// three, so a pre-s31 `Session` simply lacks the keys on reserialize):
-/// `workspace_key`/`workspace_label` are populated by
-/// `canon_ingest::normalize` from the session's own `UnifiedRow`/
-/// `DirectiveRow` workspace context (first non-`None` across its rows);
-/// `project_key` is left `None` by `canon-ingest` (a plain `pub` field,
-/// never derived inside this crate or `canon-ingest` — s31 design D3:
-/// "project_key set by the CLI layer") and stamped on directly by
-/// `canon-cli`'s ingest pass once it has resolved the current project's
-/// main-worktree key, so queries can aggregate a repo's main worktree
-/// and its linked `git worktree`s as one project.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct Session {
-    #[serde(flatten)]
-    pub envelope: Envelope,
-    pub session_id: SessionId,
-    pub client: String,
-    pub started_at: DateTime<Utc>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ended_at: Option<DateTime<Utc>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workspace_key: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workspace_label: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub project_key: Option<String>,
-}
-
-impl Session {
-    pub fn new(envelope: Envelope, session_id: SessionId, client: impl Into<String>, started_at: DateTime<Utc>, ended_at: Option<DateTime<Utc>>) -> Self {
-        debug_assert_eq!(envelope.kind, RecordKind::Session);
-        Self { envelope, session_id, client: client.into(), started_at, ended_at, workspace_key: None, workspace_label: None, project_key: None }
-    }
-}
-
-impl CanonRecord for Session {
-    const KIND: RecordKind = RecordKind::Session;
-    fn envelope(&self) -> &Envelope {
-        &self.envelope
-    }
-}
-
 /// A run's lifecycle state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -809,36 +760,6 @@ impl Run {
 
 impl CanonRecord for Run {
     const KIND: RecordKind = RecordKind::Run;
-    fn envelope(&self) -> &Envelope {
-        &self.envelope
-    }
-}
-
-/// One event within a run (join-spine `run_id` row: run ↔ events ↔
-/// manifest). `detail` is deliberately open (`serde_json::Value`) —
-/// events are the most heterogeneous record kind (tool calls, token
-/// deltas, tool errors, …); narrowing `detail` to a closed shape is a
-/// later, per-event-family change, not S1's.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct Event {
-    #[serde(flatten)]
-    pub envelope: Envelope,
-    pub run_id: RunId,
-    pub seq: u64,
-    pub label: String,
-    #[serde(default)]
-    pub detail: serde_json::Value,
-}
-
-impl Event {
-    pub fn new(envelope: Envelope, run_id: RunId, seq: u64, label: impl Into<String>, detail: serde_json::Value) -> Self {
-        debug_assert_eq!(envelope.kind, RecordKind::Event);
-        Self { envelope, run_id, seq, label: label.into(), detail }
-    }
-}
-
-impl CanonRecord for Event {
-    const KIND: RecordKind = RecordKind::Event;
     fn envelope(&self) -> &Envelope {
         &self.envelope
     }
@@ -1283,8 +1204,7 @@ impl CanonRecord for Divergence {
 }
 
 /// A reward-eligible trajectory (join-spine rows: `sha`/`pr` — reward
-/// signals ↔ trajectory; `session_id` — session ↔ cost ↔ run ↔
-/// trajectory; `task_id` via `run_id` — task ↔ evidence ↔ trajectory).
+/// signals ↔ trajectory; `run_id` — run ↔ trajectory; `task_id` via `run_id` — task ↔ evidence ↔ trajectory).
 /// `reward` is a bare numeric signal here; S7 (`reward-statistical-
 /// promotion`) owns how it is computed and aggregated.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -2818,40 +2738,6 @@ mod tests {
     }
 
     round_trip_test!(
-        session_round_trips,
-        Session::new(envelope(RecordKind::Session), SessionId::parse("f47ac10b-58cc-4372-a567-0e02b2c3d479").unwrap(), "claude-code", Utc::now(), None)
-    );
-
-    /// A pre-s31 `Session` JSON (no `workspace_key`/`workspace_label`/
-    /// `project_key` keys at all) still deserializes — to `None` on all
-    /// three — and reserializes back to the IDENTICAL shape, never
-    /// introducing a spurious key (design D3: "Sessions ingested
-    /// pre-s31 simply lack the fields"), same backward/forward-compat
-    /// bar `Run.injected_guidance`/`Task.scenario_refs` already set.
-    #[test]
-    fn session_without_workspace_keys_deserializes_none_and_reserializes_without_the_keys() {
-        let at = serde_json::to_value(Utc::now()).unwrap();
-        let started_at = serde_json::to_value(Utc::now()).unwrap();
-        let pre_s31_json = serde_json::json!({
-            "schema": 1,
-            "kind": "session",
-            "at": at,
-            "actor": {"agent_id": "codex-cli", "role": "implementer"},
-            "session_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-            "client": "claude-code",
-            "started_at": started_at,
-        });
-
-        let session: Session = serde_json::from_value(pre_s31_json.clone()).expect("a pre-s31 Session with no workspace/project keys must still deserialize");
-        assert!(session.workspace_key.is_none());
-        assert!(session.workspace_label.is_none());
-        assert!(session.project_key.is_none());
-
-        let reserialized = serde_json::to_value(&session).unwrap();
-        assert_eq!(reserialized, pre_s31_json, "None workspace/project fields must not introduce spurious keys on reserialize");
-    }
-
-    round_trip_test!(
         run_round_trips,
         Run::new(envelope(RecordKind::Run), RunId::new(), None, None, RunStatus::Succeeded, Utc::now(), Some(Utc::now()))
     );
@@ -2974,11 +2860,6 @@ mod tests {
         assert_eq!(run.parent_run_id, Some(second_parent));
         assert!(run.injected_guidance.is_empty(), "setting a parent must not perturb any other field");
     }
-
-    round_trip_test!(
-        event_round_trips,
-        Event::new(envelope(RecordKind::Event), RunId::new(), 1, "tool_call", serde_json::json!({"tool": "read"}))
-    );
 
     round_trip_test!(
         review_round_trips,

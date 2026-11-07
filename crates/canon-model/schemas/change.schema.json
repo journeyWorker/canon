@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Change",
-  "description": "A change: the top of the join spine's `change_id` row (change ↔\ntasks ↔ specs). `subject_ids` links an imported plan change to every\ndurable [`Subject`] it was adopted under (0.18 D4: a change may belong\nto several subjects; per-task subjects are out of scope). It is a\nplain `pub` field left empty by [`Change::new`] and appended to by\n`canon-cli`'s `subject adopt` at adoption time (mirroring how\n[`Session::project_key`] is set outside this crate), never derived\nhere. Skipped when empty, so an unadopted change carries no key.\n\n# Old records\nThe ledger is append-only. A change written before 0.18 carries a\nsingle `subject_id` string; it reads as a one-element `subject_ids`\n([`one_or_many_subjects`]) and is never rewritten. Renaming the field\nis a format generation change on a kind whose `at` can be byte-stable\n(plan import), so [`RecordKind::Change`] is at schema `2`.",
+  "description": "A change: the top of the join spine's `change_id` row (change ↔\ntasks ↔ specs). `subject_ids` links an imported plan change to every\ndurable [`Subject`] it was adopted under (0.18 D4: a change may belong\nto several subjects; per-task subjects are out of scope). It is a\nplain `pub` field left empty by [`Change::new`] and appended to by\n`canon-cli`'s `subject adopt` at adoption time (a plain field set\noutside this crate), never derived\nhere. Skipped when empty, so an unadopted change carries no key.\n\n# Old records\nThe ledger is append-only. A change written before 0.18 carries a\nsingle `subject_id` string; it reads as a one-element `subject_ids`\n([`one_or_many_subjects`]) and is never rewritten. Renaming the field\nis a format generation change on a kind whose `at` can be byte-stable\n(plan import), so [`RecordKind::Change`] is at schema `2`.",
   "type": "object",
   "properties": {
     "actor": {
@@ -103,15 +103,13 @@
       ]
     },
     "RecordKind": {
-      "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
       "type": "string",
       "enum": [
         "change",
         "task",
         "scenario",
-        "session",
         "run",
-        "event",
         "handoff",
         "review",
         "divergence",
@@ -127,7 +125,7 @@
       "type": "string"
     },
     "SessionId": {
-      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
       "type": "string"
     },
     "SubjectId": {
