@@ -10,14 +10,15 @@
 //! code:
 //!   exclude: ["docs/**", "*.md"]   # the default when the key is absent
 //! ```
-//! Globs are matched against repo-relative paths with `/` separators:
-//! - `*` matches any run of characters except `/`; `?` one character except `/`;
+//! Globs are matched against repo-relative paths with `/` separators by
+//! [`canon_model::path_glob`], the matcher `code_scopes` and a `--surface-ref` use too:
+//! - `*` matches any run of characters except `/`; `?` one byte except `/`;
 //!   `**` matches any run of characters including `/`; every other character is literal.
 //! - A pattern without `/` matches the file name at any depth (`*.md` matches
 //!   `README.md` and `a/b/c.md`).
 //! - A pattern with `/` is anchored at the repo root (a leading `/` is allowed);
 //!   `docs/**` matches everything below `docs/`, and a pattern that names a
-//!   directory (`docs`) also excludes everything below it.
+//!   directory (`docs`, or `docs/`: a trailing `/` is dropped) also excludes everything below it.
 //!
 //! `.canon/` and every configured `specs.roots[]` directory inside the repo
 //! are always excluded, whatever `code.exclude` says.
@@ -25,6 +26,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use canon_model::path_glob::{Anchor, Glob};
 use canon_store::git::{GitCall, GitError, GitOutput, ScratchIndex};
 
 use crate::cli_error::{CliError, CliErrorExt as _};
@@ -155,30 +157,14 @@ pub fn code_exclude(repo: &Path) -> Result<Vec<String>, CliError> {
     Ok(globs)
 }
 
-/// `glob` against a repo-relative path (see the module docs for the semantics).
-pub fn glob_matches(glob: &str, path: &str) -> bool {
-    let anchored = glob.contains('/');
-    let glob = glob.trim_start_matches('/');
-    if anchored {
-        // A directory name also covers everything below it.
-        path.match_indices('/').any(|(i, _)| wild(glob.as_bytes(), &path.as_bytes()[..i])) || wild(glob.as_bytes(), path.as_bytes())
-    } else {
-        // Any path component: the file's own name, or a directory of that name above it.
-        path.split('/').any(|name| wild(glob.as_bytes(), name.as_bytes()))
-    }
-}
-
-fn wild(glob: &[u8], text: &[u8]) -> bool {
-    match glob.split_first() {
-        None => text.is_empty(),
-        Some((b'*', rest)) if rest.first() == Some(&b'*') => {
-            let rest = &rest[rest.iter().take_while(|&&c| c == b'*').count()..];
-            (0..=text.len()).any(|i| wild(rest, &text[i..]))
-        }
-        Some((b'*', rest)) => (0..=text.iter().position(|&c| c == b'/').unwrap_or(text.len())).any(|i| wild(rest, &text[i..])),
-        Some((b'?', rest)) => text.first().is_some_and(|&c| c != b'/') && wild(rest, &text[1..]),
-        Some((c, rest)) => text.first() == Some(c) && wild(rest, &text[1..]),
-    }
+/// Every file of the working tree, repo-relative with `/` separators: the tracked ones that are still there and the
+/// untracked ones `.gitignore` does not hide. `None` when git cannot list them.
+pub fn worktree_files(repo: &Path) -> Option<Vec<String>> {
+    let listed = |extra: &[&str]| GitCall::new(repo).args(["ls-files", "-z"]).args(extra).tree_listing().run().ok().map(|out| out.stdout);
+    let names = |bytes: &[u8]| -> Vec<String> { bytes.split(|&b| b == 0).filter(|name| !name.is_empty()).map(|name| String::from_utf8_lossy(name).into_owned()).collect() };
+    let present = names(&listed(&["--cached", "--others", "--exclude-standard"])?);
+    let gone: std::collections::HashSet<String> = names(&listed(&["--deleted"])?).into_iter().collect();
+    Some(present.into_iter().filter(|name| !gone.contains(name)).collect())
 }
 
 /// A temporary index file, removed when dropped (also on error paths).
@@ -219,10 +205,11 @@ fn filtered_tree(repo: &Path, index: &ScratchIndex, exclude: &[String], roots: &
     let listing = git(repo, Some(index), &["ls-files", "-z"], None)?.stdout;
     let mut drop = Vec::new();
     let mut kept = false;
+    let exclude: Vec<Glob> = exclude.iter().map(|glob| Glob::new(glob, Anchor::Anywhere)).collect();
     for path in listing.split(|&b| b == 0).filter(|p| !p.is_empty()) {
         let name = String::from_utf8_lossy(path);
         let under = |dir: &str| name.strip_prefix(dir).is_some_and(|rest| rest.starts_with('/'));
-        if under(".canon") || roots.iter().any(|r| under(r)) || exclude.iter().any(|g| glob_matches(g, &name)) {
+        if under(".canon") || roots.iter().any(|r| under(r)) || exclude.iter().any(|glob| glob.matches(&name)) {
             drop.extend_from_slice(path);
             drop.push(0);
         } else {
