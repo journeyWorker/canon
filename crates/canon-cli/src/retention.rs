@@ -848,7 +848,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("canon.yaml"), "").unwrap();
         for _ in 0..2 {
-            append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+            append_access_audit(dir.path(), "query", Some("handoff"), "all", false, 0, 0).unwrap();
         }
         let text = fs::read_to_string(audit_path(dir.path()).unwrap()).unwrap();
         assert_eq!(text.lines().count(), 2);
@@ -860,7 +860,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("canon.yaml"), "").unwrap();
         fs::create_dir_all(audit_path(dir.path()).unwrap()).unwrap();
-        assert!(append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).is_err(), "a directory where the audit file belongs");
+        assert!(append_access_audit(dir.path(), "query", Some("handoff"), "all", false, 0, 0).is_err(), "a directory where the audit file belongs");
     }
 
     #[test]
