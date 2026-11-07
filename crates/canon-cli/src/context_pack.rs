@@ -8,9 +8,9 @@
 //! resolve today's documents.
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 
 use canon_model::records::StrategyRef;
+use canon_store::git::GitCall;
 use canon_store::write_atomic;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -550,18 +550,25 @@ fn repo_identity(repo: &Path) -> Result<RepoIdentity, ContextPackError> {
     Ok(RepoIdentity { commit, dirty, state_digest: if state.len() == 1 && diff.is_empty() && status.is_empty() { digest(b"clean") } else { digest(&state) } })
 }
 
+/// A git answer that is a line of text. A call git answered with an exit status is `None` (or an error when
+/// `required`); a call that got no answer (it did not start, ran past its deadline or wrote past its limit) is
+/// always the error `CONTEXT_GIT_REQUIRED` carries.
 fn git_output(repo: &Path, args: &[&str], required: bool) -> Result<Option<String>, ContextPackError> {
-    let output = Command::new("git").arg("-C").arg(repo).args(args).output().map_err(|e| ContextPackError::Git(e.to_string()))?;
-    if !output.status.success() {
-        if required { return Err(ContextPackError::Git(String::from_utf8_lossy(&output.stderr).trim().to_string())); }
-        return Ok(None);
+    match GitCall::new(repo).args(args).run() {
+        Ok(output) => Ok(Some(output.stdout_trimmed())),
+        Err(e) if e.is_exit() && required => Err(ContextPackError::Git(e.stderr_text())),
+        Err(e) if e.is_exit() => Ok(None),
+        Err(e) => Err(ContextPackError::Git(e.to_string())),
     }
-    Ok(Some(String::from_utf8_lossy(&output.stdout).trim().to_string()))
 }
 
+/// The bytes git wrote; nothing for a call git answered with an exit status (see [`git_output`] for the rest).
 fn git_bytes(repo: &Path, args: &[&str]) -> Result<Vec<u8>, ContextPackError> {
-    let output = Command::new("git").arg("-C").arg(repo).args(args).output().map_err(|e| ContextPackError::Git(e.to_string()))?;
-    if output.status.success() { Ok(output.stdout) } else { Ok(Vec::new()) }
+    match GitCall::new(repo).args(args).run() {
+        Ok(output) => Ok(output.stdout),
+        Err(e) if e.is_exit() => Ok(Vec::new()),
+        Err(e) => Err(ContextPackError::Git(e.to_string())),
+    }
 }
 
 fn is_digest(value: &str) -> bool {

@@ -43,7 +43,10 @@
 //!   `canon-approval-v1` payload bound to subject, project, artifact SHA, run,
 //!   normalized surface/effects, actor, and timestamp. `CANON_ACTOR` and the
 //!   persisted `verified` display bit are never authentication.
-//! - `--surface-ref` records an explicitly bound path or `effect:<slug>`.
+//! - `--surface-ref` records an explicitly bound path pattern or `effect:<slug>`: a pattern from
+//!   the repository root ([`canon_model::path_glob`]; `src/`, `src/**`) that `canon gate check`
+//!   reads against the paths that changed since `evidence_sha`, and one that matches no file of
+//!   the work tree is recorded with `SURFACE_REF_UNMATCHED` (0.39).
 //!   Risk approvals additionally require `--approval-at` and an externally
 //!   produced `--signature-file`, bound to the commit `--rev` names (HEAD by
 //!   default, recorded as `evidence_sha`); canon never signs
@@ -387,6 +390,28 @@ pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, EvidenceArgError> {
 /// The clap parser of `--surface-ref`: it takes the text; [`parse_surface_ref`] judges it in the stateless stage (`arg_rules::semantic`).
 pub fn accept_surface_ref(s: &str) -> Result<String, std::convert::Infallible> {
     Ok(s.to_string())
+}
+
+/// Says `SURFACE_REF_UNMATCHED` for each `--surface-ref` value that is not `effect:...` and matches no file of the
+/// working tree (0.39): a surface ref is a path pattern from the repository root ([`canon_model::path_glob`]), and
+/// evidence that declares one nothing matches can never go stale. The value is recorded as given. Nothing is said
+/// when git cannot list the files.
+fn warn_unmatched_surface_refs(repo: &Path, values: &[String]) {
+    let paths: Vec<&String> = values.iter().filter(|value| !value.starts_with("effect:")).collect();
+    if paths.is_empty() {
+        return;
+    }
+    let Some(files) = crate::git_rev::worktree_files(repo) else { return };
+    for value in paths {
+        let glob = canon_model::path_glob::Glob::new(value, canon_model::path_glob::Anchor::Root);
+        if !files.iter().any(|file| file == value || glob.matches(file)) {
+            crate::json_out::warn_at(
+                "SURFACE_REF_UNMATCHED",
+                Some("--surface-ref"),
+                format!("--surface-ref `{value}` matches no file of the working tree, so this evidence never goes stale for it; it is a path pattern from the repository root (`src/` or `src` the directory, `src/**`, `src/*.rs`; `*` and `?` stop at `/`, `**` does not), recorded as given"),
+            );
+        }
+    }
 }
 
 pub fn parse_surface_ref(s: &str) -> Result<String, EvidenceArgError> {
@@ -1107,6 +1132,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     }
     let record_audit_result = record.audit.as_ref().map(|a| a.result);
     if !args.surface_ref.is_empty() {
+        warn_unmatched_surface_refs(&repo, &args.surface_ref);
         record = record.with_surface_ref(normalized_strings(&args.surface_ref));
     }
     if let Some(project_id) = &args.project_id {
@@ -1526,6 +1552,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     let ledger_root = gate_context.ctx.ledger_root.clone();
 
     let at = Utc::now();
+    warn_unmatched_surface_refs(repo, &args.surface_ref);
     let mut actor = Actor::new(args.actor_id.as_str(), args.role.clone());
     if let Some(session_id) = &args.session_id {
         actor = actor.with_session(session_id.clone());

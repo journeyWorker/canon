@@ -1,0 +1,423 @@
+//! `canon-0-39-staleness-scope` through the real binary: a directory or a glob declared as the surface of evidence goes stale like a
+//! file, a surface that matches nothing is said when it is saved, and the cells whose base commit git cannot read are counted by
+//! `gate check` and `status` alike (F1-F5 of the brief).
+
+#[path = "support/hermetic.rs"]
+mod hermetic;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+use serde_json::Value;
+use tempfile::TempDir;
+
+// ── The binary and git ──
+
+/// `canon <args> --json` in `dir`; `PATH` is replaced by `path` when given.
+fn canon_at(dir: &Path, args: &[&str], path: Option<&std::ffi::OsStr>) -> Output {
+    let mut command = hermetic::canon();
+    command.args(args).arg("--json").current_dir(dir).env("CANON_ACTOR", "canon");
+    if let Some(path) = path {
+        command.env("PATH", path);
+    }
+    command.output().expect("spawn canon")
+}
+
+fn canon(dir: &Path, args: &[&str]) -> Output {
+    canon_at(dir, args, None)
+}
+
+fn text(out: &Output) -> String {
+    format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr))
+}
+
+fn body(out: &Output) -> Value {
+    serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("stdout is not one JSON document ({e}): {}", text(out)))
+}
+
+fn ok(dir: &Path, args: &[&str]) -> Value {
+    let out = canon(dir, args);
+    assert_eq!(out.status.code(), Some(0), "{args:?}: {}", text(&out));
+    body(&out)
+}
+
+fn git(dir: &Path, args: &[&str]) -> String {
+    let out = Command::new("git").args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]).args(args).current_dir(dir).output().expect("git must be on PATH");
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    String::from_utf8(out.stdout).unwrap().trim().to_string()
+}
+
+fn commit_all(dir: &Path, message: &str) {
+    git(dir, &["add", "-A"]);
+    git(dir, &["commit", "-q", "-m", message]);
+}
+
+fn write(dir: &Path, relative: &str, content: &str) {
+    let path = dir.join(relative);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, content).unwrap();
+}
+
+fn scenario(n: usize) -> String {
+    format!("game.run.{n:02}")
+}
+
+/// A committed canon project with `scenarios` scenarios (`game.run.01` ...) and the files of `files`, each holding `1`.
+fn project(scenarios: usize, files: &[&str]) -> TempDir {
+    let dir = TempDir::new().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q", "-b", "main"]);
+    ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    for n in 1..=scenarios {
+        ok(repo, &["scenario", "new", &scenario(n), "--title", &format!("A run ends {n}"), "--case", "failure"]);
+    }
+    ok(repo, &["inventory", "sync"]);
+    for file in files {
+        write(repo, file, "1");
+    }
+    commit_all(repo, "project");
+    dir
+}
+
+/// `canon evidence add` for scenario `n` with `surface` declared (none for an empty string).
+fn add_evidence(repo: &Path, n: usize, surface: &str) -> Output {
+    let id = scenario(n);
+    let reference = format!("run-{n}");
+    let mut args = vec!["evidence", "add", "--scenario", &id, "--project", "root", "--class", "test-run", "--ref", &reference, "--role", "implementer"];
+    if !surface.is_empty() {
+        args.extend(["--surface-ref", surface]);
+    }
+    canon(repo, &args)
+}
+
+fn add_evidence_ok(repo: &Path, n: usize, surface: &str) {
+    let out = add_evidence(repo, n, surface);
+    assert_eq!(out.status.code(), Some(0), "evidence add for {surface}: {}", text(&out));
+}
+
+/// The `stale-evidence` subjects and details of `gate check`, and its exit status.
+fn stale(repo: &Path) -> (Option<i32>, Vec<(String, String)>) {
+    let out = canon(repo, &["gate", "check"]);
+    let document = body(&out);
+    let violations = document["data"]["violations"].as_array().cloned().unwrap_or_default();
+    let mut stale: Vec<(String, String)> = violations
+        .iter()
+        .filter(|v| v["class"] == "stale-evidence")
+        .map(|v| (v["subject"].as_str().unwrap().to_string(), v["message"].as_str().unwrap().to_string()))
+        .collect();
+    stale.sort();
+    (out.status.code(), stale)
+}
+
+fn subjects(stale: &[(String, String)]) -> Vec<&str> {
+    stale.iter().map(|(subject, _)| subject.as_str()).collect()
+}
+
+// ── F1: the match ──
+
+/// F1: evidence that declares `src/`, `src`, `src/**` and `src/*.rs` is stale once `src/a.rs` is edited and committed, and each reason names the
+/// declaration that matched and the path it matched.
+#[test]
+fn f1_a_directory_and_a_glob_declared_as_the_surface_go_stale_when_a_file_under_them_changes() {
+    let dir = project(4, &["src/a.rs", "lib/z.rs"]);
+    let repo = dir.path();
+    let declared = ["src/", "src", "src/**", "src/*.rs"];
+    for (i, surface) in declared.iter().enumerate() {
+        add_evidence_ok(repo, i + 1, surface);
+    }
+    commit_all(repo, "evidence");
+    let (status, stale_now) = stale(repo);
+    assert_eq!((status, stale_now.len()), (Some(0), 0), "the evidence is current before the edit");
+
+    write(repo, "src/a.rs", "2");
+    commit_all(repo, "edit src/a.rs");
+    let (status, stale_after) = stale(repo);
+    assert_eq!(status, Some(1));
+    assert_eq!(subjects(&stale_after), [scenario(1), scenario(2), scenario(3), scenario(4)], "{stale_after:?}");
+    for (i, surface) in declared.iter().enumerate() {
+        let detail = &stale_after[i].1;
+        assert!(detail.contains(&format!("`{surface}`")) && detail.contains("`src/a.rs`"), "the reason names the declaration and the path: {detail}");
+    }
+}
+
+/// F1, failure path: a file below `src/x` does not match `src/*.rs`; the root `Cargo.toml` is not the manifest of a crate; the exact file and `effect:` answer
+/// as before.
+#[test]
+fn f1_a_glob_that_stops_at_a_slash_and_a_name_at_the_root_are_not_stale_for_a_file_further_down() {
+    let dir = project(4, &["src/a.rs", "src/x/b.rs", "Cargo.toml", "crates/x/Cargo.toml"]);
+    let repo = dir.path();
+    for (i, surface) in ["src/*.rs", "Cargo.toml", "src/a.rs", "effect:payments"].iter().enumerate() {
+        add_evidence_ok(repo, i + 1, surface);
+    }
+    commit_all(repo, "evidence");
+
+    write(repo, "src/x/b.rs", "2");
+    write(repo, "crates/x/Cargo.toml", "2");
+    commit_all(repo, "edit two files that none of the four covers");
+    let (status, stale_now) = stale(repo);
+    assert_eq!((status, subjects(&stale_now)), (Some(0), Vec::<&str>::new()), "{stale_now:?}");
+
+    write(repo, "src/a.rs", "2");
+    commit_all(repo, "edit the exact file");
+    let (status, stale_after) = stale(repo);
+    assert_eq!(status, Some(1));
+    assert_eq!(subjects(&stale_after), [scenario(1), scenario(3)], "`src/*.rs` and `src/a.rs` cover src/a.rs; the root manifest and the effect do not: {stale_after:?}");
+}
+
+/// F1: `code.exclude`, the policy's `code_scopes` and a surface ref read a pattern with a `/` the same way. Each row is judged by the code tree (a file
+/// that is excluded leaves the tree as it was), by the compiled scope, and by the surface matcher.
+#[test]
+fn f1_the_three_readers_of_a_pattern_with_a_slash_give_one_answer() {
+    use canon_model::path_glob::{Anchor, Glob};
+    let table: [(&str, &str, bool); 10] = [
+        ("src/**", "src/a.rs", true),
+        ("src/*.rs", "src/a.rs", true),
+        ("src/*.rs", "src/x/b.rs", false),
+        ("src/", "src/a.rs", true),
+        ("/src/**", "src/x/b.rs", true),
+        ("lib/*/m.rs", "lib/a/m.rs", true),
+        ("lib/*/m.rs", "lib/a/b/m.rs", false),
+        ("lib/**/m.rs", "lib/a/b/m.rs", true),
+        ("a?c/x", "abc/x", true),
+        ("a?c/x", "a/c/x", false),
+    ];
+    for (pattern, path, expected) in table {
+        let dir = TempDir::new().unwrap();
+        let repo = dir.path();
+        git(repo, &["init", "-q", "-b", "main"]);
+        write(repo, "canon.yaml", &format!("code:\n  exclude:\n    - '{pattern}'\n"));
+        write(repo, "keep.txt", "1");
+        commit_all(repo, "keep");
+        let without = canon_cli::git_rev::code_tree(repo, None).unwrap().tree;
+        write(repo, path, "1");
+        let with = canon_cli::git_rev::code_tree(repo, None).unwrap().tree;
+        let by_exclude = with == without;
+        let by_scope = canon_cli::code_scopes::compile(&[pattern.to_string()]).iter().any(|glob| glob.matches(path));
+        let by_surface = Glob::new(pattern, Anchor::Root).matches(path);
+        assert_eq!((by_exclude, by_scope, by_surface), (expected, expected, expected), "`{pattern}` against `{path}`: code.exclude, code_scopes, surface ref");
+    }
+}
+
+// ── F2: the warning at write time ──
+
+/// F2: a value that matches no file is saved with `SURFACE_REF_UNMATCHED` naming it, and the exit status is 0; a value that matches, and an effect, say nothing.
+#[test]
+fn f2_a_surface_that_matches_no_file_is_saved_with_a_warning() {
+    let dir = project(3, &["src/a.rs"]);
+    let repo = dir.path();
+    let out = add_evidence(repo, 1, "src/nope/**");
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out));
+    let warnings = body(&out)["meta"]["warnings"].as_array().cloned().unwrap_or_default();
+    let unmatched: Vec<&Value> = warnings.iter().filter(|w| w["code"] == "SURFACE_REF_UNMATCHED").collect();
+    assert_eq!(unmatched.len(), 1, "{warnings:?}");
+    assert!(unmatched[0]["message"].as_str().unwrap().contains("`src/nope/**`"), "{unmatched:?}");
+    let saved = std::fs::read_dir(repo.join(".canon/ledger/kind=evidence")).unwrap().filter_map(Result::ok).any(|entry| std::fs::read_to_string(entry.path()).unwrap().contains("src/nope/**"));
+    assert!(saved, "the value is recorded as given");
+
+    for (n, surface) in [(2, "src/"), (3, "effect:payments")] {
+        let out = add_evidence(repo, n, surface);
+        assert_eq!(out.status.code(), Some(0), "{}", text(&out));
+        let said: Vec<Value> = body(&out)["meta"]["warnings"].as_array().cloned().unwrap_or_default();
+        assert!(said.iter().all(|w| w["code"] != "SURFACE_REF_UNMATCHED"), "`{surface}` matches: {said:?}");
+    }
+}
+
+/// F2, failure path: a value outside the repository is refused as before, with `USAGE`, and nothing is saved.
+#[test]
+fn f2_a_surface_outside_the_repository_is_still_refused_as_usage() {
+    let dir = project(1, &["src/a.rs"]);
+    let repo = dir.path();
+    let out = add_evidence(repo, 1, "../x");
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
+    assert!(text(&out).contains("USAGE"), "{}", text(&out));
+    assert!(!repo.join(".canon/ledger/kind=evidence").exists() || std::fs::read_dir(repo.join(".canon/ledger/kind=evidence")).unwrap().next().is_none());
+}
+
+// ── F3 and F4: the cells git could not read ──
+
+/// The advisory of `gate check` and the warning of `status`, as the message each says (`None` when it says nothing).
+fn said(repo: &Path, path: Option<&std::ffi::OsStr>) -> (Option<String>, Option<String>) {
+    let gate = body(&canon_at(repo, &["gate", "check"], path));
+    let advisory = gate["data"]["advisories"].as_array().and_then(|list| list.iter().find(|a| a["kind"] == "staleness_unresolvable")).map(|a| a["message"].as_str().unwrap().to_string());
+    let status = body(&canon_at(repo, &["status"], path));
+    let warning = status["meta"]["warnings"].as_array().and_then(|list| list.iter().find(|w| w["code"] == "STALENESS_UNRESOLVABLE")).map(|w| w["message"].as_str().unwrap().to_string());
+    (advisory, warning)
+}
+
+/// Both say one sentence, and it is the same one; the sentence is returned.
+fn both_say(repo: &Path, path: Option<&std::ffi::OsStr>) -> String {
+    let (advisory, warning) = said(repo, path);
+    let advisory = advisory.unwrap_or_else(|| panic!("gate check has no staleness_unresolvable advisory"));
+    assert_eq!(Some(&advisory), warning.as_ref(), "gate check and status say the same count and reasons");
+    advisory
+}
+
+/// A project whose one evidence record (surface `src/`) has its base commit on a branch `main` does not contain: the record's ledger was moved
+/// to `main` by `git checkout side -- .canon/ledger`.
+fn ledger_moved_from_another_branch() -> TempDir {
+    let dir = project(1, &["src/main.rs"]);
+    let repo = dir.path();
+    git(repo, &["checkout", "-q", "-b", "side"]);
+    write(repo, "src/main.rs", "2");
+    commit_all(repo, "side work");
+    add_evidence_ok(repo, 1, "src/");
+    commit_all(repo, "side evidence");
+    git(repo, &["checkout", "-q", "main"]);
+    git(repo, &["checkout", "side", "--", ".canon/ledger"]);
+    write(repo, "src/main.rs", "3");
+    commit_all(repo, "main takes the ledger");
+    dir
+}
+
+/// A project with its evidence recorded, then the code changed, over three commits: the base of the record is the first.
+fn project_with_a_change_after_its_evidence() -> TempDir {
+    let dir = project(1, &["src/main.rs"]);
+    let repo = dir.path();
+    add_evidence_ok(repo, 1, "src/");
+    commit_all(repo, "evidence");
+    write(repo, "src/main.rs", "2");
+    commit_all(repo, "code moved");
+    dir
+}
+
+fn clone_of(origin: &Path, shallow: bool) -> TempDir {
+    let dir = TempDir::new().unwrap();
+    let url = format!("file://{}", origin.display());
+    let mut args = vec!["clone", "-q"];
+    if shallow {
+        args.extend(["--depth", "1"]);
+    }
+    args.extend([url.as_str(), "."]);
+    git(dir.path(), &args);
+    dir
+}
+
+/// F3, F4: a shallow clone has no base commit; `gate check` says `base_missing 1`, with the instruction to unshallow, and `status` says the same; the
+/// violation list and the exit status are those of a base that adds nothing. In a full clone of the same repository neither says anything, and
+/// the evidence is stale there.
+#[test]
+fn f3_a_shallow_clone_is_counted_as_base_missing_and_a_full_clone_says_nothing() {
+    let origin = project_with_a_change_after_its_evidence();
+    let (status, stale_origin) = stale(origin.path());
+    assert_eq!((status, stale_origin.len()), (Some(1), 1), "in the repository itself the evidence is stale");
+
+    let shallow = clone_of(origin.path(), true);
+    let message = both_say(shallow.path(), None);
+    assert!(message.starts_with("1 (subject, role) cell(s)") && message.contains("base_missing 1") && message.contains(&scenario(1)), "{message}");
+    assert!(message.contains("git fetch --unshallow"), "{message}");
+    let (status, stale_shallow) = stale(shallow.path());
+    assert_eq!((status, stale_shallow.len()), (Some(0), 0), "the cell adds nothing, as it did before the count");
+
+    let full = clone_of(origin.path(), false);
+    assert_eq!(said(full.path(), None), (None, None), "a full clone has every base");
+    assert_eq!(stale(full.path()), (Some(1), stale_origin), "and the same violations as the repository");
+}
+
+/// F3, F4: a base commit that `git gc --prune=now` removed is `base_missing`, and the clone is not shallow, so there is no instruction to unshallow.
+#[test]
+fn f3_a_pruned_base_commit_is_counted_as_base_missing() {
+    let dir = ledger_moved_from_another_branch();
+    let repo = dir.path();
+    git(repo, &["branch", "-q", "-D", "side"]);
+    git(repo, &["reflog", "expire", "--expire=now", "--all"]);
+    git(repo, &["gc", "-q", "--prune=now"]);
+
+    let message = both_say(repo, None);
+    assert!(message.contains("base_missing 1") && !message.contains("--unshallow"), "{message}");
+    let (status, stale_now) = stale(repo);
+    assert_eq!((status, stale_now.len()), (Some(0), 0), "a base that is gone adds nothing");
+}
+
+/// F3, F4: a ledger moved from another branch has a base that is there but is not an ancestor: `base_not_ancestor 1`, and the verdict is judged from
+/// `<base>..HEAD` as it was, which is stale here (src/main.rs differs between the two).
+#[test]
+fn f3_a_ledger_moved_from_another_branch_is_counted_as_base_not_ancestor_and_judged_from_the_range() {
+    let dir = ledger_moved_from_another_branch();
+    let repo = dir.path();
+    let message = both_say(repo, None);
+    assert!(message.contains("base_not_ancestor 1") && !message.contains("base_missing"), "{message}");
+    let (status, stale_now) = stale(repo);
+    assert_eq!((status, subjects(&stale_now)), (Some(1), vec![scenario(1).as_str()]), "{stale_now:?}");
+}
+
+/// F3, F4: with no `git` on the `PATH` git cannot answer: `git_unavailable`, and the violations are the ones that need no git.
+#[test]
+fn f3_no_git_on_the_path_is_counted_as_git_unavailable() {
+    let origin = project_with_a_change_after_its_evidence();
+    let repo = origin.path();
+    let empty = TempDir::new().unwrap();
+    let path = empty.path().as_os_str();
+    let message = both_say(repo, Some(path));
+    assert!(message.contains("git_unavailable 1") && !message.contains("base_missing"), "{message}");
+}
+
+/// F4, failure path: with nothing unread neither says anything; the two report what the other does or both are silent.
+#[test]
+fn f4_when_every_base_is_read_neither_gate_check_nor_status_says_anything() {
+    let dir = project_with_a_change_after_its_evidence();
+    assert_eq!(said(dir.path(), None), (None, None));
+    let empty = project(1, &["src/main.rs"]);
+    assert_eq!(said(empty.path(), None), (None, None), "no evidence, no cell");
+}
+
+// ── F5: the CHANGELOG ──
+
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+/// What the Unreleased section of `changelog` lacks about this change: the Changed entry (the new rule and what the gate asks for more, and that the
+/// `paths` of a risk tier keep theirs) and the Added entries (the advisory and the warnings).
+fn release_problems(changelog: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    let Some(unreleased) = changelog.split("\n## ").nth(1).filter(|section| section.starts_with("Unreleased")) else { return vec!["the CHANGELOG has no Unreleased section".to_string()] };
+    let sections: Vec<&str> = unreleased.split("\n### ").collect();
+    let section = |name: &str| sections.iter().find(|s| s.starts_with(name)).copied();
+    let entry_of = |section: &str, needle: &str| -> Option<String> {
+        let lines: Vec<&str> = section.lines().collect();
+        let start = lines.iter().position(|line| line.contains(needle))?;
+        Some(lines[start..].iter().enumerate().take_while(|(i, line)| *i == 0 || line.starts_with("  ")).map(|(_, line)| *line).collect::<Vec<_>>().join("\n"))
+    };
+    match section("Changed").and_then(|changed| entry_of(changed, "canon-0-39-staleness-scope")) {
+        None => problems.push("Unreleased has no Changed entry for canon-0-39-staleness-scope".to_string()),
+        Some(entry) => {
+            for needle in ["src/**", "`Cargo.toml`", "`**`", "`paths`", "next release that breaks compatibility", "stale-evidence", "code.exclude"] {
+                if !entry.contains(needle) {
+                    problems.push(format!("the Changed entry does not say `{needle}`"));
+                }
+            }
+        }
+    }
+    match section("Added") {
+        None => problems.push("Unreleased has no Added section".to_string()),
+        Some(added) => {
+            for needle in ["staleness_unresolvable", "STALENESS_UNRESOLVABLE", "SURFACE_REF_UNMATCHED", "base_missing", "base_not_ancestor", "git_unavailable", "git fetch --unshallow"] {
+                if !added.contains(needle) {
+                    problems.push(format!("the Added section does not say `{needle}`"));
+                }
+            }
+        }
+    }
+    problems
+}
+
+/// F5: the CHANGELOG says the new rule, what the gate asks for more, the advisory and the warnings, and that the `paths` of a risk tier keep their reading.
+#[test]
+fn f5_the_changelog_says_the_new_rule_the_advisory_and_the_warnings() {
+    let changelog = std::fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
+    assert_eq!(release_problems(&changelog), Vec::<String>::new());
+}
+
+/// F5, failure path: a CHANGELOG without the entry, or without a piece of it, is named by what it lacks.
+#[test]
+fn f5_a_changelog_without_the_entry_or_a_piece_of_it_is_named() {
+    let without = "# Changelog\n\n## Unreleased\n\n### Changed\n\n- an unrelated change\n\n## 0.38.0\n";
+    let problems = release_problems(without);
+    assert_eq!(problems[0], "Unreleased has no Changed entry for canon-0-39-staleness-scope");
+    assert_eq!(problems[1], "Unreleased has no Added section");
+
+    let thin = "# Changelog\n\n## Unreleased\n\n### Changed\n\n- **x** (`canon-0-39-staleness-scope`): `src/**` is stale-evidence.\n\n### Added\n\n- `STALENESS_UNRESOLVABLE`.\n\n## 0.38.0\n";
+    let problems = release_problems(thin);
+    assert!(problems.contains(&"the Changed entry does not say `next release that breaks compatibility`".to_string()), "{problems:?}");
+    assert!(problems.contains(&"the Added section does not say `SURFACE_REF_UNMATCHED`".to_string()), "{problems:?}");
+    assert!(problems.contains(&"the Added section does not say `git fetch --unshallow`".to_string()), "{problems:?}");
+}

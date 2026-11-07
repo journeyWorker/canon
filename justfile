@@ -33,11 +33,12 @@ test-callers:
     env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test --workspace --lib --locked
     env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test --workspace --lib --locked
 
-# The three clippy runs of test.yml `clippy`.
+# The three clippy runs of test.yml `clippy`, and its git boundary scan (every git call goes through `canon_store::git`).
 lint:
     cargo clippy --workspace --all-targets --locked -- -D warnings
     cargo clippy --workspace --lib --bins --locked -- -D warnings -D clippy::unwrap_used
     cargo clippy -p canon-store --all-targets --features live-pg,live-r2 --locked -- -D warnings
+    python3 scripts/check_git_boundary.py
 
 # Canon gates its own spec corpus: build, sync the scenario index, check.
 gate:

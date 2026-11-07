@@ -215,7 +215,7 @@ pub struct Derived {
     acceptances: OnceLock<HashMap<(ProjectId, ScenarioId), usize>>,
     pub(crate) verdicts: OnceLock<BTreeMap<CellKey, LedgerEntry>>,
     archive: OnceLock<Archive>,
-    staleness: OnceLock<Vec<Violation>>,
+    staleness: OnceLock<crate::staleness::Staleness>,
 }
 
 impl GateContext {
@@ -321,6 +321,16 @@ impl GateContext {
     /// computed once: the check itself and the risk check, which needs the
     /// stale subjects, share it.
     pub fn staleness_violations(&self) -> &[Violation] {
+        &self.staleness().violations
+    }
+
+    /// The cells of passing evidence whose base commit git could not read, counted by reason (0.39): the same
+    /// computation as [`Self::staleness_violations`], so a report of it and the violations never disagree.
+    pub fn staleness_unresolvable(&self) -> &crate::staleness::Unresolvable {
+        &self.staleness().unresolvable
+    }
+
+    fn staleness(&self) -> &crate::staleness::Staleness {
         self.derived.staleness.get_or_init(|| crate::staleness::compute(self))
     }
 }

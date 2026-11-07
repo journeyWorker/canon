@@ -61,12 +61,12 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 
 use canon_ingest::markdown::field;
 use canon_ingest::plan_adapters::openspec::proposal_path;
 use canon_ingest::{find_plan_adapter, PlanSourceHandle};
 use canon_model::{paths, ChangeId, RecordKind};
+use canon_store::git::GitCall;
 use canon_store::tier::TierQuery;
 use serde_yaml::Value;
 
@@ -1379,17 +1379,11 @@ fn write_atomic(path: &Path, text: &str) -> Result<(), String> {
 }
 
 fn git_run(repo: &Path, args: &[&str]) -> Result<(), String> {
-    let out = Command::new("git").args(args).current_dir(repo).output().map_err(|e| format!("could not run git: {e}"))?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(format!("`git {}` failed: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim()))
-    }
+    GitCall::new(repo).args(args).run().map(drop).map_err(|e| if e.is_exit() { format!("`git {}` failed: {}", args.join(" "), e.stderr_text()) } else { e.to_string() })
 }
 
 fn git_output(repo: &Path, args: &[&str]) -> Option<String> {
-    let out = Command::new("git").args(args).current_dir(repo).output().ok()?;
-    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+    GitCall::new(repo).args(args).run().ok().map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 fn in_git_work_tree(repo: &Path) -> bool {

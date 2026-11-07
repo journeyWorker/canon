@@ -32,10 +32,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use canon_model::layout;
 use canon_model::{EvidenceRecord, RecordKind};
+use canon_store::git::GitCall;
 use canon_store::policy::{BackendConfig, TierPolicy, LEGACY_EVIDENCE_KEY};
 use canon_store::r2_tier::{ObjectRekey, R2Tier};
 use canon_store::sqlite_tier::SqliteTier;
@@ -435,10 +435,7 @@ fn git_tracked(repo: &Path, dirs_or_files: &[String]) -> BTreeSet<String> {
         return BTreeSet::new();
     }
     let kind_dirs: BTreeSet<String> = dirs_or_files.iter().filter_map(|p| p.find("/kind=").map(|i| p[..i + 1 + p[i + 1..].find('/').unwrap_or(p.len() - i - 1)].to_string())).collect();
-    let Ok(out) = Command::new("git").args(["ls-files", "-z", "--"]).args(&kind_dirs).current_dir(repo).output() else { return BTreeSet::new() };
-    if !out.status.success() {
-        return BTreeSet::new();
-    }
+    let Ok(out) = GitCall::new(repo).args(["ls-files", "-z", "--"]).args(&kind_dirs).tree_listing().run() else { return BTreeSet::new() };
     String::from_utf8_lossy(&out.stdout).split('\0').filter(|p| !p.is_empty()).map(str::to_string).collect()
 }
 
@@ -641,13 +638,11 @@ fn journal_rows(path: String, rows: &RowPlan) -> JournalRows {
 }
 
 fn git(repo: &Path, args: &[&str], stdin: Option<&str>) -> Result<(), String> {
-    use std::io::Write;
-    let mut child = Command::new("git").args(args).current_dir(repo).stdin(if stdin.is_some() { std::process::Stdio::piped() } else { std::process::Stdio::null() }).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped()).spawn().map_err(|e| format!("could not run git: {e}"))?;
-    if let (Some(text), Some(mut pipe)) = (stdin, child.stdin.take()) {
-        pipe.write_all(text.as_bytes()).map_err(|e| format!("could not feed git: {e}"))?;
+    let mut call = GitCall::new(repo).args(args);
+    if let Some(text) = stdin {
+        call = call.stdin(text.as_bytes());
     }
-    let out = child.wait_with_output().map_err(|e| format!("could not run git: {e}"))?;
-    if out.status.success() { Ok(()) } else { Err(format!("`git {}` failed: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim())) }
+    call.run().map(drop).map_err(|e| if e.is_exit() { format!("`git {}` failed: {}", args.join(" "), e.stderr_text()) } else { e.to_string() })
 }
 
 /// Stage the renames of tracked files the way `git mv` does: the old path leaves the index, the new one joins it.
@@ -849,7 +844,7 @@ pub fn revert(repo: &Path, backup: &Path) -> Result<(), String> {
 }
 
 fn is_git_tree(repo: &Path) -> bool {
-    Command::new("git").args(["rev-parse", "--is-inside-work-tree"]).current_dir(repo).output().is_ok_and(|out| out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "true")
+    GitCall::new(repo).args(["rev-parse", "--is-inside-work-tree"]).run().is_ok_and(|out| out.stdout_trimmed() == "true")
 }
 
 // ------------------------------------------------------------------- preview
@@ -1027,10 +1022,7 @@ fn scan(repo: &Path, scope: &[String]) -> Result<Tree, String> {
 
 /// `git ls-files -s` entries (`<mode> <sha> <stage>\t<path>`) of the scope.
 fn index_entries(repo: &Path, scope: &[String]) -> Result<Vec<String>, String> {
-    let out = Command::new("git").args(["ls-files", "-s", "-z"]).current_dir(repo).output().map_err(|e| format!("could not run git: {e}"))?;
-    if !out.status.success() {
-        return Err(format!("`git ls-files` failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
-    }
+    let out = GitCall::new(repo).args(["ls-files", "-s", "-z"]).tree_listing().run().map_err(|e| if e.is_exit() { format!("`git ls-files` failed: {}", e.stderr_text()) } else { e.to_string() })?;
     Ok(String::from_utf8_lossy(&out.stdout).split('\0').filter(|e| e.split_once('\t').is_some_and(|(_, path)| in_scope(scope, path))).map(str::to_string).collect())
 }
 

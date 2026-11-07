@@ -45,13 +45,29 @@
 //! SAME (subject, role) cell is not green either: the ledger's
 //! current answer for that cell is whatever its LATEST record says,
 //! exactly [`crate::ledger::latest_verdicts`]'s own read model.
+//!
+//! # A declared surface is a path pattern (0.39)
+//! A `surface_ref` that is not `effect:...` is a pattern read from the repository root with the glob of
+//! `code.exclude` ([`canon_model::path_glob`], [`Anchor::Root`]): `src/`, `src`, `src/**` and `src/*.rs` all
+//! go stale when `src/a.rs` changes, `Cargo.toml` is the root manifest and not every crate's, and a value
+//! identical to a changed path matches it. The reason names the declarations that matched and the paths they
+//! matched (the first three of each, and the totals).
+//!
+//! # A base commit git could not read (0.39)
+//! A cell that reaches git (a green cell with an `evidence_sha` whose code tree is not the current one) has a
+//! base commit. When the base is not in the repository (`base_missing`: a shallow clone, a pruned commit) or
+//! git cannot answer (`git_unavailable`: no `git`, past its deadline or its output limit, or a failure that is
+//! neither yes nor no), the cell adds nothing, as before; a base that is there but not an ancestor of HEAD (`base_not_ancestor`) is computed as
+//! `<base>..HEAD`, as before. [`Unresolvable`] counts the cells of each reason so `canon gate check` and
+//! `canon status` can say so: the verdicts, and the exit status, do not change.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::Path;
-use std::process::Command;
 
+use canon_model::path_glob::{Anchor, Glob};
 use canon_model::{EvidenceRecord, EvidenceVerdict, Sha};
 use canon_store::fold_latest_by_key;
+use canon_store::git::{GitCall, GitError};
 use chrono::{DateTime, Utc};
 
 use crate::context::{GateCheck, GateContext};
@@ -143,54 +159,259 @@ fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
         .collect()
 }
 
+/// Why the base commit of a cell could not be read (module doc).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unresolved {
+    /// The base commit is not in this repository.
+    BaseMissing,
+    /// It is there, but not an ancestor of HEAD.
+    BaseNotAncestor,
+    /// Git did not answer: it did not start, ran past its deadline, or wrote what could not be read.
+    GitUnavailable,
+}
+
+impl Unresolved {
+    /// The name the reports use.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::BaseMissing => "base_missing",
+            Self::BaseNotAncestor => "base_not_ancestor",
+            Self::GitUnavailable => "git_unavailable",
+        }
+    }
+}
+
+/// How many subjects a report names before it counts the rest.
+const SHOWN: usize = 3;
+
+/// The cells of passing evidence whose base commit git could not read, counted by reason (module doc).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Unresolvable {
+    pub base_missing: usize,
+    pub base_not_ancestor: usize,
+    pub git_unavailable: usize,
+    /// How many subjects the cells are of.
+    pub subjects: usize,
+    /// The first three of them, in subject order.
+    pub first: Vec<String>,
+    /// The repository is a shallow clone.
+    pub shallow: bool,
+}
+
+impl Unresolvable {
+    /// The cells counted, whatever the reason.
+    pub const fn total(&self) -> usize {
+        self.base_missing + self.base_not_ancestor + self.git_unavailable
+    }
+
+    /// Whether no cell is counted: nothing is said.
+    pub const fn is_empty(&self) -> bool {
+        self.total() == 0
+    }
+
+    /// The cells of each reason, the ones that are counted, in the order of [`Unresolved`].
+    pub fn reasons(&self) -> Vec<(Unresolved, usize)> {
+        [(Unresolved::BaseMissing, self.base_missing), (Unresolved::BaseNotAncestor, self.base_not_ancestor), (Unresolved::GitUnavailable, self.git_unavailable)]
+            .into_iter()
+            .filter(|(_, count)| *count > 0)
+            .collect()
+    }
+
+    /// The lines under the advisory of `canon gate check`: the cells of each reason, then the first subjects.
+    pub fn items(&self) -> Vec<String> {
+        let mut lines: Vec<String> = self.reasons().iter().map(|(reason, count)| format!("{}: {count} cell(s)", reason.as_str())).collect();
+        let more = if self.first.len() < self.subjects { ", ..." } else { "" };
+        lines.push(format!("first subjects: {}{more}", self.first.join(", ")));
+        lines
+    }
+
+    /// The sentence `canon gate check` (its advisory) and `canon status` (its warning) both say.
+    pub fn message(&self) -> String {
+        let reasons = self.reasons().iter().map(|(reason, count)| format!("{} {count}", reason.as_str())).collect::<Vec<_>>().join(", ");
+        let named = self.first.iter().map(|subject| format!("`{subject}`")).collect::<Vec<_>>().join(", ");
+        let more = if self.first.len() < self.subjects { ", ..." } else { "" };
+        let hint = if self.shallow { " This is a shallow clone: run `git fetch --unshallow` to read the base commits." } else { "" };
+        format!(
+            "{} (subject, role) cell(s) of passing evidence could not be checked against their base commit ({reasons}); first: {named}{more}.{hint} Their verdicts are unchanged.",
+            self.total()
+        )
+    }
+}
+
+/// What the staleness check found: the violations, and what it could not check.
+#[derive(Debug, Default)]
+pub struct Staleness {
+    pub violations: Vec<Violation>,
+    pub unresolvable: Unresolvable,
+}
+
+/// What git says of a base commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Base {
+    Ancestor,
+    NotAncestor,
+    Missing,
+    Unavailable,
+}
+
+/// A question git answers yes or no with its exit status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Probe {
+    Yes,
+    No,
+    Unanswered,
+}
+
 /// Memoized `git` subprocess boundary (staleness.md §3.3: "5k+ ledger
 /// records share ~15 unique `app_sha`s ... one fork per unique query,
 /// not per ledger row") — process-lifetime-per-`run()`-call, keyed by
 /// the exact `(subcommand, sha)` pair; swallows every failure to
 /// `None`, never panics (module doc's "unresolvable" third state).
+///
+/// A query git did not answer in time, or answered with more than the output limit
+/// ([`canon_store::git::GitError::is_stopped`]), is `None`, and so is every later query of the run: one stuck git
+/// is not asked again for each commit of the ledger (0.39). The next `gate check` asks afresh.
 #[derive(Default)]
 struct GitMemo {
-    changed: std::collections::HashMap<String, Option<HashSet<String>>>,
-    behind: std::collections::HashMap<String, Option<u32>>,
+    changed: HashMap<String, Option<Vec<String>>>,
+    behind: HashMap<String, Option<u32>>,
+    base: HashMap<String, Base>,
+    stopped: bool,
 }
 
 impl GitMemo {
-    fn changed_files_since(&mut self, repo: &Path, sha: &str) -> Option<&HashSet<String>> {
-        self.changed.entry(sha.to_string()).or_insert_with(|| git_diff_names(repo, sha)).as_ref()
+    /// The paths that changed since `sha`, sorted.
+    fn changed_files_since(&mut self, repo: &Path, sha: &str) -> Option<&[String]> {
+        if !self.changed.contains_key(sha) {
+            let answer = self.git_diff_names(repo, sha);
+            self.changed.insert(sha.to_string(), answer);
+        }
+        self.changed[sha].as_deref()
     }
 
     fn commits_behind(&mut self, repo: &Path, sha: &str) -> Option<u32> {
-        *self.behind.entry(sha.to_string()).or_insert_with(|| git_rev_list_count(repo, sha))
+        if !self.behind.contains_key(sha) {
+            let answer = self.git_rev_list_count(repo, sha);
+            self.behind.insert(sha.to_string(), answer);
+        }
+        self.behind[sha]
+    }
+
+    /// Where the base commit `sha` stands against HEAD: two questions, asked once for a commit however many cells
+    /// have it as their base.
+    fn base(&mut self, repo: &Path, sha: &str) -> Base {
+        if let Some(&known) = self.base.get(sha) {
+            return known;
+        }
+        let commit = format!("{sha}^{{commit}}");
+        let found = match self.probe(repo, &["rev-parse", "--verify", "--quiet", &commit]) {
+            Probe::Yes => match self.probe(repo, &["merge-base", "--is-ancestor", sha, "HEAD"]) {
+                Probe::Yes => Base::Ancestor,
+                Probe::No => Base::NotAncestor,
+                Probe::Unanswered => Base::Unavailable,
+            },
+            Probe::No => Base::Missing,
+            Probe::Unanswered => Base::Unavailable,
+        };
+        self.base.insert(sha.to_string(), found);
+        found
+    }
+
+    /// A call whose answer is its exit status: zero is yes, one is no, anything else (git did not start, ran out of
+    /// time or size, or failed for a reason that is not the question) is no answer.
+    fn probe(&mut self, repo: &Path, args: &[&str]) -> Probe {
+        if self.stopped {
+            return Probe::Unanswered;
+        }
+        match GitCall::new(repo).args(args).no_lazy_fetch().run() {
+            Ok(_) => Probe::Yes,
+            Err(GitError::Exit { code: Some(1), .. }) => Probe::No,
+            Err(error) => {
+                self.stopped = error.is_stopped();
+                Probe::Unanswered
+            }
+        }
+    }
+
+    /// Whether the repository is a shallow clone, asked when a report needs it.
+    fn shallow(&mut self, repo: &Path) -> bool {
+        self.run_git(repo, &["rev-parse", "--is-shallow-repository"]).is_some_and(|out| out.trim() == "true")
+    }
+
+    /// The ONE subprocess boundary this module ever crosses — swallows
+    /// every failure (missing binary, unresolvable sha, non-zero exit,
+    /// invalid UTF-8, past the deadline or the output limit) into `None`,
+    /// never raises (staleness.md §3.3/`_git`; module doc's
+    /// "unresolvable" third state).
+    fn run_git(&mut self, repo: &Path, args: &[&str]) -> Option<String> {
+        if self.stopped {
+            return None;
+        }
+        match GitCall::new(repo).args(args).run() {
+            Ok(output) => String::from_utf8(output.stdout).ok(),
+            Err(error) => {
+                self.stopped = error.is_stopped();
+                None
+            }
+        }
+    }
+
+    /// The precise tier: `git diff --name-only -z --no-renames <sha>..HEAD`
+    /// (staleness.md §3.1/§6, `_changed_files_since` +
+    /// `_git_diff_touches`). `-z` names a file as it is, whatever its characters.
+    fn git_diff_names(&mut self, repo: &Path, sha: &str) -> Option<Vec<String>> {
+        let range = format!("{sha}..HEAD");
+        let out = self.run_git(repo, &["diff", "--name-only", "-z", "--no-renames", &range])?;
+        let mut names: Vec<String> = out.split('\0').filter(|name| !name.is_empty()).map(str::to_string).collect();
+        names.sort_unstable();
+        names.dedup();
+        Some(names)
+    }
+
+    /// The coarse tier: `git rev-list --count <sha>..HEAD` (staleness.md
+    /// §3.1, the `max_commits_behind` ceiling's own git query).
+    fn git_rev_list_count(&mut self, repo: &Path, sha: &str) -> Option<u32> {
+        let range = format!("{sha}..HEAD");
+        let out = self.run_git(repo, &["rev-list", "--count", &range])?;
+        out.trim().parse().ok()
     }
 }
 
-/// The ONE subprocess boundary this module ever crosses — swallows
-/// every failure (missing binary, unresolvable sha, non-zero exit,
-/// invalid UTF-8) into `None`, never raises (staleness.md §3.3/`_git`;
-/// module doc's "unresolvable" third state).
-fn run_git(repo: &Path, args: &[&str]) -> Option<String> {
-    let output = Command::new("git").arg("-C").arg(repo).args(args).output().ok()?;
-    if !output.status.success() {
-        return None;
+/// What the declarations of a cell matched among the changed paths.
+struct Matched<'a> {
+    declared: Vec<&'a str>,
+    paths: Vec<&'a str>,
+}
+
+/// The declarations among `declared` (never an `effect:`) that match a changed path, and the changed paths they
+/// match: a declaration is a pattern from the root ([`Anchor::Root`]), and a value identical to a path matches it.
+fn match_surface<'a>(declared: &'a [String], changed: &'a [String]) -> Matched<'a> {
+    let mut hit = vec![false; changed.len()];
+    let mut matched = Matched { declared: Vec::new(), paths: Vec::new() };
+    for declaration in declared.iter().filter(|value| !value.starts_with("effect:")) {
+        let glob = Glob::new(declaration, Anchor::Root);
+        let mut any = false;
+        for (i, path) in changed.iter().enumerate() {
+            if path == declaration || glob.matches(path) {
+                hit[i] = true;
+                any = true;
+            }
+        }
+        if any {
+            matched.declared.push(declaration);
+        }
     }
-    String::from_utf8(output.stdout).ok()
+    matched.paths = changed.iter().zip(&hit).filter(|(_, hit)| **hit).map(|(path, _)| path.as_str()).collect();
+    matched
 }
 
-/// The precise tier: `git diff --name-only --no-renames <sha>..HEAD`
-/// (staleness.md §3.1/§6, `_changed_files_since` +
-/// `_git_diff_touches`).
-fn git_diff_names(repo: &Path, sha: &str) -> Option<HashSet<String>> {
-    let range = format!("{sha}..HEAD");
-    let out = run_git(repo, &["diff", "--name-only", "--no-renames", &range])?;
-    Some(out.lines().map(str::to_string).collect())
-}
-
-/// The coarse tier: `git rev-list --count <sha>..HEAD` (staleness.md
-/// §3.1, the `max_commits_behind` ceiling's own git query).
-fn git_rev_list_count(repo: &Path, sha: &str) -> Option<u32> {
-    let range = format!("{sha}..HEAD");
-    let out = run_git(repo, &["rev-list", "--count", &range])?;
-    out.trim().parse().ok()
+/// `items`, the first [`SHOWN`] of them in backticks and how many more.
+fn first_of(items: &[&str]) -> String {
+    let shown = items.iter().take(SHOWN).map(|item| format!("`{item}`")).collect::<Vec<_>>().join(", ");
+    match items.len().checked_sub(SHOWN).filter(|more| *more > 0) {
+        Some(more) => format!("{shown} and {more} more"),
+        None => shown,
+    }
 }
 
 /// The staleness [`crate::GateCheck`] (D4) — see module doc for the
@@ -210,12 +431,33 @@ impl GateCheck for StalenessCheck {
 }
 
 /// What [`StalenessCheck`] reports for `ctx`. Callers go through
-/// [`GateContext::staleness_violations`], which holds the result for the
-/// command: the staleness check and the risk check read the same one.
-pub(crate) fn compute(ctx: &GateContext) -> Vec<Violation> {
+/// [`GateContext::staleness_violations`] and [`GateContext::staleness_unresolvable`], which hold the result for the
+/// command: the staleness check, the risk check and the reports of what could not be read share it.
+pub(crate) fn compute(ctx: &GateContext) -> Staleness {
+    evaluate(ctx, ctx.code_tree.as_deref(), true)
+}
+
+/// The cells whose base commit git could not read, without the violations: `canon status` says what `canon gate
+/// check` does, and asks git two questions per base commit and nothing else. `code_tree` is the code tree now
+/// (the one `canon gate check` sets on its context); it is asked for only when a cell is unread without it, since
+/// a cell whose record's code tree is the current one never reaches git.
+pub fn unresolvable_cells(ctx: &GateContext, code_tree: impl FnOnce() -> Option<String>) -> Unresolvable {
+    let without = evaluate(ctx, None, false).unresolvable;
+    if without.is_empty() {
+        return without;
+    }
+    evaluate(ctx, code_tree().as_deref(), false).unresolvable
+}
+
+/// The staleness of every green cell as of `code_tree` (the code now, `None` when unknown), and the cells whose
+/// base commit could not be read. `queries` asks git for the changed paths and the commits behind: without them
+/// the violations are left out and git is asked only where a base stands.
+fn evaluate(ctx: &GateContext, code_tree: Option<&str>, queries: bool) -> Staleness {
     let mut memo = GitMemo::default();
+    let repo = &ctx.ctx.repo;
     let now = ctx.now;
     let mut violations = Vec::new();
+    let mut unread: Vec<(String, Unresolved)> = Vec::new();
 
     for cell in fold_latest_green_cells(ctx) {
         // No `evidence_sha` at all: neither tier has a starting
@@ -225,7 +467,25 @@ pub(crate) fn compute(ctx: &GateContext) -> Vec<Violation> {
         // The code is what it was when the evidence was recorded (D7b):
         // commits since then (docs, specs, briefs) did not move it, so no
         // surface changed and the ceiling is not about code.
-        if cell.code_tree.is_some() && cell.code_tree == ctx.code_tree {
+        if cell.code_tree.is_some() && cell.code_tree.as_deref() == code_tree {
+            continue;
+        }
+
+        match memo.base(repo, sha.as_str()) {
+            // Nothing to compare: as it always was, the cell adds nothing.
+            Base::Missing => {
+                unread.push((cell.subject.clone(), Unresolved::BaseMissing));
+                continue;
+            }
+            Base::Unavailable => {
+                unread.push((cell.subject.clone(), Unresolved::GitUnavailable));
+                continue;
+            }
+            // Computed as `<base>..HEAD`, as it always was.
+            Base::NotAncestor => unread.push((cell.subject.clone(), Unresolved::BaseNotAncestor)),
+            Base::Ancestor => {}
+        }
+        if !queries {
             continue;
         }
 
@@ -233,19 +493,26 @@ pub(crate) fn compute(ctx: &GateContext) -> Vec<Violation> {
 
         let surface_scoped = ctx.policy.surface_scoped(&cell.raw, now).unwrap_or(DEFAULT_SURFACE_SCOPED);
         if surface_scoped && !cell.surface_ref.is_empty() {
-            if let Some(changed) = memo.changed_files_since(&ctx.ctx.repo, sha.as_str()) {
-                if cell.surface_ref.iter().any(|declared| changed.contains(declared)) {
-                    reasons.push(format!("a declared surface file changed since {sha}"));
-                }
-            }
             // `None` (unresolvable diff query) contributes nothing
             // to this tier — never assumed stale.
+            if let Some(changed) = memo.changed_files_since(repo, sha.as_str()) {
+                let matched = match_surface(&cell.surface_ref, changed);
+                if !matched.paths.is_empty() {
+                    reasons.push(format!(
+                        "a declared surface changed since {sha}: {} declared surface ref(s) matched {} changed path(s) — declared {}; changed {}",
+                        matched.declared.len(),
+                        matched.paths.len(),
+                        first_of(&matched.declared),
+                        first_of(&matched.paths)
+                    ));
+                }
+            }
         }
 
         // The ceiling is an UNCONDITIONAL backstop (module doc) —
         // it always runs, even when the precise diff above came
         // back clean.
-        if let Some(commits_behind) = memo.commits_behind(&ctx.ctx.repo, sha.as_str()) {
+        if let Some(commits_behind) = memo.commits_behind(repo, sha.as_str()) {
             let ceiling = ctx.policy.max_commits_behind(&cell.raw, now).unwrap_or(DEFAULT_MAX_COMMITS_BEHIND);
             if commits_behind > ceiling {
                 reasons.push(format!("{commits_behind} commits behind HEAD (max_commits_behind={ceiling})"));
@@ -257,7 +524,24 @@ pub(crate) fn compute(ctx: &GateContext) -> Vec<Violation> {
         }
     }
 
-    violations
+    let mut unresolvable = Unresolvable::default();
+    for (_, why) in &unread {
+        match why {
+            Unresolved::BaseMissing => unresolvable.base_missing += 1,
+            Unresolved::BaseNotAncestor => unresolvable.base_not_ancestor += 1,
+            Unresolved::GitUnavailable => unresolvable.git_unavailable += 1,
+        }
+    }
+    if !unresolvable.is_empty() {
+        let mut subjects: Vec<&str> = unread.iter().map(|(subject, _)| subject.as_str()).collect();
+        subjects.sort_unstable();
+        subjects.dedup();
+        unresolvable.subjects = subjects.len();
+        unresolvable.first = subjects.iter().take(SHOWN).map(|subject| (*subject).to_string()).collect();
+        unresolvable.shallow = memo.shallow(repo);
+    }
+
+    Staleness { violations, unresolvable }
 }
 
 #[cfg(test)]
@@ -275,8 +559,7 @@ mod tests {
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};
 
     fn git(repo: &Path, args: &[&str]) {
-        let status = Command::new("git").arg("-C").arg(repo).args(args).status().expect("git must be on PATH for this test");
-        assert!(status.success(), "git {args:?} failed");
+        GitCall::new(repo).args(args).run().unwrap_or_else(|error| panic!("{error}"));
     }
 
     fn init_repo(repo: &Path) {
@@ -291,7 +574,7 @@ mod tests {
         std::fs::write(&path, content).unwrap();
         git(repo, &["add", "-A"]);
         git(repo, &["commit", "-q", "-m", message]);
-        run_git(repo, &["rev-parse", "HEAD"]).unwrap().trim().to_string()
+        GitCall::new(repo).args(["rev-parse", "HEAD"]).run().unwrap().stdout_trimmed()
     }
 
     /// Writes one green `EvidenceRecord` with its NATIVE
@@ -388,7 +671,49 @@ mod tests {
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].class, FailureClass::StaleEvidence);
         assert_eq!(violations[0].subject, "s5#1.7");
-        assert!(violations[0].detail.contains("declared surface file changed"));
+        assert!(violations[0].detail.contains("declared surface changed"));
+    }
+
+    /// git quotes a name with a non-ASCII character or a quote unless the list is NUL-terminated (0.39): the declared
+    /// surface and the name git gave were two strings, and a changed file was reported clean.
+    #[test]
+    fn stale_evidence_fires_for_a_surface_file_whose_name_git_would_quote() {
+        for name in ["é.rs", "a\"b.rs", "with space.rs", "dir/ü ñ.rs"] {
+            let dir = TempDir::new().unwrap();
+            let repo = dir.path();
+            init_repo(repo);
+            let sha = write_and_commit(repo, name, "fn a() {}", "initial");
+            let ledger_root = repo.join(".canon/ledger");
+            write_green_record(&ledger_root, "s5#1.7", "implementer", &sha, &[name]);
+            write_and_commit(repo, name, "fn a() { /* changed */ }", "surface changed");
+
+            let violations = StalenessCheck.run(&ctx_for(repo, &ledger_root, policy_with(50, true), fixed_now()));
+            assert_eq!(violations.len(), 1, "{name}: {violations:?}");
+            assert!(violations[0].detail.contains("declared surface changed"), "{name}: {}", violations[0].detail);
+        }
+    }
+
+    /// A commit that adds a file whose name is no UTF-8 string: the diff answer is unknown, never "stale" and never
+    /// "clean" for the surface it also changed.
+    #[test]
+    fn a_name_that_is_not_utf8_leaves_the_surface_query_unanswered_and_the_evidence_not_stale() {
+        let dir = TempDir::new().unwrap();
+        let repo = dir.path();
+        init_repo(repo);
+        let sha = write_and_commit(repo, "crates/foo/src/bar.rs", "fn bar() {}", "initial");
+        let ledger_root = repo.join(".canon/ledger");
+        write_green_record(&ledger_root, "s5#1.7", "implementer", &sha, &["crates/foo/src/bar.rs"]);
+
+        std::fs::write(repo.join("crates/foo/src/bar.rs"), "fn bar() { /* changed */ }").unwrap();
+        git(repo, &["add", "-A"]);
+        let blob = GitCall::new(repo).args(["hash-object", "-w", "--stdin"]).stdin(b"x").run().unwrap().stdout_trimmed();
+        let mut entry = format!("100644 {blob}\tcrates/").into_bytes();
+        entry.extend_from_slice(b"\xff.rs\n");
+        GitCall::new(repo).args(["update-index", "--add", "--index-info"]).stdin(&entry).run().unwrap();
+        git(repo, &["commit", "-q", "-m", "changes the surface and adds a name that is not UTF-8"]);
+
+        let violations = StalenessCheck.run(&ctx_for(repo, &ledger_root, policy_with(50, true), fixed_now()));
+        assert!(violations.is_empty(), "the query has no answer, so nothing is asserted: {violations:?}");
     }
 
     #[test]
@@ -636,5 +961,168 @@ mod tests {
         assert_eq!(violations.len(), 1, "age above the age_days threshold: surface_scoped resolves true and the declared surface changed since the evidence sha");
         assert_eq!(violations[0].class, FailureClass::StaleEvidence);
         assert_eq!(violations[0].subject, "s5#1.7");
+    }
+
+    /// The subjects a set of fixed-task records is about, as the check names them.
+    fn stale_subjects(violations: &[Violation]) -> Vec<&str> {
+        let mut subjects: Vec<&str> = violations.iter().map(|violation| violation.subject.as_str()).collect();
+        subjects.sort_unstable();
+        subjects
+    }
+
+    /// A repository with one commit holding `files`, and a green record per `(task, declared)` pair of `declarations`
+    /// whose base is that commit. Returns the repository, its ledger root and the base.
+    fn repo_with_records(files: &[&str], declarations: &[(&str, &[&str])]) -> (TempDir, PathBuf, String) {
+        let dir = TempDir::new().unwrap();
+        let repo = dir.path().to_path_buf();
+        init_repo(&repo);
+        for file in files {
+            let path = repo.join(file);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, "1").unwrap();
+        }
+        git(&repo, &["add", "-A"]);
+        git(&repo, &["commit", "-q", "-m", "base"]);
+        let base = GitCall::new(&repo).args(["rev-parse", "HEAD"]).run().unwrap().stdout_trimmed();
+        let ledger_root = repo.join(".canon/ledger");
+        for (task, declared) in declarations {
+            write_green_record(&ledger_root, task, "implementer", &base, declared);
+        }
+        (dir, ledger_root, base)
+    }
+
+    fn violations_of(dir: &TempDir, ledger_root: &Path) -> Vec<Violation> {
+        StalenessCheck.run(&ctx_for(dir.path(), ledger_root, policy_with(50, true), fixed_now()))
+    }
+
+    #[test]
+    fn a_directory_and_a_glob_declared_as_the_surface_go_stale_when_a_file_under_them_changes() {
+        let declarations: [(&str, &[&str]); 4] = [("s1#1.1", &["src/"]), ("s1#1.2", &["src"]), ("s1#1.3", &["src/**"]), ("s1#1.4", &["src/*.rs"])];
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs", "lib/z.rs"], &declarations);
+        write_and_commit(dir.path(), "src/a.rs", "2", "edit");
+
+        let violations = violations_of(&dir, &ledger_root);
+        assert_eq!(stale_subjects(&violations), ["s1#1.1", "s1#1.2", "s1#1.3", "s1#1.4"], "{violations:?}");
+        for (violation, (_, declared)) in stale_subjects(&violations).iter().zip(&declarations) {
+            let detail = &violations.iter().find(|v| v.subject == *violation).unwrap().detail;
+            assert!(detail.contains(&format!("`{}`", declared[0])) && detail.contains("`src/a.rs`"), "the reason names the declaration and the path: {detail}");
+        }
+    }
+
+    #[test]
+    fn a_glob_that_does_not_cross_a_slash_is_not_stale_for_a_file_in_a_subdirectory() {
+        let declarations: [(&str, &[&str]); 3] = [("s1#1.1", &["src/*.rs"]), ("s1#1.2", &["src/"]), ("s1#1.3", &["Cargo.toml"])];
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs", "src/x/b.rs", "Cargo.toml", "crates/x/Cargo.toml"], &declarations);
+        write_and_commit(dir.path(), "src/x/b.rs", "2", "edit one below src");
+        write_and_commit(dir.path(), "crates/x/Cargo.toml", "2", "edit another crate's manifest");
+
+        let violations = violations_of(&dir, &ledger_root);
+        assert_eq!(stale_subjects(&violations), ["s1#1.2"], "only the directory covers src/x/b.rs; `src/*.rs` stops at the slash and `Cargo.toml` is the root manifest: {violations:?}");
+    }
+
+    #[test]
+    fn an_exact_file_and_an_effect_give_the_answer_they_gave_before() {
+        let declarations: [(&str, &[&str]); 3] = [("s1#1.1", &["src/a.rs"]), ("s1#1.2", &["effect:payments"]), ("s1#1.3", &["src/a.rs", "effect:payments"])];
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs", "src/b.rs"], &declarations);
+        write_and_commit(dir.path(), "src/b.rs", "2", "edit another file");
+        assert!(violations_of(&dir, &ledger_root).is_empty());
+
+        write_and_commit(dir.path(), "src/a.rs", "2", "edit the declared file");
+        let violations = violations_of(&dir, &ledger_root);
+        assert_eq!(stale_subjects(&violations), ["s1#1.1", "s1#1.3"], "{violations:?}");
+    }
+
+    #[test]
+    fn the_reason_names_the_first_three_declarations_and_paths_and_how_many_there_are() {
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs"], &[("s1#1.1", &["src/**", "src/", "src/*.rs", "lib/**"])]);
+        for name in ["a.rs", "b.rs", "c.rs", "d.rs", "e.rs"] {
+            write_and_commit(dir.path(), &format!("src/{name}"), "2", "edit");
+        }
+        let violations = violations_of(&dir, &ledger_root);
+        assert_eq!(violations.len(), 1);
+        let detail = &violations[0].detail;
+        assert!(detail.contains("3 declared surface ref(s) matched 5 changed path(s)"), "{detail}");
+        assert!(detail.contains("declared `src/**`, `src/`, `src/*.rs`;"), "the declarations in the order the record has them; `lib/**` matched nothing: {detail}");
+        assert!(detail.contains("changed `src/a.rs`, `src/b.rs`, `src/c.rs` and 2 more"), "{detail}");
+    }
+
+    #[test]
+    fn a_base_commit_the_repository_does_not_have_is_counted_and_adds_nothing() {
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs"], &[]);
+        write_green_record(&ledger_root, "s1#1.1", "implementer", &"1".repeat(40), &["src/"]);
+        write_green_record(&ledger_root, "s1#1.2", "implementer", &"2".repeat(40), &["src/a.rs"]);
+        write_and_commit(dir.path(), "src/a.rs", "2", "edit");
+
+        let ctx = ctx_for(dir.path(), &ledger_root, policy_with(0, true), fixed_now());
+        assert!(StalenessCheck.run(&ctx).is_empty());
+        let unresolvable = ctx.staleness_unresolvable();
+        assert_eq!((unresolvable.base_missing, unresolvable.base_not_ancestor, unresolvable.git_unavailable), (2, 0, 0));
+        assert_eq!(unresolvable.first, ["s1#1.1", "s1#1.2"]);
+        assert!(!unresolvable.shallow);
+        assert!(!unresolvable.message().contains("--unshallow"));
+    }
+
+    #[test]
+    fn a_base_commit_that_is_not_an_ancestor_is_counted_and_still_judged_from_its_range() {
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs"], &[]);
+        let repo = dir.path();
+        git(repo, &["checkout", "-q", "-b", "other"]);
+        let other = write_and_commit(repo, "src/a.rs", "2", "the other branch");
+        write_green_record(&ledger_root, "s1#1.1", "implementer", &other, &["src/"]);
+        git(repo, &["checkout", "-q", "-"]);
+        write_and_commit(repo, "lib/b.rs", "1", "the branch HEAD is on");
+
+        let ctx = ctx_for(repo, &ledger_root, policy_with(50, true), fixed_now());
+        let violations = StalenessCheck.run(&ctx);
+        assert_eq!(stale_subjects(&violations), ["s1#1.1"], "`<base>..HEAD` differs in src/a.rs, as it did before: {violations:?}");
+        let unresolvable = ctx.staleness_unresolvable();
+        assert_eq!((unresolvable.base_missing, unresolvable.base_not_ancestor, unresolvable.git_unavailable), (0, 1, 0));
+    }
+
+    #[test]
+    fn a_git_that_cannot_answer_counts_its_cells_as_unavailable() {
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs"], &[("s1#1.1", &["src/"])]);
+        let gone = dir.path().join("no-such-directory");
+        let ctx = ctx_for(&gone, &ledger_root, policy_with(0, true), fixed_now());
+        assert!(StalenessCheck.run(&ctx).is_empty());
+        let unresolvable = ctx.staleness_unresolvable();
+        assert_eq!((unresolvable.base_missing, unresolvable.base_not_ancestor, unresolvable.git_unavailable), (0, 0, 1));
+    }
+
+    #[test]
+    fn nothing_is_counted_when_every_base_is_an_ancestor() {
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs"], &[("s1#1.1", &["src/"])]);
+        write_and_commit(dir.path(), "src/a.rs", "2", "edit");
+        let ctx = ctx_for(dir.path(), &ledger_root, policy_with(50, true), fixed_now());
+        assert_eq!(StalenessCheck.run(&ctx).len(), 1);
+        assert!(ctx.staleness_unresolvable().is_empty());
+        assert!(unresolvable_cells(&ctx, || panic!("the code tree is not asked for when nothing is unread")).is_empty());
+    }
+
+    #[test]
+    fn the_report_without_queries_counts_the_cells_the_check_counts() {
+        let (dir, ledger_root, _) = repo_with_records(&["src/a.rs"], &[("s1#1.1", &["src/"])]);
+        write_green_record(&ledger_root, "s1#1.2", "implementer", &"3".repeat(40), &["src/"]);
+        write_green_record(&ledger_root, "s1#1.3", "reviewer", &"4".repeat(40), &["src/"]);
+        let ctx = ctx_for(dir.path(), &ledger_root, policy_with(50, true), fixed_now());
+        let asked = std::cell::Cell::new(0);
+        let alone = unresolvable_cells(&ctx, || {
+            asked.set(asked.get() + 1);
+            None
+        });
+        assert_eq!(&alone, ctx.staleness_unresolvable());
+        assert_eq!(asked.get(), 1);
+        assert_eq!(alone.base_missing, 2);
+    }
+
+    #[test]
+    fn the_message_counts_the_cells_by_reason_names_three_subjects_and_points_a_shallow_clone_at_unshallow() {
+        let unresolvable = Unresolvable { base_missing: 3, base_not_ancestor: 1, git_unavailable: 0, subjects: 4, first: vec!["a".into(), "b".into(), "c".into()], shallow: true };
+        let message = unresolvable.message();
+        assert!(message.starts_with("4 (subject, role) cell(s)"), "{message}");
+        assert!(message.contains("(base_missing 3, base_not_ancestor 1)"), "{message}");
+        assert!(message.contains("first: `a`, `b`, `c`, ..."), "{message}");
+        assert!(message.contains("git fetch --unshallow"), "{message}");
+        assert_eq!(unresolvable.items(), ["base_missing: 3 cell(s)", "base_not_ancestor: 1 cell(s)", "first subjects: a, b, c, ..."]);
     }
 }

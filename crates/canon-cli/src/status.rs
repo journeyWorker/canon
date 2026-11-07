@@ -611,6 +611,11 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
     };
     let derived = Derived { code_tree: crate::reverify::CodeTreeMemo::lazy(), flow_changes: crate::brief_check::FlowChangesIndex::lazy() };
     warnings.extend(crate::reverify::scope_warnings(repo, &ctx, &derived.code_tree).into_iter().map(|line| Warning::new("CODE_SCOPES_UNMATCHED", line)));
+    // The cells of passing evidence whose base commit git could not read (0.39): the sentence `canon gate check` says as an advisory.
+    let unresolvable = canon_gate::staleness::unresolvable_cells(&ctx, || derived.code_tree.get(repo).map(str::to_string));
+    if !unresolvable.is_empty() {
+        warnings.push(Warning::new("STALENESS_UNRESOLVABLE", unresolvable.message()));
+    }
     let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, repo, &plan_roots, &derived, s))).collect();
     summaries.sort_by_key(|(s, _)| (rank(&DISPLAY_ORDER, s.status), s.subject_id.as_str().to_string()));
 

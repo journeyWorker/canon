@@ -2359,7 +2359,7 @@
           "domain": {
             "pattern": "^\\P{White_Space}([^\\n\\r\u0000]*\\P{White_Space})?$"
           },
-          "help": "Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref",
+          "help": "A path pattern from the repository root (src/, src/**) or effect:<kebab-slug>; persisted as surface_ref",
           "name": "surface-ref",
           "repeatable": true,
           "valueName": "PATH_OR_EFFECT"
@@ -19384,7 +19384,7 @@
               "type": "string"
             },
             "surfaceRef": {
-              "description": "Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref",
+              "description": "A path pattern from the repository root (src/, src/**) or effect:<kebab-slug>; persisted as surface_ref",
               "items": {
                 "type": "string"
               },
@@ -22732,7 +22732,7 @@
               "type": "array"
             },
             "kind": {
-              "description": "`spec_coverage_off`, `policy_approval`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.",
+              "description": "`spec_coverage_off`, `policy_approval`, `chore_code_scopes`, `code_scopes`, `staleness_unresolvable`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.",
               "type": "string"
             },
             "message": {
@@ -39960,6 +39960,11 @@
       "meaning": "the search index file was not a usable database, so it was deleted and rebuilt"
     },
     {
+      "code": "STALENESS_UNRESOLVABLE",
+      "fix": "Read the base commits: in a shallow clone run `git fetch --unshallow`, and check that `git` runs in this repository; a base that is not an ancestor of HEAD (a squash merge, a rebase) is judged as `<base>..HEAD`, so record fresh evidence on the code as it stands to clear it.",
+      "meaning": "some (subject, role) cells of passing evidence could not be checked for staleness against their base commit: it is not in this repository (`base_missing`: a shallow clone, a pruned commit), it is not an ancestor of HEAD (`base_not_ancestor`), or git did not answer (`git_unavailable`); the message counts the cells of each reason and names the first subjects. `canon gate check` says the same as its `staleness_unresolvable` advisory; verdicts and exit statuses are unchanged"
+    },
+    {
       "code": "STRATEGY_DEMOTED",
       "fix": "Review the contradicting trajectory before promoting the strategy again.",
       "meaning": "later contradictory evidence demoted an active strategy while its promotion was blocked"
@@ -39973,6 +39978,11 @@
       "code": "SUBJECT_REOPENED",
       "fix": "Keep the follow-up in its change, then scenario, evidence and review, before shipping again.",
       "meaning": "a shipped subject was reopened for a follow-up change; shipping again runs every guard"
+    },
+    {
+      "code": "SURFACE_REF_UNMATCHED",
+      "fix": "Spell the value as a file, a directory or a pattern from the repository root that matches at least one file, then record the evidence again (a pattern that matches nothing yet is allowed: it is recorded).",
+      "meaning": "a `--surface-ref` value that is not `effect:...` matches no file of the working tree: it is a path pattern read from the repository root (`src/` and `src` the directory, `src/**`, `src/*.rs`; `*` and `?` do not cross `/`, `**` does), so evidence that declares it can never go stale; the value is recorded as given"
     },
     {
       "code": "TASK_PROOF_IS_CANON_COMMAND",

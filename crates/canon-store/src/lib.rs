@@ -16,6 +16,7 @@ pub mod cursor;
 pub mod eio;
 pub mod file_lock;
 pub mod fold;
+pub mod git;
 pub mod git_tier;
 pub mod partition;
 pub mod pg_tier;

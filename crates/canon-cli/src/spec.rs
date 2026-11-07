@@ -85,7 +85,8 @@ const ENV_VARS: &[EnvVar] = &[
 /// digest and its first effect: the three seams of the test of the lock; `CANON_TEST_INDEX_LOCK_WAIT_MS`: how long a debug build waits for the scenario-index lock, in milliseconds; `CANON_TEST_BLOB_RACE_AFTER`: a debug build rewrites,
 /// once, the blob `artifacts move --commit` is about to upload when this many blobs were uploaded, as another process would; `CANON_TEST_STOP_AT`: a debug build fails the named step of a command
 /// that works in steps with an I/O error after the steps before it made their effects, for the tests of the `<SUBJECT>_INCOMPLETE` codes; `CANON_TEST_EIO`: a debug build fails the reads of the paths a glob names with
-/// `EIO`, the error a repeat can pass, for the tests of every `_UNAVAILABLE` call site (`canon_store::eio`)).
+/// `EIO`, the error a repeat can pass, for the tests of every `_UNAVAILABLE` call site (`canon_store::eio`); `CANON_TEST_GIT_DEADLINE_MS`: how long a debug build lets one git call run before it stops the git process, in milliseconds
+/// (a release build has no such variable and always allows 300 seconds), for the tests of the git deadline (`canon_store::git`)).
 pub const INTERNAL_ENV: &[&str] = &[
     "CANON_ARCHIVE_ROOT",
     "CANON_DASHBOARD_DIST",
@@ -96,6 +97,7 @@ pub const INTERNAL_ENV: &[&str] = &[
     "CANON_R2_ROOT",
     "CANON_TEST_BLOB_RACE_AFTER",
     "CANON_TEST_EIO",
+    "CANON_TEST_GIT_DEADLINE_MS",
     "CANON_TEST_HOLD_AFTER_RUN_MS",
     "CANON_TEST_INDEX_LOCK_WAIT_MS",
     "CANON_TEST_PANIC",

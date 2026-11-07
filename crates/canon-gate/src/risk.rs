@@ -11,9 +11,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-use std::process::Command;
 
 use canon_model::{approval_payload_bytes, ApprovalPayload, EvidenceApproval, EvidenceRecord, EvidenceVerdict};
+use canon_store::git::{GitCall, GitError};
 use canon_store::partition::content_digest;
 
 use crate::approval::verify_risk_approval;
@@ -63,6 +63,9 @@ impl GateCheck for RiskApprovalCheck {
             }
         }
         let mut changed_paths: BTreeMap<String, Option<Vec<String>>> = BTreeMap::new();
+        // A commit git could not be asked about in time (or answered past the output limit) closes the analysis as
+        // unknown, and the commits after it are not asked: one stuck git costs one deadline, not one per commit.
+        let mut git_stopped = false;
 
         groups
             .into_iter()
@@ -84,7 +87,21 @@ impl GateCheck for RiskApprovalCheck {
                     None => None,
                     // Groups of one generation share a commit: two git
                     // processes per commit, not per group.
-                    Some(sha) => changed_paths.entry(sha.to_string()).or_insert_with(|| artifact_changed_paths(&ctx.ctx.repo, sha).ok()).clone(),
+                    Some(sha) => changed_paths
+                        .entry(sha.to_string())
+                        .or_insert_with(|| {
+                            if git_stopped {
+                                return None;
+                            }
+                            match artifact_changed_paths(&ctx.ctx.repo, sha) {
+                                Ok(paths) => Some(paths),
+                                Err(error) => {
+                                    git_stopped = error.is_stopped();
+                                    None
+                                }
+                            }
+                        })
+                        .clone(),
                 };
                 let analysis_known = analysis.is_some();
                 let mut derived_surfaces = analysis.unwrap_or_default();
@@ -143,38 +160,43 @@ impl GateCheck for RiskApprovalCheck {
 /// Why the paths a commit changed could not be derived.
 #[derive(Debug, thiserror::Error)]
 pub enum ArtifactPathsError {
+    /// Git did not start, ran past its deadline or wrote past its output limit while the SHA was resolved.
     #[error("resolve artifact SHA: {0}")]
-    Resolve(#[source] std::io::Error),
+    Resolve(#[source] GitError),
     #[error("artifact SHA is not a commit: {0}")]
     NotACommit(String),
+    /// Git did not start, ran past its deadline or wrote past its output limit while the paths were listed.
     #[error("derive artifact paths: {0}")]
-    Derive(#[source] std::io::Error),
+    Derive(#[source] GitError),
     #[error("cannot derive changed paths for artifact SHA: {0}")]
     Underivable(String),
     #[error("artifact path output is not UTF-8: {0}")]
     NotUtf8(#[from] std::string::FromUtf8Error),
 }
 
+impl ArtifactPathsError {
+    /// Whether git was stopped for time or size: the answer is unknown, and asking again costs the same.
+    pub fn is_stopped(&self) -> bool {
+        matches!(self, Self::Resolve(error) | Self::Derive(error) if error.is_stopped())
+    }
+}
+
+/// The paths `sha` changed, sorted and unique. Names are read NUL-terminated (`-z`), so a name with a non-ASCII
+/// character, a quote or a space is the string the surface declares; a name that is not UTF-8 is [`ArtifactPathsError::NotUtf8`].
 pub fn artifact_changed_paths(repo: &Path, sha: &canon_model::Sha) -> Result<Vec<String>, ArtifactPathsError> {
     let sha = sha.to_string();
-    let resolved = Command::new("git")
-        .arg("-C").arg(repo)
-        .args(["rev-parse", "--verify", &format!("{sha}^{{commit}}")])
-        .output()
-        .map_err(ArtifactPathsError::Resolve)?;
-    if !resolved.status.success() {
-        return Err(ArtifactPathsError::NotACommit(sha));
+    match GitCall::new(repo).args(["rev-parse", "--verify", &format!("{sha}^{{commit}}")]).run() {
+        Ok(_) => {}
+        Err(error) if error.is_exit() => return Err(ArtifactPathsError::NotACommit(sha)),
+        Err(error) => return Err(ArtifactPathsError::Resolve(error)),
     }
-    let output = Command::new("git")
-        .arg("-C").arg(repo)
-        .args(["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--no-renames", "--name-only", &sha])
-        .output()
-        .map_err(ArtifactPathsError::Derive)?;
-    if !output.status.success() {
-        return Err(ArtifactPathsError::Underivable(sha));
-    }
+    let output = match GitCall::new(repo).args(["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--no-renames", "--name-only", "-z", &sha]).run() {
+        Ok(output) => output,
+        Err(error) if error.is_exit() => return Err(ArtifactPathsError::Underivable(sha)),
+        Err(error) => return Err(ArtifactPathsError::Derive(error)),
+    };
     let text = String::from_utf8(output.stdout)?;
-    let mut paths: Vec<String> = text.lines().map(str::trim).filter(|path| !path.is_empty()).map(str::to_string).collect();
+    let mut paths: Vec<String> = text.split('\0').filter(|path| !path.is_empty()).map(str::to_string).collect();
     paths.sort_unstable();
     paths.dedup();
     Ok(paths)
@@ -298,9 +320,83 @@ mod tests {
         let err = artifact_changed_paths(dir.path(), &Sha::parse(sha).unwrap()).unwrap_err();
         assert_eq!(err.to_string(), format!("artifact SHA is not a commit: {sha}"));
         assert_eq!(ArtifactPathsError::Underivable(sha.to_string()).to_string(), format!("cannot derive changed paths for artifact SHA: {sha}"));
-        let io = std::io::Error::other("boom");
-        assert_eq!(ArtifactPathsError::Resolve(io).to_string(), "resolve artifact SHA: boom");
-        assert_eq!(ArtifactPathsError::Derive(std::io::Error::other("boom")).to_string(), "derive artifact paths: boom");
+        let spawn = || GitError::Spawn { subcommand: "rev-parse".to_string(), source: std::io::Error::other("boom") };
+        assert_eq!(ArtifactPathsError::Resolve(spawn()).to_string(), "resolve artifact SHA: could not start `git rev-parse`: boom");
+        assert_eq!(ArtifactPathsError::Derive(spawn()).to_string(), "derive artifact paths: could not start `git rev-parse`: boom");
+    }
+
+    fn git(dir: &Path, args: &[&str]) -> String {
+        GitCall::new(dir).args(args).run().unwrap_or_else(|error| panic!("{error}")).stdout_trimmed()
+    }
+
+    fn repo_with_files(names: &[&str]) -> (tempfile::TempDir, Sha) {
+        let dir = tempfile::TempDir::new().unwrap();
+        git(dir.path(), &["init", "-q"]);
+        git(dir.path(), &["config", "user.email", "t@example.com"]);
+        git(dir.path(), &["config", "user.name", "t"]);
+        for name in names {
+            let path = dir.path().join(name);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, name).unwrap();
+        }
+        git(dir.path(), &["add", "-A"]);
+        git(dir.path(), &["commit", "-q", "-m", "files"]);
+        let head = Sha::parse(git(dir.path(), &["rev-parse", "HEAD"])).unwrap();
+        (dir, head)
+    }
+
+    /// A repo whose one commit holds `src/auth/\xff.rs`: a name no UTF-8 string spells. The file is never written to disk
+    /// (a file system may refuse such a name); the entry goes into the index and the commit takes the index.
+    fn repo_with_a_name_that_is_not_utf8() -> (tempfile::TempDir, Sha) {
+        let dir = tempfile::TempDir::new().unwrap();
+        git(dir.path(), &["init", "-q"]);
+        git(dir.path(), &["config", "user.email", "t@example.com"]);
+        git(dir.path(), &["config", "user.name", "t"]);
+        let blob = GitCall::new(dir.path()).args(["hash-object", "-w", "--stdin"]).stdin(b"x").run().unwrap().stdout_trimmed();
+        let mut entry = format!("100644 {blob}\tsrc/auth/").into_bytes();
+        entry.extend_from_slice(b"\xff.rs\n");
+        GitCall::new(dir.path()).args(["update-index", "--add", "--index-info"]).stdin(&entry).run().unwrap();
+        git(dir.path(), &["commit", "-q", "-m", "a name that is not UTF-8"]);
+        let head = Sha::parse(git(dir.path(), &["rev-parse", "HEAD"])).unwrap();
+        (dir, head)
+    }
+
+    #[test]
+    fn changed_paths_are_the_names_the_surface_declares_whatever_their_characters() {
+        let names = ["é.rs", "a\"b.rs", "with space.rs", " lead.rs", "dir/ü ñ.rs", "plain.rs"];
+        let (dir, head) = repo_with_files(&names);
+        let mut expected: Vec<String> = names.iter().map(ToString::to_string).collect();
+        expected.sort_unstable();
+        assert_eq!(artifact_changed_paths(dir.path(), &head).unwrap(), expected);
+    }
+
+    #[test]
+    fn a_name_that_is_not_utf8_is_not_derived() {
+        let (dir, head) = repo_with_a_name_that_is_not_utf8();
+        let err = artifact_changed_paths(dir.path(), &head).unwrap_err();
+        assert!(matches!(err, ArtifactPathsError::NotUtf8(_)), "{err}");
+        assert!(!err.is_stopped(), "an unreadable name is not a deadline: asking the next commit is fine");
+    }
+
+    #[test]
+    fn a_commit_that_changed_a_name_that_is_not_utf8_closes_the_risk_check_as_an_unknown_analysis() {
+        let (dir, head) = repo_with_a_name_that_is_not_utf8();
+        let mut ctx = context(vec![record("src/auth/login.rs", None)]);
+        ctx.ctx.repo = dir.path().to_path_buf();
+        ctx.evidence = vec![record("src/auth/login.rs", None).with_evidence_sha(head)];
+        let violations = RiskApprovalCheck.run(&ctx);
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert!(violations[0].detail.contains("unknown analysis cannot establish safety"), "{}", violations[0].detail);
+    }
+
+    #[test]
+    fn only_a_stopped_git_makes_the_risk_check_skip_the_commits_after_it() {
+        let spawn = GitError::Spawn { subcommand: "diff-tree".to_string(), source: std::io::Error::other("boom") };
+        assert!(!ArtifactPathsError::Derive(spawn).is_stopped());
+        let deadline = GitError::Deadline { subcommand: "diff-tree".to_string(), deadline: "300s".to_string() };
+        assert!(ArtifactPathsError::Derive(deadline).is_stopped());
+        let limit = GitError::OutputLimit { subcommand: "diff-tree".to_string(), stream: "stdout", limit: "8 MiB".to_string() };
+        assert!(ArtifactPathsError::Resolve(limit).is_stopped());
     }
 
     fn now() -> DateTime<Utc> {
