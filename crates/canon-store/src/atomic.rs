@@ -78,15 +78,12 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// Unix only: Windows cannot open a directory with `File::open`, so there this does nothing and the
 /// callers behave as they did before it existed. The error keeps the underlying kind and names the directory.
 pub fn sync_dir(dir: &Path) -> io::Result<()> {
-    #[cfg(unix)]
-    {
+    if cfg!(unix) {
         std::fs::File::open(dir)
             .and_then(|handle| handle.sync_all())
             .map_err(|e| io::Error::new(e.kind(), format!("could not sync directory {}: {e}", dir.display())))?;
         trace::record(trace::Event::DirSync(dir.to_path_buf()));
     }
-    #[cfg(not(unix))]
-    let _ = dir;
     Ok(())
 }
 
