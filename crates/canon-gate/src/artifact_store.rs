@@ -437,6 +437,13 @@ impl StoreLock {
     /// call itself renamed into place are removed (best effort), the
     /// rest are dropped unpublished, and the error carries the failing
     /// blob's index.
+    ///
+    /// After the renames, when this call placed at least one blob, the store
+    /// directory is synced once ([`canon_store::atomic::sync_dir`], Unix only:
+    /// Windows is as before), so a blob's name is on disk before a record can
+    /// point at it. If that sync fails the blobs this call placed are removed
+    /// as for a failed rename, and the error carries the last placed blob's
+    /// index. A call that placed nothing syncs nothing.
     pub fn publish(&self, staged: Vec<StagedBlob<'_>>) -> Result<usize, (usize, ArtifactStoreError)> {
         self.publish_paths(staged).map(|renamed| renamed.len())
     }
@@ -449,6 +456,7 @@ impl StoreLock {
     /// among them.
     pub fn publish_paths(&self, staged: Vec<StagedBlob<'_>>) -> Result<Vec<PathBuf>, (usize, ArtifactStoreError)> {
         let mut renamed: Vec<PathBuf> = Vec::new();
+        let mut last_placed = 0;
         for (index, mut blob) in staged.into_iter().enumerate() {
             if stored_blob(&self.repo, &blob.sha256).matches(&blob.sha256) {
                 continue;
@@ -460,7 +468,15 @@ impl StoreLock {
                 self.unpublish(&renamed);
                 return Err((index, e.into()));
             }
+            canon_store::atomic::trace::record(canon_store::atomic::trace::Event::Rename { from: temp, to: target.clone() });
             renamed.push(target);
+            last_placed = index;
+        }
+        if !renamed.is_empty() {
+            if let Err(e) = canon_store::atomic::sync_dir(&store_dir(&self.repo)) {
+                self.unpublish(&renamed);
+                return Err((last_placed, e.into()));
+            }
         }
         Ok(renamed)
     }
@@ -987,6 +1003,57 @@ mod tests {
         std::fs::write(blob_path(dir.path(), &digest), b"tampered").unwrap();
         assert_eq!(store(dir.path(), &digest, &b"report"[..]).unwrap(), StoreOutcome::Stored);
         assert_eq!(std::fs::read(blob_path(dir.path(), &digest)).unwrap(), b"report");
+    }
+
+    #[cfg(all(unix, debug_assertions))]
+    #[test]
+    fn publishing_two_blobs_syncs_the_store_directory_once_after_both_renames_and_an_existing_blob_syncs_nothing() {
+        use canon_store::atomic::trace::{self, Event};
+        let dir = TempDir::new().unwrap();
+        let lock = StoreLock::acquire(dir.path()).unwrap();
+        let (a, b) = (sha(b"first"), sha(b"second"));
+        let staged = vec![lock.stage(&a, &b"first"[..]).unwrap().unwrap(), lock.stage(&b, &b"second"[..]).unwrap().unwrap()];
+        trace::take();
+        assert_eq!(lock.publish_paths(staged).unwrap().len(), 2);
+        let events = trace::take();
+        let [Event::Rename { to: first, .. }, Event::Rename { to: second, .. }, Event::DirSync(synced)] = events.as_slice() else {
+            panic!("expected two renames then one directory sync, got {events:?}");
+        };
+        assert_eq!((first, second, synced), (&blob_path(dir.path(), &a), &blob_path(dir.path(), &b), &store_dir(dir.path())));
+
+        // A blob another writer placed while this one was staged is counted as stored and syncs nothing.
+        let c = sha(b"third");
+        let staged = vec![lock.stage(&c, &b"third"[..]).unwrap().unwrap()];
+        std::fs::write(blob_path(dir.path(), &c), b"third").unwrap();
+        trace::take();
+        assert_eq!(lock.publish_paths(staged).unwrap().len(), 0);
+        assert!(trace::take().is_empty(), "nothing placed, nothing synced");
+    }
+
+    /// Unix, not root (skipped, and says so, as root and on Windows): a store directory that can be written and searched but not read lets
+    /// every `rename` succeed and fails only the directory sync.
+    #[cfg(unix)]
+    #[test]
+    fn a_store_directory_that_cannot_be_synced_removes_the_placed_blobs_and_fails_skipped_as_root() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = TempDir::new().unwrap();
+        let lock = StoreLock::acquire(dir.path()).unwrap();
+        let (a, b) = (sha(b"first"), sha(b"second"));
+        let staged = vec![lock.stage(&a, &b"first"[..]).unwrap().unwrap(), lock.stage(&b, &b"second"[..]).unwrap().unwrap()];
+        let store = store_dir(dir.path());
+        let restore = |mode| std::fs::set_permissions(&store, std::fs::Permissions::from_mode(mode)).unwrap();
+        restore(0o300);
+        if File::open(&store).is_ok() {
+            restore(0o700);
+            eprintln!("skipped: running as root, who can open an unreadable directory");
+            return;
+        }
+        let failed = lock.publish_paths(staged);
+        restore(0o700);
+        let (index, error) = failed.unwrap_err();
+        assert_eq!(index, 1, "the error points at the last blob placed");
+        assert!(error.to_string().contains(&store.display().to_string()), "{error}");
+        assert!(!blob_path(dir.path(), &a).exists() && !blob_path(dir.path(), &b).exists(), "the blobs placed are taken back");
     }
 
     #[test]

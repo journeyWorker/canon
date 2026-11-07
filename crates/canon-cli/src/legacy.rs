@@ -391,8 +391,7 @@ pub enum LegacyError {
 }
 
 fn write_file(path: &Path, bytes: &[u8]) -> Result<(), LegacyError> {
-    let temp = path.with_extension("canon-migrate.tmp");
-    fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, path)).map_err(|source| LegacyError::Write { path: path.to_path_buf(), source })
+    canon_store::write_atomic(path, bytes).map_err(|source| LegacyError::Write { path: path.to_path_buf(), source })
 }
 
 /// The repo-relative `/`-separated form of `path` under `repo`.
@@ -541,7 +540,9 @@ mod tests {
     #[test]
     fn migrate_failures_read_as_before_and_keep_their_cause() {
         let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("missing").join("hook.json");
+        // A file where the parent directory belongs: `write_atomic` creates a missing parent, so only this stops the write.
+        fs::write(dir.path().join("blocked"), b"").unwrap();
+        let file = dir.path().join("blocked").join("hook.json");
         let write = write_file(&file, b"x").unwrap_err();
         assert!(write.to_string().starts_with(&format!("could not write {}: ", file.display())), "{write}");
         assert!(std::error::Error::source(&write).is_some());
