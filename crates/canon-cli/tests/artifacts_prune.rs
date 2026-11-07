@@ -9,6 +9,7 @@ mod hermetic;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::time::{Duration, SystemTime};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -742,13 +743,355 @@ fn artifacts_prune_15_a_release_without_the_announcement_fails_the_release_check
     assert_eq!(release_problems(&silent, &changelog), ["the guide `canon-storage` never says a deleted local blob stays in git history"]);
 
     // A CHANGELOG with no Added section under 0.38.0, and with an Added section that says neither thing.
-    let no_added = changelog.replacen("\n### Added\n", "\n### Changed\n", 1);
+    // The Added section of 0.38.0 is the first one after its heading (the Unreleased section has its own).
+    let release = changelog.find("\n## 0.38.0").expect("the 0.38.0 section");
+    let added_at = release + changelog[release..].find("\n### Added\n").expect("an Added section under 0.38.0");
+    let no_added = format!("{}\n### Changed\n{}", &changelog[..added_at], &changelog[added_at + "\n### Added\n".len()..]);
     assert_eq!(release_problems(&guides, &no_added), ["the CHANGELOG has no Added section under 0.38.0"]);
-    let start = changelog.find("\n### Added\n").expect("an Added section");
+    let start = added_at;
     let end = changelog[start + 1..].find("\n### ").map_or(changelog.len(), |at| start + 1 + at);
     let emptied = format!("{}\n### Added\n\n- something else\n{}", &changelog[..start], &changelog[end..]);
     let problems = release_problems(&guides, &emptied);
     assert_eq!(problems, ["the Added section never names `canon artifacts prune`", "the Added section never says a deleted local blob stays in git history"], "{problems:?}");
     // A CHANGELOG with no 0.38.0 section at all.
     assert_eq!(release_problems(&guides, "# Changelog\n\n## 0.37.0\n\n### Added\n").len(), 1);
+}
+
+// ---- 0.39 `canon-0-39-prune-temps`: the stale `.tmp-` files a killed blob write left ----
+
+const MINUTE: Duration = Duration::from_secs(60);
+
+impl Repo {
+    /// A staging temp file of the shape a blob write gives it, `.tmp-<sha256 of bytes>-<tag>-<tag>`, last modified `age` ago (`None`: an hour from
+    /// now, a clock that ran ahead).
+    fn temp(&self, tag: u32, bytes: &[u8], age: Option<Duration>) -> PathBuf {
+        std::fs::create_dir_all(self.path().join(".canon/artifacts/sha256")).unwrap();
+        let path = self.path().join(".canon/artifacts/sha256").join(format!(".tmp-{}-{tag}-{tag}", sha(bytes)));
+        std::fs::write(&path, bytes).unwrap();
+        let time = match age {
+            Some(age) => SystemTime::now() - age,
+            None => SystemTime::now() + Duration::from_secs(3600),
+        };
+        std::fs::File::options().write(true).open(&path).unwrap().set_modified(time).unwrap();
+        path
+    }
+
+    fn verify(&self, extra: &[&str]) -> (Output, Value) {
+        let mut args = vec!["artifacts", "verify"];
+        args.extend_from_slice(extra);
+        args.push("--json");
+        let out = self.canon(&args);
+        let body = json(&out);
+        (out, body)
+    }
+}
+
+fn temp_name(path: &Path) -> String {
+    path.file_name().unwrap().to_string_lossy().into_owned()
+}
+
+/// artifacts.prune.16 (F1): a temp file written 6 minutes ago is in the preview's `staleTemps` with its bytes and the preview changes no file; a
+/// name that is not the staging shape (`.tmp-x`) and a directory of the shape are not listed.
+#[test]
+fn artifacts_prune_16_the_preview_lists_a_stale_temp_file_and_leaves_it() {
+    let repo = new_repo(None);
+    let old = repo.temp(1, b"half a report", Some(6 * MINUTE));
+    std::fs::write(repo.path().join(".canon/artifacts/sha256/.tmp-x"), b"mine").unwrap();
+    std::fs::create_dir(repo.path().join(format!(".canon/artifacts/sha256/.tmp-{}-2-2", sha(b"dir")))).unwrap();
+    let before = repo.files();
+
+    let body = repo.preview(&[]);
+    let temps = &body["data"]["staleTemps"];
+    assert_eq!((temps["files"].as_u64(), temps["bytes"].as_u64()), (Some(1), Some(13)), "{body}");
+    assert_eq!(temps["items"], serde_json::json!([{"name": temp_name(&old), "bytes": 13}]), "{body}");
+    assert!(temps["gitNote"].as_str().unwrap().contains("take it out of the commit"), "{body}");
+    assert_eq!(body["data"]["delete"]["blobs"], 0, "a temp file is no blob: {body}");
+    assert_eq!(body["data"]["blobs"], serde_json::json!([]), "{body}");
+    assert_eq!(commit_steps(&body), 1, "temp files and no blob to delete still offer the commit: {body}");
+    assert_eq!(repo.files(), before, "a preview writes nothing");
+
+    let said = text(&repo.canon(&["artifacts", "prune"]));
+    assert!(said.contains("1 stale temp file(s)") && said.contains(&temp_name(&old)) && said.contains("--commit --plan-digest") && !said.contains("nothing to delete"), "{said}");
+    assert_eq!(repo.files(), before);
+
+    // Failure path: a store with neither a blob nor a stale temp file offers no commit.
+    let empty = new_repo(None);
+    empty.temp(1, b"young", Some(MINUTE));
+    let body = empty.preview(&[]);
+    assert_eq!(body["data"]["staleTemps"]["files"], 0, "{body}");
+    assert_eq!(commit_steps(&body), 0, "{body}");
+}
+
+/// artifacts.prune.17 (F2): the digest of the preview deletes the listed temp file with the blobs and counts it apart; the kept blob,
+/// `artifacts verify` and `gate check` answer as before. A repo with only a temp file is cleaned too, and what is not a staging name stays.
+#[test]
+fn artifacts_prune_17_the_commit_deletes_the_listed_temp_files_with_the_blobs() {
+    let repo = new_repo(None);
+    repo.attest(V1, true);
+    repo.orphan(O1);
+    let old = repo.temp(1, b"half a report", Some(6 * MINUTE));
+    let mine = repo.path().join(".canon/artifacts/sha256/.tmp-x");
+    std::fs::write(&mine, b"mine").unwrap();
+    let (verify_before, gate_before) = state(&repo);
+    assert_eq!((verify_before.status.code(), gate_before.status.code()), (Some(0), Some(0)));
+
+    let preview = repo.preview(&[]);
+    let done = repo.commit(&preview);
+    assert_eq!(done.status.code(), Some(0), "{}", text(&done));
+    let body = json(&done);
+    assert_eq!((body["data"]["deleted"]["blobs"].as_u64(), body["data"]["deleted"]["staleTemps"]["files"].as_u64(), body["data"]["deleted"]["staleTemps"]["bytes"].as_u64()), (Some(1), Some(1), Some(13)), "{body}");
+    assert_eq!(body["data"]["deleted"]["bytes"], O1.len(), "the temp bytes are not in the blob bytes: {body}");
+    assert!(!old.exists() && mine.exists(), "only the listed stale temp file goes");
+    assert_eq!(repo.local_blobs(), vec![".tmp-x".to_string(), sha(V1)]);
+    let (verify_after, gate_after) = state(&repo);
+    assert_eq!((verify_after.status.code(), gate_after.status.code()), (Some(0), Some(0)));
+    assert_eq!(json(&verify_after)["data"]["problems"], json(&verify_before)["data"]["problems"]);
+    assert_eq!(json(&verify_after)["data"]["staleTemps"]["files"], 0);
+    let said = text(&repo.canon(&["artifacts", "prune"]));
+    assert!(said.contains("nothing to delete"), "a second run finds nothing: {said}");
+
+    // Only a temp file: still a plan, and the commit deletes it.
+    let only = new_repo(None);
+    let old = only.temp(7, b"a killed upload", Some(6 * MINUTE));
+    let preview = only.preview(&[]);
+    assert_eq!(preview["data"]["staleTemps"]["files"], 1, "{preview}");
+    let done = only.commit(&preview);
+    assert_eq!(done.status.code(), Some(0), "{}", text(&done));
+    let human = text(&only.canon(&["artifacts", "prune"]));
+    assert!(!old.exists() && human.contains("nothing to delete"), "{human}");
+    assert_eq!(json(&done)["data"]["deleted"]["staleTemps"]["files"], 1);
+}
+
+/// artifacts.prune.17 (F2 failure path): a store directory that cannot be written is refused before the temp file is touched.
+#[test]
+fn artifacts_prune_18_an_unwritable_store_directory_refuses_the_commit_and_keeps_the_temp_files() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let repo = new_repo(None);
+    let old = repo.temp(1, b"half a report", Some(6 * MINUTE));
+    let preview = repo.preview(&[]);
+    let dir = repo.path().join(".canon/artifacts/sha256");
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let refused = repo.commit(&preview);
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(refused.status.code(), Some(2), "{}", text(&refused));
+    let body = json(&refused);
+    assert!(body["error"]["code"].as_str().unwrap().starts_with("WRITE_"), "{body}");
+    assert!(old.exists(), "nothing was deleted");
+    let done = repo.commit(&preview);
+    assert_eq!(done.status.code(), Some(0), "{}", text(&done));
+    assert!(!old.exists());
+}
+
+/// artifacts.prune.19 (F3): a temp file written a minute ago may be a live write: it is not in the preview and stays after a commit that deletes an
+/// older one. A temp file stamped in the future is no stale file either.
+#[test]
+fn artifacts_prune_19_a_young_or_future_temp_file_is_never_listed_or_deleted() {
+    let repo = new_repo(None);
+    let young = repo.temp(1, b"young", Some(MINUTE));
+    let edge = repo.temp(2, b"just under the floor", Some(4 * MINUTE + Duration::from_secs(30)));
+    let future = repo.temp(3, b"future", None);
+    let old = repo.temp(4, b"old", Some(6 * MINUTE));
+
+    let preview = repo.preview(&[]);
+    assert_eq!(preview["data"]["staleTemps"]["items"], serde_json::json!([{"name": temp_name(&old), "bytes": 3}]), "{preview}");
+    let done = repo.commit(&preview);
+    assert_eq!(done.status.code(), Some(0), "{}", text(&done));
+    assert!(!old.exists());
+    assert!(young.exists() && edge.exists() && future.exists(), "only the stale file goes");
+    let again = repo.preview(&[]);
+    assert_eq!(again["data"]["staleTemps"]["files"], 0, "{again}");
+    assert_eq!(commit_steps(&again), 0);
+}
+
+/// artifacts.prune.20 (F4): `artifacts verify` counts the stale temp file, names `canon artifacts prune`, exits 0 and leaves it; without temp
+/// files `staleTemps` is 0 and the human output has no such line.
+#[test]
+fn artifacts_prune_20_verify_counts_the_stale_temp_files_and_deletes_nothing() {
+    let repo = new_repo(None);
+    repo.attest(V1, true);
+    let (clean, body) = repo.verify(&["--full"]);
+    assert_eq!(clean.status.code(), Some(0));
+    assert_eq!((body["data"]["staleTemps"]["files"].as_u64(), body["data"]["staleTemps"]["bytes"].as_u64()), (Some(0), Some(0)), "{body}");
+    assert!(!text(&repo.canon(&["artifacts", "verify", "--full"])).contains("temp"));
+
+    let old = repo.temp(1, b"half a report", Some(6 * MINUTE));
+    let young = repo.temp(2, b"young", Some(MINUTE));
+    let before = repo.files();
+    let (out, body) = repo.verify(&["--full"]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out));
+    assert_eq!((body["data"]["staleTemps"]["files"].as_u64(), body["data"]["staleTemps"]["bytes"].as_u64()), (Some(1), Some(13)), "{body}");
+    assert_eq!(body["data"]["problems"], serde_json::json!([]), "{body}");
+    let human = repo.canon(&["artifacts", "verify", "--full"]);
+    assert_eq!(human.status.code(), Some(0));
+    let said = text(&human);
+    assert!(said.contains("problems 0") && said.contains("stale temp file(s) 1 (13 bytes)") && said.contains("canon artifacts prune"), "{said}");
+    assert!(old.exists() && young.exists());
+    assert_eq!(repo.files(), before, "verify deletes nothing");
+}
+
+/// artifacts.prune.20 (F4 failure path): a store directory that cannot be read, or is no directory, leaves the count unknown: the line says it
+/// could not be read and the JSON has no count (never 0); the bound files' result is unchanged.
+#[test]
+fn artifacts_prune_21_an_unreadable_store_directory_is_not_a_zero_count() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let repo = new_repo(None);
+    repo.temp(1, b"half a report", Some(6 * MINUTE));
+    let dir = repo.path().join(".canon/artifacts/sha256");
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let (out, body) = repo.verify(&[]);
+    let said = text(&repo.canon(&["artifacts", "verify"]));
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(out.status.code(), Some(0), "no bound file is in question: {}", text(&out));
+    assert!(body["data"]["staleTemps"].get("files").is_none() && body["data"]["staleTemps"]["unreadable"].is_string(), "{body}");
+    assert!(said.contains("stale temp files: could not be counted") && !said.contains("stale temp file(s) 0"), "{said}");
+
+    // A regular file where the directory belongs.
+    std::fs::remove_dir_all(&dir).unwrap();
+    std::fs::write(&dir, b"not a directory").unwrap();
+    let (out, body) = repo.verify(&[]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out));
+    assert!(body["data"]["staleTemps"].get("files").is_none() && body["data"]["staleTemps"]["unreadable"].is_string(), "{body}");
+}
+
+/// artifacts.prune.22 (F5): a temp file deleted, or one more written, after the preview makes the plan stale: exit 2 `PLAN_STALE`, the hint says to
+/// preview again and every file stays. A commit without the digest is refused and deletes nothing.
+#[test]
+fn artifacts_prune_22_a_temp_file_that_changed_since_the_preview_makes_the_plan_stale() {
+    let repo = new_repo(None);
+    let first = repo.temp(1, b"one", Some(6 * MINUTE));
+    let second = repo.temp(2, b"two", Some(6 * MINUTE));
+    let preview = repo.preview(&[]);
+
+    std::fs::remove_file(&second).unwrap();
+    let before = repo.files();
+    let stale = repo.commit(&preview);
+    assert_eq!(stale.status.code(), Some(2), "{}", text(&stale));
+    let body = json(&stale);
+    assert_eq!(body["error"]["code"], "PLAN_STALE", "{body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("artifacts prune"), "{body}");
+    assert_eq!(repo.files(), before);
+
+    let preview = repo.preview(&[]);
+    let third = repo.temp(3, b"three", Some(6 * MINUTE));
+    let before = repo.files();
+    let stale = repo.commit(&preview);
+    assert_eq!(stale.status.code(), Some(2), "{}", text(&stale));
+    assert_eq!(json(&stale)["error"]["code"], "PLAN_STALE");
+    assert_eq!(repo.files(), before);
+    assert!(first.exists() && third.exists());
+
+    let none = repo.canon(&["artifacts", "prune", "--commit", "--json"]);
+    assert_eq!(none.status.code(), Some(2), "{}", text(&none));
+    assert_eq!(json(&none)["error"]["code"], "USAGE");
+    assert_eq!(repo.files(), before);
+
+    let fresh = repo.preview(&[]);
+    assert_eq!(repo.commit(&fresh).status.code(), Some(0));
+    assert!(!first.exists() && !third.exists());
+}
+
+/// artifacts.prune.23: a temp file that cannot be deleted stops the run like a blob does: after some were deleted it is
+/// `ARTIFACTS_PRUNE_INCOMPLETE` (`WRITE_FAILED`, the state read first) with what went in `data.deleted.staleTemps`; a new preview lists what remains
+/// and its commit finishes.
+#[test]
+fn artifacts_prune_23_a_temp_file_delete_that_stops_part_way_says_what_was_deleted() {
+    let repo = new_repo(None);
+    repo.temp(1, b"one", Some(6 * MINUTE));
+    repo.temp(2, b"two", Some(6 * MINUTE));
+    let preview = repo.preview(&[]);
+    let argv: Vec<String> = preview["meta"]["next"][0]["argv"].as_array().unwrap().iter().map(|word| word.as_str().unwrap().to_string()).collect();
+    let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+    let stopped = repo.canon_env(&args, &[("CANON_TEST_STOP_AT", "artifacts-prune-temp-after-delete")]);
+    assert_eq!(stopped.status.code(), Some(1), "{}", text(&stopped));
+    let body = json(&stopped);
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["reason"].as_str()), (Some("ARTIFACTS_PRUNE_INCOMPLETE"), Some("WRITE_FAILED")), "{body}");
+    assert_eq!((body["data"]["deleted"]["staleTemps"]["files"].as_u64(), body["data"]["deleted"]["blobs"].as_u64()), (Some(1), Some(0)), "{body}");
+    assert_eq!(body["meta"]["next"][0]["argv"][1], "verify", "the state is read first: {body}");
+    assert!(body["error"]["message"].as_str().unwrap().contains("1 of 2 stale temp file(s)"), "{body}");
+    let rest = repo.preview(&[]);
+    assert_eq!(rest["data"]["staleTemps"]["files"], 1, "{rest}");
+    assert_eq!(repo.commit(&rest).status.code(), Some(0));
+    assert_eq!(repo.local_blobs(), Vec::<String>::new());
+}
+
+/// artifacts.prune.24: an object-store tier repo counts and deletes the stale temp files of its local directory by the same rule, apart from the
+/// tier's objects: the objects stay, and `irreversible` does not name them.
+#[test]
+fn artifacts_prune_24_a_tier_repo_sweeps_its_local_temp_files_and_leaves_the_objects() {
+    let repo = new_repo(Some(ARTIFACTS_COLD));
+    repo.attest(V1, true);
+    let old = repo.temp(1, b"half a report", Some(6 * MINUTE));
+    let preview = repo.preview(&[]);
+    assert_eq!(preview["data"]["staleTemps"]["files"], 1, "{preview}");
+    assert_eq!(preview["data"]["delete"]["tierObjects"], 0, "{preview}");
+    assert!(preview["data"].get("irreversible").is_none(), "{preview}");
+    let done = repo.commit(&preview);
+    assert_eq!(done.status.code(), Some(0), "{}", text(&done));
+    assert!(!old.exists() && repo.object(V1).exists());
+    assert_eq!(repo.canon(&["artifacts", "verify", "--full"]).status.code(), Some(0));
+}
+
+/// artifacts.prune.25: the preview names at most 50 temp files; `files` and `bytes` count them all.
+#[test]
+fn artifacts_prune_25_the_listed_names_are_cut_but_the_totals_count_every_temp_file() {
+    let repo = new_repo(None);
+    for tag in 0..52u32 {
+        repo.temp(tag, format!("temp {tag}").as_bytes(), Some(6 * MINUTE));
+    }
+    let preview = repo.preview(&[]);
+    assert_eq!((preview["data"]["staleTemps"]["files"].as_u64(), preview["data"]["staleTemps"]["items"].as_array().map(Vec::len)), (Some(52), Some(50)), "{preview}");
+    let said = text(&repo.canon(&["artifacts", "prune"]));
+    assert!(said.contains("… and 2 more"), "{said}");
+    let done = repo.commit(&preview);
+    assert_eq!(json(&done)["data"]["deleted"]["staleTemps"]["files"], 52);
+    assert_eq!(repo.local_blobs(), Vec::<String>::new());
+}
+
+/// artifacts.prune.26 (F6): the guides and the Unreleased CHANGELOG entry say that prune deletes the stale temp files and `verify` counts them,
+/// and that a committed temp file must be taken out of the commit; the release check names each piece that is missing.
+fn temp_release_problems(guides: &[(&str, String)], changelog: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, text) in guides {
+        let said = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !said.contains("stale") || !said.contains(".tmp-") {
+            problems.push(format!("the guide `{name}` never names the stale `.tmp-` files"));
+        }
+    }
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("Unreleased"));
+    let entry = unreleased.and_then(|section| section.split("\n- **").find(|entry| entry.contains("canon-0-39-prune-temps")));
+    match entry {
+        None => problems.push("the Unreleased section has no entry of `canon-0-39-prune-temps`".to_string()),
+        Some(entry) => {
+            for (what, needle) in [("that prune deletes them", "`canon artifacts prune` deletes the stale temp files"), ("that verify counts them", "`canon artifacts verify` counts them"), ("`data.staleTemps`", "data.staleTemps"), ("the five minutes", "five minutes"), ("that git may hold one", "take it out of the commit")] {
+                if !entry.contains(needle) {
+                    problems.push(format!("the entry does not say {what} (`{needle}`)"));
+                }
+            }
+        }
+    }
+    problems
+}
+
+#[test]
+fn artifacts_prune_26_the_guides_and_the_changelog_name_the_stale_temp_files() {
+    let repo = new_repo(None);
+    let (guides, changelog) = (guides(&repo), changelog());
+    assert_eq!(temp_release_problems(&guides, &changelog), Vec::<String>::new());
+    let help = text(&repo.canon(&["artifacts", "prune", "--help"]));
+    assert!(help.contains("stale temp files") && help.contains("data.staleTemps"), "{help}");
+    let help = text(&repo.canon(&["artifacts", "verify", "--help"]));
+    assert!(help.contains("stale temp files") && help.contains("canon artifacts prune"), "{help}");
+}
+
+/// artifacts.prune.27 (F6 failure path): a release without the entry, or a guide that never names the temp files, fails the check.
+#[test]
+fn artifacts_prune_27_a_release_without_the_temp_file_announcement_fails_the_release_check() {
+    let repo = new_repo(None);
+    let (mut guides, changelog) = (guides(&repo), changelog());
+    let without_entry = changelog.replace("canon-0-39-prune-temps", "canon-0-39-other");
+    assert_eq!(temp_release_problems(&guides, &without_entry), ["the Unreleased section has no entry of `canon-0-39-prune-temps`"]);
+    let thin = changelog.replace("take it out of the commit", "ignore it");
+    assert_eq!(temp_release_problems(&guides, &thin), ["the entry does not say that git may hold one (`take it out of the commit`)"]);
+    guides[1].1 = guides[1].1.replace(".tmp-", "tmp");
+    assert_eq!(temp_release_problems(&guides, &changelog), ["the guide `canon-storage` never names the stale `.tmp-` files"]);
 }
