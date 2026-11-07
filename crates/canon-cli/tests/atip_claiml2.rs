@@ -480,7 +480,7 @@ fn files_holding(dir: &Path, needle: &str, found: &mut Vec<PathBuf>) {
 #[test]
 fn atip_claiml2_17_a_known_secret_of_the_environment_reaches_no_output_and_no_file() {
     // The tiers canon.yaml can route to, named by the environment variables that carry their credentials: Postgres (a DSN with a password) and s3.
-    const CANON_YAML: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: \"canon/\" }\nrouting:\n  change: local\n  task: hot\n  session: hot\n  trajectory: cold\n";
+    const CANON_YAML: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: \"canon/\" }\nrouting:\n  change: local\n  task: hot\n  run: hot\n  trajectory: cold\n";
     // The search sees a marker where one is: a file that holds it is found.
     let planted = tempfile::tempdir().expect("tempdir");
     std::fs::create_dir(planted.path().join("sub")).expect("mkdir");

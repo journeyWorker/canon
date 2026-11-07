@@ -61,8 +61,11 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
     assert!(text.contains("path: .canon/hot.db"), "{text}");
     assert!(text.contains("#   backend: postgres"), "postgres must stay present as a commented same-class swap: {text}");
     assert!(text.contains("dsn_env: CANON_PG_DSN"), "the commented postgres swap must keep its dsn_env line intact: {text}");
-    for kind in ["task", "handoff", "session", "run", "event"] {
+    for kind in ["task", "handoff", "run"] {
         assert!(text.contains(&format!("{kind}: hot")), "missing hot-routing line for `{kind}`: {text}");
+    }
+    for retired in ["session", "event"] {
+        assert!(!text.lines().any(|l| l.trim_start().starts_with(&format!("{retired}:"))), "the retired kind `{retired}` is not routed: {text}");
     }
     for kind in ["change", "scenario", "review", "divergence", "trajectory", "strategy_item", "evidence"] {
         assert!(text.contains(&format!("{kind}: local")), "missing local-routing line for `{kind}`: {text}");

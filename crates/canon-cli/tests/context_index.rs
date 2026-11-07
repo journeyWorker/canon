@@ -63,6 +63,10 @@ fn every_kind_option_value_is_a_context_kind() {
                 if doc.command == "search" && value == "brief" {
                     continue;
                 }
+                // `purge --kind` still takes the two kinds 0.39 retired, for one release, so stored rows can be deleted: they are no context kind.
+                if doc.command == "purge" && canon_store::policy::RETIRED_KIND_NAMES.contains(&value.as_str()) {
+                    continue;
+                }
                 assert!(kinds.contains(value), "`{} --kind {value}` is not in context.kinds", doc.command);
             }
         }

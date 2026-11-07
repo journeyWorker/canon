@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Subject, SubjectId, SubjectStatus};
+use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, ProjectId, RecordKind, RoleId, RunId, RunStatus, ScenarioId, SessionId, Subject, SubjectId, SubjectStatus};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
 use chrono::{DateTime, Duration, Utc};
@@ -538,15 +538,15 @@ fn tier_storage_15_export_refuses_sensitive_records_without_policy_permission_an
 
 // ───────────────────────── purge ─────────────────────────
 
-fn session(at: DateTime<Utc>, id: &str) -> canon_model::records::Session {
-    canon_model::records::Session::new(Envelope::new(1, RecordKind::Session, at, Actor::new("test-agent", role("implementer"))), SessionId::parse(id).unwrap(), "test-client", at, None)
+fn run_record(at: DateTime<Utc>) -> canon_model::records::Run {
+    canon_model::records::Run::new(Envelope::new(1, RecordKind::Run, at, Actor::new("test-agent", role("implementer"))), RunId::new(), None, None, RunStatus::Succeeded, at, Some(at))
 }
 
 fn purge_fixture() -> support::Fixture {
-    let fixture = support::Fixture::new("  session: local\n", "");
+    let fixture = support::Fixture::new("  run: local\n", "");
     let git = GitTier::new(fixture.git_root());
-    git.write(&session("2026-01-01T00:00:00Z".parse().unwrap(), "old-session")).unwrap();
-    git.write(&session("2027-06-01T00:00:00Z".parse().unwrap(), "new-session")).unwrap();
+    git.write(&run_record("2026-01-01T00:00:00Z".parse().unwrap())).unwrap();
+    git.write(&run_record("2027-06-01T00:00:00Z".parse().unwrap())).unwrap();
     fixture
 }
 
@@ -560,13 +560,13 @@ fn tier_storage_16_purge_previews_the_removal_set_then_deletes_exactly_that_set_
     assert_eq!(fixture.git_file_count(), 2);
     let before = snapshot(fixture.root.path());
 
-    let preview = fixture.run_canon(&["purge", "--kind", "session", "--before", "2026-06-01"]);
+    let preview = fixture.run_canon(&["purge", "--kind", "run", "--before", "2026-06-01"]);
     assert_eq!(preview.status.code(), Some(0), "{}", out_text(&preview));
     let digest = support::preview_digest(&support::stdout(&preview)).unwrap_or_else(|| panic!("a preview prints its planDigest: {}", out_text(&preview)));
     assert!(support::stdout(&preview).contains("nothing written"), "{}", out_text(&preview));
     assert_eq!(snapshot(fixture.root.path()), before, "the preview deletes nothing");
 
-    let commit = fixture.run_canon(&["purge", "--kind", "session", "--before", "2026-06-01", "--commit", "--plan-digest", &digest]);
+    let commit = fixture.run_canon(&["purge", "--kind", "run", "--before", "2026-06-01", "--commit", "--plan-digest", &digest]);
     assert_eq!(commit.status.code(), Some(0), "{}", out_text(&commit));
     assert!(support::stdout(&commit).contains("1 matched, 1 deleted"), "{}", out_text(&commit));
     assert_eq!(fixture.git_file_count(), 1, "only the record before the cutoff is gone");
@@ -575,25 +575,25 @@ fn tier_storage_16_purge_previews_the_removal_set_then_deletes_exactly_that_set_
 #[test]
 fn tier_storage_17_purge_refuses_a_stale_digest_a_kind_outside_its_four_and_a_missing_cutoff_and_deletes_nothing() {
     let fixture = purge_fixture();
-    let preview = fixture.run_canon(&["purge", "--kind", "session", "--before", "2026-06-01"]);
+    let preview = fixture.run_canon(&["purge", "--kind", "run", "--before", "2026-06-01"]);
     let digest = support::preview_digest(&support::stdout(&preview)).unwrap();
     // The cutoff moves past the second record, so the removal set is another set.
     let before = snapshot(fixture.root.path());
 
-    let stale = fixture.run_canon(&["purge", "--kind", "session", "--before", "2028-01-01", "--commit", "--plan-digest", &digest, "--json"]);
+    let stale = fixture.run_canon(&["purge", "--kind", "run", "--before", "2028-01-01", "--commit", "--plan-digest", &digest, "--json"]);
     assert_eq!(stale.status.code(), Some(2), "{}", out_text(&stale));
     assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_STALE");
     assert_eq!(snapshot(fixture.root.path()), before, "a stale digest deletes nothing");
 
     let kind = fixture.run_canon(&["purge", "--kind", "change", "--before", "2026-06-01"]);
     assert_eq!(kind.status.code(), Some(2), "{}", out_text(&kind));
-    assert!(out_text(&kind).contains("expected: session, run, event, trajectory"), "{}", out_text(&kind));
+    assert!(out_text(&kind).contains("expected: run, trajectory, session, event"), "{}", out_text(&kind));
 
-    let no_cutoff = fixture.run_canon(&["purge", "--kind", "session"]);
+    let no_cutoff = fixture.run_canon(&["purge", "--kind", "run"]);
     assert_eq!(no_cutoff.status.code(), Some(2), "{}", out_text(&no_cutoff));
     assert!(out_text(&no_cutoff).contains("--before"), "{}", out_text(&no_cutoff));
 
-    let no_digest = fixture.run_canon(&["purge", "--kind", "session", "--before", "2026-06-01", "--commit"]);
+    let no_digest = fixture.run_canon(&["purge", "--kind", "run", "--before", "2026-06-01", "--commit"]);
     assert_eq!(no_digest.status.code(), Some(2), "{}", out_text(&no_digest));
     assert!(out_text(&no_digest).contains("--plan-digest"), "{}", out_text(&no_digest));
     assert_eq!(snapshot(fixture.root.path()), before);

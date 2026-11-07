@@ -210,7 +210,9 @@ fn one_name_has_one_value_name_arity_and_value_set_on_every_leaf() {
         // Value sets: equal, except a declared subset of the shared (largest) set.
         let largest: BTreeSet<String> = uses.iter().map(|(_, o)| strings(&o["possibleValues"]).into_iter().collect::<BTreeSet<_>>()).max_by_key(BTreeSet::len).unwrap();
         for (leaf, option) in uses {
-            let set: BTreeSet<String> = strings(&option["possibleValues"]).into_iter().collect();
+            // 0.39: `purge --kind` also takes the two retired record kinds, which no other command reads (they leave next release).
+            let retired = |value: &String| n == "kind" && leaf == "purge" && canon_store::policy::RETIRED_KIND_NAMES.contains(&value.as_str());
+            let set: BTreeSet<String> = strings(&option["possibleValues"]).into_iter().filter(|value| !retired(value)).collect();
             let declared = DECLARED_SUBSETS.iter().any(|(o, l)| o == n && l == leaf);
             if declared {
                 if !(set.is_subset(&largest) && set.len() < largest.len()) {

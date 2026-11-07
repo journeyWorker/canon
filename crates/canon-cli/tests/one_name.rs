@@ -165,7 +165,7 @@ fn context_capability_14_one_concept_has_one_flag_spelling_across_every_command(
 fn context_capability_15_a_kind_value_never_carries_the_record_suffix() {
     let tree = command_tree();
     let purge = &tree.iter().find(|c| c.path == "purge").unwrap().kind_values;
-    assert_eq!(purge, &["session", "run", "event", "trajectory"], "purge takes only the kinds it can remove");
+    assert_eq!(purge, &["run", "trajectory", "session", "event"], "purge takes only the kinds it can remove, then the two retired ones");
     for command in ["query", "export"] {
         let values = &tree.iter().find(|c| c.path == command).unwrap().kind_values;
         assert!(values.contains(&"evidence".to_string()) && values.contains(&"strategy_item".to_string()), "{command}: {values:?}");
@@ -279,7 +279,7 @@ fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_rep
         (&["query", "--kind", "review_record", "--json"][..], "review_record", "review"),
         (&["export", "--kind", "evidence_record", "--json"], "evidence_record", "evidence"),
         (&["query", "--kind=finding_record", "--json"], "finding_record", "finding"),
-        (&["purge", "--kind=session_record", "--before", "2020-01-01T00:00:00Z", "--json"], "session_record", "session"),
+        (&["purge", "--kind=run_record", "--before", "2020-01-01T00:00:00Z", "--json"], "run_record", "run"),
     ] {
         let body = usage_error(&canon_in(repo, args));
         assert_eq!(body["error"]["field"], "--kind", "{args:?}: {body}");

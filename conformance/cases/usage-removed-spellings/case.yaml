@@ -1,4 +1,4 @@
-description: "0.25 D6, 0.31: the spellings 0.24 deprecated and the id-suffixed options 0.31 renamed no longer parse. A removed flag (`brief check --change`, `change new --subject-id`, `finding list --change-id=`, with `=` or a space), a line with several id-suffixed spellings whose hint line runs as printed, and a removed kind value (`query --kind review_record`, `purge --kind=session_record`) are usage errors (exit 2, code USAGE) whose hint names the spelling to use; the canonical spellings run; help and `canon schema <command> --json` carry no deprecated field"
+description: "0.25 D6, 0.31: the spellings 0.24 deprecated and the id-suffixed options 0.31 renamed no longer parse. A removed flag (`brief check --change`, `change new --subject-id`, `finding list --change-id=`, with `=` or a space), a line with several id-suffixed spellings whose hint line runs as printed, and a removed kind value (`query --kind review_record`, `purge --kind=run_record`) are usage errors (exit 2, code USAGE) whose hint names the spelling to use; the canonical spellings run; help and `canon schema <command> --json` carry no deprecated field"
 env: { CANON_ACTOR: canon }
 steps:
   - args: [init, --no-agents-md, --no-policy]
@@ -23,7 +23,7 @@ steps:
     exit: 2
   - args: [query, --kind, review_record, --json]
     exit: 2
-  - args: [purge, --kind=session_record, --before, "2020-01-01T00:00:00Z", --json]
+  - args: [purge, --kind=run_record, --before, "2020-01-01T00:00:00Z", --json]
     exit: 2
   - args: [query, --kind, review, --json]
     exit: 0

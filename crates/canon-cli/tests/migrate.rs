@@ -238,6 +238,8 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
     ] {
         assert!(dry.contains(line), "missing {line:?} in:\n{dry}");
     }
+    // 0.39: the `routing` keys of the two retired record kinds the 0.16 scaffold wrote are deleted too, by line.
+    assert!(dry.contains("(`routing.session`)") && dry.contains("(`routing.event`)"), "the plan names the retired keys it deletes:\n{dry}");
     let after_dry: Vec<String> = files(repo, "").into_iter().filter(|f| !f.starts_with(".git/")).collect();
     assert_eq!(after_dry, before, "--dry-run writes nothing");
 
@@ -260,6 +262,8 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         OLD_YAML
             .replace("      root: specs\n", "      root: .canon/specs\n      former_roots: [specs]\n")
             .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
+            .replace("  session: hot\n", "")
+            .replace("  event: hot\n", "")
             + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.\nskills:\n  providers: [claude, codex]\n",
         "every other byte of canon.yaml is kept"
     );
@@ -498,6 +502,8 @@ fn migrated_yaml() -> String {
     OLD_YAML
         .replace("      root: specs\n", "      root: .canon/specs\n      former_roots: [specs]\n")
         .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
+        .replace("  session: hot\n", "")
+        .replace("  event: hot\n", "")
         + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.\nskills:\n  providers: [claude, codex]\n"
 }
 
@@ -567,7 +573,8 @@ fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_a
     set_mode(&repo.join(".canon/changes"), 0o755);
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
     assert!(text(&out).contains("canon: MIGRATION_INCOMPLETE: failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
-    assert_eq!(read(repo, "canon.yaml"), yaml, "the source canon init wrote stays while the approval is not copied");
+    // The retired kind keys come first in the migration, so they are already deleted when the run stops.
+    assert_eq!(read(repo, "canon.yaml"), yaml.replace("  session: hot\n", "").replace("  event: hot\n", ""), "the source canon init wrote stays while the approval is not copied");
     assert!(repo.join("openspec/changes/.gitkeep").is_file());
 
     let out = ok_commit(repo);
