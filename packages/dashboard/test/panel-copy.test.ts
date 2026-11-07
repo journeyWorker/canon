@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { COLUMNS as FUNNEL_COLUMNS, NOTE as FUNNEL_NOTE } from "../src/panels/flywheel-funnel";
 import { COLUMNS as ROLE_MEMORY_COLUMNS, NOTE as ROLE_MEMORY_NOTE } from "../src/panels/role-memory";
 import { COLUMNS as BURNDOWN_COLUMNS, NOTE as BURNDOWN_NOTE } from "../src/panels/review-burndown";
-import { COLUMNS as SESSION_COSTS_COLUMNS, NOTE as SESSION_COSTS_NOTE } from "../src/panels/session-costs";
 import {
   COLUMNS as REVIEW_ROUNDS_COLUMNS,
   FIX_OF_FIX_MEANING,
@@ -17,14 +16,12 @@ import {
 
 // s42 (`close-the-open-loops`) re-review: the dashboard is a SECOND
 // surface over the same marts as `.canon/REPORT.md`, and a reader must
-// not learn something different from it. Four panels had drifted — a
+// not learn something different from it. Three panels had drifted — a
 // "Hit rate" column over a not-demoted share, an "Open (running total)"
-// column over a running event count, an applied-split described as
-// per-run when it is per distinct strategy, and a session-costs
-// paragraph calling `workspace_label` the closest available stand-in
-// for a repo when two stronger fields sit unread on the same join —
-// each the same defect class: a friendly label asserting something its
-// query does not compute.
+// column over a running event count, and an applied-split described as
+// per-run when it is per distinct strategy — each the same defect
+// class: a friendly label asserting something its query does not
+// compute.
 //
 // These tests pin the two surfaces together in BOTH directions: every
 // claim below must appear in this package's own panel copy AND in the
@@ -110,19 +107,6 @@ const EMITTED_PANELS = emittedPanels(REPORT_RENDER_RS);
  * turns those spans into `<code>`.
  */
 const SHARED_CLAIMS: Record<string, { note: string; emittedFrom: string; claims: string[] }> = {
-  "session costs": {
-    note: SESSION_COSTS_NOTE,
-    emittedFrom: "SESSION_COSTS_PANEL",
-    claims: [
-      "a re-ingested corrected cost REPLACES the superseded figure",
-      "`workspace_label` is NOT a repo identity",
-      "SPLITS one repo whose worktrees sit in differently-named directories",
-      "MERGES two different repos sharing a directory name",
-      "Two stronger fields exist and this mart reads neither",
-      "the same event's own `workspace_key`, at this panel's exact grain",
-      "`Session.project_key`, which `canon-cli` stamps to the main worktree's key",
-    ],
-  },
   "role memory": {
     note: ROLE_MEMORY_NOTE,
     emittedFrom: "ROLE_MEMORY_PANEL",
@@ -274,30 +258,6 @@ for (const [panel, { note, emittedFrom, claims }] of Object.entries(SHARED_CLAIM
   }
 }
 
-test("the session costs panel never sells workspace_label as a repo identity", () => {
-  // `workspace_label` is `workspace_label_from_key`'s last non-empty
-  // path segment, so it SPLITS one repo whose worktrees sit in
-  // differently-named directories and MERGES two repos sharing a
-  // directory name. It is not the best field available either: the same
-  // `token_usage` event carries `workspace_key` at the identical grain,
-  // and `Session.project_key` (`crates/canon-model/src/records.rs`'
-  // `Session` doc) carries repo identity outright. This mart selects
-  // neither, so no surface may rank `workspace_label` as the closest
-  // available repo proxy.
-  expect(EMITTED_PANELS.get("SESSION_COSTS_PANEL")).not.toContain("closest available stand-in");
-  expect(SESSION_COSTS_NOTE).not.toContain("closest available");
-  const workspace = SESSION_COSTS_COLUMNS.find((c) => c.key === "workspace_label");
-  expect(workspace?.label).not.toBe("Repo");
-  expect(workspace?.description).toContain("Not a repo identity");
-  expect(workspace?.description).toContain("workspace_key and Session.project_key are both stronger; this mart reads neither");
-  // The fold is what makes the money column a corrected figure rather
-  // than a sum over superseded versions; the reader needs that at the
-  // column too, not only in the note.
-  const cost = SESSION_COSTS_COLUMNS.find((c) => c.key === "total_cost");
-  expect(cost?.description).toContain("latest version of each token_usage event");
-  expect(cost?.description).toContain("replaces the figure it corrects");
-});
-
 test("the role memory panel does not advertise a hit rate or an effect the view lacks", () => {
   const hitRate = ROLE_MEMORY_COLUMNS.find((c) => c.key === "hit_rate");
   // The bare label was the lie: `mart_role_memory` computes
@@ -355,7 +315,6 @@ test("dashboard sources cite views.sql by view name, never by line range", () =>
     "src/panels/review-burndown.ts",
     "src/panels/review-rounds.ts",
     "src/panels/review-totals.ts",
-    "src/panels/session-costs.ts",
     "src/panels/trust-matrix.ts",
     "src/render-table.ts",
     "scripts/build-fixture-snapshot.sql",
@@ -559,7 +518,7 @@ test("index.html's panel captions are bare view names, never claims", () => {
   // renders and the tests above pin against the report.
   const html = readFileSync(join(new URL("..", import.meta.url).pathname, "index.html"), "utf-8");
   const captions = [...html.matchAll(/<p class="panel-source">([\s\S]*?)<\/p>/g)].map(([, text]) => text.trim());
-  expect(captions.length).toBe(7);
+  expect(captions.length).toBe(6);
   for (const caption of captions) {
     expect({ caption, isBareTable: SNAPSHOT_TABLES.includes(caption) }).toEqual({ caption, isBareTable: true });
   }
@@ -904,12 +863,6 @@ const SKILL_CLAIMS: Record<string, string[]> = {
   "Trust matrix": ["Change/task coverage × green × who"],
   "Scope status": ["Every specified scenario × evidence-verified × plan-carried × spec-covered"],
   Subjects: ["Per-domain subject rollup: status × scenario coverage"],
-  "Session costs": [
-    "a re-ingested corrected cost REPLACES the superseded figure instead of being summed with it",
-    "`workspace_label` is NOT a repo identity",
-    "SPLITS one repo whose worktrees sit in differently-named directories",
-    "MERGES two different repos sharing a directory name",
-  ],
   // The bullet that drifted: every clause here replaces a word of the
   // retired "strategies, hit rate, and an effect proxy" phrasing.
   "Role memory": [

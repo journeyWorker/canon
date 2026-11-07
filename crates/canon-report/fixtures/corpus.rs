@@ -35,7 +35,7 @@ use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::ids::{ChangeId, ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
 use canon_model::records::DivergenceFields;
 use canon_model::records::{
-    Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, Review, ProvenanceRef, Run, RunStatus, Session, StrategyRef, Subject,
+    Divergence, DivergenceStatus, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, Review, ProvenanceRef, Run, RunStatus, StrategyRef, Subject,
     SubjectStatus, Task, TaskStatus,
 };
 use canon_store::git_tier::GitTier;
@@ -76,16 +76,13 @@ pub mod trust_matrix {
     pub const TASK_3_NOT_COVERED: &str = "s9-fixture#3";
 }
 
-/// `mart_session_costs`'s expected single row: one session, one run,
-/// two `token_usage` events summing to `0.05` cost / `120` tokens.
-pub mod session_costs {
+/// `mart_run_observability`'s fixture runs: five folded runs, of which
+/// exactly one (the `Succeeded` one carrying the `dev` strategy) names a
+/// session.
+pub mod run_observability {
     pub const SESSION_ID: &str = "s9-fixture-session";
     pub const CLIENT: &str = "claude-code";
-    pub const ROLE: &str = "dev";
-    pub const WORKSPACE_LABEL: &str = "acme";
-    pub const RUN_COUNT: i64 = 1;
-    pub const TOTAL_COST: f64 = 0.05;
-    pub const TOTAL_TOKENS: i64 = 120;
+    pub const RUN_COUNT: usize = 5;
 }
 
 /// `mart_role_memory`'s expected four rows: `dev/acme/auth/abc123` has
@@ -514,22 +511,13 @@ fn build_git_tier(git_root: &Path) {
     )
     .unwrap();
 
-    // ── session costs: 1 session, 1 run (carrying the `dev` strategy
-    // as retrieved guidance), 2 token_usage events ─────────────────
-    let session_id = SessionId::parse(session_costs::SESSION_ID).unwrap();
-    tier.write(&Session::new(
-        Envelope::new(1, RecordKind::Session, at(2026, 1, 4, 9), actor("fixture-session-actor", session_costs::ROLE)),
-        session_id.clone(),
-        session_costs::CLIENT,
-        at(2026, 1, 4, 9),
-        Some(at(2026, 1, 4, 10)),
-    ))
-    .unwrap();
+    // ── run observability: 1 run naming a session (carrying the `dev`
+    // strategy as retrieved guidance) ──────────────────────────────
+    let session_id = SessionId::parse(run_observability::SESSION_ID).unwrap();
 
-    let run_id = RunId::new();
     let mut run = Run::new(
-        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 10), Actor::new_unattributed(session_costs::CLIENT)),
-        run_id,
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 10), Actor::new_unattributed(run_observability::CLIENT)),
+        RunId::new(),
         Some(session_id),
         None,
         RunStatus::Succeeded,
@@ -544,12 +532,9 @@ fn build_git_tier(git_root: &Path) {
     // retrieved guidance and left `Running` — a dispatched run nobody
     // ever closed, which is the state every guidance-carrying run in a
     // real repo sits in until `canon dispatch end` runs. `retrieved`
-    // counts it, `applied` must not. Deliberately session-less and
-    // event-less: `mart_session_costs` inner-joins runs to their
-    // `token_usage` events through a `Session`, so this run cannot
-    // perturb that panel's expected single row.
+    // counts it, `applied` must not. Deliberately session-less.
     let mut unfinished_run = Run::new(
-        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 11), Actor::new_unattributed(session_costs::CLIENT)),
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 11), Actor::new_unattributed(run_observability::CLIENT)),
         RunId::new(),
         None,
         None,
@@ -563,14 +548,14 @@ fn build_git_tier(git_root: &Path) {
     // ── flywheel funnel's ATTRIBUTION case (s42
     // (`close-the-open-loops`) task 3.3, closing s40 task 3.1): a THIRD
     // run, byte-for-byte the same shape as `unfinished_run` above —
-    // guidance carried, still `Running`, session-less and event-less —
+    // guidance carried, still `Running`, session-less —
     // differing ONLY in that a resolved `reviewer` trajectory in the
     // learn store carries this run's `run_id` (`reviewer_run_id`, fixed
     // so both halves of the corpus can name it). The proxy scores this
     // run 0 exactly like `content`; `applied = 1` for `reviewer` is
     // therefore attributable to nothing but the stamped trajectory.
     let mut attributed_run = Run::new(
-        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 12), Actor::new_unattributed(session_costs::CLIENT)),
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 12), Actor::new_unattributed(run_observability::CLIENT)),
         reviewer_run_id(),
         None,
         None,
@@ -588,10 +573,9 @@ fn build_git_tier(git_root: &Path) {
     // none. Attribution must WIN so the strategy is counted once, which is
     // what makes `applied == applied_attributed + applied_proxy` a real
     // assertion rather than a vacuous one on this corpus. Both are
-    // session-less and event-less, so neither perturbs
-    // `mart_session_costs`.
+    // session-less.
     let mut fixer_attributed_run = Run::new(
-        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 13), Actor::new_unattributed(session_costs::CLIENT)),
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 13), Actor::new_unattributed(run_observability::CLIENT)),
         fixer_run_id(),
         None,
         None,
@@ -603,7 +587,7 @@ fn build_git_tier(git_root: &Path) {
     tier.write(&fixer_attributed_run).unwrap();
 
     let mut fixer_terminal_run = Run::new(
-        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 14), Actor::new_unattributed(session_costs::CLIENT)),
+        Envelope::new(1, RecordKind::Run, at(2026, 1, 4, 14), Actor::new_unattributed(run_observability::CLIENT)),
         RunId::new(),
         None,
         None,
@@ -613,37 +597,6 @@ fn build_git_tier(git_root: &Path) {
     );
     fixer_terminal_run.injected_guidance = vec![StrategyRef::new(fixer_strategy_id(), "fixer strategy", "content")];
     tier.write(&fixer_terminal_run).unwrap();
-
-    tier.write(&Event::new(
-        Envelope::new(1, RecordKind::Event, at_min(2026, 1, 4, 9, 30), Actor::new_unattributed(session_costs::CLIENT)),
-        run_id,
-        1,
-        "token_usage",
-        json!({
-            "provider_id": "anthropic",
-            "workspace_key": "acme",
-            "workspace_label": session_costs::WORKSPACE_LABEL,
-            "tokens": {"input": 60, "output": 20, "cache_read": 0, "cache_write": 0, "reasoning": 0, "total": 80},
-            "cost": 0.03,
-            "cost_source": "api",
-        }),
-    ))
-    .unwrap();
-    tier.write(&Event::new(
-        Envelope::new(1, RecordKind::Event, at_min(2026, 1, 4, 9, 45), Actor::new_unattributed(session_costs::CLIENT)),
-        run_id,
-        2,
-        "token_usage",
-        json!({
-            "provider_id": "anthropic",
-            "workspace_key": "acme",
-            "workspace_label": session_costs::WORKSPACE_LABEL,
-            "tokens": {"input": 30, "output": 10, "cache_read": 0, "cache_write": 0, "reasoning": 0, "total": 40},
-            "cost": 0.02,
-            "cost_source": "api",
-        }),
-    ))
-    .unwrap();
 
     // ── mart_subjects: one `dev`-domain subject (status `building`)
     // owning the two scope_status scenarios through their `subject_id`
@@ -696,7 +649,7 @@ fn build_git_tier(git_root: &Path) {
     .unwrap();
 }
 
-// Fixed strategy/trajectory ids so `session_costs`'s `injected_guidance`
+// Fixed strategy/trajectory ids so `run_observability`'s `injected_guidance`
 // (built before the learn store, above) can cite them by value — both
 // sides of the corpus reference the SAME ids, exactly like a real
 // `Run::injected_guidance` snapshot would.

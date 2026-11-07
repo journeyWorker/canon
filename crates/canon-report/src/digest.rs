@@ -127,12 +127,10 @@ const fn digest_side(kind: RecordKind) -> DigestSide {
         // digest ignored it would claim to describe a corpus it could
         // not distinguish.
         RecordKind::Evidence | RecordKind::Review | RecordKind::Divergence | RecordKind::Finding => DigestSide::Ledger,
-        // Ingested execution telemetry: machine-derived from agent
-        // transcripts, re-derivable by re-running `canon ingest
-        // sessions`, and routed off the git tier this module reads.
-        // Not something a `git diff` shows a reviewer, which is the
-        // module doc's own membership test.
-        RecordKind::Session | RecordKind::Run | RecordKind::Event => DigestSide::Neither,
+        // Execution telemetry: a dispatched run, routed off the git
+        // tier this module reads. Not something a `git diff` shows a
+        // reviewer, which is the module doc's own membership test.
+        RecordKind::Run => DigestSide::Neither,
         // In-flight coordination state, routed `hot` and aged to
         // `cold`; a handoff is a message between agents, not a claim
         // about the corpus.
@@ -407,9 +405,9 @@ mod tests {
     }
 
     /// Every kind lands on exactly one side, and the side that digests
-    /// NOTHING is exactly the six documented exclusions. Without this,
+    /// NOTHING is exactly the four documented exclusions. Without this,
     /// `digest_side`'s exhaustive `match` still forces a decision for a
-    /// fifteenth kind but nothing stops that decision being
+    /// thirteenth kind but nothing stops that decision being
     /// `Neither` by reflex — which is how `Subject` and `Finding` went
     /// missing under the hand-kept arrays.
     #[test]
@@ -424,9 +422,7 @@ mod tests {
         assert_eq!(
             neither,
             vec![
-                RecordKind::Session,
                 RecordKind::Run,
-                RecordKind::Event,
                 RecordKind::Handoff,
                 RecordKind::Trajectory,
                 RecordKind::StrategyItem,
@@ -618,14 +614,14 @@ mod tests {
 
     /// The exclusion half of `manifest.rs`'s account, asserted rather
     /// than asserted-about: a record of an excluded kind must leave
-    /// `source_digest` alone. Without this, "excludes exactly six core
-    /// kinds" is a claim only the `match` arms support, and the two
-    /// findings above are both cases of a claim no test held down.
+    /// `source_digest` alone. Without this, "excludes exactly four core
+    /// kinds" is a claim only the `match` arms support.
     #[test]
     fn a_record_of_an_excluded_kind_does_not_move_the_source_digest() {
         use canon_model::envelope::{Actor, Envelope};
-        use canon_model::ids::{RoleId, SessionId};
-        use canon_model::records::Session;
+        use canon_model::ids::RoleId;
+        use canon_model::ids::RunId;
+        use canon_model::records::Run;
 
         let dir = tempfile::tempdir().unwrap();
         let git_root = dir.path().join("ledger");
@@ -633,10 +629,12 @@ mod tests {
         let at = chrono::Utc::now();
 
         let baseline = DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
-        tier.write(&Session::new(
-            Envelope::new(1, RecordKind::Session, at, Actor::new("agent1", RoleId::parse("dev").unwrap())),
-            SessionId::parse("11111111-1111-4111-8111-111111111111").unwrap(),
-            "omp",
+        tier.write(&Run::new(
+            Envelope::new(1, RecordKind::Run, at, Actor::new("agent1", RoleId::parse("dev").unwrap())),
+            RunId::new(),
+            None,
+            None,
+            canon_model::records::RunStatus::Succeeded,
             at,
             None,
         ))
@@ -644,7 +642,7 @@ mod tests {
         assert_eq!(
             baseline,
             DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest(),
-            "`session` is a documented exclusion (manifest.rs); a session-only change must NOT move `source_digest`"
+            "`run` is a documented exclusion (manifest.rs); a run-only change must NOT move `source_digest`"
         );
     }
 }

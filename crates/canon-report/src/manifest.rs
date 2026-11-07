@@ -52,13 +52,12 @@ pub struct Manifest {
     /// — PLUS every namespaced overlay kind that tier holds, whatever
     /// it is named, discovered from the tier's own `kind=`
     /// directories rather than from any list
-    /// (`crate::digest`'s `overlay_kind_dirs`). It excludes exactly six
-    /// core kinds: `session`, `run`, `event`, `handoff`, `trajectory`,
-    /// `strategy_item`.
+    /// (`crate::digest`'s `overlay_kind_dirs`). It excludes exactly four
+    /// core kinds: `run`, `handoff`, `trajectory`, `strategy_item`.
     ///
-    /// So a snapshot whose `mart_session_costs`/`mart_role_memory`/
+    /// So a snapshot whose `mart_run_observability`/`mart_role_memory`/
     /// `mart_flywheel_funnel` rows moved — those are built from the
-    /// excluded six — can carry an UNCHANGED `source_digest`. A
+    /// excluded four — can carry an UNCHANGED `source_digest`. A
     /// snapshot whose `mart_scope_status` rows moved cannot, over
     /// VALIDATED core records and overlay inputs: that mart's inputs
     /// are `Scenario` (its driving side since s45), `Task.scenario_refs`

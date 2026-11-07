@@ -64,7 +64,6 @@ test("report.dashboard.04 the unavailable-snapshot page shows the reason and the
   }));
   for (const [file, fn] of [
     ["trust-matrix", "renderTrustMatrix"],
-    ["session-costs", "renderSessionCosts"],
     ["role-memory", "renderRoleMemory"],
     ["flywheel-funnel", "renderFlywheelFunnel"],
     ["review-burndown", "renderReviewBurndown"],

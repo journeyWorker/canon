@@ -40,7 +40,7 @@
 -- files (`kind=<kind>/<n>_<digest8>.json`) by `canon-report` right
 -- before it opens this file — the sqlite db is local and needs no
 -- credential, so `canon init`'s default routing (`task`/`handoff`/
--- `session`/`run`/`event` to a sqlite `hot` rung) reaches the marts.
+-- `task`/`handoff`/`run` to a sqlite `hot` rung) reaches the marts.
 -- `read_text` tolerates zero matches, so an unset or empty root reads
 -- as no hot rows at all, never an error.
 --
@@ -66,8 +66,8 @@
 -- physical root and every mart reads it directly, so a mart is
 -- exposed to raw versions even though `canon query` for the same kind
 -- is not. Each view therefore states its own posture below — the s42
--- re-review found `mart_session_costs` silently multiplying
--- `sum(cost)`/`sum(tokens_total)` by a dispatched run's version count.
+-- re-review found a cost mart (since removed) silently multiplying
+-- its sums by a dispatched run's version count.
 --
 -- The rule, applied view by view: a superseded version is a BUG when
 -- it either (a) multiplies a measure sourced from a DIFFERENT relation
@@ -111,8 +111,8 @@
 -- without the bump the fold "surfaced this field on an arbitrary
 -- SUBSET of one file's rows"). And only a DISPATCHED `run` gets s42's
 -- strictly-greater version-`at` (`canon-cli::dispatch::
--- close_version_at`) — `task`, `session`, `handoff`, `subject`,
--- `event` and the `porting.coverage` overlay get nothing of the kind.
+-- close_version_at`) — `task`, `handoff`, `subject`
+-- and the `porting.coverage` overlay get nothing of the kind.
 -- On such a corpus an `at`-only fold retains the STALE body while
 -- `canon query --kind <k>` returns the fresh one, from the same files.
 --
@@ -318,21 +318,7 @@
 --     id and then returns an arbitrary winner — reporting one
 --     project's coverage under another's, which is worse than the
 --     double-count folding replaced.
---   `mart_session_costs`'s `token_usage` — `(run_id, seq)`, the two
---     fields `Event`'s `{run_id}-{seq:010}` key is built from.
---   `mart_session_costs`'s `runs` · `mart_session_run_handoff`'s
---     `runs` — `run_id`.
---   `mart_session_costs`'s `sessions` ·
---     `mart_session_run_handoff`'s `sessions` — the body's own
---     `session_id`. This is the one key that is deliberately NOT
---     literally `resolve_partition`'s output: that arm keys `Session`
---     by `sanitize_component(session_id)` (`/` -> `_`, so the key is
---     filename-safe). These folds group by the raw SEMANTIC id, one
---     rung FINER — sanitizing is many-to-one, so two distinct session
---     ids can share a filename key, and a fold at the finer key can
---     therefore never merge two records the coarser key would keep
---     apart. Finer is the safe direction; the reverse would not be.
---   `mart_session_run_handoff`'s `handoffs` — `id`.
+--   `mart_run_observability`'s `runs` — `run_id`.
 --   `mart_subjects`'s `subjects` — `subject_id`.
 --   `mart_subjects`'s `scenario_latest_verdict` — `scenario_id`, the
 --     `partition.rs` `EvidenceRecord` arm's second fallback. Like
@@ -347,8 +333,7 @@
 --   `mart_review_rounds`'s `finding_latest` — `(change_id, round,
 --     seq)`, the three fields `partition.rs`'s `Finding` arm builds
 --     its `{change_id}_{round}_{seq}` key from. Grouped in the
---     raw text form `body ->> …` returns, exactly like
---     `mart_session_costs`' `token_usage` fold: JSON forbids a leading
+--     raw text form `body ->> …` returns, JSON forbids a leading
 --     zero on a number, so a well-formed `round` of 1 is the text `1`
 --     on every root and the padding `resolve_partition` adds is a
 --     filename concern, not a grouping one. `reviewed_sha` is
@@ -405,10 +390,10 @@
 --
 -- Why per-view folds and NOT one shared `stg_latest_records`: such a
 -- view needs a `natural_key` column, and supplying it means
--- re-deriving the key from `body` in a 14-arm `CASE` reimplementing
--- `resolve_partition` (`Event`'s `{run_id}-{seq:010}`, the composite
--- `scenario`/`review`/`divergence`/`finding` keys, `Session`'s
--- `sanitize_component`, `EvidenceRecord`'s three-way fallback) — a
+-- re-deriving the key from `body` in a 12-arm `CASE` reimplementing
+-- `resolve_partition` (the composite
+-- `scenario`/`review`/`divergence`/`finding` keys,
+-- `EvidenceRecord`'s three-way fallback) — a
 -- SECOND implementation of the join-spine key grammar that drifts
 -- silently the moment `partition.rs` changes, the exact
 -- second-derivation risk design D1 exists to prevent and the same
@@ -1078,138 +1063,11 @@ LEFT JOIN scenario_evidence se ON se.project_id = s.project_id AND se.scenario_i
 LEFT JOIN spec_cov cov ON cov.project_id = s.project_id AND cov.scenario_id = s.scenario_id
 ORDER BY s.project_id, coalesce(s.scenario_id, t.scenario_id);
 
--- Panel 2: session costs grouped by `(session_id, client, role,
--- workspace_label)` (S3 ingest, the donor's `session_id` join key).
--- There is no `repo` column and this panel never claims one. Neither
--- `Session` nor `Run` carries a native `role` field yet — verified
--- against `crates/canon-ingest/src/normalize.rs`, 2026-07-11: every
--- actor `canon-ingest` constructs is `Actor::new_unattributed` (`role`
--- always `NULL`), surfaced honestly here as `'unattributed'` rather
--- than hidden.
---
--- `workspace_label` is NOT a repo identity, and specifically is not
--- "the closest available" one — an earlier version of this comment
--- claimed that and it was wrong twice over (s42 gate re-review). What
--- it actually is: `canon_ingest::normalize::workspace_label_from_key`'s
--- output, i.e. the LAST non-empty path segment of the normalized
--- workspace key, and nothing more. Two concrete failure modes follow
--- directly from that definition — it SPLITS one repo whose main and
--- linked `git worktree`s sit in differently-named directories
--- (`/w/canon` + `/w/canon-feat` -> two rows for one repo), and it
--- MERGES two genuinely different repos that share a directory name
--- (`~/a/canon` + `~/b/canon` -> one row).
---
--- Two STRONGER fields exist today and this mart reads neither, which is
--- the honest framing rather than calling this one the best available:
---   `Session.project_key` — the field with actual repo semantics.
---     `canon-cli`'s ingest pass stamps it to the MAIN worktree's
---     normalized key (`crates/canon-cli/src/ingest.rs`'s
---     `project_key_for`), and `canon_model::records::Session`'s own doc
---     states the purpose: "so queries can aggregate a repo's main
---     worktree and its linked `git worktree`s as one project". The
---     `sessions` CTE below does not select it.
---   the `token_usage` event's own `workspace_key` — the full
---     normalized path, at THIS panel's exact grain (it sits in the same
---     `detail` object `workspace_label` is read from), so it
---     distinguishes same-named repos under different parents.
---
--- Why the label is nonetheless what this panel groups by: `project_key`
--- is session-level, and this GROUP BY is deliberately event-level so a
--- session whose runs span two workspaces yields two distinct rows
--- rather than one row with an arbitrary workspace silently standing in
--- for the other (pinned by `session_costs_multi_workspace.rs`).
--- Switching the column would collapse that split, so the gap stays a
--- NAMED one under this file's existing convention — the column is
--- called `workspace_label`, never renamed to `repo`, and a caller
--- needing repo-level truth must read `project_key`, not this. Replace
--- this derivation wholesale (not patch around it) if the panel ever
--- grows a genuine repo grain.
---
--- Cost/tokens come from `canon_ingest::normalize::TOKEN_USAGE_LABEL`
--- (`"token_usage"`) events, keyed `run_id` -> `session_id` (design D5's
--- `Session`/`Run` keyed by `session_id`).
---
--- BLOCKER FIXED HERE (s42 re-review). All three CTEs are folded to one
--- row per natural key (header's fold list), because every one of them
--- feeds a `sum()` and a multi-version row on ANY of the three fans the
--- join out and multiplies BOTH `total_cost` and `total_tokens`.
--- `run_count` never had the bug — it is `count(DISTINCT tu.run_id)`,
--- which absorbs duplicates — which is exactly why the double-count was
--- silent: `run_count 1 / total_cost 0.02` for a single $0.01 run reads
--- like an expensive run, not like a bug.
---
--- Each CTE's exposure, all three real rather than theoretical:
---   `runs`     — `canon dispatch begin`/`end` store TWO `run` versions
---                per dispatched run (s42 task group 1), so ONE
---                completed, locally-readable dispatch doubled both
---                totals. Key `run_id`.
---   `sessions` — `canon ingest sessions` re-persists a `Session` as
---                the transcript grows (an `ended_at` appearing on a
---                later pass is a second version at the same
---                `session_id`). The outer `GROUP BY` does NOT save
---                this: the join fans out BEFORE aggregation, so
---                regrouping two identical `(session_id, client, role)`
---                tuples still sums each cost twice. Key `session_id`.
---   `token_usage` — an `Event` is keyed `(run_id, seq)`
---                (`partition.rs`), so a re-ingested line whose body
---                CHANGED (a corrected cost) is a second version of the
---                same event, and summing both charges it twice. A
---                byte-identical re-ingest cannot get here at all —
---                `GitTier::write` rejects the unchanged path as
---                `DuplicatePath` — so the fold's job is precisely to
---                take the CORRECTION and drop the superseded figure.
-CREATE OR REPLACE VIEW mart_session_costs AS
-WITH token_usage AS (
-    SELECT
-        body ->> '$.run_id'                                            AS run_id,
-        "at",
-        CAST(body -> '$.detail' ->> '$.cost' AS DOUBLE)                AS cost,
-        body -> '$.detail' ->> '$.workspace_label'                     AS workspace_label,
-        CAST(body -> '$.detail' -> '$.tokens' ->> '$.total' AS BIGINT) AS tokens_total
-    FROM stg_records
-    WHERE kind = 'event' AND (body ->> '$.label') = 'token_usage'
-    QUALIFY row_number() OVER (
-        PARTITION BY body ->> '$.run_id', body ->> '$.seq'
-        ORDER BY version_rank DESC
-    ) = 1
-),
-runs AS (
-    SELECT
-        body ->> '$.run_id'     AS run_id,
-        body ->> '$.session_id' AS session_id
-    FROM stg_records
-    WHERE kind = 'run'
-    QUALIFY row_number() OVER (PARTITION BY body ->> '$.run_id' ORDER BY version_rank DESC) = 1
-),
-sessions AS (
-    SELECT
-        body ->> '$.session_id'        AS session_id,
-        body ->> '$.client'            AS client,
-        body -> '$.actor' ->> '$.role' AS actor_role
-    FROM stg_records
-    WHERE kind = 'session'
-    QUALIFY row_number() OVER (PARTITION BY body ->> '$.session_id' ORDER BY version_rank DESC) = 1
-)
-SELECT
-    s.session_id,
-    s.client,
-    coalesce(s.actor_role, 'unattributed') AS role,
-    tu.workspace_label                     AS workspace_label,
-    count(DISTINCT tu.run_id)              AS run_count,
-    round(sum(tu.cost), 6)                 AS total_cost,
-    CAST(sum(tu.tokens_total) AS BIGINT)   AS total_tokens,
-    min(tu."at")                           AS first_event_at,
-    max(tu."at")                           AS last_event_at
-FROM sessions s
-JOIN runs r         ON r.session_id = s.session_id
-JOIN token_usage tu ON tu.run_id = r.run_id
-GROUP BY s.session_id, s.client, s.actor_role, tu.workspace_label
-ORDER BY s.session_id, tu.workspace_label;
-
 -- Panel 3: run observability. One row per folded run, with bounded
--- lifecycle/event/cost proxies only. This view deliberately emits counts
--- and identifiers, never directive or guidance text and never a causal
--- interpretation of any outcome.
+-- lifecycle proxies only. This view deliberately emits counts and
+-- identifiers, never guidance text and never a causal interpretation of
+-- any outcome. It reads `run` records alone: `project_key` is the Run's
+-- own value, so a Run stored without one is `project_key_unknown`.
 CREATE OR REPLACE VIEW mart_run_observability AS
 WITH runs AS (
     SELECT
@@ -1228,42 +1086,6 @@ WITH runs AS (
     WHERE kind = 'run'
     QUALIFY row_number() OVER (PARTITION BY body ->> '$.run_id' ORDER BY version_rank DESC) = 1
 ),
-sessions AS (
-    SELECT
-        body ->> '$.session_id' AS session_id,
-        body ->> '$.project_key' AS project_key
-    FROM stg_records
-    WHERE kind = 'session'
-    QUALIFY row_number() OVER (PARTITION BY body ->> '$.session_id' ORDER BY version_rank DESC) = 1
-),
-events AS (
-    SELECT
-        body ->> '$.run_id' AS run_id,
-        "at",
-        body ->> '$.label' AS label,
-        CAST(body -> '$.detail' ->> '$.cost' AS DOUBLE) AS cost,
-        CAST(body -> '$.detail' -> '$.tokens' ->> '$.total' AS BIGINT) AS tokens_total
-    FROM stg_records
-    WHERE kind = 'event'
-    QUALIFY row_number() OVER (
-        PARTITION BY body ->> '$.run_id', body ->> '$.seq'
-        ORDER BY version_rank DESC
-    ) = 1
-),
-event_rollup AS (
-    SELECT
-        run_id,
-        count(*) AS event_count,
-        count(*) FILTER (WHERE label = 'token_usage') AS token_event_count,
-        count(*) FILTER (WHERE label = 'user_directive') AS directive_event_count,
-        count(*) FILTER (WHERE label = 'token_usage' AND cost IS NOT NULL) AS cost_source_count,
-        round(sum(cost) FILTER (WHERE label = 'token_usage'), 6) AS total_cost,
-        CAST(sum(tokens_total) FILTER (WHERE label = 'token_usage') AS BIGINT) AS total_tokens,
-        min("at") AS first_event_at,
-        max("at") AS last_event_at
-    FROM events
-    GROUP BY run_id
-),
 children AS (
     SELECT parent_run_id, count(*) AS child_run_count
     FROM runs
@@ -1273,7 +1095,7 @@ children AS (
 SELECT
     r.run_id,
     r.session_id,
-    coalesce(r.project_key, s.project_key) AS project_key,
+    r.project_key,
     r.task_id,
     r.parent_run_id,
     r.status,
@@ -1281,31 +1103,19 @@ SELECT
     r.ended_at,
     CASE WHEN r.started_at IS NOT NULL AND r.ended_at IS NOT NULL
          THEN date_diff('millisecond', r.started_at, r.ended_at) END AS latency_ms,
-    coalesce(e.event_count, 0) AS event_count,
-    coalesce(e.token_event_count, 0) AS token_event_count,
-    coalesce(e.directive_event_count, 0) AS directive_event_count,
     coalesce(c.child_run_count, 0) AS child_run_count,
     r.guidance_count,
     r.provider,
     r.model,
-    coalesce(e.cost_source_count, 0) AS cost_source_count,
-    e.total_cost,
-    e.total_tokens,
-    e.first_event_at,
-    e.last_event_at,
     r.session_id IS NULL AS session_id_unknown,
-    coalesce(r.project_key, s.project_key) IS NULL AS project_key_unknown,
+    r.project_key IS NULL AS project_key_unknown,
     r.task_id IS NULL AS task_id_unknown,
     r.parent_run_id IS NULL AS parent_run_id_unknown,
     r.ended_at IS NULL AS ended_at_unknown,
     r.provider IS NULL AS provider_unknown,
     r.model IS NULL AS model_unknown,
-    e.event_count IS NULL AS event_times_unknown,
-    e.cost_source_count IS NULL OR e.cost_source_count = 0 AS cost_unknown,
     r.guidance_count = 0 AS guidance_unknown
 FROM runs r
-LEFT JOIN sessions s ON s.session_id = r.session_id
-LEFT JOIN event_rollup e ON e.run_id = r.run_id
 LEFT JOIN children c ON c.parent_run_id = r.run_id
 ORDER BY r.run_id;
 
@@ -1631,118 +1441,6 @@ SELECT
 FROM by_day
 ORDER BY day;
 
--- Panel 6 (S2 hardening addition, data-stores Pattern 2 — "Second-hop
--- join keys (session ↔ run, session ↔ handoff) must be minted, typed,
--- and reachable — they are NOT currently wired anywhere"):
--- a prior session-store audit's §Pattern 2
--- names this donor's OWN unclosed gap as a cautionary tale — a prior
--- session store's DuckDB ATTACH surface exposes exactly ONE prior
--- session/event store table
--- (`dash.public.sessions`) and never `handoffs`, so "one fan-out query
--- reaches Session+Run+Handoff together" was never actually buildable
--- there even though the donor's own schema HELD the columns
--- (`sessions.workflowRunId`, `handoffs.createdBySessionId`) needed to.
--- `mart_session_costs` above already closes the Session⋈Run half over
--- `token_usage` events; this view closes the full Session⋈Run⋈Handoff
--- triple so no caller has to separately query 3 surfaces the way a
--- prior-session-store-shaped consumer would have had to (Pattern 2's own
--- "adoption sketch").
---
--- Handoff join-key caveat: `canon_model::records::Handoff` (S1) carries
--- no dedicated `session_id` field of its own today — verified against
--- `crates/canon-model/src/handoff.rs`, 2026-07-11: its own fields are
--- `id`/`state`/`chain_id`/`parent_handoff_id`/`seq`/`claimed_by`/
--- `openspec_change_slug`/`tags`/`title`/`body`, plus s37's
--- `from_role`/`to_role` edge endpoints — the endpoints type WHICH ROLE
--- handed to which, still not WHICH SESSION, so none of these is a
--- session key. The one currently-available, honest join key is every record's
--- OWN envelope `actor.session_id` (S1's structured-actor design,
--- `canon_model::envelope::Actor::session_id` — the "no artifact can
--- join to the session… that produced it" gap this exact field exists
--- to close) — the agent-CLI session that AUTHORED this handoff. This
--- is a proxy for "the handoff belongs to this session," not a
--- first-class `Handoff.session_id` field; replace this view's
--- `h.session_id` derivation wholesale (not patch around it) if/when S1
--- adds one — the same "explicit STUB, never silently load-bearing"
--- posture `int_evidence_verdicts` already establishes. `LEFT JOIN`
--- against handoffs (unlike `mart_session_costs`'s `JOIN` against
--- token_usage) is deliberate: not every session has an associated
--- handoff, and a session/run pair must never silently disappear from
--- this view for lacking one.
---
--- All three CTEs are folded to one row per natural key (header's fold
--- list). This view carries no `sum()`, so the symptom was not a
--- multiplied measure but a CONTRADICTORY row set: a run stored twice
--- (`canon dispatch begin`/`end`, s42) crossed with a handoff stored
--- twice (`open` -> `accepted`) emitted FOUR rows for one
--- session/run/handoff triple, simultaneously reporting `run_status`
--- `running` AND `succeeded`, `handoff_state` `open` AND `accepted`.
--- Since a caller reads this view to learn a triple's CURRENT state,
--- every one of those rows but the latest is a false answer, and no
--- column told the caller which. `session_at`/`handoff_at` follow the
--- fold: they are that surviving VERSION's `at`, so `handoff_at` now
--- reads when the handoff last changed state — the same posture
--- `mart_session_costs`' bounds already take toward the `token_usage`
--- event's own `at`.
-CREATE OR REPLACE VIEW mart_session_run_handoff AS
-WITH runs AS (
-    -- Fold FIRST, filter second: the `session_id IS NOT NULL` test
-    -- belongs to the surviving version, so it sits outside the folding
-    -- subquery. Inlined into the `WHERE` it would run BEFORE the window
-    -- function and resurrect a superseded version of a run whose
-    -- CURRENT version carries no `session_id`.
-    SELECT run_id, session_id, run_status
-    FROM (
-        SELECT
-            body ->> '$.run_id'     AS run_id,
-            body ->> '$.session_id' AS session_id,
-            body ->> '$.status'     AS run_status
-        FROM stg_records
-        WHERE kind = 'run'
-        QUALIFY row_number() OVER (PARTITION BY body ->> '$.run_id' ORDER BY version_rank DESC) = 1
-    )
-    WHERE session_id IS NOT NULL
-),
-sessions AS (
-    SELECT
-        body ->> '$.session_id' AS session_id,
-        body ->> '$.client'     AS client,
-        "at"                    AS session_at
-    FROM stg_records
-    WHERE kind = 'session'
-    QUALIFY row_number() OVER (PARTITION BY body ->> '$.session_id' ORDER BY version_rank DESC) = 1
-),
-handoffs AS (
-    -- Fold FIRST, filter second, for the same reason `runs` does.
-    SELECT handoff_id, session_id, handoff_state, handoff_title, handoff_at
-    FROM (
-        SELECT
-            body ->> '$.id'                      AS handoff_id,
-            body -> '$.actor' ->> '$.session_id' AS session_id,
-            body ->> '$.state'                   AS handoff_state,
-            body ->> '$.title'                   AS handoff_title,
-            "at"                                 AS handoff_at
-        FROM stg_records
-        WHERE kind = 'handoff'
-        QUALIFY row_number() OVER (PARTITION BY body ->> '$.id' ORDER BY version_rank DESC) = 1
-    )
-    WHERE session_id IS NOT NULL
-)
-SELECT
-    s.session_id,
-    s.client,
-    r.run_id,
-    r.run_status,
-    h.handoff_id,
-    h.handoff_state,
-    h.handoff_title,
-    s.session_at,
-    h.handoff_at
-FROM sessions s
-JOIN runs r          ON r.session_id = s.session_id
-LEFT JOIN handoffs h ON h.session_id = s.session_id
-ORDER BY s.session_id, r.run_id, h.handoff_id;
-
 -- s36 (subject-domain-loop) addition: the per-domain subject rollup
 -- panel (canon report's subject panel). One row per `subject` record
 -- (the reviewed 13th kind), grouped/ordered by `domain` then
@@ -1776,9 +1474,8 @@ ORDER BY s.session_id, r.run_id, h.handoff_id;
 -- it, each claiming a different current `status`, while the coverage
 -- join fanned out five-fold and multiplied BOTH
 -- `scenario_count` and `covered_scenarios` by five. A two-scenario
--- shipped subject read `scenario_count 10`. That is the same shape as
--- `mart_session_costs`' cost double-count, on the panel whose grain is
--- literally "one row per subject".
+-- shipped subject read `scenario_count 10`. That is the shape of a double count on a
+-- panel whose grain is literally "one row per subject".
 CREATE OR REPLACE VIEW mart_subjects AS
 WITH subjects AS (
     SELECT

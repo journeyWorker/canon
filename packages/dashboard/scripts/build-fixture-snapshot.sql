@@ -1,5 +1,5 @@
--- Builds packages/dashboard's canonical fixture snapshot: ten small tables
--- (nine hand-authored, one DERIVED — see panel 9) whose column NAME + ORDER + TYPE match
+-- Builds packages/dashboard's canonical fixture snapshot: nine small tables
+-- (eight hand-authored, one DERIVED — see panel 9) whose column NAME + ORDER + TYPE match
 -- crates/canon-store/sql/views.sql's mart_* SELECT lists exactly (S9
 -- SHARED SNAPSHOT CONTRACT). Each is exported with the same
 -- `COPY "<table>" TO '<table>.parquet' (FORMAT parquet)` shape
@@ -22,15 +22,6 @@ SELECT * FROM (
         ('fix-retry-backoff#1.1',    'fix-retry-backoff',  'Exponential backoff on 5xx',      'done',        true,  true,  'agent-s3',  3::BIGINT, TIMESTAMP '2026-07-10 18:45:00'),
         ('fix-retry-backoff#1.2',    'fix-retry-backoff',  'Circuit breaker after 5 failures','done',        true,  true,  'agent-s3',  1::BIGINT, TIMESTAMP '2026-07-10 19:02:00')
 ) AS t(task_id, change_id, title, task_status, covered, green, who, evidence_count, latest_at);
-
--- Panel 2: mart_session_costs (crates/canon-store/sql/views.sql)
-CREATE OR REPLACE TABLE mart_session_costs AS
-SELECT * FROM (
-    VALUES
-        ('sess-0001', 'claude-code', 'unattributed', 'canon-wt/impl',   4::BIGINT, 1.284500::DOUBLE, 182340::BIGINT, TIMESTAMP '2026-07-08 13:55:00', TIMESTAMP '2026-07-08 15:40:00'),
-        ('sess-0002', 'codex',       'unattributed', 'canon-wt/impl',   2::BIGINT, 0.412300::DOUBLE,  63210::BIGINT, TIMESTAMP '2026-07-09 08:50:00', TIMESTAMP '2026-07-09 09:20:00'),
-        ('sess-0003', 'claude-code', 'reviewer',     'canon-wt/review', 3::BIGINT, 0.902100::DOUBLE, 140012::BIGINT, TIMESTAMP '2026-07-10 17:30:00', TIMESTAMP '2026-07-10 19:10:00')
-) AS t(session_id, client, role, workspace_label, run_count, total_cost, total_tokens, first_event_at, last_event_at);
 
 -- Panel 3: mart_role_memory (crates/canon-store/sql/views.sql).
 -- `hit_rate` is the view's `round(active_count::DOUBLE / strategy_count,
@@ -188,26 +179,18 @@ SELECT * FROM (
     VALUES
         ('run-synth-001', 'sess-synth-001', 'project-synth', 'task-synth-001', CAST(NULL AS VARCHAR), 'completed',
          TIMESTAMP '2026-07-08 14:00:00', TIMESTAMP '2026-07-08 14:02:15', 135000::BIGINT,
-         3::BIGINT, 1::BIGINT, 0::BIGINT, 0::BIGINT, 0::UBIGINT, 'provider-a', 'model-synth',
-         1::BIGINT, 0.125000::DOUBLE, 2048::BIGINT,
-         TIMESTAMP '2026-07-08 14:00:05', TIMESTAMP '2026-07-08 14:02:10',
-         false, false, false, true, false, false, false, false, false, true),
+         1::BIGINT, 0::UBIGINT, 'provider-a', 'model-synth',
+         false, false, false, true, false, false, false, true),
         ('run-synth-002', 'sess-synth-001', 'project-synth', 'task-synth-002', 'run-synth-001', 'failed',
          TIMESTAMP '2026-07-08 14:03:00', CAST(NULL AS TIMESTAMP), CAST(NULL AS BIGINT),
-         1::BIGINT, 0::BIGINT, 1::BIGINT, 1::BIGINT, 0::UBIGINT, 'provider-a', CAST(NULL AS VARCHAR),
-         0::BIGINT, CAST(NULL AS DOUBLE), CAST(NULL AS BIGINT),
-         TIMESTAMP '2026-07-08 14:03:02', TIMESTAMP '2026-07-08 14:03:02',
-         false, false, false, false, true, false, true, false, true, true)
+         1::BIGINT, 0::UBIGINT, 'provider-a', CAST(NULL AS VARCHAR),
+         false, false, false, false, true, false, true, true)
 ) AS t(run_id, session_id, project_key, task_id, parent_run_id, status,
-       started_at, ended_at, latency_ms, event_count, token_event_count,
-       directive_event_count, child_run_count, guidance_count, provider, model,
-       cost_source_count, total_cost, total_tokens, first_event_at, last_event_at,
+       started_at, ended_at, latency_ms, child_run_count, guidance_count, provider, model,
        session_id_unknown, project_key_unknown, task_id_unknown, parent_run_id_unknown,
-       ended_at_unknown, provider_unknown, model_unknown, event_times_unknown,
-       cost_unknown, guidance_unknown);
+       ended_at_unknown, provider_unknown, model_unknown, guidance_unknown);
 
 COPY "mart_trust_matrix"    TO 'fixtures/snapshot/mart_trust_matrix.parquet'    (FORMAT parquet);
-COPY "mart_session_costs"   TO 'fixtures/snapshot/mart_session_costs.parquet'   (FORMAT parquet);
 COPY "mart_role_memory"     TO 'fixtures/snapshot/mart_role_memory.parquet'     (FORMAT parquet);
 COPY "mart_flywheel_funnel" TO 'fixtures/snapshot/mart_flywheel_funnel.parquet' (FORMAT parquet);
 COPY "mart_review_burndown" TO 'fixtures/snapshot/mart_review_burndown.parquet' (FORMAT parquet);

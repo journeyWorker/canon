@@ -5,7 +5,6 @@ import puppeteer, { type Browser } from "puppeteer-core";
 import { COLUMNS as FUNNEL_COLUMNS, NOTE as FUNNEL_NOTE } from "../src/panels/flywheel-funnel";
 import { NOTE as ROLE_MEMORY_NOTE } from "../src/panels/role-memory";
 import { NOTE as BURNDOWN_NOTE } from "../src/panels/review-burndown";
-import { NOTE as SESSION_COSTS_NOTE } from "../src/panels/session-costs";
 import { NOTE as REVIEW_ROUNDS_NOTE } from "../src/panels/review-rounds";
 import { NOTE as REVIEW_TOTALS_NOTE } from "../src/panels/review-totals";
 
@@ -122,7 +121,7 @@ afterAll(async () => {
   server?.kill();
 });
 
-test("renders all 7 panels from the fixture snapshot with zero third-party network", async () => {
+test("renders all 6 panels from the fixture snapshot with zero third-party network", async () => {
   const page = await browser.newPage();
   const requestedUrls: string[] = [];
   page.on("request", (req) => requestedUrls.push(req.url()));
@@ -137,7 +136,6 @@ test("renders all 7 panels from the fixture snapshot with zero third-party netwo
 
   const panelIds = [
     "panel-trust-matrix",
-    "panel-session-costs",
     "panel-role-memory",
     "panel-flywheel-funnel",
     "panel-review-burndown",
@@ -157,9 +155,7 @@ test("renders all 7 panels from the fixture snapshot with zero third-party netwo
   // backticked spans into `<code>`, so the rendered text is the note
   // with its backticks removed.
   //
-  // Round-9 re-review added session costs: its correction had reached
-  // only a source comment, so it was the one panel whose reader learned
-  // nothing the markdown report tells them.
+  // s42 (`close-the-open-loops`) re-review added the panel notes.
   //
   // s43 (`findings-are-records`) added review rounds, which is the panel
   // a release note gets copied FROM — a reader who sees its
@@ -171,7 +167,6 @@ test("renders all 7 panels from the fixture snapshot with zero third-party netwo
   // is not rounds run has to be on the page beside the number, not one
   // panel up.
   const annotated = [
-    { panelId: "panel-session-costs", note: SESSION_COSTS_NOTE },
     { panelId: "panel-role-memory", note: ROLE_MEMORY_NOTE },
     { panelId: "panel-flywheel-funnel", note: FUNNEL_NOTE },
     { panelId: "panel-review-burndown", note: BURNDOWN_NOTE },
