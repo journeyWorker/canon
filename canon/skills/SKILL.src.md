@@ -168,7 +168,13 @@ binds it, and, with `--keep-days N`, while any evidence or review of the last
 `N` days binds it; the bare run previews the blobs it deletes and why the rest
 stay, and `--commit --plan-digest` deletes. A deleted local blob stays in git
 history (shrinking that history is the repo owner's call, not the command's); a
-deleted object of an object-store tier is gone for good.
+deleted object of an object-store tier is gone for good. The preview and the
+commit also cover the stale temp files a killed blob write leaves in
+`.canon/artifacts/sha256` (`.tmp-<sha256>-<pid>-<nanos>`, a regular file
+modified over five minutes ago): the plan lists them in `data.staleTemps`, and
+`artifacts verify` only counts them (it deletes nothing and its exit does not
+change). A temp file is no finished blob, so deleting it changes no record; one
+that git already tracks must be taken out of the commit.
 
 ### Search and trace
 

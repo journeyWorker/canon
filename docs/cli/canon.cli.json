@@ -250,7 +250,7 @@
       "outputs": [
         {
           "schemaRef": "#/schemas/ArtifactsPruneReport",
-          "schemaVersion": "1.2"
+          "schemaVersion": "1.3"
         }
       ],
       "summary": "Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes)",
@@ -364,7 +364,8 @@
       ],
       "outputs": [
         {
-          "schemaRef": "#/schemas/ArtifactsVerifyReport"
+          "schemaRef": "#/schemas/ArtifactsVerifyReport",
+          "schemaVersion": "1.1"
         }
       ],
       "summary": "Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes)",
@@ -11374,7 +11375,7 @@
               "description": "What the plan deletes, over the whole store (not only the page below)."
             },
             "deleted": {
-              "$ref": "#/schemas/PruneCounts",
+              "$ref": "#/schemas/PruneDeleted",
               "description": "What this run deleted: all zero in a preview."
             },
             "effects": {
@@ -11420,6 +11421,10 @@
               "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
+            "staleTemps": {
+              "$ref": "#/schemas/PruneTemps",
+              "description": "The stale temp files of the local store the plan deletes (a dead write's leftovers), apart from the blobs."
+            },
             "unchanged": {
               "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
               "type": "boolean"
@@ -11438,6 +11443,7 @@
             "delete",
             "keep",
             "deleted",
+            "staleTemps",
             "blobs",
             "planDigest",
             "effects",
@@ -11579,6 +11585,47 @@
           ],
           "type": "object"
         },
+        "PruneDeleted": {
+          "description": "What a run deleted: the blobs, and the stale temp files apart from them (a temp file is no blob and never counts as one).",
+          "properties": {
+            "blobs": {
+              "description": "Distinct blobs (digests).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "bytes": {
+              "description": "Bytes of every copy of them.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "localCopies": {
+              "description": "Copies in the local directory.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "staleTemps": {
+              "$ref": "#/schemas/TempCounts",
+              "description": "Stale temp files this run deleted."
+            },
+            "tierObjects": {
+              "description": "Objects in the tier.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blobs",
+            "bytes",
+            "localCopies",
+            "tierObjects",
+            "staleTemps"
+          ],
+          "type": "object"
+        },
         "PruneKeep": {
           "description": "The blobs a plan keeps.",
           "properties": {
@@ -11614,6 +11661,82 @@
             "bytes",
             "reasons",
             "items"
+          ],
+          "type": "object"
+        },
+        "PruneTemps": {
+          "description": "The stale temp files of the local store (`.tmp-<sha256>-<pid>-<nanos>`, a regular file modified more than five minutes ago): what a write that\ndied left. They sit beside the blobs and are not counted among them, in a tier repo too (they are local files).",
+          "properties": {
+            "bytes": {
+              "description": "Their bytes together.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "files": {
+              "description": "How many the plan deletes, over the whole store (not only the names below).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "gitNote": {
+              "description": "Present when the plan deletes temp files: a temp file already committed must be taken out of the commit.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "items": {
+              "description": "The first 50 of them in name order, empty in a commit: `files` says how many there are in all.",
+              "items": {
+                "$ref": "#/schemas/TempFile"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "files",
+            "bytes",
+            "items"
+          ],
+          "type": "object"
+        },
+        "TempCounts": {
+          "description": "Files and bytes of a set of stale temp files.",
+          "properties": {
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "files": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "files",
+            "bytes"
+          ],
+          "type": "object"
+        },
+        "TempFile": {
+          "description": "One stale temp file a plan deletes.",
+          "properties": {
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "name": {
+              "description": "Its name in `.canon/artifacts/sha256`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "bytes"
           ],
           "type": "object"
         }
@@ -12026,6 +12149,10 @@
               },
               "type": "array"
             },
+            "staleTemps": {
+              "$ref": "#/schemas/StaleTempsFound",
+              "description": "The stale staging temp files a dead write left in the local store: they change neither `problems` nor the exit."
+            },
             "stored": {
               "description": "Files whose blob is in the store.",
               "format": "uint",
@@ -12045,9 +12172,41 @@
             "bound",
             "stored",
             "workingTreeOnly",
+            "staleTemps",
             "problems"
           ],
           "title": "ArtifactsVerifyReport",
+          "type": "object"
+        },
+        "StaleTempsFound": {
+          "description": "What `artifacts verify` found of the stale temp files (`.tmp-<sha256>-<pid>-<nanos>` older than five minutes) of the local store.",
+          "properties": {
+            "bytes": {
+              "description": "Their bytes together; absent with `files`.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "files": {
+              "description": "How many there are; absent when the store directory could not be read (the count is then unknown, not zero).",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "unreadable": {
+              "description": "Why the store directory could not be read, when it could not.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
           "type": "object"
         },
         "VerifyProblem": {

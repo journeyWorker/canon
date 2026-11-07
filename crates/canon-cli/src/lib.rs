@@ -84,6 +84,7 @@ pub mod spec_facts;
 pub mod subject;
 pub mod selftest;
 pub mod skills;
+pub mod stale_temps;
 pub mod status;
 pub mod suggest;
 pub mod tier;
