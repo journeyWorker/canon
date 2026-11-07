@@ -24,7 +24,7 @@ Every violation carries one of these stable, grep-able strings:
 | `uncovered-cell` | Either a policy-required evidence cell (role × artifact) with no matching record, or — with `spec_coverage` enabled — a spec scenario that is unimplemented or mismatched, or a feature surface missing a `require_cases` case. The detail string distinguishes them. Coverage means "a test exists", not "a test passed": even a `Divergent` verdict satisfies the role-cell form. At `verifying → shipped`, a `Divergent` latest verdict is `uncovered-cell` unless a reviewer accepted it (see Accepted divergence below), and a chore's approval, like a blocker closed `fixed`, needs every evidenced scenario evidenced again afterwards (see Re-verification below). |
 | `unreviewed-promotion` | An artifact tagged `reviewed` has no matching ledger review record — or, with `spec_coverage.require_review` set, an in-scope scenario has no qualifying `Review`: none at all, only self-reviews, only stale reviews (the spec or evidence it pinned changed since), or only `indeterminate`/`unavailable` ones. Also, subject `policy`: the policy changed since its approval or its approval is unreadable (fails closed; see `canon-policy`). See `canon-review`. |
 | `trust-below-required` | Achieved trust level is below `policy.yaml`'s `trust_required` for its class — RELEASE-scoped only (`canon gate check --release`); never fires on an ordinary run. |
-| `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone — no intact blob in `.canon/artifacts/sha256/` and no working-tree copy with the recorded digest — or a file bound to an in-effect review with no intact blob (see Bound evidence stays provable below). |
+| `stale-evidence` | A passing record degraded to stale: a path that changed since its `evidence_sha` matches its declared surface (`--surface-ref`, a path pattern read from the repository root; the detail names the declarations and paths that matched), or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone — no intact blob in `.canon/artifacts/sha256/` and no working-tree copy with the recorded digest — or a file bound to an in-effect review with no intact blob (see Bound evidence stays provable below). |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
 | `unevidenced-flip` | `canon task done <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
@@ -697,6 +697,30 @@ configured rule by declaring a safe path.
 binding. This is still attestation input, not proof of the changed paths;
 run/diff metadata is authoritative when available, and an unavailable
 binding is a gate violation rather than a clean result.
+
+A `--surface-ref` that is not `effect:...` is a path pattern read from the
+repository root with the glob of `code.exclude`: `*` and `?` do not cross
+`/`, `**` does, a directory matches everything below it, and a trailing `/`
+is dropped. `src/`, `src`, `src/**` and `src/*.rs` all go `stale-evidence`
+when `src/a.rs` changes; for `src/x/b.rs` the first three do and `src/*.rs`
+does not. A name with no `/` is the file at the root: `Cargo.toml` is
+the root manifest, not every crate's. A value identical to a changed path
+matches it, and `effect:` is never compared with paths. A value that
+matches no file of the work tree is recorded all the same, with a
+`SURFACE_REF_UNMATCHED` warning. The `paths` of a risk tier keep their
+older reading (`*` crosses `/`) until the next release that breaks
+compatibility.
+
+When git cannot read the base commit of a passing cell, `canon gate check`
+prints one `staleness_unresolvable` advisory and `canon status` one
+`STALENESS_UNRESOLVABLE` warning, with the same sentence: how many
+(subject, role) cells, how many for each reason (`base_missing`: the commit
+is not in this repository, as in a shallow clone or after `git gc
+--prune=now`; `base_not_ancestor`: it is not an ancestor of HEAD, as after
+a squash merge; `git_unavailable`: git did not answer), the first three
+subjects, and `git fetch --unshallow` in a shallow clone. Verdicts and the
+exit status do not change: a `base_missing` or `git_unavailable` cell adds
+nothing, a `base_not_ancestor` cell is judged from `<base>..HEAD`.
 
 Approval identity is separate from attestation text. An approval counts
 only when it carries a detached SSH signature (`ssh-keygen -Y sign -n

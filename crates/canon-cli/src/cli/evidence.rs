@@ -80,7 +80,7 @@ pub struct EvidenceAddArgs {
     /// RunId (ULID) of the run that produced this evidence
     #[arg(long = "run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
-    /// Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref
+    /// The surface the evidence covers, persisted as surface_ref: a path pattern read from the repository root (`src/` or `src` the directory, `src/**`, `src/*.rs`; `*` and `?` stop at `/`, `**` does not, a name with no `/` is a file at the root) or effect:<kebab-slug>. `canon gate check` degrades the evidence to stale-evidence when a changed path matches; a value that matches no file of the work tree is recorded with a warning
     #[arg(long = "surface-ref", value_parser = crate::evidence::accept_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// The attesting actor's id (recorded as the attestation's author). One line of text: the white space around it is trimmed; a control character or line break inside it is refused

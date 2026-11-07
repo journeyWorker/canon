@@ -118,7 +118,7 @@ pub struct GateViolation<'a> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GateAdvisory {
-    /// `spec_coverage_off`, `policy_approval`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.
+    /// `spec_coverage_off`, `policy_approval`, `chore_code_scopes`, `code_scopes`, `staleness_unresolvable`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.
     pub kind: String,
     pub message: String,
     pub items: Vec<String>,
@@ -221,6 +221,13 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
     if !scope_warnings.is_empty() {
         crate::say_raw!(json, "\nadvisory: {} code scope problem(s) in .canon/policy.yaml:\n{}\n", scope_warnings.len(), scope_warnings.iter().map(|l| format!("  {l}")).collect::<Vec<_>>().join("\n"));
         advisories.push(advisory("code_scopes", format!("{} code scope problem(s) in .canon/policy.yaml — not failing the gate", scope_warnings.len()), scope_warnings));
+    }
+    // The cells of passing evidence whose base commit git could not read (0.39): staleness could not be judged for them, and the verdicts above are what they were.
+    let unresolvable = gate_context.staleness_unresolvable();
+    if !unresolvable.is_empty() {
+        let message = unresolvable.message();
+        crate::say_raw!(json, "\nadvisory: {message}\n");
+        advisories.push(advisory("staleness_unresolvable", message, unresolvable.items()));
     }
     if let Some(summary) = canon_gate::binding_summary(&gate_context) {
         crate::say_raw!(json, "{}", format_binding_summary(&summary));

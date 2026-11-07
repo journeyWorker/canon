@@ -28,7 +28,7 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 | `uncovered-cell` | 정책상 요구되는 증거 셀(역할 × 아티팩트)에 대응하는 레코드가 아예 없음 — 또는 `spec_coverage`가 켜진 경우, 스펙 코퍼스의 시나리오 중 어떤 증거도 없거나, 열린 divergence를 갖거나, 최신 판정이 `Divergent`인 것. 어느 쪽인지는 detail 문자열이 밝힙니다. |
 | `unreviewed-promotion` | 아티팩트의 `reviewed` 라이프사이클 태그에 대응하는 레저 리뷰-레코드가 없음 — 또는 `spec_coverage.require_review`가 켜진 경우, 범위 안 시나리오에 유효한 `Review`가 없음(아예 없거나, 그 시나리오의 증거를 남긴 액터 본인의 리뷰뿐임). |
 | `trust-below-required` | 아티팩트의 트러스트 레벨이 `policy.yaml`의 `trust_required`보다 낮음 — release 스코프 전용(`canon gate check --release`). |
-| `stale-evidence` | 통과했던 레코드가 stale로 저하됨: `evidence_sha` 이후 선언된 표면이 변경됐거나, HEAD가 `staleness.max_commits_behind`를 넘어섬. 이미 green인 레코드만 저하시킴. 또한: 최신 증거 레코드에 묶인 파일의 바이트가 아티팩트 저장소와 작업 트리 양쪽에서 모두 사라진 경우. |
+| `stale-evidence` | 통과했던 레코드가 stale로 저하됨: `evidence_sha` 이후 선언된 표면(`--surface-ref`: 저장소 루트에서 시작하는 경로 패턴이라 `src/`, `src`, `src/**`가 모두 `src/a.rs`를 덮음)이 변경됐거나, HEAD가 `staleness.max_commits_behind`를 넘어섬. 이미 green인 레코드만 저하시킴. 또한: 최신 증거 레코드에 묶인 파일의 바이트가 아티팩트 저장소와 작업 트리 양쪽에서 모두 사라진 경우. |
 | `malformed-evidence` | 후보 레코드가 파싱되지 않거나, 잘못된 위치에 있거나, 파싱 불가능한 임시 태그를 가짐. 잘못된 형식의 증거는 증거가 아님. |
 | `flagged` | 사람만 설정 가능한 `flagged` 오버레이가 켜짐 — 어떤 통과 증거가 있어도 절대 green이 되지 않음. |
 | `unevidenced-flip` | `canon task done <task_id>`가 대응하는 non-`Divergent` `EvidenceRecord` 없이 체크박스 플립을 요청받음. |
