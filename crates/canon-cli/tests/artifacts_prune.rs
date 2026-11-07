@@ -742,9 +742,11 @@ fn artifacts_prune_15_a_release_without_the_announcement_fails_the_release_check
     assert_eq!(release_problems(&silent, &changelog), ["the guide `canon-storage` never says a deleted local blob stays in git history"]);
 
     // A CHANGELOG with no Added section under 0.38.0, and with an Added section that says neither thing.
-    let no_added = changelog.replacen("\n### Added\n", "\n### Changed\n", 1);
+    // The Added section of the release, not the first one in the file: `Unreleased` may have its own above it.
+    let release = changelog.find("\n## 0.38.0").expect("a 0.38.0 section");
+    let no_added = format!("{}{}", &changelog[..release], changelog[release..].replacen("\n### Added\n", "\n### Changed\n", 1));
     assert_eq!(release_problems(&guides, &no_added), ["the CHANGELOG has no Added section under 0.38.0"]);
-    let start = changelog.find("\n### Added\n").expect("an Added section");
+    let start = release + changelog[release..].find("\n### Added\n").expect("an Added section");
     let end = changelog[start + 1..].find("\n### ").map_or(changelog.len(), |at| start + 1 + at);
     let emptied = format!("{}\n### Added\n\n- something else\n{}", &changelog[..start], &changelog[end..]);
     let problems = release_problems(&guides, &emptied);

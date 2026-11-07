@@ -2359,7 +2359,7 @@
           "domain": {
             "pattern": "^\\P{White_Space}([^\\n\\r\u0000]*\\P{White_Space})?$"
           },
-          "help": "The surface the evidence covers, persisted as surface_ref: a path pattern read from the repository root (`src/` or `src` the directory, `src/**`, `src/*.rs`; `*` and `?` stop at `/`, `**` does not, a name with no `/` is a file at the root) or effect:<kebab-slug>. `canon gate check` degrades the evidence to stale-evidence when a changed path matches; a value that matches no file of the work tree is recorded with a warning",
+          "help": "A path pattern from the repository root (src/, src/**) or effect:<kebab-slug>; persisted as surface_ref",
           "name": "surface-ref",
           "repeatable": true,
           "valueName": "PATH_OR_EFFECT"
@@ -19384,7 +19384,7 @@
               "type": "string"
             },
             "surfaceRef": {
-              "description": "The surface the evidence covers, persisted as surface_ref: a path pattern read from the repository root (`src/` or `src` the directory, `src/**`, `src/*.rs`; `*` and `?` stop at `/`, `**` does not, a name with no `/` is a file at the root) or effect:<kebab-slug>. `canon gate check` degrades the evidence to stale-evidence when a changed path matches; a value that matches no file of the work tree is recorded with a warning",
+              "description": "A path pattern from the repository root (src/, src/**) or effect:<kebab-slug>; persisted as surface_ref",
               "items": {
                 "type": "string"
               },
