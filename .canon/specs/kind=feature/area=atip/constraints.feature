@@ -208,7 +208,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   @atip.constraints.21
   Scenario: A negative integer after an integer option names the option in field, and -0 is the integer 0
     Given an empty directory
-    When query --limit, artifacts store --max-artifact-mib, ingest sessions --interval-secs, retrieve --limit and finding close --round run with a negative number after a space, and with -0 and +0
+    When query --limit, artifacts store --max-artifact-mib, ingest records --interval-secs, retrieve --limit and finding close --round run with a negative number after a space, and with -0 and +0
     Then the negative number is USAGE with field the option, never the number; -0 and +0 are the integer 0 where 0 is in the domain and refused for the minimum where it is not; 9007199254740991 is accepted and 9007199254740992 refused
 
   # canon: {"schema":1,"at":"2026-11-01T16:13:45Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r3"}}
@@ -258,5 +258,5 @@ Feature: atip constraints: the relations, domains and validators of the command 
   @atip.constraints.26
   Scenario: A stateless fault in a later batch element is the answer before the first valid element's missing repository
     Given an empty directory with an empty HOME
-    When export, artifacts store, ingest records and ingest sessions run with --input an array whose first element is valid and whose second breaks a validator or a domain, and with every element valid
+    When export, artifacts store, ingest records and ingest plans run with --input an array whose first element is valid and whose second breaks a validator or a domain, and with every element valid
     Then the first is exit 2 with the second element's code and a field pointed at it (/items/1/...), the second answers CONFIG_REQUIRED; every element's stateless stage runs before any element's dry run

@@ -206,13 +206,6 @@ usage: canon ingest records [--watch] [--interval-secs <N>] [--dry-run] [--run <
 canon ingest records --json
 ```
 ```text
-# Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)
-usage: canon ingest sessions [--watch] [--interval-secs <N>] [--home <DIR>] [--full] [--all-workspaces] [--dry-run] [--input]
-```
-```bash
-canon ingest sessions --json
-```
-```text
 # Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
 usage: canon init [--check] [--no-agents-md | --check] [--policy <light|standard|strict> | --check | --no-policy] [--harness <claude|codex|omp|pi> | --check | --no-harness]* [--language <TAG> | --check] [--dry-run | --check] [--input]
 ```
@@ -336,7 +329,7 @@ canon search timeout --kind finding --json
 ```
 ```text
 # Run canon's built-in fixture self-tests
-usage: canon selftest [--suite <trust-spine-gate|tiered-storage|typed-authoring-vocabulary|policy-expressions|format-authority|session-ingest|canon-context|artifact-ingest|spec-ledger-selftest|plugin-overlays|plan-import>]
+usage: canon selftest [--suite <trust-spine-gate|tiered-storage|typed-authoring-vocabulary|policy-expressions|format-authority|canon-context|artifact-ingest|spec-ledger-selftest|plugin-overlays|plan-import>]
 ```
 ```bash
 canon selftest --suite trust-spine-gate --json

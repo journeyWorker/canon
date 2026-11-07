@@ -1,6 +1,6 @@
 # Canon P0 maintenance evals
 
-This corpus contains 40 distinct, real Canon maintenance tasks. Each task has an
+This corpus contains 37 distinct, real Canon maintenance tasks. Each task has an
 external setup seed, instructions, expected contract, bounded diff paths,
 forbidden side effects, an explicitly selected deterministic grader command,
 required evidence, and a final-gate evidence contract. The corpus is intentionally
@@ -14,7 +14,7 @@ python3 evals/run_eval.py \
   --result /tmp/openspec.result.json
 ```
 
-The repository-default corpus is exactly 40 tasks and is pinned by
+The repository-default corpus is exactly 37 tasks and is pinned by
 `evals/corpus.sha256`; another corpus is rejected unless
 `--allow-unpinned-corpus` is explicitly supplied. The runner creates the
 evaluator-owned `.canon/eval/task.json` contract and read-only
@@ -102,7 +102,7 @@ A task passes only when all of the following are observed:
 A zero exit code from an agent is recorded as a claim, not an outcome. If it is
 followed by a failed objective grader, the result records `false_pass: true`.
 Tampered result files are rejected by integrity verification. The repository
-default corpus is exactly 40 unique tasks and is pinned by `evals/corpus.sha256`;
+default corpus is exactly 37 unique tasks and is pinned by `evals/corpus.sha256`;
 custom corpora require explicit `--allow-unpinned-corpus`. Grading uses the
 SHA-pinned probes under `evals/probes/`, never a grader executable from the
 task workspace.
