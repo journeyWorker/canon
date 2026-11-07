@@ -650,8 +650,10 @@ canon ledger compact
 
 `canon artifacts move --tier <tier>` moves the local artifact store to an
 object store and removes the local blobs, `canon artifacts prune` deletes the
-blobs no record binds any more (a deleted local blob stays in git history; a
-deleted object of a tier is gone for good), and `purge` deletes records. They
+blobs no record binds any more and the stale `.tmp-` files a killed write left
+in the store (a deleted local blob stays in git history; a deleted object of a
+tier is gone for good; `canon artifacts verify` only counts the temp files), and
+`purge` deletes records. They
 are the repo owner's decisions, not steps of the loop: run the preview, give
 the human the effects, and run the commit only on their answer. If the repo is
 large, the store is slow or the human has not asked for it, do not run it.

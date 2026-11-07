@@ -628,7 +628,8 @@ downloads and re-hashes) and refuse, never pass, when it cannot be reached.
 store; it is the repo owner's decision. `canon artifacts prune` (a preview;
 `--commit --plan-digest` acts) deletes the blobs no record binds any more and
 leaves what `gate check` and `artifacts verify` read, so their answers do not
-change; it is the repo owner's decision too. See `canon-storage`.
+change (it also deletes the stale `.tmp-` files a killed blob write left, which
+`artifacts verify` counts without deleting); it is the repo owner's decision too. See `canon-storage`.
 
 `canon gate check` re-checks every file bound to a LATEST evidence record
 (the latest per task and per `(project_id, scenario_id)`):
