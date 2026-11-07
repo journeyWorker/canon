@@ -23,8 +23,9 @@
 //! are always excluded, whatever `code.exclude` says.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+
+use canon_store::git::{GitCall, GitError, GitOutput, ScratchIndex};
 
 use crate::cli_error::{CliError, CliErrorExt as _};
 
@@ -45,56 +46,39 @@ pub fn no_commit(message: impl Into<String>) -> CliError {
     CliError::refused("COMMIT_REQUIRED", message).hint(NO_COMMIT_HINT)
 }
 
-/// Where a computation of the code tree keeps what it writes: a temporary index and a temporary object
-/// directory. Git writes the blobs of `add -A` and the trees of `write-tree` into the object directory; the
-/// repository's own objects (and its own alternates) are read through `GIT_ALTERNATE_OBJECT_DIRECTORIES`. So the
-/// run reads the repository and writes nothing in it, `.git` included: a refusal changes nothing (atip/1 8.2),
-/// and a read command (`gate check`) does not grow `.git/objects`. A code tree is only ever compared as an id,
-/// never read back as an object, so its objects need not outlive the run.
-#[derive(Debug)]
-struct Scratch {
-    index: PathBuf,
-    objects: PathBuf,
-    /// The repository's object directory and the ones its `objects/info/alternates` lists, `:`-joined.
-    alternates: std::ffi::OsString,
+/// What git said, as a message: its stderr for a failed exit, the whole error (the subcommand and the deadline or
+/// the limit) for a call that did not give an answer.
+fn why(error: &GitError) -> String {
+    if error.is_exit() { error.stderr_text() } else { error.to_string() }
 }
 
-impl Scratch {
-    fn new(repo: &Path, dir: &Path) -> Result<Self, String> {
-        let real = text(git(repo, None, &["rev-parse", "--path-format=absolute", "--git-path", "objects"], None)?);
-        let real = PathBuf::from(real);
-        let mut dirs = vec![real.clone()];
-        if let Ok(listed) = std::fs::read_to_string(real.join("info/alternates")) {
-            dirs.extend(listed.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).map(|l| real.join(l)));
-        }
-        let alternates = std::env::join_paths(dirs).map_err(|e| e.to_string())?;
-        let objects = dir.join("objects");
-        std::fs::create_dir_all(&objects).map_err(|e| e.to_string())?;
-        Ok(Self { index: dir.join("index"), objects, alternates })
-    }
-}
-
-fn git(repo: &Path, scratch: Option<&Scratch>, args: &[&str], stdin: Option<&[u8]>) -> Result<std::process::Output, String> {
-    use std::io::Write;
-    let mut cmd = Command::new("git");
-    cmd.current_dir(repo).args(args).stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() }).stdout(Stdio::piped()).stderr(Stdio::piped());
+/// One call of the code tree's git. `scratch` is where it keeps what it writes (see [`ScratchIndex`]: the run reads
+/// the repository and writes nothing in it, `.git` included, so a refusal changes nothing (atip/1 8.2) and a read
+/// command (`gate check`) does not grow `.git/objects`; a code tree is only ever compared as an id, never read
+/// back as an object, so its objects need not outlive the run). `-z` listings of a whole tree may be large.
+fn git(repo: &Path, scratch: Option<&ScratchIndex>, args: &[&str], stdin: Option<&[u8]>) -> Result<GitOutput, String> {
+    let mut call = GitCall::new(repo).args(args);
     if let Some(scratch) = scratch {
-        cmd.env("GIT_INDEX_FILE", &scratch.index).env("GIT_OBJECT_DIRECTORY", &scratch.objects).env("GIT_ALTERNATE_OBJECT_DIRECTORIES", &scratch.alternates);
+        call = call.scratch(scratch);
     }
-    let mut child = cmd.spawn().map_err(|e| format!("cannot run git: {e}"))?;
-    if let (Some(bytes), Some(mut pipe)) = (stdin, child.stdin.take()) {
-        pipe.write_all(bytes).map_err(|e| format!("git {}: {e}", args[0]))?;
+    if let Some(bytes) = stdin {
+        call = call.stdin(bytes);
     }
-    let out = child.wait_with_output().map_err(|e| format!("git {}: {e}", args[0]))?;
-    if out.status.success() {
-        Ok(out)
-    } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    if matches!(args.first(), Some(&("ls-files" | "ls-tree"))) {
+        call = call.tree_listing();
     }
+    call.run().map_err(|e| why(&e))
 }
 
-fn text(out: std::process::Output) -> String {
-    String::from_utf8_lossy(&out.stdout).trim().to_string()
+fn text(out: GitOutput) -> String {
+    out.stdout_trimmed()
+}
+
+/// `COMMIT_REQUIRED` unless `repo` is a git work tree.
+fn require_work_tree(repo: &Path) -> Result<(), CliError> {
+    GitCall::new(repo).args(["rev-parse", "--is-inside-work-tree"]).run().map(drop).map_err(|e| {
+        if e.is_exit() { no_commit("this directory is not a git work tree") } else { no_commit(format!("git could not compute the code tree: {e}")) }
+    })
 }
 
 /// The full sha of `rev` (`git rev-parse --verify <rev>^{commit}`, run in
@@ -231,7 +215,7 @@ fn spec_root_prefixes(repo: &Path) -> Result<Vec<String>, CliError> {
 
 /// Write the tree of the temporary index after dropping everything that is not code.
 /// Returns the tree id and whether any code file is left.
-fn filtered_tree(repo: &Path, index: &Scratch, exclude: &[String], roots: &[String]) -> Result<(String, bool), String> {
+fn filtered_tree(repo: &Path, index: &ScratchIndex, exclude: &[String], roots: &[String]) -> Result<(String, bool), String> {
     let listing = git(repo, Some(index), &["ls-files", "-z"], None)?.stdout;
     let mut drop = Vec::new();
     let mut kept = false;
@@ -266,14 +250,13 @@ pub fn code_tree(repo: &Path, rev: Option<&str>) -> Result<CodeTree, CliError> {
     let exclude = code_exclude(repo)?;
     let roots = spec_root_prefixes(repo)?;
     let fail = |why: String| no_commit(format!("git could not compute the code tree: {why}"));
-    #[expect(clippy::map_err_ignore, reason = "`no_commit` reports one fixed message; git's own stderr for a non-work-tree is the failure being named")]
-    git(repo, None, &["rev-parse", "--is-inside-work-tree"], None).map_err(|_| no_commit("this directory is not a git work tree"))?;
+    require_work_tree(repo)?;
     let head = resolve_rev(repo, "HEAD").ok();
     let tmp = TempIndex::new();
     std::fs::create_dir_all(&tmp.0).map_err(|e| fail(e.to_string()))?;
-    let index = Scratch::new(repo, &tmp.0).map_err(fail)?;
+    let index = ScratchIndex::open(repo, &tmp.0).map_err(|e| fail(why(&e)))?;
     let build = |source: Option<&str>| -> Result<(String, bool), String> {
-        let _ = std::fs::remove_file(&index.index);
+        let _ = std::fs::remove_file(index.index_file());
         match source {
             Some(sha) => {
                 git(repo, Some(&index), &["read-tree", sha], None)?;
@@ -315,7 +298,7 @@ pub struct TreeDiffer {
     exclude: Vec<String>,
     roots: Vec<String>,
     _tmp: TempIndex,
-    index: Scratch,
+    index: ScratchIndex,
     now: String,
 }
 
@@ -325,12 +308,11 @@ impl TreeDiffer {
         let exclude = code_exclude(repo)?;
         let roots = spec_root_prefixes(repo)?;
         let fail = |why: String| no_commit(format!("git could not compute the code tree: {why}"));
-        #[expect(clippy::map_err_ignore, reason = "`no_commit` reports one fixed message; git's own stderr for a non-work-tree is the failure being named")]
-        git(repo, None, &["rev-parse", "--is-inside-work-tree"], None).map_err(|_| no_commit("this directory is not a git work tree"))?;
+        require_work_tree(repo)?;
         let head = resolve_rev(repo, "HEAD").ok();
         let tmp = TempIndex::new();
         std::fs::create_dir_all(&tmp.0).map_err(|e| fail(e.to_string()))?;
-        let index = Scratch::new(repo, &tmp.0).map_err(fail)?;
+        let index = ScratchIndex::open(repo, &tmp.0).map_err(|e| fail(why(&e)))?;
         let now = (|| -> Result<String, String> {
             if let Some(sha) = &head {
                 git(repo, Some(&index), &["read-tree", sha], None)?;
@@ -358,7 +340,7 @@ impl TreeDiffer {
     /// commit is gone, or its code tree is not `recorded` (the record was made over uncommitted code, or
     /// `code.exclude` changed since).
     pub fn changed_since(&self, sha: &str, recorded: &str) -> Option<Vec<String>> {
-        let _ = std::fs::remove_file(&self.index.index);
+        let _ = std::fs::remove_file(self.index.index_file());
         git(&self.repo, Some(&self.index), &["read-tree", sha], None).ok()?;
         let (old, _) = filtered_tree(&self.repo, &self.index, &self.exclude, &self.roots).ok()?;
         if old != recorded {

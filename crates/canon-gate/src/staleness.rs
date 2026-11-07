@@ -48,10 +48,10 @@
 
 use std::collections::HashSet;
 use std::path::Path;
-use std::process::Command;
 
 use canon_model::{EvidenceRecord, EvidenceVerdict, Sha};
 use canon_store::fold_latest_by_key;
+use canon_store::git::GitCall;
 use chrono::{DateTime, Utc};
 
 use crate::context::{GateCheck, GateContext};
@@ -148,49 +148,68 @@ fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
 /// not per ledger row") — process-lifetime-per-`run()`-call, keyed by
 /// the exact `(subcommand, sha)` pair; swallows every failure to
 /// `None`, never panics (module doc's "unresolvable" third state).
+///
+/// A query git did not answer in time, or answered with more than the output limit
+/// ([`canon_store::git::GitError::is_stopped`]), is `None`, and so is every later query of the run: one stuck git
+/// is not asked again for each commit of the ledger (0.39). The next `gate check` asks afresh.
 #[derive(Default)]
 struct GitMemo {
     changed: std::collections::HashMap<String, Option<HashSet<String>>>,
     behind: std::collections::HashMap<String, Option<u32>>,
+    stopped: bool,
 }
 
 impl GitMemo {
     fn changed_files_since(&mut self, repo: &Path, sha: &str) -> Option<&HashSet<String>> {
-        self.changed.entry(sha.to_string()).or_insert_with(|| git_diff_names(repo, sha)).as_ref()
+        if !self.changed.contains_key(sha) {
+            let answer = self.git_diff_names(repo, sha);
+            self.changed.insert(sha.to_string(), answer);
+        }
+        self.changed[sha].as_ref()
     }
 
     fn commits_behind(&mut self, repo: &Path, sha: &str) -> Option<u32> {
-        *self.behind.entry(sha.to_string()).or_insert_with(|| git_rev_list_count(repo, sha))
+        if !self.behind.contains_key(sha) {
+            let answer = self.git_rev_list_count(repo, sha);
+            self.behind.insert(sha.to_string(), answer);
+        }
+        self.behind[sha]
     }
-}
 
-/// The ONE subprocess boundary this module ever crosses — swallows
-/// every failure (missing binary, unresolvable sha, non-zero exit,
-/// invalid UTF-8) into `None`, never raises (staleness.md §3.3/`_git`;
-/// module doc's "unresolvable" third state).
-fn run_git(repo: &Path, args: &[&str]) -> Option<String> {
-    let output = Command::new("git").arg("-C").arg(repo).args(args).output().ok()?;
-    if !output.status.success() {
-        return None;
+    /// The ONE subprocess boundary this module ever crosses — swallows
+    /// every failure (missing binary, unresolvable sha, non-zero exit,
+    /// invalid UTF-8, past the deadline or the output limit) into `None`,
+    /// never raises (staleness.md §3.3/`_git`; module doc's
+    /// "unresolvable" third state).
+    fn run_git(&mut self, repo: &Path, args: &[&str]) -> Option<String> {
+        if self.stopped {
+            return None;
+        }
+        match GitCall::new(repo).args(args).run() {
+            Ok(output) => String::from_utf8(output.stdout).ok(),
+            Err(error) => {
+                self.stopped = error.is_stopped();
+                None
+            }
+        }
     }
-    String::from_utf8(output.stdout).ok()
-}
 
-/// The precise tier: `git diff --name-only --no-renames <sha>..HEAD`
-/// (staleness.md §3.1/§6, `_changed_files_since` +
-/// `_git_diff_touches`).
-fn git_diff_names(repo: &Path, sha: &str) -> Option<HashSet<String>> {
-    let range = format!("{sha}..HEAD");
-    let out = run_git(repo, &["diff", "--name-only", "--no-renames", &range])?;
-    Some(out.lines().map(str::to_string).collect())
-}
+    /// The precise tier: `git diff --name-only -z --no-renames <sha>..HEAD`
+    /// (staleness.md §3.1/§6, `_changed_files_since` +
+    /// `_git_diff_touches`). `-z` names a file as it is, whatever its characters.
+    fn git_diff_names(&mut self, repo: &Path, sha: &str) -> Option<HashSet<String>> {
+        let range = format!("{sha}..HEAD");
+        let out = self.run_git(repo, &["diff", "--name-only", "-z", "--no-renames", &range])?;
+        Some(out.split('\0').filter(|name| !name.is_empty()).map(str::to_string).collect())
+    }
 
-/// The coarse tier: `git rev-list --count <sha>..HEAD` (staleness.md
-/// §3.1, the `max_commits_behind` ceiling's own git query).
-fn git_rev_list_count(repo: &Path, sha: &str) -> Option<u32> {
-    let range = format!("{sha}..HEAD");
-    let out = run_git(repo, &["rev-list", "--count", &range])?;
-    out.trim().parse().ok()
+    /// The coarse tier: `git rev-list --count <sha>..HEAD` (staleness.md
+    /// §3.1, the `max_commits_behind` ceiling's own git query).
+    fn git_rev_list_count(&mut self, repo: &Path, sha: &str) -> Option<u32> {
+        let range = format!("{sha}..HEAD");
+        let out = self.run_git(repo, &["rev-list", "--count", &range])?;
+        out.trim().parse().ok()
+    }
 }
 
 /// The staleness [`crate::GateCheck`] (D4) — see module doc for the
@@ -275,8 +294,7 @@ mod tests {
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};
 
     fn git(repo: &Path, args: &[&str]) {
-        let status = Command::new("git").arg("-C").arg(repo).args(args).status().expect("git must be on PATH for this test");
-        assert!(status.success(), "git {args:?} failed");
+        GitCall::new(repo).args(args).run().unwrap_or_else(|error| panic!("{error}"));
     }
 
     fn init_repo(repo: &Path) {
@@ -291,7 +309,7 @@ mod tests {
         std::fs::write(&path, content).unwrap();
         git(repo, &["add", "-A"]);
         git(repo, &["commit", "-q", "-m", message]);
-        run_git(repo, &["rev-parse", "HEAD"]).unwrap().trim().to_string()
+        GitCall::new(repo).args(["rev-parse", "HEAD"]).run().unwrap().stdout_trimmed()
     }
 
     /// Writes one green `EvidenceRecord` with its NATIVE
@@ -389,6 +407,48 @@ mod tests {
         assert_eq!(violations[0].class, FailureClass::StaleEvidence);
         assert_eq!(violations[0].subject, "s5#1.7");
         assert!(violations[0].detail.contains("declared surface file changed"));
+    }
+
+    /// git quotes a name with a non-ASCII character or a quote unless the list is NUL-terminated (0.39): the declared
+    /// surface and the name git gave were two strings, and a changed file was reported clean.
+    #[test]
+    fn stale_evidence_fires_for_a_surface_file_whose_name_git_would_quote() {
+        for name in ["é.rs", "a\"b.rs", "with space.rs", "dir/ü ñ.rs"] {
+            let dir = TempDir::new().unwrap();
+            let repo = dir.path();
+            init_repo(repo);
+            let sha = write_and_commit(repo, name, "fn a() {}", "initial");
+            let ledger_root = repo.join(".canon/ledger");
+            write_green_record(&ledger_root, "s5#1.7", "implementer", &sha, &[name]);
+            write_and_commit(repo, name, "fn a() { /* changed */ }", "surface changed");
+
+            let violations = StalenessCheck.run(&ctx_for(repo, &ledger_root, policy_with(50, true), fixed_now()));
+            assert_eq!(violations.len(), 1, "{name}: {violations:?}");
+            assert!(violations[0].detail.contains("declared surface file changed"), "{name}: {}", violations[0].detail);
+        }
+    }
+
+    /// A commit that adds a file whose name is no UTF-8 string: the diff answer is unknown, never "stale" and never
+    /// "clean" for the surface it also changed.
+    #[test]
+    fn a_name_that_is_not_utf8_leaves_the_surface_query_unanswered_and_the_evidence_not_stale() {
+        let dir = TempDir::new().unwrap();
+        let repo = dir.path();
+        init_repo(repo);
+        let sha = write_and_commit(repo, "crates/foo/src/bar.rs", "fn bar() {}", "initial");
+        let ledger_root = repo.join(".canon/ledger");
+        write_green_record(&ledger_root, "s5#1.7", "implementer", &sha, &["crates/foo/src/bar.rs"]);
+
+        std::fs::write(repo.join("crates/foo/src/bar.rs"), "fn bar() { /* changed */ }").unwrap();
+        git(repo, &["add", "-A"]);
+        let blob = GitCall::new(repo).args(["hash-object", "-w", "--stdin"]).stdin(b"x").run().unwrap().stdout_trimmed();
+        let mut entry = format!("100644 {blob}\tcrates/").into_bytes();
+        entry.extend_from_slice(b"\xff.rs\n");
+        GitCall::new(repo).args(["update-index", "--add", "--index-info"]).stdin(&entry).run().unwrap();
+        git(repo, &["commit", "-q", "-m", "changes the surface and adds a name that is not UTF-8"]);
+
+        let violations = StalenessCheck.run(&ctx_for(repo, &ledger_root, policy_with(50, true), fixed_now()));
+        assert!(violations.is_empty(), "the query has no answer, so nothing is asserted: {violations:?}");
     }
 
     #[test]

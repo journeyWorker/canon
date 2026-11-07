@@ -32,9 +32,9 @@
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use canon_model::{RawRecord, RecordKind};
+use canon_store::git::GitCall;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
@@ -217,8 +217,8 @@ fn json_files(dir: &Path, out: &mut Vec<PathBuf>) {
 /// or a root lies outside the repo.
 fn visible_files(repo: &Path, roots: &[PathBuf]) -> Option<BTreeSet<PathBuf>> {
     let specs: Vec<&Path> = roots.iter().map(|root| root.strip_prefix(repo).ok()).collect::<Option<_>>()?;
-    let output = Command::new("git").args(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--"]).args(specs).current_dir(repo).output().ok()?;
-    output.status.success().then(|| output.stdout.split(|byte| *byte == 0).filter(|path| !path.is_empty()).map(|path| PathBuf::from(String::from_utf8_lossy(path).into_owned())).collect())
+    let output = GitCall::new(repo).args(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--"]).args(specs).tree_listing().run().ok()?;
+    Some(output.stdout.split(|byte| *byte == 0).filter(|path| !path.is_empty()).map(|path| PathBuf::from(String::from_utf8_lossy(path).into_owned())).collect())
 }
 
 /// How many references are unresolved, in all and per kind of reference
@@ -281,7 +281,7 @@ mod tests {
     use super::*;
 
     fn git(dir: &Path, args: &[&str]) {
-        assert!(Command::new("git").args(args).current_dir(dir).status().expect("git must be on PATH for this test").success());
+        GitCall::new(dir).args(args).run().unwrap_or_else(|error| panic!("{error}"));
     }
 
     fn write(dir: &Path, relative: &str, text: &str) {

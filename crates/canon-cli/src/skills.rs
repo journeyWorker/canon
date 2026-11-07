@@ -49,6 +49,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use canon_model::paths;
+use canon_store::git::GitCall;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -909,15 +910,10 @@ impl CanonicalManifest {
 /// `None` for the embedded text.
 fn source_commit(source: Option<&Path>) -> Option<String> {
     let source_dir = source?;
-    let output = std::process::Command::new("git")
-        .arg("-C")
-        .arg(source_dir)
-        .args(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"])
-        .output()
-        .ok()?;
+    let output = GitCall::new(source_dir).args(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"]).run().ok()?;
     let commit = String::from_utf8(output.stdout).ok()?;
     let commit = commit.trim();
-    (output.status.success() && !commit.is_empty()).then(|| commit.to_string())
+    (!commit.is_empty()).then(|| commit.to_string())
 }
 
 /// The install lock, relative to the target.

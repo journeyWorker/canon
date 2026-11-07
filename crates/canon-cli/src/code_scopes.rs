@@ -27,6 +27,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use canon_model::{paths, ScenarioId};
+use canon_store::git::GitCall;
 
 /// The `code_scopes` of a repo's policy and whether the policy stands approved.
 #[derive(Debug, Default)]
@@ -151,7 +152,7 @@ pub fn changed_since_approval(repo: &Path) -> Option<Vec<String>> {
 
 /// The policy file as it was when its digest was `digest`, from git history.
 fn approved_bytes(repo: &Path, digest: &str) -> Option<String> {
-    let git = |args: &[&str]| std::process::Command::new("git").current_dir(repo).args(args).output().ok().filter(|o| o.status.success()).map(|o| o.stdout);
+    let git = |args: &[&str]| GitCall::new(repo).args(args).run().ok().map(|output| output.stdout);
     let revs = git(&["log", "--format=%H", "--", paths::POLICY_FILE])?;
     for rev in String::from_utf8_lossy(&revs).lines() {
         let Some(bytes) = git(&["show", &format!("{rev}:{}", paths::POLICY_FILE)]) else { continue };
