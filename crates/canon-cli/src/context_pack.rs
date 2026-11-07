@@ -817,13 +817,11 @@ mod tests {
     }
 
     fn git(dir: &Path, args: &[&str]) -> Vec<u8> {
-        let out = Command::new("git")
+        let out = GitCall::new(dir)
             .args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"])
             .args(args)
-            .current_dir(dir)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+            .run()
+            .unwrap_or_else(|e| panic!("git {args:?}: {e}"));
         out.stdout
     }
 
