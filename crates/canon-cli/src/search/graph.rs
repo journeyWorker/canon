@@ -148,7 +148,6 @@ enum Target {
     Change,
     Subject,
     Task,
-    Session,
     Run,
     Handoff,
     Scenario,
@@ -164,8 +163,8 @@ struct Reference {
     project: Option<String>,
 }
 
-/// The reference fields of a record of `kind`: the join keys the typed records carry. Every record also
-/// names the session that wrote it.
+/// The reference fields of a record of `kind`: the join keys the typed records carry. `session_id` (a run's, a
+/// trajectory's, an actor's) is an attribute of the record, not an edge: there is no session node.
 fn references_of(kind: RecordKind, body: &Value) -> Vec<Reference> {
     let mut out = Vec::new();
     let mut one = |field: &'static str, target: Target, project: Option<String>| {
@@ -176,10 +175,8 @@ fn references_of(kind: RecordKind, body: &Value) -> Vec<Reference> {
     match kind {
         RecordKind::Run => {
             one("parent_run_id", Target::Run, None);
-            one("session_id", Target::Session, None);
             one("task_id", Target::Task, None);
         }
-        RecordKind::Event => one("run_id", Target::Run, None),
         RecordKind::Review => {
             one("scenario_id", Target::Scenario, text(body, "project_id"));
             one("change_id", Target::Change, None);
@@ -188,7 +185,6 @@ fn references_of(kind: RecordKind, body: &Value) -> Vec<Reference> {
         RecordKind::Trajectory => {
             one("run_id", Target::Run, None);
             one("task_id", Target::Task, None);
-            one("session_id", Target::Session, None);
         }
         RecordKind::StrategyItem => one("source_task_id", Target::Task, None),
         RecordKind::Evidence => {
@@ -205,7 +201,7 @@ fn references_of(kind: RecordKind, body: &Value) -> Vec<Reference> {
             one("openspec_change_slug", Target::Change, None);
         }
         RecordKind::Scenario => one("subject_id", Target::Subject, None),
-        RecordKind::Change | RecordKind::Subject | RecordKind::Task | RecordKind::Session => {}
+        RecordKind::Change | RecordKind::Subject | RecordKind::Task => {}
     }
     let lists: &[(&'static str, Target)] = match kind {
         RecordKind::Change => &[("subject_ids", Target::Subject)],
@@ -219,9 +215,6 @@ fn references_of(kind: RecordKind, body: &Value) -> Vec<Reference> {
             out.push(Reference { field, target: *target, id, project: None });
         }
     }
-    if let Some(id) = body.get("actor").and_then(|actor| text(actor, "session_id")) {
-        out.push(Reference { field: "actor.session_id", target: Target::Session, id, project: None });
-    }
     out
 }
 
@@ -231,7 +224,6 @@ fn target_of(kind: RecordKind) -> Option<Target> {
         RecordKind::Change => Some(Target::Change),
         RecordKind::Subject => Some(Target::Subject),
         RecordKind::Task => Some(Target::Task),
-        RecordKind::Session => Some(Target::Session),
         RecordKind::Run => Some(Target::Run),
         RecordKind::Handoff => Some(Target::Handoff),
         _ => None,

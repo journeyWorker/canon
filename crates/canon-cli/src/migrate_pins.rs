@@ -347,7 +347,7 @@ mod tests {
     #[test]
     fn migration_failures_read_as_before_and_keep_their_cause() {
         let store = || StoreError::PurgeKindUnsupported { kind: "x".to_string() };
-        let cause = "purge kind `x` is not allowed; allowed kinds: session, run, event, trajectory";
+        let cause = "purge kind `x` is not allowed; allowed kinds: run, trajectory, session (retired), event (retired)";
         assert_eq!(MigratePinsError::ReadLedger { kind: "review", source: store() }.to_string(), format!("cannot read the review ledger: {cause}"));
         assert_eq!(MigratePinsError::Write { kind: "review", source: store() }.to_string(), format!("cannot write the migrated review: {cause}"));
         let json = serde_json::from_str::<u8>("x").unwrap_err();

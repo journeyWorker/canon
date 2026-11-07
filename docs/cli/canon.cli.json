@@ -2932,9 +2932,7 @@
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -4947,27 +4945,27 @@
         "WRITE_INVALID"
       ],
       "examples": [
-        "canon purge --kind session --before 2020-01-01T00:00:00Z --json"
+        "canon purge --kind run --before 2020-01-01T00:00:00Z --json"
       ],
       "idempotency": "replay-safe",
       "input": {
         "argumentsRef": "#/schemas/PurgeArguments",
         "example": {
           "before": "2020-01-01T00:00:00Z",
-          "kind": "session"
+          "kind": "run"
         },
         "maxBytes": 8388608
       },
       "kind": "command",
       "options": [
         {
-          "help": "The record kind to purge (session, run, event or trajectory)",
+          "help": "The record kind to purge: run or trajectory. `session` and `event` are retired in 0.39 and leave the next release; they delete rows an older canon stored",
           "name": "kind",
           "possibleValues": [
-            "session",
             "run",
-            "event",
-            "trajectory"
+            "trajectory",
+            "session",
+            "event"
           ],
           "required": true,
           "valueType": "enum"
@@ -5031,9 +5029,7 @@
           "if": {
             "in": [
               "scenario",
-              "session",
               "run",
-              "event",
               "handoff",
               "review",
               "divergence",
@@ -5056,9 +5052,7 @@
           "if": {
             "in": [
               "scenario",
-              "session",
               "run",
-              "event",
               "handoff",
               "review",
               "divergence",
@@ -5082,9 +5076,7 @@
               "change",
               "task",
               "scenario",
-              "session",
               "run",
-              "event",
               "handoff",
               "review",
               "divergence",
@@ -5124,9 +5116,7 @@
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -5208,7 +5198,6 @@
               "change_ids",
               "claimed_at",
               "claimed_by",
-              "client",
               "code_tree",
               "completed_at",
               "content",
@@ -5228,7 +5217,6 @@
               "introduced_by",
               "introduced_unknown",
               "kind",
-              "label",
               "lane",
               "lifecycle",
               "lineage",
@@ -5242,7 +5230,6 @@
               "pins",
               "pr",
               "project_id",
-              "project_key",
               "provenance_ref",
               "reason",
               "regime_key",
@@ -5289,8 +5276,6 @@
               "title",
               "to_role",
               "verdict",
-              "workspace_key",
-              "workspace_label",
               "worktree_dirty"
             ],
             "records": "/records"
@@ -6183,9 +6168,7 @@
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -9733,21 +9716,9 @@
         "schemaVersion": 1
       },
       {
-        "kind": "session",
-        "partition": "kind=session/{session_id}_{digest8}.json",
-        "schema": "crates/canon-model/schemas/session.schema.json",
-        "schemaVersion": 1
-      },
-      {
         "kind": "run",
         "partition": "kind=run/{run_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/run.schema.json",
-        "schemaVersion": 1
-      },
-      {
-        "kind": "event",
-        "partition": "kind=event/{run_id}_{seq}_{digest8}.json",
-        "schema": "crates/canon-model/schemas/event.schema.json",
         "schemaVersion": 1
       },
       {
@@ -20637,9 +20608,7 @@
                 "change",
                 "task",
                 "scenario",
-                "session",
                 "run",
-                "event",
                 "handoff",
                 "review",
                 "divergence",
@@ -21018,9 +20987,7 @@
                 "change",
                 "task",
                 "scenario",
-                "session",
                 "run",
-                "event",
                 "handoff",
                 "review",
                 "divergence",
@@ -23614,7 +23581,7 @@
           "type": "object"
         },
         "Change": {
-          "description": "A change: the top of the join spine's `change_id` row (change ↔\ntasks ↔ specs). `subject_ids` links an imported plan change to every\ndurable [`Subject`] it was adopted under (0.18 D4: a change may belong\nto several subjects; per-task subjects are out of scope). It is a\nplain `pub` field left empty by [`Change::new`] and appended to by\n`canon-cli`'s `subject adopt` at adoption time (mirroring how\n[`Session::project_key`] is set outside this crate), never derived\nhere. Skipped when empty, so an unadopted change carries no key.\n\n# Old records\nThe ledger is append-only. A change written before 0.18 carries a\nsingle `subject_id` string; it reads as a one-element `subject_ids`\n([`one_or_many_subjects`]) and is never rewritten. Renaming the field\nis a format generation change on a kind whose `at` can be byte-stable\n(plan import), so [`RecordKind::Change`] is at schema `2`.",
+          "description": "A change: the top of the join spine's `change_id` row (change ↔\ntasks ↔ specs). `subject_ids` links an imported plan change to every\ndurable [`Subject`] it was adopted under (0.18 D4: a change may belong\nto several subjects; per-task subjects are out of scope). It is a\nplain `pub` field left empty by [`Change::new`] and appended to by\n`canon-cli`'s `subject adopt` at adoption time (a plain field set\noutside this crate), never derived\nhere. Skipped when empty, so an unadopted change carries no key.\n\n# Old records\nThe ledger is append-only. A change written before 0.18 carries a\nsingle `subject_id` string; it reads as a one-element `subject_ids`\n([`one_or_many_subjects`]) and is never rewritten. Renaming the field\nis a format generation change on a kind whose `at` can be byte-stable\n(plan import), so [`RecordKind::Change`] is at schema `2`.",
           "properties": {
             "actor": {
               "$ref": "#/schemas/Actor"
@@ -24120,14 +24087,12 @@
           "type": "object"
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -24148,7 +24113,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "SubjectId": {
@@ -27695,7 +27660,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon purge --kind session --before 2026-02-30 --json"
+          "canon purge --kind run --before 2026-02-30 --json"
         ]
       ],
       "schemas": {
@@ -27735,10 +27700,10 @@
             },
             "kind": {
               "enum": [
-                "session",
                 "run",
-                "event",
-                "trajectory"
+                "trajectory",
+                "session",
+                "event"
               ]
             }
           },
@@ -27752,12 +27717,12 @@
               "type": "string"
             },
             "kind": {
-              "description": "The record kind to purge (session, run, event or trajectory)",
+              "description": "The record kind to purge: run or trajectory. `session` and `event` are retired in 0.39 and leave the next release; they delete rows an older canon stored",
               "enum": [
-                "session",
                 "run",
-                "event",
-                "trajectory"
+                "trajectory",
+                "session",
+                "event"
               ]
             }
           },
@@ -27986,7 +27951,7 @@
               "description": "a member of the records of: handoff"
             },
             "actor": {
-              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
             },
             "approval": {
               "description": "a member of the records of: evidence"
@@ -27995,7 +27960,7 @@
               "description": "a member of the records of: review"
             },
             "at": {
-              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
             },
             "attachments": {
               "description": "a member of the records of: evidence"
@@ -28027,9 +27992,6 @@
             "claimed_by": {
               "description": "a member of the records of: handoff"
             },
-            "client": {
-              "description": "a member of the records of: session"
-            },
             "code_tree": {
               "description": "a member of the records of: review, divergence, evidence, finding"
             },
@@ -28046,7 +28008,7 @@
               "description": "a member of the records of: scenario"
             },
             "detail": {
-              "description": "a member of the records of: event, divergence"
+              "description": "a member of the records of: divergence"
             },
             "disposition": {
               "description": "a member of the records of: finding"
@@ -28055,7 +28017,7 @@
               "description": "a member of the records of: subject"
             },
             "ended_at": {
-              "description": "a member of the records of: session, run"
+              "description": "a member of the records of: run"
             },
             "evidence_note": {
               "description": "a member of the records of: task"
@@ -28085,10 +28047,7 @@
               "description": "a member of the records of: finding"
             },
             "kind": {
-              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
-            },
-            "label": {
-              "description": "a member of the records of: event"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
             },
             "lane": {
               "description": "a member of the records of: scenario"
@@ -28128,9 +28087,6 @@
             },
             "project_id": {
               "description": "a member of the records of: scenario, review, divergence, evidence"
-            },
-            "project_key": {
-              "description": "a member of the records of: session"
             },
             "provenance_ref": {
               "description": "a member of the records of: review"
@@ -28187,7 +28143,7 @@
               "description": "a member of the records of: divergence, finding"
             },
             "run_id": {
-              "description": "a member of the records of: run, event, trajectory, evidence"
+              "description": "a member of the records of: run, trajectory, evidence"
             },
             "run_seq": {
               "description": "a member of the records of: divergence, evidence"
@@ -28205,13 +28161,13 @@
               "description": "a member of the records of: task"
             },
             "schema": {
-              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
             },
             "seq": {
-              "description": "a member of the records of: event, handoff, finding"
+              "description": "a member of the records of: handoff, finding"
             },
             "session_id": {
-              "description": "a member of the records of: session, run, trajectory"
+              "description": "a member of the records of: run, trajectory"
             },
             "severity": {
               "description": "a member of the records of: finding"
@@ -28226,7 +28182,7 @@
               "description": "a member of the records of: strategy_item"
             },
             "started_at": {
-              "description": "a member of the records of: session, run"
+              "description": "a member of the records of: run"
             },
             "state": {
               "description": "a member of the records of: handoff"
@@ -28269,12 +28225,6 @@
             },
             "verdict": {
               "description": "a member of the records of: evidence"
-            },
-            "workspace_key": {
-              "description": "a member of the records of: session"
-            },
-            "workspace_label": {
-              "description": "a member of the records of: session"
             },
             "worktree_dirty": {
               "description": "a member of the records of: review, divergence, evidence, finding"
@@ -34528,14 +34478,12 @@
           ]
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -34581,7 +34529,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -35130,14 +35078,12 @@
           "type": "object"
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -35183,7 +35129,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -35841,14 +35787,12 @@
           ]
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -35894,7 +35838,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -36172,14 +36116,12 @@
           "type": "string"
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -36225,7 +36167,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -36708,14 +36650,12 @@
           ]
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -36761,7 +36701,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -39005,6 +38945,11 @@
       "code": "REPORT_TIER_NOT_READ_DIRECTLY",
       "fix": "Route the kinds the message names to a rung the report reads, then run the report again.",
       "meaning": "a report was built from a ledger where some record kinds are not read directly from their routed tier"
+    },
+    {
+      "code": "RETIRED_KIND_KEYS",
+      "fix": "Run `canon migrate --json` to preview deleting the lines, then `canon migrate --commit --plan-digest <digest>`.",
+      "meaning": "canon.yaml still names the `session` or `event` record kind under `routing` or `aging`; canon 0.39 has no such kinds, so the keys route and age nothing"
     },
     {
       "code": "RETRIEVE_REGIME_FELL_BACK",

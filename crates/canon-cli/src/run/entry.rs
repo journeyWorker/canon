@@ -41,7 +41,7 @@ pub fn usage_error(error: &clap::Error) -> ExitCode {
     let removed = crate::removed::find(&crate::cli::command(), &args);
     if let Some(removed) = removed.as_ref().filter(|removed| !removed.is_bare()) {
         let command = format!("canon {}", removed.command);
-        return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.expected()]).emit(command.trim(), json));
+        return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected(removed.expected_values()).emit(command.trim(), json));
     }
     let root = crate::cli::command();
     let (path, mut usage) = usage_parts(error, &root);
@@ -180,6 +180,10 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
         if read && matches!(arg.as_str(), "--actor" | "--session" | "--role") {
             hint.push_str(&format!("; `canon {joined}` is a read leaf: it records nothing, so the attribution flags (--actor, --session, --role) do not apply to it"));
         }
+    }
+    // `purge --kind` is closed over `run` and `trajectory` and, for this one release, the retired `session` and `event`: the refusal says which are which.
+    if joined == "purge" && error.kind() == ErrorKind::InvalidValue && usage.field_name() == Some("--kind") {
+        hint = "`--kind` takes `run` or `trajectory`; `session` and `event` are retired in 0.39 and leave the next release (they only delete rows an older canon stored): `canon purge --kind run --before <date>`".to_string();
     }
     (joined, usage.hint(hint))
 }

@@ -239,9 +239,9 @@ pub struct ExportArgs {
 
 #[derive(Debug, Args)]
 pub struct PurgeArgs {
-    /// The record kind to purge (session, run, event or trajectory)
-    #[arg(long, value_parser = crate::query::purgeable_kind_parser(), value_name = "KIND")]
-    pub kind: RecordKind,
+    /// The record kind to purge: run or trajectory. `session` and `event` are retired in 0.39 and leave the next release; they delete rows an older canon stored
+    #[arg(long, value_parser = crate::query::purge_kind_parser(), value_name = "KIND")]
+    pub kind: canon_store::tier::PurgeKind,
     /// Remove records strictly before this time: an RFC 3339 date (`2030-01-01`, UTC midnight) or date-time (`2030-01-01T10:00:00Z`)
     #[arg(long, value_parser = crate::timestamp::shape_only, value_name = "TIMESTAMP")]
     pub before: DateTime<Utc>,

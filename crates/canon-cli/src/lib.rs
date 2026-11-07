@@ -50,6 +50,7 @@ pub mod ledger;
 pub mod migrate;
 pub mod old_briefs;
 pub mod old_layout;
+pub mod retired_kind_keys;
 pub mod migrate_briefs;
 pub mod migrate_legacy_pins;
 pub mod migrate_names;

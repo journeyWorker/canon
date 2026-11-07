@@ -518,6 +518,8 @@ pub fn announce(repo: &Path) {
     let legacy = detect(repo);
     // A 0.29 ledger layout (0.30 `ledger-naming`): the same `canon migrate` step; one step when both hold.
     crate::old_layout::announce(repo, legacy.is_none());
+    // 0.39 `session-kinds-removal`: `canon.yaml` keys for the retired kinds; one `canon migrate` step when another already leads.
+    crate::retired_kind_keys::announce(repo, legacy.is_none() && crate::old_layout::detect(repo).is_none());
     // 0.31 `brief-format`: a brief in the 0.30 format.
     crate::old_briefs::announce(repo);
     if let Some(found) = legacy {
