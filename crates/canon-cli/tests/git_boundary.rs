@@ -192,7 +192,8 @@ fn f1_a_git_index_file_in_the_shell_does_not_change_the_state_digest_of_a_contex
     assert_eq!(body(&shown)["data"]["id"], id.as_str());
 }
 
-/// F1: the same environment on `migrate --commit` does not touch the other repository's index: the moves stay in the project.
+/// F1: `GIT_DIR` in the shell, naming a repository that tracks the same path, does not make `migrate --commit` stage its removal of
+/// `openspec/changes/.gitkeep` in that repository's index: the move stays in the project.
 #[test]
 fn f1_migrate_commit_does_not_change_the_index_of_the_repository_git_dir_names() {
     let dir = TempDir::new().unwrap();
@@ -203,8 +204,10 @@ fn f1_migrate_commit_does_not_change_the_index_of_the_repository_git_dir_names()
     write(repo, ".gitignore", ".canon/hot.db*\n");
     commit_all(repo, "a 0.16 repo");
     let other = other_repo();
+    write(other.path(), "openspec/changes/.gitkeep", "");
+    commit_all(other.path(), "tracks the same placeholder");
     let index_before = std::fs::read(other.path().join(".git/index")).unwrap();
-    let env = [("GIT_DIR", other.path().join(".git").display().to_string()), ("GIT_WORK_TREE", other.path().display().to_string()), ("GIT_INDEX_FILE", other.path().join(".git/index").display().to_string())];
+    let env = [("GIT_DIR", other.path().join(".git").display().to_string())];
 
     let preview = canon_env(repo, &["migrate"], &env, None);
     assert_eq!(preview.status.code(), Some(0), "{}{}", String::from_utf8_lossy(&preview.stdout), String::from_utf8_lossy(&preview.stderr));
