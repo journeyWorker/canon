@@ -178,3 +178,15 @@ Feature: ingest removal
     When canon ingest plans runs on it
     Then it exits 2 with INGEST_SOURCE_INVALID and no data, as 0.38 did
     And no change or task record is written and no plan cursor file exists under .canon/ingest/cursors
+
+  # canon: {"schema":1,"at":"2026-11-08T08:30:56Z","actor":{"agent_id":"impl-0-39","role":"implementer","session_id":"s-0-39-impl"}}
+  @subject:ingest-pipelines
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-39-session-ingest-removal.F6
+  @ingest.removal.16
+  Scenario: The old evidence of a scenario whose feature file is deleted is not stale evidence once enough commits have passed
+    Given two scenarios with green evidence, both past max_commits_behind, so the gate names both as stale-evidence, and one feature file then deleted and canon inventory sync run
+    When canon gate check runs
+    Then it names the scenario that is still declared as stale-evidence and does not name the deleted one
+    And the count of cells whose base commit git could not read does not include the deleted scenario

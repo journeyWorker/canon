@@ -272,3 +272,67 @@ fn ingest_removal_11_a_scenario_whose_feature_file_is_deleted_is_tombstoned_and_
     let left = scenarios(dir.path());
     assert!(!left.contains(&"gone.leaf.01".to_string()) && left.contains(&"kept.leaf.01".to_string()), "{left:?}");
 }
+
+fn git_in(dir: &Path, args: &[&str]) {
+    let out = std::process::Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .expect("git must be on PATH");
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+}
+
+fn commit_all(dir: &Path, message: &str) {
+    git_in(dir, &["add", "-A"]);
+    git_in(dir, &["commit", "-q", "-m", message]);
+}
+
+/// The `stale-evidence` subjects of `gate check` in `dir`, sorted, and the `staleness_unresolvable` advisory when it says one.
+fn stale_subjects(dir: &Path) -> (Vec<String>, Option<String>) {
+    let body = json_of(&canon_in(dir, &["gate", "check", "--json"]));
+    let mut subjects: Vec<String> =
+        body["data"]["violations"].as_array().into_iter().flatten().filter(|v| v["class"] == "stale-evidence").map(|v| v["subject"].as_str().unwrap().to_string()).collect();
+    subjects.sort();
+    let advisory = body["data"]["advisories"].as_array().into_iter().flatten().find(|a| a["kind"] == "staleness_unresolvable").map(|a| a["message"].as_str().unwrap().to_string());
+    (subjects, advisory)
+}
+
+/// ingest.removal.16 (F6, failure path): the green evidence of a scenario whose `.feature` file was deleted and tombstoned is not `stale-evidence` however many commits have passed since, and the cell is not counted as one whose base commit git could not read; the evidence of the scenario that is still declared is both.
+#[test]
+fn ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evidence() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git_in(repo, &["init", "-q", "-b", "main"]);
+    assert!(canon_in(repo, &["init", "--repo", ".", "--no-policy", "--json"]).status.success());
+    fs::write(repo.join(".canon/policy.yaml"), "staleness:\n  max_commits_behind: 2\n").unwrap();
+    for id in ["gone.leaf.01", "kept.leaf.01"] {
+        assert_eq!(canon_in(repo, &["scenario", "new", id, "--title", id, "--case", "failure", "--json"]).status.code(), Some(0));
+    }
+    assert_eq!(canon_in(repo, &["inventory", "sync", "--json"]).status.code(), Some(0));
+    fs::write(repo.join("code.rs"), "1").unwrap();
+    commit_all(repo, "project");
+    for id in ["gone.leaf.01", "kept.leaf.01"] {
+        let out = canon_in(repo, &["evidence", "add", "--scenario", id, "--project", "root", "--class", "test-run", "--ref", "run", "--role", "implementer", "--json"]);
+        assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
+    }
+    commit_all(repo, "evidence");
+    for n in 2..=4 {
+        fs::write(repo.join("code.rs"), n.to_string()).unwrap();
+        commit_all(repo, &format!("code {n}"));
+    }
+    assert_eq!(stale_subjects(repo).0, ["gone.leaf.01", "kept.leaf.01"], "both are past the ceiling while both are declared");
+
+    fs::remove_file(repo.join(".canon/specs/kind=feature/area=gone/leaf.feature")).unwrap();
+    assert_eq!(canon_in(repo, &["inventory", "sync", "--json"]).status.code(), Some(0));
+    commit_all(repo, "the gone feature file is deleted");
+    assert_eq!(stale_subjects(repo).0, ["kept.leaf.01"], "the tombstoned scenario is absent for the staleness check, the declared one is not");
+
+    let shallow = tempfile::tempdir().unwrap();
+    let url = format!("file://{}", repo.display());
+    git_in(shallow.path(), &["clone", "-q", "--depth", "1", &url, "."]);
+    let (stale, advisory) = stale_subjects(shallow.path());
+    assert!(stale.is_empty(), "{stale:?}");
+    let advisory = advisory.expect("a shallow clone has no base commit for the declared scenario");
+    assert!(advisory.starts_with("1 (subject, role) cell(s)") && advisory.contains("kept.leaf.01") && !advisory.contains("gone.leaf.01"), "{advisory}");
+}
