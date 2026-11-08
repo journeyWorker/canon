@@ -1005,9 +1005,10 @@ mod tests {
         assert_eq!(std::fs::read(blob_path(dir.path(), &digest)).unwrap(), b"report");
     }
 
+    /// tier.durability.03 (F2): the store directory is synced once, after the last rename; a blob that already exists syncs nothing.
     #[cfg(all(unix, debug_assertions))]
     #[test]
-    fn publishing_two_blobs_syncs_the_store_directory_once_after_both_renames_and_an_existing_blob_syncs_nothing() {
+    fn tier_durability_03_publishing_two_blobs_syncs_the_store_directory_once_after_both_renames_and_an_existing_blob_syncs_nothing() {
         use canon_store::atomic::trace::{self, Event};
         let dir = TempDir::new().unwrap();
         let lock = StoreLock::acquire(dir.path()).unwrap();
@@ -1030,11 +1031,11 @@ mod tests {
         assert!(trace::take().is_empty(), "nothing placed, nothing synced");
     }
 
-    /// Unix, not root (skipped, and says so, as root and on Windows): a store directory that can be written and searched but not read lets
+    /// tier.durability.04 (F2 failure path). Unix, not root (skipped, and says so, as root and on Windows): a store directory that can be written and searched but not read lets
     /// every `rename` succeed and fails only the directory sync.
     #[cfg(unix)]
     #[test]
-    fn a_store_directory_that_cannot_be_synced_removes_the_placed_blobs_and_fails_skipped_as_root() {
+    fn tier_durability_04_a_store_directory_that_cannot_be_synced_removes_the_placed_blobs_and_fails_skipped_as_root() {
         use std::os::unix::fs::PermissionsExt;
         let dir = TempDir::new().unwrap();
         let lock = StoreLock::acquire(dir.path()).unwrap();

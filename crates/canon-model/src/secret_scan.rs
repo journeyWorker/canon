@@ -357,8 +357,9 @@ mod tests {
         "A1".repeat(len).chars().take(len).collect()
     }
 
+    /// dispatch.secret-scan.04 (F2).
     #[test]
-    fn aws_access_key_id_needs_sixteen_characters_and_both_boundaries() {
+    fn dispatch_secret_scan_04_aws_access_key_id_needs_sixteen_characters_and_both_boundaries() {
         let key = format!("AKIA{}", upper(16));
         assert_eq!(kinds(&format!("id: {key} end")), [(4, 24, SecretKind::AwsAccessKeyId)]);
         assert!(!rejected(&format!("AKIA{}", upper(15))), "fifteen is below the minimum");
@@ -371,8 +372,9 @@ mod tests {
         assert!(!rejected("Akiashi AKIATSU akiaakiaakiaakiaakia"));
     }
 
+    /// dispatch.secret-scan.05 (F2).
     #[test]
-    fn github_token_needs_thirty_six_characters() {
+    fn dispatch_secret_scan_05_github_token_needs_thirty_six_characters() {
         let token = |len: usize| format!("ghp_{}", "a1".repeat(len).chars().take(len).collect::<String>());
         assert_eq!(kinds(&format!("t={}.", token(36))), [(2, 42, SecretKind::GithubToken)]);
         assert!(!rejected(&token(35)));
@@ -383,8 +385,9 @@ mod tests {
         assert!(!rejected(&format!("ghp_{}-", "a".repeat(35))), "a hyphen ends the run");
     }
 
+    /// dispatch.secret-scan.06 (F2).
     #[test]
-    fn github_fine_grained_token_takes_underscores_from_twenty_two_characters() {
+    fn dispatch_secret_scan_06_github_fine_grained_token_takes_underscores_from_twenty_two_characters() {
         let token = |len: usize| format!("github_pat_{}", "a_1".repeat(len).chars().take(len).collect::<String>());
         assert_eq!(kinds(&format!("({})", token(22))), [(1, 34, SecretKind::GithubFineGrainedToken)]);
         assert!(!rejected(&token(21)));
@@ -393,8 +396,9 @@ mod tests {
         assert!(!rejected("github_pat_"));
     }
 
+    /// dispatch.secret-scan.07 (F2).
     #[test]
-    fn api_secret_key_needs_twenty_characters_with_a_digit() {
+    fn dispatch_secret_scan_07_api_secret_key_needs_twenty_characters_with_a_digit() {
         let key = |len: usize| format!("sk-{}", "ab1-".repeat(len).chars().take(len).collect::<String>());
         assert_eq!(kinds(&format!("key {} ", key(20))), [(4, 27, SecretKind::ApiSecretKey)]);
         assert!(!rejected(&key(19)));
@@ -410,8 +414,9 @@ mod tests {
         }
     }
 
+    /// dispatch.secret-scan.08 (F2).
     #[test]
-    fn private_key_reads_the_header_and_runs_to_the_end_line() {
+    fn dispatch_secret_scan_08_private_key_reads_the_header_and_runs_to_the_end_line() {
         let pem = "intro\n-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\nafter";
         let start = pem.find("-----BEGIN").unwrap();
         assert_eq!(kinds(pem), [(start, pem.find("\nafter").unwrap(), SecretKind::PrivateKey)]);
@@ -430,14 +435,16 @@ mod tests {
         assert!(!rejected(&padded(fits + 1)), "a header of 81 bytes is not");
     }
 
+    /// dispatch.secret-scan.09 (F2).
     #[test]
-    fn private_key_with_an_unreadable_end_line_is_the_header_alone() {
+    fn dispatch_secret_scan_09_private_key_with_an_unreadable_end_line_is_the_header_alone() {
         let text = "-----BEGIN PRIVATE KEY-----\n-----END lower-----";
         assert_eq!(kinds(text), [(0, 27, SecretKind::PrivateKey)]);
     }
 
+    /// dispatch.secret-scan.10 (F2).
     #[test]
-    fn named_value_reads_the_value_after_a_key_name() {
+    fn dispatch_secret_scan_10_named_value_reads_the_value_after_a_key_name() {
         assert_eq!(kinds("api_key=abcd1234"), [(8, 16, SecretKind::NamedValue)]);
         assert_eq!(kinds("API_KEY = \"abcd1234\""), [(11, 19, SecretKind::NamedValue)], "case of the name, blanks around =, a quote");
         assert_eq!(kinds("export OPENAI_API_KEY=abcd1234"), [(22, 30, SecretKind::NamedValue)], "an environment variable prefix");
@@ -453,8 +460,9 @@ mod tests {
         assert!(!rejected("api_key_name=abcd1234"));
     }
 
+    /// dispatch.secret-scan.11 (F2).
     #[test]
-    fn named_value_ignores_placeholders_and_empty_values() {
+    fn dispatch_secret_scan_11_named_value_ignores_placeholders_and_empty_values() {
         for line in [
             "api_key=",
             "api_key=<your key>",
@@ -473,16 +481,18 @@ mod tests {
         assert!(rejected("api_key=Placeholder"), "mixed case makes it a value");
     }
 
+    /// dispatch.secret-scan.12 (F2).
     #[test]
-    fn a_value_takes_at_most_one_window_from_the_name() {
+    fn dispatch_secret_scan_12_a_value_takes_at_most_one_window_from_the_name() {
         let text = format!("api_key={}", "a".repeat(2000));
         let spans = scan(&text);
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].end - spans[0].start, CANDIDATE_WINDOW - "api_key=".len());
     }
 
+    /// dispatch.secret-scan.19 (F4).
     #[test]
-    fn overlapping_spans_merge_into_the_earlier_kind_and_touching_spans_stay_apart() {
+    fn dispatch_secret_scan_19_overlapping_spans_merge_into_the_earlier_kind_and_touching_spans_stay_apart() {
         let key = format!("sk-{}", "ab1".repeat(10));
         // `api_key="sk-…"`: the key's value and the `sk-` run are the same bytes; the rule that comes first in the table names them.
         let text = format!("api_key=\"{key}\"");
@@ -499,8 +509,9 @@ mod tests {
         assert_eq!(merge(vec![touching(4, 8), touching(0, 5)]), [touching(0, 8)], "spans that overlap are one");
     }
 
+    /// dispatch.secret-scan.18 (F4).
     #[test]
-    fn spans_come_in_start_order_whatever_the_rule_order() {
+    fn dispatch_secret_scan_18_spans_come_in_start_order_whatever_the_rule_order() {
         let key = format!("sk-{}", "ab1".repeat(10));
         let aws = format!("AKIA{}", upper(16));
         let text = format!("{key} {aws} -----BEGIN PRIVATE KEY----- api_key=abcd1234");
@@ -509,8 +520,9 @@ mod tests {
         assert!(spans.windows(2).all(|pair| pair[0].start < pair[1].start));
     }
 
+    /// dispatch.secret-scan.20 (F4).
     #[test]
-    fn spans_lie_on_character_boundaries_in_text_with_multibyte_characters() {
+    fn dispatch_secret_scan_20_spans_lie_on_character_boundaries_in_text_with_multibyte_characters() {
         let text = "비밀 🙂 api_key=\"abcd1234\" 끝 ghp_é";
         for span in scan(text) {
             assert!(text.is_char_boundary(span.start) && text.is_char_boundary(span.end), "{span:?}");
@@ -518,8 +530,9 @@ mod tests {
         assert_eq!(scan(text).len(), 1);
     }
 
+    /// dispatch.secret-scan.21 (F4).
     #[test]
-    fn line_of_counts_from_one() {
+    fn dispatch_secret_scan_21_line_of_counts_from_one() {
         let text = "a\nb\r\nc api_key=abcd1234";
         let span = scan(text)[0];
         assert_eq!(line_of(text, span.start), 3);
@@ -527,8 +540,9 @@ mod tests {
         assert_eq!(line_of("", 5), 1);
     }
 
+    /// dispatch.secret-scan.02 (F1): the lookalike lines of the brief's table hold no secret.
     #[test]
-    fn plain_prose_holds_no_secret() {
+    fn dispatch_secret_scan_02_plain_prose_holds_no_secret() {
         for line in [
             "risk-high", "RISK-HIGH", "task-list", "disk-usage", "mask-all", "ask-user", "Akiashi", "AKIATSU", "sk-live-123456",
             "sk-documentation-for-onboarding-flow", "ghp_", "github_pat_", "-----BEGIN CERTIFICATE-----", "-----BEGIN PUBLIC KEY-----", "api_key=",
@@ -538,8 +552,9 @@ mod tests {
         }
     }
 
+    /// dispatch.secret-scan.22 (F4): a 4 MiB input of repeated candidates ends.
     #[test]
-    fn a_long_input_of_repeated_candidates_is_scanned_in_linear_time() {
+    fn dispatch_secret_scan_22_a_long_input_of_repeated_candidates_is_scanned_in_linear_time() {
         const MIB4: usize = 4 << 20;
         for unit in ["sk-", "AKIA", "-----BEGIN ", "sk-a-", "-----BEGIN PRIVATE KEY-----\n"] {
             let text = unit.repeat(MIB4 / unit.len());

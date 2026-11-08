@@ -164,15 +164,17 @@ mod tests {
         assert_eq!(std::fs::read(&path).unwrap(), b"nested");
     }
 
+    /// tier.durability.02 (F1 failure path): a path with no parent is refused as invalid input.
     #[test]
-    fn rejects_a_path_with_no_parent() {
+    fn tier_durability_02_a_path_with_no_parent_is_invalid_input() {
         let err = write_atomic(Path::new("/"), b"x").unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
     }
 
+    /// tier.durability.01 (F1): file sync, rename, parent directory sync, in that order.
     #[cfg(all(unix, debug_assertions))]
     #[test]
-    fn one_write_syncs_the_file_then_renames_then_syncs_the_parent_directory() {
+    fn tier_durability_01_one_write_syncs_the_file_then_renames_then_syncs_the_parent_directory() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("record.json");
         trace::take();
@@ -186,19 +188,20 @@ mod tests {
         assert_eq!(parent, dir.path());
     }
 
+    /// tier.durability.02 (F1 failure path): a refused path records no sync.
     #[cfg(all(unix, debug_assertions))]
     #[test]
-    fn a_refused_path_records_no_sync() {
+    fn tier_durability_02_a_refused_path_records_no_sync() {
         trace::take();
         write_atomic(Path::new("/"), b"x").unwrap_err();
         assert!(trace::take().is_empty());
     }
 
-    /// Unix, not root: a parent that can be written and searched but not read lets the temp file and `rename` succeed and fails only the
+    /// tier.durability.05 (F3 failure path). Unix, not root: a parent that can be written and searched but not read lets the temp file and `rename` succeed and fails only the
     /// directory sync. Skipped (and says so) as root, who can open any directory, and on Windows.
     #[cfg(unix)]
     #[test]
-    fn an_unreadable_parent_fails_the_directory_sync_naming_the_directory_skipped_as_root() {
+    fn tier_durability_05_an_unreadable_parent_fails_the_directory_sync_naming_the_directory_skipped_as_root() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let parent = dir.path().join("closed");

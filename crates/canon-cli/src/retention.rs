@@ -803,9 +803,10 @@ mod tests {
         assert!(err.to_string().contains("requires configured learn root"));
     }
 
+    /// tier.durability.10 (F5 failure path): the audit file is still created 0600.
     #[cfg(unix)]
     #[test]
-    fn audit_file_is_created_restrictively() {
+    fn tier_durability_10_the_audit_file_is_created_restrictively() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("canon.yaml"), "").unwrap();
         append_access_audit(dir.path(), "query", Some("run"), "all", false, 0, 0).unwrap();
@@ -833,8 +834,9 @@ mod tests {
         }
     }
 
+    /// tier.durability.08 (F5): the JSON and its newline leave in one `write` call.
     #[test]
-    fn an_audit_line_and_its_newline_leave_in_one_write_call() {
+    fn tier_durability_08_an_audit_line_and_its_newline_leave_in_one_write_call() {
         let mut sink = CountingSink::default();
         write_audit_line(&mut sink, &json!({"operation": "query", "result_counts": {"matched": 3, "deleted": 0}})).unwrap();
         assert_eq!(sink.calls, 1, "the JSON and the newline go out together");
@@ -843,8 +845,9 @@ mod tests {
         assert_eq!(parsed["operation"], "query");
     }
 
+    /// tier.durability.09 (F5): two appended audit lines are two lines of the file.
     #[test]
-    fn two_audit_lines_stay_two_lines_in_the_file() {
+    fn tier_durability_09_two_audit_lines_stay_two_lines_in_the_file() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("canon.yaml"), "").unwrap();
         for _ in 0..2 {
@@ -855,8 +858,9 @@ mod tests {
         assert!(text.lines().all(|line| serde_json::from_str::<serde_json::Value>(line).is_ok()), "{text}");
     }
 
+    /// tier.durability.10 (F5 failure path): an audit file that cannot be opened is an error.
     #[test]
-    fn an_unopenable_audit_file_is_an_error() {
+    fn tier_durability_10_an_unopenable_audit_file_is_an_error() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("canon.yaml"), "").unwrap();
         fs::create_dir_all(audit_path(dir.path()).unwrap()).unwrap();

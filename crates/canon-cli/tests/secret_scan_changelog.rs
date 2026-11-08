@@ -37,13 +37,15 @@ fn changelog() -> String {
     std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap()
 }
 
+/// dispatch.secret-scan.28 (F6): the CHANGELOG entry announces the scanner, the fixed refusals and the new pack ids.
 #[test]
-fn the_changelog_announces_the_scanner_the_fixed_refusals_and_the_new_pack_ids() {
+fn dispatch_secret_scan_28_the_changelog_announces_the_scanner_the_fixed_refusals_and_the_new_pack_ids() {
     assert_eq!(release_problems(&changelog()), Vec::<String>::new());
 }
 
+/// dispatch.secret-scan.29 (F6 failure path): a release without the announcement fails the release check.
 #[test]
-fn a_release_without_the_announcement_fails_the_release_check() {
+fn dispatch_secret_scan_29_a_release_without_the_announcement_fails_the_release_check() {
     let real = changelog();
     assert_eq!(release_problems("# Changelog\n\n## Unreleased\n\n## 0.38.0\n"), ["no release section of the CHANGELOG names `canon-0-39-secret-scan`"]);
     let without = real.replace("risk-high", "removed");

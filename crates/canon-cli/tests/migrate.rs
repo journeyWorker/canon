@@ -575,6 +575,24 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     assert!(ok_commit(repo).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"));
 }
 
+/// tier.durability.07 (F4 failure path, the canon.yaml half): canon.yaml is written through `canon_store::write_atomic`, so a repo root that takes
+/// no new entry stops `migrate --commit` as `MIGRATION_INCOMPLETE` / `STOPPED` (exit 1) with canon.yaml as it was, and the next run finishes it.
+/// The same wording of the promise as `authoring_migrate_09_…` and `atip_incomplete_10_…`, which keep their own scenarios. Skipped as root.
+#[test]
+fn tier_durability_07_a_canon_yaml_that_cannot_be_replaced_stops_the_migrate_incomplete_and_the_next_run_finishes() {
+    let dir = old_repo();
+    let repo = dir.path();
+    let Some(blocked) = ReadOnlyRoot::new(repo) else { return };
+    let (out, body) = commit_json(repo, &[]);
+    assert_eq!(out.status.code(), Some(1), "{body}");
+    assert_eq!((body["error"]["code"].as_str(), body["error"]["reason"].as_str()), (Some("MIGRATION_INCOMPLETE"), Some("STOPPED")), "{body}");
+    assert_eq!(read(repo, "canon.yaml"), OLD_YAML, "canon.yaml is as it was, never half-written");
+    drop(blocked);
+    let finished = commit(repo);
+    assert_eq!(finished.status.code(), Some(0), "running it again finishes the rest: {}", text(&finished));
+    assert_eq!(read(repo, "canon.yaml"), migrated_yaml());
+}
+
 /// authoring.migrate.10: when a pointer brief cannot be written, the
 /// openspec source that still holds the approval stays configured and the
 /// run exits 1 (it stopped after it had begun); the rerun writes the brief and only then removes the

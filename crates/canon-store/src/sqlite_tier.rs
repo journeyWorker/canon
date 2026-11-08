@@ -721,10 +721,10 @@ mod tests {
         std::fs::metadata(path).unwrap().permissions().mode() & 0o777
     }
 
-    /// 0.39 write-durability F7: a new db file, and the `-wal` and `-shm` SQLite makes beside it, are owner-only.
+    /// tier.durability.13 (F7): a new db file, and the `-wal` and `-shm` SQLite makes beside it, are owner-only.
     #[cfg(unix)]
     #[test]
-    fn a_new_hot_db_and_its_sidecars_are_owner_only() {
+    fn tier_durability_13_a_new_hot_db_and_its_sidecars_are_owner_only() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join(".canon/hot.db");
         let tier = SqliteTier::connect(&path).unwrap();
@@ -736,10 +736,10 @@ mod tests {
         }
     }
 
-    /// F7 failure path: an existing db file keeps its mode, written to or not.
+    /// tier.durability.14 (F7 failure path): an existing db file keeps its mode, written to or not.
     #[cfg(unix)]
     #[test]
-    fn an_existing_hot_db_keeps_its_mode() {
+    fn tier_durability_14_an_existing_hot_db_keeps_its_mode() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("hot.db");
@@ -775,15 +775,17 @@ mod tests {
         .unwrap()
     }
 
-    /// 0.39 write-durability F6, both sides, deterministic: another connection writes in the gap between a rekey's held-key `SELECT` and its
-    /// first write.
-    ///
-    /// - A plain `BEGIN` that reads first (what `rekey` used to do) loses: the other write commits, then the upgrade fails with
-    ///   `database is locked` at once, busy timeout or not. This half shows the gap is real, so the other half proves something.
-    /// - `rekey` itself holds the write lock from its first statement: the other write is refused while it runs, and `rekey` succeeds.
-    ///   Putting the plain `BEGIN` back makes this half fail with `database is locked`.
-    #[test]
-    fn rekey_takes_the_write_lock_first_so_a_writer_in_the_gap_cannot_make_it_fail() {
+    /// A tier holding one change `rekey-a`, with the key it moves from and the key it moves to.
+    struct RekeyFixture {
+        _dir: tempfile::TempDir,
+        path: PathBuf,
+        tier: SqliteTier,
+        a: Change,
+        from: (String, String, String),
+        to: (String, String, String),
+    }
+
+    fn rekey_fixture() -> RekeyFixture {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("hot.db");
         let tier = SqliteTier::connect(&path).unwrap();
@@ -791,19 +793,17 @@ mod tests {
         let receipt = tier.write(&a).unwrap();
         let from = ("change".to_string(), "rekey-a".to_string(), receipt.digest.clone());
         let to = ("change".to_string(), "rekey-a2".to_string(), "deadbeef".to_string());
+        RekeyFixture { _dir: dir, path, tier, a, from, to }
+    }
 
-        // The old shape: a plain BEGIN, the held-key SELECT, a writer gets in, then the UPDATE.
-        let plain = tier.rt.block_on(async {
-            let mut tx = tier.pool.begin().await.unwrap();
-            sqlx::query(select_body_sql()).bind(&to.0).bind(&to.1).bind(&to.2).fetch_optional(&mut *tx).await.unwrap();
-            let other = write_from_another_connection(&path, "gap-plain");
-            let update = sqlx::query("UPDATE records_history SET id = ? WHERE kind = ? AND id = ? AND digest = ?").bind(&to.1).bind(&from.0).bind(&from.1).bind(&from.2).execute(&mut *tx).await;
-            (other, update.map(drop).map_err(|e| e.to_string()))
-        });
-        assert_eq!(plain.0, Ok(()), "with a plain BEGIN nothing holds the write lock, so the other writer commits in the gap");
-        assert!(plain.1.as_ref().is_err_and(|e| e.contains("database is locked")), "and the upgrade then fails: {:?}", plain.1);
-
-        // rekey: the same gap, through the real function.
+    /// 0.39 write-durability F6, deterministic: another connection writes in the gap between a rekey's held-key `SELECT` and its first write.
+    /// `rekey` itself holds the write lock from its first statement: the other write is refused while it runs, and `rekey` succeeds.
+    /// Putting the plain `BEGIN` back makes this fail with `database is locked`.
+    ///
+    /// tier.durability.11 (F6).
+    #[test]
+    fn tier_durability_11_rekey_takes_the_write_lock_first_so_a_writer_in_the_gap_cannot_make_it_fail() {
+        let RekeyFixture { _dir, path, tier, a, from, to } = rekey_fixture();
         let seen = std::rc::Rc::new(std::cell::RefCell::new(None));
         let record = std::rc::Rc::clone(&seen);
         let gap_path = path.clone();
@@ -819,7 +819,23 @@ mod tests {
             .into_iter()
             .map(|r| r.get::<String, _>("id"))
             .collect();
-        assert_eq!(ids, vec!["after".to_string(), "gap-plain".to_string(), "rekey-a2".to_string()]);
+        assert_eq!(ids, vec!["after".to_string(), "rekey-a2".to_string()]);
+    }
+
+    /// tier.durability.12 (F6 failure path): a plain `BEGIN` that reads first (what `rekey` used to do) loses: the other write commits in the gap, then
+    /// the upgrade fails with `database is locked` at once, busy timeout or not. This shows the gap is real, so the test above proves something.
+    #[test]
+    fn tier_durability_12_a_plain_begin_that_reads_first_fails_with_database_is_locked_when_a_writer_gets_in() {
+        let RekeyFixture { _dir, path, tier, from, to, .. } = rekey_fixture();
+        let plain = tier.rt.block_on(async {
+            let mut tx = tier.pool.begin().await.unwrap();
+            sqlx::query(select_body_sql()).bind(&to.0).bind(&to.1).bind(&to.2).fetch_optional(&mut *tx).await.unwrap();
+            let other = write_from_another_connection(&path, "gap-plain");
+            let update = sqlx::query("UPDATE records_history SET id = ? WHERE kind = ? AND id = ? AND digest = ?").bind(&to.1).bind(&from.0).bind(&from.1).bind(&from.2).execute(&mut *tx).await;
+            (other, update.map(drop).map_err(|e| e.to_string()))
+        });
+        assert_eq!(plain.0, Ok(()), "with a plain BEGIN nothing holds the write lock, so the other writer commits in the gap");
+        assert!(plain.1.as_ref().is_err_and(|e| e.contains("database is locked")), "and the upgrade then fails: {:?}", plain.1);
     }
 
     /// s32 spec.md "SqliteTier honors the store contract": "WAL
