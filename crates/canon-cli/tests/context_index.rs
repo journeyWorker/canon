@@ -63,7 +63,7 @@ fn context_capability_39_every_kind_option_value_is_a_context_kind_and_purge_add
         for option in doc.options.iter().filter(|o| o.name == "kind" && o.possible_values.is_some()) {
             checked.insert(doc.command.clone());
             if doc.command == "purge" {
-                purge_values = option.possible_values.iter().flatten().map(|v| v.to_string()).collect();
+                purge_values = option.possible_values.iter().flatten().cloned().collect();
             }
             for value in option.possible_values.iter().flatten() {
                 // A node of `canon search` is a record of any kind or a brief section: `brief` is no record kind.
