@@ -408,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn the_command_clears_the_repository_variables_and_fixes_the_rest() {
+    fn gate_git_boundary_01_the_command_clears_the_repository_variables_and_fixes_the_rest() {
         let repo = here();
         let command = GitCall::new(&repo).args(["status"]).command();
         let envs = envs(&command);
@@ -427,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn a_scratch_index_sets_the_three_variables_together_and_only_then() {
+    fn gate_git_boundary_02_a_scratch_index_sets_the_three_variables_together_and_only_then() {
         let repo = here();
         let scratch = ScratchIndex::new(PathBuf::from("/s/index"), PathBuf::from("/s/objects"), OsString::from("/r/objects"));
         let with = envs(&GitCall::new(&repo).scratch(&scratch).command());
@@ -479,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn a_call_past_its_deadline_is_stopped_and_names_the_subcommand_and_the_deadline() {
+    fn gate_git_boundary_09_a_call_past_its_deadline_is_stopped_and_names_the_subcommand_and_the_deadline() {
         let repo = here();
         let started = Instant::now();
         let err = GitCall::new(&repo).args(["-c", "alias.nap=!sleep 30", "nap"]).within(Duration::from_secs(1)).run().expect_err("the alias sleeps 30 seconds");
@@ -490,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn a_grandchild_that_holds_the_pipes_is_not_waited_for() {
+    fn gate_git_boundary_09_a_grandchild_that_holds_the_pipes_is_not_waited_for() {
         let repo = here();
         let started = Instant::now();
         // git -> sh -> sleep: killing git leaves the sleeps holding stdout and stderr.
@@ -500,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    fn nine_mib_is_past_the_default_limit_and_inside_the_tree_listing_limit() {
+    fn gate_git_boundary_09_nine_mib_is_past_the_default_limit_and_inside_the_tree_listing_limit() {
         let repo = here();
         let nine_mib = ["-c", "alias.big=!head -c 9437184 /dev/zero", "big"];
         let err = GitCall::new(&repo).args(nine_mib).run().expect_err("9 MiB is past 8 MiB");
@@ -511,7 +511,7 @@ mod tests {
     }
 
     #[test]
-    fn a_limit_applies_to_each_stream_and_exactly_the_limit_is_allowed() {
+    fn gate_git_boundary_09_a_limit_applies_to_each_stream_and_exactly_the_limit_is_allowed() {
         let repo = here();
         let to_stderr = ["-c", "alias.loud=!head -c 2048 /dev/zero >&2", "loud"];
         let err = GitCall::new(&repo).args(to_stderr).at_most(1024).run().expect_err("2048 bytes on stderr is past 1024");

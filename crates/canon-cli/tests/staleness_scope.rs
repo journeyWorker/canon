@@ -114,10 +114,10 @@ fn subjects(stale: &[(String, String)]) -> Vec<&str> {
 
 // ── F1: the match ──
 
-/// F1: evidence that declares `src/`, `src`, `src/**` and `src/*.rs` is stale once `src/a.rs` is edited and committed, and each reason names the
+/// gate.staleness-scope.01 (F1): evidence that declares `src/`, `src`, `src/**` and `src/*.rs` is stale once `src/a.rs` is edited and committed, and each reason names the
 /// declaration that matched and the path it matched.
 #[test]
-fn f1_a_directory_and_a_glob_declared_as_the_surface_go_stale_when_a_file_under_them_changes() {
+fn gate_staleness_scope_01_a_directory_and_a_glob_declared_as_the_surface_go_stale_when_a_file_under_them_changes() {
     let dir = project(4, &["src/a.rs", "lib/z.rs"]);
     let repo = dir.path();
     let declared = ["src/", "src", "src/**", "src/*.rs"];
@@ -139,10 +139,10 @@ fn f1_a_directory_and_a_glob_declared_as_the_surface_go_stale_when_a_file_under_
     }
 }
 
-/// F1, failure path: a file below `src/x` does not match `src/*.rs`; the root `Cargo.toml` is not the manifest of a crate; the exact file and `effect:` answer
+/// gate.staleness-scope.02 (F1, failure path): a file below `src/x` does not match `src/*.rs`; the root `Cargo.toml` is not the manifest of a crate; the exact file and `effect:` answer
 /// as before.
 #[test]
-fn f1_a_glob_that_stops_at_a_slash_and_a_name_at_the_root_are_not_stale_for_a_file_further_down() {
+fn gate_staleness_scope_02_a_glob_that_stops_at_a_slash_and_a_name_at_the_root_are_not_stale_for_a_file_further_down() {
     let dir = project(4, &["src/a.rs", "src/x/b.rs", "Cargo.toml", "crates/x/Cargo.toml"]);
     let repo = dir.path();
     for (i, surface) in ["src/*.rs", "Cargo.toml", "src/a.rs", "effect:payments"].iter().enumerate() {
@@ -163,10 +163,10 @@ fn f1_a_glob_that_stops_at_a_slash_and_a_name_at_the_root_are_not_stale_for_a_fi
     assert_eq!(subjects(&stale_after), [scenario(1), scenario(3)], "`src/*.rs` and `src/a.rs` cover src/a.rs; the root manifest and the effect do not: {stale_after:?}");
 }
 
-/// F1: `code.exclude`, the policy's `code_scopes` and a surface ref read a pattern with a `/` the same way. Each row is judged by the code tree (a file
+/// gate.staleness-scope.03 (F1): `code.exclude`, the policy's `code_scopes` and a surface ref read a pattern with a `/` the same way. Each row is judged by the code tree (a file
 /// that is excluded leaves the tree as it was), by the compiled scope, and by the surface matcher.
 #[test]
-fn f1_the_three_readers_of_a_pattern_with_a_slash_give_one_answer() {
+fn gate_staleness_scope_03_the_three_readers_of_a_pattern_with_a_slash_give_one_answer() {
     use canon_model::path_glob::{Anchor, Glob};
     let table: [(&str, &str, bool); 10] = [
         ("src/**", "src/a.rs", true),
@@ -199,9 +199,9 @@ fn f1_the_three_readers_of_a_pattern_with_a_slash_give_one_answer() {
 
 // ── F2: the warning at write time ──
 
-/// F2: a value that matches no file is saved with `SURFACE_REF_UNMATCHED` naming it, and the exit status is 0; a value that matches, and an effect, say nothing.
+/// gate.staleness-scope.04 (F2): a value that matches no file is saved with `SURFACE_REF_UNMATCHED` naming it, and the exit status is 0; a value that matches, and an effect, say nothing.
 #[test]
-fn f2_a_surface_that_matches_no_file_is_saved_with_a_warning() {
+fn gate_staleness_scope_04_a_surface_that_matches_no_file_is_saved_with_a_warning() {
     let dir = project(3, &["src/a.rs"]);
     let repo = dir.path();
     let out = add_evidence(repo, 1, "src/nope/**");
@@ -221,9 +221,9 @@ fn f2_a_surface_that_matches_no_file_is_saved_with_a_warning() {
     }
 }
 
-/// F2, failure path: a value outside the repository is refused as before, with `USAGE`, and nothing is saved.
+/// gate.staleness-scope.05 (F2, failure path): a value outside the repository is refused as before, with `USAGE`, and nothing is saved.
 #[test]
-fn f2_a_surface_outside_the_repository_is_still_refused_as_usage() {
+fn gate_staleness_scope_05_a_surface_outside_the_repository_is_still_refused_as_usage() {
     let dir = project(1, &["src/a.rs"]);
     let repo = dir.path();
     let out = add_evidence(repo, 1, "../x");
@@ -291,30 +291,47 @@ fn clone_of(origin: &Path, shallow: bool) -> TempDir {
     dir
 }
 
-/// F3, F4: a shallow clone has no base commit; `gate check` says `base_missing 1`, with the instruction to unshallow, and `status` says the same; the
-/// violation list and the exit status are those of a base that adds nothing. In a full clone of the same repository neither says anything, and
-/// the evidence is stale there.
+/// gate.staleness-scope.06 (F3, F4): a shallow clone has no base commit; `gate check` says `base_missing 1`, with the instruction to unshallow, and `status`
+/// says the same; the violation list and the exit status are those of a base that adds nothing.
 #[test]
-fn f3_a_shallow_clone_is_counted_as_base_missing_and_a_full_clone_says_nothing() {
+fn gate_staleness_scope_06_a_shallow_clone_is_counted_as_base_missing_with_the_unshallow_instruction() {
     let origin = project_with_a_change_after_its_evidence();
-    let (status, stale_origin) = stale(origin.path());
-    assert_eq!((status, stale_origin.len()), (Some(1), 1), "in the repository itself the evidence is stale");
-
     let shallow = clone_of(origin.path(), true);
     let message = both_say(shallow.path(), None);
     assert!(message.starts_with("1 (subject, role) cell(s)") && message.contains("base_missing 1") && message.contains(&scenario(1)), "{message}");
     assert!(message.contains("git fetch --unshallow"), "{message}");
     let (status, stale_shallow) = stale(shallow.path());
     assert_eq!((status, stale_shallow.len()), (Some(0), 0), "the cell adds nothing, as it did before the count");
+}
 
+/// gate.staleness-scope.07 (F3, failure path): in a full clone of the same repository neither says anything, and the evidence is stale there as in the
+/// repository itself.
+#[test]
+fn gate_staleness_scope_07_a_full_clone_has_every_base_and_says_nothing() {
+    let origin = project_with_a_change_after_its_evidence();
+    let (status, stale_origin) = stale(origin.path());
+    assert_eq!((status, stale_origin.len()), (Some(1), 1), "in the repository itself the evidence is stale");
     let full = clone_of(origin.path(), false);
     assert_eq!(said(full.path(), None), (None, None), "a full clone has every base");
     assert_eq!(stale(full.path()), (Some(1), stale_origin), "and the same violations as the repository");
 }
 
-/// F3, F4: a base commit that `git gc --prune=now` removed is `base_missing`, and the clone is not shallow, so there is no instruction to unshallow.
+/// gate.staleness-scope.11 (F4): `status` and `gate check` count the same cells for the same reasons: one sentence, said twice, in a shallow clone and with no
+/// git on the `PATH`.
 #[test]
-fn f3_a_pruned_base_commit_is_counted_as_base_missing() {
+fn gate_staleness_scope_11_status_and_gate_check_say_the_same_count_and_reasons() {
+    let origin = project_with_a_change_after_its_evidence();
+    let shallow = clone_of(origin.path(), true);
+    let (advisory, warning) = said(shallow.path(), None);
+    assert!(advisory.is_some() && advisory == warning, "{advisory:?} vs {warning:?}");
+    let empty = TempDir::new().unwrap();
+    let (advisory, warning) = said(origin.path(), Some(empty.path().as_os_str()));
+    assert!(advisory.as_deref().is_some_and(|m| m.contains("git_unavailable 1")) && advisory == warning, "{advisory:?} vs {warning:?}");
+}
+
+/// gate.staleness-scope.08 (F3, F4): a base commit that `git gc --prune=now` removed is `base_missing`, and the clone is not shallow, so there is no instruction to unshallow.
+#[test]
+fn gate_staleness_scope_08_a_pruned_base_commit_is_counted_as_base_missing() {
     let dir = ledger_moved_from_another_branch();
     let repo = dir.path();
     git(repo, &["branch", "-q", "-D", "side"]);
@@ -327,10 +344,10 @@ fn f3_a_pruned_base_commit_is_counted_as_base_missing() {
     assert_eq!((status, stale_now.len()), (Some(0), 0), "a base that is gone adds nothing");
 }
 
-/// F3, F4: a ledger moved from another branch has a base that is there but is not an ancestor: `base_not_ancestor 1`, and the verdict is judged from
+/// gate.staleness-scope.09 (F3, F4): a ledger moved from another branch has a base that is there but is not an ancestor: `base_not_ancestor 1`, and the verdict is judged from
 /// `<base>..HEAD` as it was, which is stale here (src/main.rs differs between the two).
 #[test]
-fn f3_a_ledger_moved_from_another_branch_is_counted_as_base_not_ancestor_and_judged_from_the_range() {
+fn gate_staleness_scope_09_a_ledger_moved_from_another_branch_is_counted_as_base_not_ancestor_and_judged_from_the_range() {
     let dir = ledger_moved_from_another_branch();
     let repo = dir.path();
     let message = both_say(repo, None);
@@ -339,9 +356,9 @@ fn f3_a_ledger_moved_from_another_branch_is_counted_as_base_not_ancestor_and_jud
     assert_eq!((status, subjects(&stale_now)), (Some(1), vec![scenario(1).as_str()]), "{stale_now:?}");
 }
 
-/// F3, F4: with no `git` on the `PATH` git cannot answer: `git_unavailable`, and the violations are the ones that need no git.
+/// gate.staleness-scope.10 (F3, F4): with no `git` on the `PATH` git cannot answer: `git_unavailable`, and the violations are the ones that need no git.
 #[test]
-fn f3_no_git_on_the_path_is_counted_as_git_unavailable() {
+fn gate_staleness_scope_10_no_git_on_the_path_is_counted_as_git_unavailable() {
     let origin = project_with_a_change_after_its_evidence();
     let repo = origin.path();
     let empty = TempDir::new().unwrap();
@@ -350,9 +367,9 @@ fn f3_no_git_on_the_path_is_counted_as_git_unavailable() {
     assert!(message.contains("git_unavailable 1") && !message.contains("base_missing"), "{message}");
 }
 
-/// F4, failure path: with nothing unread neither says anything; the two report what the other does or both are silent.
+/// gate.staleness-scope.12 (F4, failure path): with nothing unread neither says anything; the two report what the other does or both are silent.
 #[test]
-fn f4_when_every_base_is_read_neither_gate_check_nor_status_says_anything() {
+fn gate_staleness_scope_12_when_every_base_is_read_neither_gate_check_nor_status_says_anything() {
     let dir = project_with_a_change_after_its_evidence();
     assert_eq!(said(dir.path(), None), (None, None));
     let empty = project(1, &["src/main.rs"]);
@@ -400,16 +417,16 @@ fn release_problems(changelog: &str) -> Vec<String> {
     problems
 }
 
-/// F5: the CHANGELOG says the new rule, what the gate asks for more, the advisory and the warnings, and that the `paths` of a risk tier keep their reading.
+/// gate.staleness-scope.13 (F5): the CHANGELOG says the new rule, what the gate asks for more, the advisory and the warnings, and that the `paths` of a risk tier keep their reading.
 #[test]
-fn f5_the_changelog_says_the_new_rule_the_advisory_and_the_warnings() {
+fn gate_staleness_scope_13_the_changelog_says_the_new_rule_the_advisory_and_the_warnings() {
     let changelog = std::fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
     assert_eq!(release_problems(&changelog), Vec::<String>::new());
 }
 
-/// F5, failure path: a CHANGELOG without the entry, or without a piece of it, is named by what it lacks.
+/// gate.staleness-scope.14 (F5, failure path): a CHANGELOG without the entry, or without a piece of it, is named by what it lacks.
 #[test]
-fn f5_a_changelog_without_the_entry_or_a_piece_of_it_is_named() {
+fn gate_staleness_scope_14_a_changelog_without_the_entry_or_a_piece_of_it_is_named() {
     let without = "# Changelog\n\n## Unreleased\n\n### Changed\n\n- an unrelated change\n\n## 0.38.0\n";
     let problems = release_problems(without);
     assert_eq!(problems[0], "Unreleased has no Changed entry for canon-0-39-staleness-scope");
