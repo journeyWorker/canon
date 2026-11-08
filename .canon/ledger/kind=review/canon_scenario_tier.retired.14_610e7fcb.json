@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:46:28.602739Z",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "kind": "review",
+  "pin": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:tier_retired_14_a_0_38_report_with_the_session_costs_section_is_drift_until_it_is_rebuilt"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "d795c2ab1800dc12f2278f622e50994b885247f96b7f94593bb222d6d5c4ac01",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-session-kinds-removal/brief.md"
+  },
+  "review_id": "01M6X1YZKTZVA3V93A6CMHCC9Z",
+  "reviewer": "rev-0-39-ingest",
+  "scenario_id": "tier.retired.14",
+  "schema": 2,
+  "worktree_dirty": false
+}

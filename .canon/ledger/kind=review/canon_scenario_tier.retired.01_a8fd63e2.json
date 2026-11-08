@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:46:28.602739Z",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "kind": "review",
+  "pin": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:policy::tests::tier_retired_01_retired_kind_keys_load_route_nothing_and_are_listed",
+          "junit:retired_kind_keys::tests::tier_retired_01_the_retired_keys_are_listed_in_one_sorted_message",
+          "junit:tier_retired_01_old_retired_keys_load_and_warn_with_the_migrate_step_first",
+          "junit:tier_retired_01_the_values_of_the_retired_keys_are_not_checked"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "343331df96b0b07a2b0566858d1f4e8498b6bfac6d8ff7dfedd5f2a699ff1a9b",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-session-kinds-removal/brief.md"
+  },
+  "review_id": "01M6X1YZKTZVA3V93A6CMHCC9Z",
+  "reviewer": "rev-0-39-ingest",
+  "scenario_id": "tier.retired.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:41:44.975447Z",
+  "change_id": "canon-0-39-session-kinds-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "tier.retired.07"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[spec fidelity] purge --kind session|event searches every tier in tiers:, so a repo that declares a tier it cannot attach (probed: a cold s3 tier whose bucket_env is unset) previews fine with the tier in 'unavailable' but the commit is refused RETENTION_TIERS_REQUIRED, and the session rows in the git and sqlite tiers cannot be purged until the credential exists or the tier is dropped. This follows from 'every configured tier' in the brief and the error names what to set; worth a line in the CHANGELOG's purge entry. Nothing else reads those rows, so no data is at risk.",
+  "worktree_dirty": false
+}

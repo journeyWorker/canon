@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:41:40.467004Z",
+  "change_id": "canon-0-39-session-kinds-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "tier.retired.19"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[standards] tier_retired_19_the_guides_do_not_list_the_retired_kinds greps five literal spellings of a list ('`session`, `event`', 'session|event', ...), so a table row or a list in another spelling would pass. I grepped README, ARCHITECTURE.md, website sources and the skills with looser patterns (session within 20 characters of event) and found nothing, so the docs are clean today.",
+  "worktree_dirty": false
+}
