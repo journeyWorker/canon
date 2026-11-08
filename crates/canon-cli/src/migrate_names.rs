@@ -1534,7 +1534,7 @@ mod tests {
     const OLD: &str = "routing:\n  # hot\n  task: hot\n  session: hot\n  run: hot\n  event: hot\n  trajectory: cold\n\naging:\n  handoff: { after: 30d, to: cold }\n  event: { after: 7d, to: cold }\n\nplans:\n  sources: []\n";
 
     #[test]
-    fn the_retired_keys_are_found_by_line_and_deleted_alone() {
+    fn tier_retired_04_the_retired_keys_are_found_by_line_and_deleted_alone() {
         let found = retired_key_lines(OLD);
         assert_eq!(found.iter().map(|k| (k.key.as_str(), k.first, k.last)).collect::<Vec<_>>(), [("routing.session", 4, 4), ("routing.event", 6, 6), ("aging.event", 11, 11)]);
         let rewritten = rewrite_config(OLD).unwrap();
@@ -1544,26 +1544,26 @@ mod tests {
     }
 
     #[test]
-    fn a_section_left_without_keys_becomes_an_empty_mapping() {
+    fn tier_retired_04_a_section_left_without_keys_becomes_an_empty_mapping() {
         let text = "routing:\n  session: hot\naging: # why\n  event:\n    after: 7d\n    to: cold\nplans:\n  sources: []\n";
         assert_eq!(retired_key_lines(text).iter().map(|k| (k.first, k.last)).collect::<Vec<_>>(), [(2, 2), (4, 6)], "the key and the lines of its value");
         assert_eq!(rewrite_config(text).unwrap(), "routing: {}\naging: {} # why\nplans:\n  sources: []\n");
     }
 
     #[test]
-    fn the_legacy_evidence_key_is_renamed_in_the_same_pass() {
+    fn tier_retired_04_the_legacy_evidence_key_is_renamed_in_the_same_pass() {
         let text = "routing:\n  evidence_record: local\n  session: hot\n";
         assert_eq!(rewrite_config(text).unwrap(), "routing:\n  evidence: local\n");
     }
 
     #[test]
-    fn a_config_without_the_keys_is_returned_byte_for_byte() {
+    fn tier_retired_04_a_config_without_the_keys_is_returned_byte_for_byte() {
         let text = "# comment\nrouting:\n    task:   hot # kept\n";
         assert_eq!(rewrite_config(text).unwrap(), text);
     }
 
     #[test]
-    fn forms_that_cannot_be_deleted_by_line_are_refused_with_a_hand_edit_hint() {
+    fn tier_retired_05_forms_that_cannot_be_deleted_by_line_are_refused_with_a_hand_edit_hint() {
         for text in [
             "routing: { session: hot, task: hot }\n",
             "routing:\n  session: &shared hot\n  task: *shared\n",
@@ -1575,7 +1575,7 @@ mod tests {
     }
 
     #[test]
-    fn only_the_direct_keys_of_routing_and_aging_count() {
+    fn tier_retired_04_only_the_direct_keys_of_routing_and_aging_count() {
         let text = "tiers:\n  hot: { backend: sqlite, path: .canon/hot.db }\nspecs:\n  session: kept\nrouting:\n  task: hot\n";
         assert!(retired_key_lines(text).is_empty());
         assert_eq!(rewrite_config(text).unwrap(), text);

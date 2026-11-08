@@ -89,10 +89,10 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
     assert!(stderr(&drift).contains("DRIFT"), "{}", stderr(&drift));
 }
 
-/// 0.39: the report has no `## Session costs` and `## Run observability` names only the Run columns; a `REPORT.md` built by 0.38 (it has the
+/// tier.retired.14 (F6, failure path): the report has no `## Session costs` and `## Run observability` names only the Run columns; a `REPORT.md` built by 0.38 (it has the
 /// section) is DRIFT (exit 1) until `canon report build` writes it again (exit 0).
 #[test]
-fn a_0_38_report_with_the_session_costs_section_is_drift_until_it_is_rebuilt() {
+fn tier_retired_14_a_0_38_report_with_the_session_costs_section_is_drift_until_it_is_rebuilt() {
     if !duckdb_available() {
         eprintln!("skipping: `duckdb` CLI not found on PATH");
         return;
@@ -169,8 +169,9 @@ fn report_check_over_empty_sources_reports_no_drift_creates_nothing_and_leaves_n
     assert!(std::fs::read_dir(scratch.path()).unwrap().next().is_none(), "the seeded scratch must be gone when the run ends");
 }
 
+/// tier.retired.13 (F6): the snapshot is nine tables with a manifest listing exactly those, none of them the session costs.
 #[test]
-fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
+fn tier_retired_13_snapshot_writes_nine_parquet_files_and_a_manifest_under_the_given_dir() {
     if !duckdb_available() {
         eprintln!("skipping: `duckdb` CLI not found on PATH");
         return;

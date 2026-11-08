@@ -193,10 +193,11 @@ const RETIRED_KEYS: [&str; 3] = ["routing.session", "routing.event", "aging.even
 // ---------------------------------------------------------------------------
 // F1: an old canon.yaml loads and warns.
 
+/// tier.retired.01 (F1):
 /// F1: `status`, `gate check` and `context` read a `canon.yaml` that still routes and ages the retired kinds: they exit without an error, warn
 /// `RETIRED_KIND_KEYS` naming each key, and lead `meta.next` with `canon migrate --json`.
 #[test]
-fn f1_old_retired_keys_load_and_warn_with_the_migrate_step_first() {
+fn tier_retired_01_old_retired_keys_load_and_warn_with_the_migrate_step_first() {
     let repo = Repo::old();
     for args in [&["status"][..], &["gate", "check"], &["context"]] {
         let (doc, out) = repo.json(args);
@@ -210,9 +211,10 @@ fn f1_old_retired_keys_load_and_warn_with_the_migrate_step_first() {
     }
 }
 
+/// tier.retired.01 (F1):
 /// F1: the keys' values are never read: a value that is no rung, in either section, loads the same.
 #[test]
-fn f1_the_values_of_the_retired_keys_are_not_checked() {
+fn tier_retired_01_the_values_of_the_retired_keys_are_not_checked() {
     let repo = Repo::old();
     let odd = repo.read("canon.yaml").replace("  session: hot\n", "  session: not-a-rung\n").replace("event: { after: 7d, to: cold }", "event: { after: soon, to: nowhere }");
     repo.write("canon.yaml", &odd);
@@ -221,9 +223,10 @@ fn f1_the_values_of_the_retired_keys_are_not_checked() {
     assert!(warning(&doc, "RETIRED_KIND_KEYS").is_some(), "{doc}");
 }
 
+/// tier.retired.02 (F1, failure path):
 /// F1: the retired names are the only unknown ones read as keys that route nothing; any other misspelled kind is still a config error.
 #[test]
-fn f1_a_misspelled_kind_in_routing_is_still_a_config_error() {
+fn tier_retired_02_a_misspelled_kind_in_routing_is_still_a_config_error() {
     let repo = Repo::old();
     let typo = repo.read("canon.yaml").replace("  session: hot\n", "  sesion: hot\n");
     repo.write("canon.yaml", &typo);
@@ -233,9 +236,10 @@ fn f1_a_misspelled_kind_in_routing_is_still_a_config_error() {
     assert!(doc.to_string().contains("sesion"), "the refusal names the key: {doc}");
 }
 
+/// tier.retired.03 (F1, failure path):
 /// F1: unlike the 0.29 layout, the keys never refuse a write: a repo with them takes `change new` and `evidence add`.
 #[test]
-fn f1_writes_are_not_refused_in_a_repo_with_the_retired_keys() {
+fn tier_retired_03_writes_are_not_refused_in_a_repo_with_the_retired_keys() {
     let repo = Repo::init();
     for args in [
         &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..],
@@ -260,10 +264,11 @@ fn f1_writes_are_not_refused_in_a_repo_with_the_retired_keys() {
 // ---------------------------------------------------------------------------
 // F2: `canon migrate` deletes the keys.
 
+/// tier.retired.04 (F2):
 /// F2: the preview names the lines it deletes by number and writes nothing; the commit deletes exactly those lines; the warning is gone and
 /// the next plan is empty; `--revert` restores the old file byte for byte.
 #[test]
-fn f2_migrate_deletes_exactly_the_retired_key_lines_and_revert_restores_them() {
+fn tier_retired_04_migrate_deletes_exactly_the_retired_key_lines_and_revert_restores_them() {
     let repo = Repo::old();
     let old = repo.read("canon.yaml");
     let expected = format!("{}aging: {{}}\n", without_retired_keys(&old));
@@ -302,9 +307,10 @@ fn f2_migrate_deletes_exactly_the_retired_key_lines_and_revert_restores_them() {
     assert!(warning(&status, "RETIRED_KIND_KEYS").is_some(), "the restored file warns again: {status}");
 }
 
+/// tier.retired.05 (F2, failure path):
 /// F2: a key that cannot be deleted line by line (a flow mapping, an anchor) is refused as a config error and the file stays as it was.
 #[test]
-fn f2_a_flow_mapping_or_an_anchored_key_is_refused_and_the_file_is_unchanged() {
+fn tier_retired_05_a_flow_mapping_or_an_anchored_key_is_refused_and_the_file_is_unchanged() {
     for config in [
         "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting: { change: local, session: hot }\n",
         "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  session: &shared hot\n  task: *shared\n",
@@ -324,10 +330,11 @@ fn f2_a_flow_mapping_or_an_anchored_key_is_refused_and_the_file_is_unchanged() {
     }
 }
 
+/// tier.retired.06 (F2, failure path):
 /// F2: a file under `kind=session/` named the 0.29 way (a `__<digest12>` stem) is not a file `canon migrate` renames or refuses, even when it
 /// is no JSON at all.
 #[test]
-fn f2_a_0_29_named_file_under_kind_session_does_not_make_migrate_refuse() {
+fn tier_retired_06_a_0_29_named_file_under_kind_session_does_not_make_migrate_refuse() {
     let repo = Repo::old();
     repo.write(".canon/ledger/kind=session/legacy-session__0123456789ab.json", "this is not json");
     repo.write(".canon/ledger/kind=session/area=x/another__abcdef012345.json", "{\"kind\":\"session\"}");
@@ -437,15 +444,17 @@ fn purge_session_flow(repo: &Repo) {
     assert_eq!(hot_ids(repo, "session"), ["new-hot-session"]);
 }
 
+/// tier.retired.07 (F3):
 /// F3: with `routing.session` and `routing.event` still in `canon.yaml`.
 #[test]
-fn f3_purge_session_deletes_the_stored_rows_of_every_tier() {
+fn tier_retired_07_purge_session_deletes_the_stored_rows_of_every_tier() {
     purge_session_flow(&Repo::old());
 }
 
+/// tier.retired.07 (F3):
 /// F3: the same after `canon migrate` deleted the keys: a retired kind is scanned in every tier `canon.yaml` configures, routed or not.
 #[test]
-fn f3_purge_session_finds_the_rows_after_the_routing_keys_were_migrated_away() {
+fn tier_retired_07_purge_session_finds_the_rows_after_the_routing_keys_were_migrated_away() {
     let repo = Repo::old();
     let digest = repo.preview_digest(&["migrate"]);
     let (done, out) = repo.json(&["migrate", "--commit", "--plan-digest", &digest]);
@@ -454,9 +463,10 @@ fn f3_purge_session_finds_the_rows_after_the_routing_keys_were_migrated_away() {
     purge_session_flow(&repo);
 }
 
+/// tier.retired.08 (F3, failure path):
 /// F3: only the four names are purgeable; every other kind keeps its closed-value refusal, and the rows stay.
 #[test]
-fn f3_purge_of_another_kind_is_refused_and_deletes_nothing() {
+fn tier_retired_08_purge_of_another_kind_is_refused_and_deletes_nothing() {
     let repo = Repo::old();
     plant_rows(&repo);
     let before = repo.snapshot();
@@ -478,9 +488,10 @@ fn f3_purge_of_another_kind_is_refused_and_deletes_nothing() {
 // ---------------------------------------------------------------------------
 // F4: the readers refuse the two names.
 
+/// tier.retired.09 (F4):
 /// F4: `query`, `export` and `search` refuse `--kind session` and `--kind event` as a usage error that lists the twelve kinds and points at `canon purge`.
 #[test]
-fn f4_the_readers_refuse_the_retired_kind_names() {
+fn tier_retired_09_the_readers_refuse_the_retired_kind_names() {
     let repo = Repo::init();
     let twelve = kinds();
     assert_eq!(twelve.len(), 12);
@@ -506,9 +517,10 @@ fn f4_the_readers_refuse_the_retired_kind_names() {
     }
 }
 
+/// tier.retired.10 (F4, failure path):
 /// F4: the twelve kinds still read, and `purge` still takes the retired names.
 #[test]
-fn f4_the_twelve_kinds_still_read() {
+fn tier_retired_10_the_twelve_kinds_still_read() {
     let repo = Repo::init();
     for kind in ["run", "evidence"] {
         let (doc, out) = repo.json(&["query", "--kind", kind]);
@@ -523,10 +535,11 @@ fn f4_the_twelve_kinds_still_read() {
 // ---------------------------------------------------------------------------
 // F7: a `kind=session/` directory in the ledger.
 
+/// tier.retired.15 (F7):
 /// F7: rows of a retired kind sit in the git tier, whatever their body (even none that parses): `status`, `gate check` and `ledger compact` succeed and
 /// leave the files as they were.
 #[test]
-fn f7_a_kind_session_directory_in_the_ledger_breaks_no_command_and_is_left_alone() {
+fn tier_retired_15_a_kind_session_directory_in_the_ledger_breaks_no_command_and_is_left_alone() {
     let repo = Repo::init();
     repo.write(".canon/ledger/kind=session/parseable.json", "{\"kind\":\"session\",\"at\":\"2026-01-01T00:00:00Z\"}");
     repo.write(".canon/ledger/kind=session/garbage.json", "this is not json {");
@@ -560,9 +573,10 @@ fn routing(text: &str) -> BTreeMap<String, String> {
     doc["routing"].as_mapping().unwrap().iter().map(|(k, v)| (k.as_str().unwrap().to_string(), v.as_str().unwrap().to_string())).collect()
 }
 
+/// tier.retired.16 (F8):
 /// F8: a fresh scaffold routes the twelve kinds and no retired one, `task`, `handoff` and `run` to hot, and `init --check` passes without a warning.
 #[test]
-fn f8_init_routes_the_twelve_kinds_and_no_retired_one() {
+fn tier_retired_16_init_routes_the_twelve_kinds_and_no_retired_one() {
     let repo = Repo::init();
     let text = repo.read("canon.yaml");
     for retired in ["session", "event"] {
@@ -580,9 +594,10 @@ fn f8_init_routes_the_twelve_kinds_and_no_retired_one() {
     assert!(warning(&check, "RETIRED_KIND_KEYS").is_none(), "{check}");
 }
 
+/// tier.retired.17 (F8, failure path):
 /// F8: an old scaffold (routing lines for the retired kinds) gets the F1 warning in `init --check`, which still passes.
 #[test]
-fn f8_init_check_warns_of_an_old_scaffold() {
+fn tier_retired_17_init_check_warns_of_an_old_scaffold() {
     let repo = Repo::old();
     let (check, out) = repo.json(&["init", "--check"]);
     assert!(out.status.success() && check["ok"] == true, "init --check on an old scaffold: {check}");
@@ -591,4 +606,55 @@ fn f8_init_check_warns_of_an_old_scaffold() {
         assert!(warn["message"].as_str().unwrap().contains(&format!("`{key}`")), "{key}: {warn}");
     }
     assert_eq!(check["meta"]["next"][0]["command"], "canon migrate --json", "{check}");
+}
+
+/// tier.retired.11 (F5): `canon context` lists the twelve kinds and the model's schema directory holds no `session` or `event` schema.
+#[test]
+fn tier_retired_11_context_and_the_schema_files_have_twelve_kinds_and_no_retired_one() {
+    let repo = Repo::init();
+    let (doc, out) = repo.json(&["context"]);
+    assert!(out.status.success(), "{doc}");
+    let listed: BTreeSet<String> = doc["data"]["kinds"].as_object().unwrap().keys().cloned().collect();
+    assert_eq!(listed, kinds().into_iter().collect::<BTreeSet<_>>(), "{doc}");
+    assert_eq!(listed.len(), 12);
+    assert!(!listed.contains("session") && !listed.contains("event"), "{listed:?}");
+    let schemas = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../canon-model/schemas");
+    for retired in ["session", "event"] {
+        assert!(!schemas.join(format!("{retired}.schema.json")).exists(), "{retired}.schema.json is still shipped");
+    }
+}
+
+fn repo_text(relative: &str) -> String {
+    fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").join(relative)).unwrap()
+}
+
+/// tier.retired.18 (F9, failure path): the 0.39 section of the CHANGELOG names the retired keys and the warning, the one-release purge, the refusals and the removed marts;
+/// a missing entry fails this release check naming it.
+#[test]
+fn tier_retired_18_the_changelog_lists_the_retired_kinds_and_what_replaces_them() {
+    let changelog = repo_text("CHANGELOG.md");
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("Unreleased") || section.starts_with("0.39")).unwrap_or_default();
+    for needed in ["`RETIRED_KIND_KEYS`", "`routing.session`", "`routing.event`", "`aging.event`", "`canon migrate`", "`canon purge --kind session|event`", "`--kind session|event`", "`mart_session_costs`", "`## Session costs`"] {
+        assert!(unreleased.contains(needed), "the 0.39 section of CHANGELOG.md does not mention {needed}");
+    }
+}
+
+/// tier.retired.19 (F9): the architecture document, the README and the website list no record kind named `session` or `event`.
+#[test]
+fn tier_retired_19_the_guides_do_not_list_the_retired_kinds() {
+    let mut files = vec!["README.md".to_string(), "ARCHITECTURE.md".to_string()];
+    for dir in ["packages/website/src/content/docs", "packages/website/src/content/docs/ko", "packages/website/src/content/docs/concepts", "packages/website/src/content/docs/ko/concepts"] {
+        for entry in fs::read_dir(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").join(dir)).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_some_and(|e| e == "mdx") {
+                files.push(format!("{dir}/{}", path.file_name().unwrap().to_string_lossy()));
+            }
+        }
+    }
+    for file in files {
+        let text = repo_text(&file);
+        for listing in ["`session`, `event`", "`session` and `event`", "session|event", "session, event", "`event`, `session`"] {
+            assert!(!text.contains(listing), "{file} lists the retired kinds as `{listing}`");
+        }
+    }
 }

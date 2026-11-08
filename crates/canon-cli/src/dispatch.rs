@@ -3375,12 +3375,12 @@ mod tier_tests {
         assert_eq!(round_tripped.ended_at, Some(ended_at));
     }
 
-    /// `persist_idempotent` (moved to `crate::tiers` with the removal of
+    /// ingest.removal.05 (F3, failure path): `persist_idempotent` (moved to `crate::tiers` with the removal of
     /// `canon ingest sessions`): writing a Run the tier already holds,
     /// byte for byte, is not an error; the same run id with other content
     /// is a new version the fold ranks, never a silent overwrite.
     #[test]
-    fn rewriting_the_same_run_is_not_an_error_and_other_content_is_a_new_version() {
+    fn ingest_removal_05_rewriting_the_same_run_is_not_an_error_and_other_content_is_a_new_version() {
         let tmp = repo_with_git_routed_runs();
         let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
         assert_eq!(persist_run(tmp.path(), &begun.run), TierPersist::Persisted, "a byte-identical re-write is a no-op, not an error");

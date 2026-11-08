@@ -108,8 +108,9 @@ pub fn pretty_family_schemas() -> Vec<(String, String)> {
 mod tests {
     use super::*;
 
+    /// tier.retired.12 (F5, failure path): one schema per record kind, so a leftover `session` schema fails this registry test.
     #[test]
-    fn emits_exactly_one_schema_per_record_kind() {
+    fn tier_retired_12_emits_exactly_one_schema_per_record_kind() {
         let schemas = record_schemas();
         assert_eq!(schemas.len(), 12);
         let mut seen = std::collections::HashSet::new();

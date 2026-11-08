@@ -27,10 +27,10 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Vectors computed independently from the 0.38 function's definition
-    /// (sha256 of compact, key-sorted JSON, first 12 hex chars).
+    /// ingest.removal.03 (F2): vectors computed independently from the 0.38 function's definition
+    /// (sha256 of compact, key-sorted JSON, first 12 hex chars); one changed character of any value fails.
     #[test]
-    fn content_digest_is_pinned_to_fixed_vectors() {
+    fn ingest_removal_03_content_digest_is_pinned_to_fixed_vectors() {
         let cases = [
             (json!("abc"), "6cc43f858fbb"),
             (json!("/Users/x/ws"), "3e582dffb2d6"),

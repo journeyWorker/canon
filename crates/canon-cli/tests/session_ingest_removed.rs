@@ -34,9 +34,10 @@ fn init_repo() -> tempfile::TempDir {
     dir
 }
 
+/// ingest.removal.01 (F1): the command is refused and the help names what is left.
 /// F1: whatever options follow, `ingest sessions` is refused by the generic unknown-command path, naming the two subcommands `ingest` has.
 #[test]
-fn ingest_sessions_is_an_unknown_subcommand_of_ingest() {
+fn ingest_removal_01_ingest_sessions_is_an_unknown_subcommand_of_ingest() {
     let dir = tempfile::tempdir().unwrap();
     for args in [&["ingest", "sessions", "--json"][..], &["ingest", "sessions", "--watch", "--json"], &["ingest", "sessions", "--home", ".", "--all-workspaces", "--json"]] {
         let out = canon_in(dir.path(), args);
@@ -52,7 +53,7 @@ fn ingest_sessions_is_an_unknown_subcommand_of_ingest() {
 
 /// F1: the `ingest` help shows two subcommands and examples of those two only.
 #[test]
-fn the_ingest_help_names_plans_and_records_only() {
+fn ingest_removal_01_the_ingest_help_names_plans_and_records_only() {
     let dir = tempfile::tempdir().unwrap();
     let out = canon_in(dir.path(), &["ingest", "--help"]);
     let help = String::from_utf8_lossy(&out.stdout).into_owned();
@@ -60,9 +61,10 @@ fn the_ingest_help_names_plans_and_records_only() {
     assert!(!help.contains("sessions"), "{help}");
 }
 
+/// ingest.removal.02 (F1, failure path): the selftest suite and the generated documents keep no trace of the command.
 /// F1: `--suite session-ingest` is outside the closed set (exit 2); a run with no `--suite` runs the suites that are left.
 #[test]
-fn selftest_suite_session_ingest_is_a_closed_value_refusal() {
+fn ingest_removal_02_selftest_suite_session_ingest_is_a_closed_value_refusal() {
     let dir = tempfile::tempdir().unwrap();
     let out = canon_in(dir.path(), &["selftest", "--suite", "session-ingest", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stdout));
@@ -75,7 +77,7 @@ fn selftest_suite_session_ingest_is_a_closed_value_refusal() {
 
 /// F1: the generated command document, the schema and the website reference say nothing of the command (the drift test `atip_l0` holds the document equal to the generator).
 #[test]
-fn the_generated_documents_have_no_ingest_sessions_line() {
+fn ingest_removal_02_the_generated_documents_have_no_ingest_sessions_line() {
     let root = repo_root();
     for path in ["docs/cli/canon.cli.json", "packages/website/src/content/docs/cli.mdx", "packages/website/src/content/docs/ko/cli.mdx", "canon/skills/reference/role-orchestrator.md"] {
         let text = fs::read_to_string(root.join(path)).unwrap();
@@ -86,9 +88,10 @@ fn the_generated_documents_have_no_ingest_sessions_line() {
     assert!(!schema.contains("ingest sessions") && !schema.contains("IngestSessionsReport"), "canon schema still names the removed command");
 }
 
+/// ingest.removal.12 (F7): the guides say nothing of the command.
 /// F7: the guides a person reads do not name the command, and the two env vars are not in the spec.
 #[test]
-fn the_readme_architecture_and_website_do_not_name_the_removed_command() {
+fn ingest_removal_12_the_readme_architecture_and_website_do_not_name_the_removed_command() {
     let root = repo_root();
     let mut files = vec![root.join("README.md"), root.join("ARCHITECTURE.md")];
     let mut dirs = vec![root.join("packages/website/src")];
@@ -111,9 +114,10 @@ fn the_readme_architecture_and_website_do_not_name_the_removed_command() {
     assert!(!spec.contains("CANON_INGEST_CLAUDE_SESSIONS_DIR") && !spec.contains("CANON_INGEST_OMP_SESSIONS_DIR"));
 }
 
+/// ingest.removal.13 (F7, failure path): the release check fails when the CHANGELOG entry is missing.
 /// F7: the CHANGELOG's Breaking table names the command, both variables, both keys, the suite and the skill; and says stored records are left alone.
 #[test]
-fn the_changelog_lists_what_was_removed() {
+fn ingest_removal_13_the_changelog_lists_what_was_removed() {
     let changelog = fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
     let unreleased = changelog.split("\n## ").find(|section| section.starts_with("Unreleased") || section.starts_with("0.39")).unwrap_or_default();
     for needed in [
@@ -131,9 +135,10 @@ fn the_changelog_lists_what_was_removed() {
     }
 }
 
+/// ingest.removal.08 (F5): the bundle no longer carries the guide.
 /// F5: the bundle names no `canon-session-ingest` anywhere, and `skills show` has no such guide.
 #[test]
-fn the_skills_bundle_no_longer_carries_the_session_ingest_guide() {
+fn ingest_removal_08_the_skills_bundle_no_longer_carries_the_session_ingest_guide() {
     let root = repo_root();
     assert!(!root.join("canon/skills/reference/canon-session-ingest.md").exists());
     for path in ["canon/skills/SKILL.src.md", "canon/knowledge-index.json", "canon/skills/reference/canon-artifact-ingest.md"] {
@@ -145,9 +150,10 @@ fn the_skills_bundle_no_longer_carries_the_session_ingest_guide() {
     assert_ne!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
 }
 
+/// ingest.removal.09 (F5): an old install's guide is an orphan.
 /// F5 failure path: an old install's copy of the guide is an orphan (`skills check` names it, exit 1); `skills install` removes it while its bytes match the lock, and the check then passes.
 #[test]
-fn an_old_installs_session_ingest_guide_is_an_orphan_that_install_removes() {
+fn ingest_removal_09_an_old_installs_session_ingest_guide_is_an_orphan_that_install_removes() {
     let tmp = tempfile::tempdir().unwrap();
     let (source, target) = (repo_root().join("canon/skills"), tmp.path().join("target"));
     fs::create_dir_all(&target).unwrap();
@@ -177,9 +183,9 @@ fn an_old_installs_session_ingest_guide_is_an_orphan_that_install_removes() {
     assert_eq!(run(&["skills", "check", "--harness", "claude"]).status.code(), Some(0));
 }
 
-/// F4: a canon.yaml still holding the old `ingest:` section gives the answers it gave without it, and a broken one is still a config error.
+/// ingest.removal.06 (F4): a canon.yaml still holding the old `ingest:` section gives the answers it gave without it.
 #[test]
-fn an_old_ingest_section_in_canon_yaml_is_not_read() {
+fn ingest_removal_06_an_old_ingest_section_in_canon_yaml_is_not_read() {
     let plain = init_repo();
     let old = init_repo();
     let yaml_path = old.path().join("canon.yaml");
@@ -200,16 +206,22 @@ fn an_old_ingest_section_in_canon_yaml_is_not_read() {
         assert_eq!(strip(&a), strip(&b), "canon {args:?}: the old section changes nothing");
         assert!(json_of(&b)["warnings"].as_array().is_none_or(Vec::is_empty), "canon {args:?}: no warning for the old section: {}", json_of(&b));
     }
+}
 
-    fs::write(&yaml_path, "tiers: [unclosed\n").unwrap();
+/// ingest.removal.07 (F4, failure path): a broken canon.yaml is still the command's config error, whatever sections it holds.
+#[test]
+fn ingest_removal_07_a_broken_canon_yaml_is_still_a_config_error() {
+    let old = init_repo();
+    let yaml_path = old.path().join("canon.yaml");
+    fs::write(&yaml_path, "ingest:\n  sources: {}\ntiers: [unclosed\n").unwrap();
     let broken = canon_in(old.path(), &["gate", "check", "--json"]);
     assert_ne!(broken.status.code(), Some(0));
     assert!(json_of(&broken)["error"]["code"].as_str().unwrap().starts_with("CONFIG_"), "{}", json_of(&broken));
 }
 
-/// F3: `dispatch begin` then `end` write the Run to the routed tier (the repeat and other-content cases are the unit test `rewriting_the_same_run_is_not_an_error_and_other_content_is_a_new_version`).
+/// ingest.removal.04 (F3): `dispatch begin` then `end` write the Run to the routed tier (the repeat and other-content cases are the unit test `ingest_removal_05_…`).
 #[test]
-fn dispatch_begin_and_end_write_the_run_to_the_routed_tier() {
+fn ingest_removal_04_dispatch_begin_and_end_write_the_run_to_the_routed_tier() {
     let dir = init_repo();
     let begin = canon_in(dir.path(), &["dispatch", "begin", "--role", "implementer", "--regime", "implementer/app/api/abcdef012345", "--actor", "a", "--json"]);
     assert_eq!(begin.status.code(), Some(0), "{}{}", String::from_utf8_lossy(&begin.stdout), String::from_utf8_lossy(&begin.stderr));
@@ -220,9 +232,9 @@ fn dispatch_begin_and_end_write_the_run_to_the_routed_tier() {
     assert_eq!(end.status.code(), Some(0), "{}{}", String::from_utf8_lossy(&end.stdout), String::from_utf8_lossy(&end.stderr));
 }
 
-/// F6: no `ingest.sessions.*` scenario remains in the corpus; the hot-store-location scenario moved to `plans.feature` as `ingest.plans.14` with its flow tag and body.
+/// ingest.removal.10 (F6): no `ingest.sessions.*` scenario remains in the corpus; the hot-store-location scenario moved to `plans.feature` as `ingest.plans.14` with its flow tag and body.
 #[test]
-fn the_session_scenarios_left_with_their_feature_file_and_the_hot_store_one_moved() {
+fn ingest_removal_10_the_session_scenarios_left_with_their_feature_file_and_the_hot_store_one_moved() {
     let ingest = repo_root().join(".canon/specs/kind=feature/area=ingest");
     assert!(!ingest.join("sessions.feature").exists());
     let plans = fs::read_to_string(ingest.join("plans.feature")).unwrap();
@@ -242,9 +254,9 @@ fn the_session_scenarios_left_with_their_feature_file_and_the_hot_store_one_move
     }
 }
 
-/// F6: a scenario whose `.feature` file is deleted gets a tombstone on the next sync and leaves the corpus; it is not an uncovered cell.
+/// ingest.removal.11 (F6, failure path): a scenario whose `.feature` file is deleted gets a tombstone on the next sync and leaves the corpus; it is not an uncovered cell.
 #[test]
-fn a_scenario_whose_feature_file_is_deleted_is_tombstoned_and_leaves_query() {
+fn ingest_removal_11_a_scenario_whose_feature_file_is_deleted_is_tombstoned_and_leaves_query() {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n").unwrap();
     support::declare_scenario(dir.path(), "demo", "gone.leaf.01", None);

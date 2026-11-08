@@ -411,7 +411,7 @@ mod tests {
     /// 0.39: `--kind session|event` on the reading commands is refused with the twelve kinds that remain and a pointer to `purge`;
     /// `purge` still takes them for one release.
     #[test]
-    fn a_retired_record_kind_is_refused_on_the_reading_commands_only() {
+    fn tier_retired_09_a_retired_record_kind_is_refused_on_the_reading_commands_only() {
         use clap::Arg;
         let tree = Command::new("canon")
             .subcommand(Command::new("query").arg(Arg::new("kind").long("kind")))
