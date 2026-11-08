@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-durasecret",
+    "role": "reviewer",
+    "session_id": "s-0-39-durasecret-rev"
+  },
+  "at": "2026-11-08T07:37:07.932142Z",
+  "change_id": "canon-0-39-write-durability",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/src/atomic.rs",
+  "introduced_by": "e0571acf6147980c3e573c17cdd64cf86d4e3061",
+  "kind": "finding",
+  "reviewed_sha": "ef2e822a05d4aeb9bb858f714e83f665cc7b84a7",
+  "reviewer": "rev-0-39-durasecret",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards pass, tier.durability.01/.03: the brief says the sync trace is a debug-build device that is not in a release. `trace::record` is a no-op in release, but its argument is built before the call (`Event::FileSync(tmp_path.clone())`, `Event::Rename{from: tmp_path.clone(), to: path.to_path_buf()}`, `DirSync(dir.to_path_buf())`, and the artifact store's `target.clone()`), so a release `write_atomic` still makes 3 PathBuf allocations and `publish_paths` one per blob, and the `trace` module and `Event` type are public in canon-store in release. Small next to an fsync; fixable by building the event inside the cfg(debug_assertions) call or a closure.",
+  "worktree_dirty": false
+}
