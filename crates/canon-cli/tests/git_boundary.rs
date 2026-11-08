@@ -142,10 +142,10 @@ fn short_deadline() -> [(&'static str, String); 1] {
 
 // ── F1: the environment ──
 
-/// F1: a shell that points git at another repository does not point canon's git there. The record names the project's commit and code
+/// gate.git-boundary.01 (F1): a shell that points git at another repository does not point canon's git there. The record names the project's commit and code
 /// tree, the ones a run without the variables records.
 #[test]
-fn f1_evidence_add_records_the_repos_commit_and_code_tree_whatever_git_dir_the_shell_holds() {
+fn gate_git_boundary_01_evidence_add_records_the_repos_commit_and_code_tree_whatever_git_dir_the_shell_holds() {
     let dir = project();
     let repo = dir.path();
     let other = other_repo();
@@ -167,10 +167,10 @@ fn f1_evidence_add_records_the_repos_commit_and_code_tree_whatever_git_dir_the_s
     assert_eq!(held["code_tree"], plain["code_tree"], "the code tree of --repo, not of GIT_WORK_TREE");
 }
 
-/// F1: the three object-store variables and `GIT_INDEX_FILE` are not read either; `git status` of a context pack is not computed against the
+/// gate.git-boundary.02 (F1): the three object-store variables and `GIT_INDEX_FILE` are not read either; `git status` of a context pack is not computed against the
 /// index the shell names, so the pack id (which holds the state digest) is the one a run without the variable makes.
 #[test]
-fn f1_a_git_index_file_in_the_shell_does_not_change_the_state_digest_of_a_context_pack() {
+fn gate_git_boundary_02_a_git_index_file_in_the_shell_does_not_change_the_state_digest_of_a_context_pack() {
     let dir = project();
     let repo = dir.path();
     let other = other_repo();
@@ -192,10 +192,10 @@ fn f1_a_git_index_file_in_the_shell_does_not_change_the_state_digest_of_a_contex
     assert_eq!(body(&shown)["data"]["id"], id.as_str());
 }
 
-/// F1: `GIT_DIR` in the shell, naming a repository that tracks the same path, does not make `migrate --commit` stage its removal of
+/// gate.git-boundary.03 (F1): `GIT_DIR` in the shell, naming a repository that tracks the same path, does not make `migrate --commit` stage its removal of
 /// `openspec/changes/.gitkeep` in that repository's index: the move stays in the project.
 #[test]
-fn f1_migrate_commit_does_not_change_the_index_of_the_repository_git_dir_names() {
+fn gate_git_boundary_03_migrate_commit_does_not_change_the_index_of_the_repository_git_dir_names() {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
     git(repo, &["init", "-q", "-b", "main"]);
@@ -241,10 +241,10 @@ write:
   promote: auto
 ";
 
-/// F1, failure path: a directory that is no git work tree stays `COMMIT_REQUIRED` when the shell names a git directory: the variable is not
+/// gate.git-boundary.04 (F1, failure path): a directory that is no git work tree stays `COMMIT_REQUIRED` when the shell names a git directory: the variable is not
 /// a way to make `--repo` a repository.
 #[test]
-fn f1_git_dir_does_not_make_a_directory_that_is_not_a_work_tree_one() {
+fn gate_git_boundary_04_git_dir_does_not_make_a_directory_that_is_not_a_work_tree_one() {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
@@ -266,10 +266,10 @@ fn f1_git_dir_does_not_make_a_directory_that_is_not_a_work_tree_one() {
 
 // ── F2: file names ──
 
-/// F2: a surface named `é.rs` or `a"b.rs` is stale when the file is changed and committed: the changed-file list is read NUL-terminated, so
+/// gate.git-boundary.05 (F2): a surface named `é.rs` or `a"b.rs` is stale when the file is changed and committed: the changed-file list is read NUL-terminated, so
 /// the name git gives is the name the surface declares (git writes `"\303\251.rs"` otherwise). Spaces and directories: `canon-gate`'s unit tests.
 #[test]
-fn f2_a_declared_surface_with_a_non_ascii_name_or_a_quote_goes_stale_when_it_changes() {
+fn gate_git_boundary_05_a_declared_surface_with_a_non_ascii_name_or_a_quote_goes_stale_when_it_changes() {
     for name in ["é.rs", "a\"b.rs"] {
         let dir = project();
         let repo = dir.path();
@@ -289,9 +289,9 @@ fn f2_a_declared_surface_with_a_non_ascii_name_or_a_quote_goes_stale_when_it_cha
     }
 }
 
-/// F2: the approval payload's surface is the name as it is, `é.rs`.
+/// gate.git-boundary.06 (F2): the approval payload's surface is the name as it is, `é.rs`.
 #[test]
-fn f2_the_approval_payload_lists_a_non_ascii_surface_as_it_is() {
+fn gate_git_boundary_06_the_approval_payload_lists_a_non_ascii_surface_as_it_is() {
     let dir = project();
     let repo = dir.path();
     write(repo, "é.rs", "fn a() {}\n");
@@ -319,10 +319,10 @@ fn commit_a_name_that_is_not_utf8(repo: &Path) -> String {
     git(repo, &["rev-parse", "HEAD"])
 }
 
-/// F2, failure path: a commit that changed a name no UTF-8 string spells has no path list. The approval payload cannot be made for it, and
+/// gate.git-boundary.07 (F2, failure path): a commit that changed a name no UTF-8 string spells has no path list. The approval payload cannot be made for it, and
 /// the staleness check does not call the evidence stale on the strength of a list it could not read.
 #[test]
-fn f2_a_name_that_is_not_utf8_gives_no_surface_and_never_a_stale_verdict() {
+fn gate_git_boundary_07_a_name_that_is_not_utf8_gives_no_surface_and_never_a_stale_verdict() {
     let dir = project();
     let repo = dir.path();
     let added = canon_env(repo, &evidence_add_args("surface", &["--surface-ref", "src/main.rs"]), &[], None);
@@ -341,10 +341,10 @@ fn f2_a_name_that_is_not_utf8_gives_no_surface_and_never_a_stale_verdict() {
 
 // ── F3: the deadline ──
 
-/// F3: `..HEAD` sleeps in the `git` ahead on the `PATH`; `gate check` ends within seconds of the one-second deadline, asks the stuck query
+/// gate.git-boundary.08 (F3): `..HEAD` sleeps in the `git` ahead on the `PATH`; `gate check` ends within seconds of the one-second deadline, asks the stuck query
 /// once, and does not wait for the grandchild that holds git's pipes.
 #[test]
-fn f3_gate_check_ends_within_seconds_when_the_staleness_queries_stop_answering() {
+fn gate_git_boundary_08_gate_check_ends_within_seconds_when_the_staleness_queries_stop_answering() {
     let dir = project();
     let repo = dir.path();
     let added = canon_env(repo, &evidence_add_args("surface", &["--surface-ref", "src/main.rs"]), &[], None);
@@ -368,10 +368,10 @@ fn f3_gate_check_ends_within_seconds_when_the_staleness_queries_stop_answering()
     assert!(!text.contains("stale-evidence"), "a query with no answer is not a stale verdict: {text}");
 }
 
-/// F3, failure path: `add` sleeps, so the code tree cannot be made. `evidence add` is refused as `COMMIT_REQUIRED`, the message names `git add`
+/// gate.git-boundary.10 (F3, failure path): `add` sleeps, so the code tree cannot be made. `evidence add` is refused as `COMMIT_REQUIRED`, the message names `git add`
 /// and the deadline, and nothing is written.
 #[test]
-fn f3_evidence_add_is_refused_with_commit_required_when_the_code_tree_cannot_be_made_in_time() {
+fn gate_git_boundary_10_evidence_add_is_refused_with_commit_required_when_the_code_tree_cannot_be_made_in_time() {
     let dir = project();
     let repo = dir.path();
     let before = snapshot(repo);
@@ -389,9 +389,9 @@ fn f3_evidence_add_is_refused_with_commit_required_when_the_code_tree_cannot_be_
     assert_eq!(snapshot(repo), before, "nothing was written");
 }
 
-/// F3: a context pack that cannot ask git in time is `CONTEXT_GIT_REQUIRED`, naming the git command and the deadline.
+/// gate.git-boundary.11 (F3): a context pack that cannot ask git in time is `CONTEXT_GIT_REQUIRED`, naming the git command and the deadline.
 #[test]
-fn f3_context_pack_add_is_refused_with_context_git_required_when_git_stops_answering() {
+fn gate_git_boundary_11_context_pack_add_is_refused_with_context_git_required_when_git_stops_answering() {
     let dir = project();
     let repo = dir.path();
     write(repo, "doc.md", "hi\n");
@@ -420,17 +420,17 @@ fn scan(root: &Path) -> Output {
     Command::new("python3").arg(repo_root().join("scripts/check_git_boundary.py")).arg(root).output().expect("python3 runs the scan")
 }
 
-/// F4: the repository passes its own scan.
+/// gate.git-boundary.13 (F4): the repository passes its own scan.
 #[test]
-fn f4_no_crate_source_starts_git_outside_the_one_path() {
+fn gate_git_boundary_13_no_crate_source_starts_git_outside_the_one_path() {
     let out = scan(&repo_root());
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
 }
 
-/// F4: a `Command::new("git")` outside the path is reported with its file and line and the scan exits 1: on one line, with the argument on
+/// gate.git-boundary.12 (F4): a `Command::new("git")` outside the path is reported with its file and line and the scan exits 1: on one line, with the argument on
 /// the next line, in a `#[cfg(test)]` module, and in a `crates/*/src` of any crate. The path itself, a `crates/*/tests` file and a comment are not.
 #[test]
-fn f4_a_launch_outside_the_path_is_reported_with_file_and_line_and_exits_1() {
+fn gate_git_boundary_12_a_launch_outside_the_path_is_reported_with_file_and_line_and_exits_1() {
     let dir = TempDir::new().unwrap();
     let root = dir.path();
     write(root, "crates/a/src/one.rs", "fn one() {\n    std::process::Command::new(\"git\").arg(\"status\");\n}\n");
@@ -453,18 +453,18 @@ fn f4_a_launch_outside_the_path_is_reported_with_file_and_line_and_exits_1() {
     }
 }
 
-/// F4: a tree with no launch outside the path is clean: exit 0 and nothing printed.
+/// gate.git-boundary.13 (F4): a tree with no launch outside the path is clean: exit 0 and nothing printed.
 #[test]
-fn f4_a_tree_without_a_launch_outside_the_path_is_clean() {
+fn gate_git_boundary_13_a_tree_without_a_launch_outside_the_path_is_clean() {
     let dir = TempDir::new().unwrap();
     write(dir.path(), "crates/a/src/lib.rs", "fn ok() { Command::new(\"ssh-keygen\"); GitCall::new(repo); }\n");
     let out = scan(dir.path());
     assert_eq!((out.status.code(), out.stdout.len(), out.stderr.len()), (Some(0), 0, 0), "{}", String::from_utf8_lossy(&out.stderr));
 }
 
-/// F4: the scan runs where the lint runs: `just lint` and the CI clippy job, and the rule is written down.
+/// gate.git-boundary.14 (F4): the scan runs where the lint runs: `just lint` and the CI clippy job, and the rule is written down.
 #[test]
-fn f4_the_scan_is_wired_into_just_lint_the_clippy_job_and_the_coding_rules() {
+fn gate_git_boundary_14_the_scan_is_wired_into_just_lint_the_clippy_job_and_the_coding_rules() {
     let root = repo_root();
     let justfile = std::fs::read_to_string(root.join("justfile")).unwrap();
     let lint = justfile.split("\nlint:").nth(1).and_then(|rest| rest.split("\n\n").next()).expect("the justfile has a lint recipe");
@@ -479,10 +479,10 @@ fn f4_the_scan_is_wired_into_just_lint_the_clippy_job_and_the_coding_rules() {
 
 // ── F5: the changelog ──
 
-/// F5: the CHANGELOG's `Unreleased` section has the entry under Changed: it says the environment is ignored, a non-ASCII name is read as it
+/// gate.git-boundary.15 (F5): the CHANGELOG's `Unreleased` section has the entry under Changed: it says the environment is ignored, a non-ASCII name is read as it
 /// is, the deadline and the limits, and that an approval recorded for such a commit is made again.
 #[test]
-fn f5_the_changelog_says_what_changed_and_when_to_approve_again() {
+fn gate_git_boundary_15_the_changelog_says_what_changed_and_when_to_approve_again() {
     let changelog = std::fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
     let unreleased = changelog.split("\n## ").nth(1).expect("an Unreleased section");
     assert!(unreleased.starts_with("Unreleased"), "the first section is Unreleased: {}", &unreleased[..unreleased.len().min(40)]);
