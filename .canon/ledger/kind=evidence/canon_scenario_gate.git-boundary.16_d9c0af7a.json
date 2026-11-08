@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T08:23:47.073782Z",
+  "attachments": [
+    {
+      "case": "gate_git_boundary_16_a_changelog_entry_missing_an_item_fails_the_release_check",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "8d34c08d551383ece2865e11cf08e9742f481443b91698cd425b88dad38568e2"
+    }
+  ],
+  "code_tree": "5cd1ec8887637575fa1e9b8098349efd5c0a78e5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "44ccca8a3575adabdbff7c7b7208576be72131d2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "gate.git-boundary.16",
+  "schema": 1,
+  "staging_id": "bc622659",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T08:23:50.850951Z",
+  "attachments": [
+    {
+      "case": "ingest_removal_15_a_source_with_no_readable_change_is_refused_and_writes_no_record_and_no_cursor_file",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "8d34c08d551383ece2865e11cf08e9742f481443b91698cd425b88dad38568e2"
+    }
+  ],
+  "code_tree": "5cd1ec8887637575fa1e9b8098349efd5c0a78e5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "44ccca8a3575adabdbff7c7b7208576be72131d2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 16,
+  "scenario_id": "ingest.removal.15",
+  "schema": 1,
+  "staging_id": "f3ae9fb9",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

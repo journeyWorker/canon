@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="3" skipped="0" failures="0" errors="0" uuid="a066b017-43d2-4ae2-861a-92940f38a29e" timestamp="2026-11-08T17:23:34.844+09:00" time="2.610">
+    <testsuite name="canon-cli::git_boundary" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="gate_git_boundary_16_a_changelog_entry_missing_an_item_fails_the_release_check" classname="canon-cli::git_boundary" timestamp="2026-11-08T17:23:34.844+09:00" time="0.013"/>
+    </testsuite>
+    <testsuite name="canon-cli::plans_ingest" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="ingest_removal_15_a_source_with_no_readable_change_is_refused_and_writes_no_record_and_no_cursor_file" classname="canon-cli::plans_ingest" timestamp="2026-11-08T17:23:34.844+09:00" time="2.314"/>
+    </testsuite>
+    <testsuite name="canon-cli::context_pack_secret_scan" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="dispatch_secret_scan_30_a_selection_with_a_secret_document_is_refused_as_a_whole_and_stores_no_pack" classname="canon-cli::context_pack_secret_scan" timestamp="2026-11-08T17:23:34.844+09:00" time="2.610"/>
+    </testsuite>
+</testsuites>
