@@ -658,3 +658,50 @@ fn tier_retired_19_the_guides_do_not_list_the_retired_kinds() {
         }
     }
 }
+
+/// What `canon <args>` says that a retired directory could change: the exit status, the error code, the violations and the warning codes.
+fn verdict_of(repo: &Repo, args: &[&str]) -> (Option<i32>, String, Value, Vec<String>) {
+    let (doc, out) = repo.json(args);
+    let warnings = doc["meta"]["warnings"].as_array().into_iter().flatten().map(|w| w["code"].as_str().unwrap_or_default().to_string()).collect();
+    (out.status.code(), error_code(&doc).to_string(), doc["data"]["violations"].clone(), warnings)
+}
+
+/// tier.retired.20 (F7, failure path):
+/// F7: files of `kind=session/` and `kind=event/` whose bodies cannot be read (not UTF-8, empty, truncated, the wrong shape) add no violation, warning or error to `status`,
+/// `gate check`, `inventory sync` and `ledger compact`: each says what it says without them, and the files are as they were. The same truncated body under a live kind is named.
+#[test]
+fn tier_retired_20_unreadable_bodies_in_the_retired_directories_change_nothing_and_under_a_live_kind_are_named() {
+    let repo = Repo::init();
+    let commands: [&[&str]; 4] = [&["status"], &["gate", "check"], &["inventory", "sync"], &["ledger", "compact"]];
+    let before: Vec<_> = commands.iter().map(|args| verdict_of(&repo, args)).collect();
+
+    let bodies: [(&str, &[u8]); 4] = [("binary", b"\xff\xfe\x00\x80"), ("empty", b""), ("truncated", b"{\"kind\":\"session\",\"at\":"), ("array", b"[1, 2")];
+    for (kind, dir) in [("session", "kind=session"), ("event", "kind=event/area=x")] {
+        for (name, body) in bodies {
+            let path = repo.path().join(format!(".canon/ledger/{dir}/{kind}-{name}.json"));
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, body).unwrap();
+        }
+    }
+    repo.commit_all("unreadable rows of the retired kinds");
+    let planted: BTreeMap<PathBuf, Vec<u8>> = repo.snapshot().into_iter().filter(|(path, _)| path.starts_with(".canon/ledger/kind=session") || path.starts_with(".canon/ledger/kind=event")).collect();
+    assert_eq!(planted.len(), 8);
+
+    for (args, was) in commands.iter().zip(&before) {
+        let (doc, _) = repo.json(args);
+        assert_eq!(&verdict_of(&repo, args), was, "`canon {args:?}` says something else with unreadable rows of the retired kinds");
+        let said = doc.to_string();
+        assert!(!said.contains("kind=session") && !said.contains("kind=event"), "`canon {args:?}` names a retired directory: {doc}");
+    }
+    let after = repo.snapshot();
+    for (path, bytes) in &planted {
+        assert_eq!(after.get(path), Some(bytes), "{} was touched", path.display());
+    }
+
+    // The same truncated body under a live kind is not ignored: the reading above is not a reader that reads nothing.
+    repo.write(".canon/ledger/kind=evidence/truncated.json", "{\"kind\":\"evidence\",\"at\":");
+    let (doc, out) = repo.json(&["gate", "check"]);
+    assert_eq!(out.status.code(), Some(1), "{doc}");
+    let named: Vec<String> = doc["data"]["violations"].as_array().unwrap().iter().map(|v| v["subject"].as_str().unwrap_or_default().to_string()).collect();
+    assert!(named.iter().any(|subject| subject.contains("kind=evidence")) && !named.iter().any(|subject| subject.contains("kind=session") || subject.contains("kind=event")), "{named:?}");
+}

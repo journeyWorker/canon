@@ -221,3 +221,15 @@ Feature: retired record kinds
     Given ARCHITECTURE.md, README.md and the website pages
     When they are read
     Then no page lists the two names as record kinds
+
+  # canon: {"schema":1,"at":"2026-11-08T08:36:14Z","actor":{"agent_id":"impl-0-39","role":"implementer","session_id":"s-0-39-impl"}}
+  @subject:tier-storage
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-39-session-kinds-removal.F7
+  @tier.retired.20
+  Scenario: Files in kind=session and kind=event whose bodies cannot be read add no violation, warning or error, while the same body under a live kind is named
+    Given a git tier holding, in kind=session and kind=event, a file that is not UTF-8, an empty one, a truncated JSON one and a JSON array
+    When canon status, canon gate check, canon inventory sync and canon ledger compact run in the repo with those files and in the same repo without them
+    Then each exits as it does without the files, with the same violations and warnings and no mention of the retired directories, and every retired file is as it was
+    And the same truncated body put under kind=evidence makes canon gate check exit 1 naming that row, and names no retired file
