@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-gitstale",
+    "role": "reviewer",
+    "session_id": "s-0-39-gitstale-rev"
+  },
+  "at": "2026-11-08T08:13:10.770637Z",
+  "code_tree": "997b9b68cc804295ebb670643a5003ed9ec4c027",
+  "kind": "review",
+  "pin": "597024ce41aa828a53e1d3261bcffd5cfee2ca9e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable",
+          "junit:gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable",
+          "junit:gate_staleness_scope_10_no_git_on_the_path_is_counted_as_git_unavailable"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "3a49ad839e9ac4b150e0f2f72b54470e7417cae90291a06f91a25a6753aa5034",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-staleness-scope/brief.md"
+  },
+  "review_id": "01M6X3FW7J0VZVCHS5Y3FCC03M",
+  "reviewer": "rev-0-39-gitstale",
+  "scenario_id": "gate.staleness-scope.10",
+  "schema": 2,
+  "worktree_dirty": false
+}
