@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T08:08:08.828180Z",
+  "attachments": [
+    {
+      "case": "gate_staleness_scope_10_no_git_on_the_path_is_counted_as_git_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": ".reports/red.xml",
+      "sha256": "b5b5e9d3ee74198e18bf42d748523a1aeadf7063665f207716387e9fc693d9dc"
+    },
+    {
+      "case": "gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable",
+      "format": "junit",
+      "outcome": "failed",
+      "path": ".reports/red.xml",
+      "sha256": "b5b5e9d3ee74198e18bf42d748523a1aeadf7063665f207716387e9fc693d9dc"
+    },
+    {
+      "case": "gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable",
+      "format": "junit",
+      "outcome": "failed",
+      "path": ".reports/red.xml",
+      "sha256": "b5b5e9d3ee74198e18bf42d748523a1aeadf7063665f207716387e9fc693d9dc"
+    }
+  ],
+  "code_tree": "86cebd70e622a9b0eec1e121f0824c97d176a02e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": ".reports/red.xml"
+  },
+  "evidence_sha": "c4a416d646666ad1069b16933e9e23212219032d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 16,
+  "scenario_id": "gate.staleness-scope.10",
+  "schema": 1,
+  "staging_id": "f0640c9e",
+  "verdict": "divergent",
+  "worktree_dirty": false
+}
