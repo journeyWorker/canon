@@ -829,11 +829,16 @@ fn atip_constraints_26_a_stateless_fault_in_a_later_element_beats_the_first_elem
         ("export", r#"[{"kind":"change"},{"kind":"change","after":"2026-02-01","before":"2026-01-02"}]"#, "USAGE", "/1/after"),
         ("artifacts store", r#"[{},{"maxArtifactMib":0}]"#, "USAGE", "/1/maxArtifactMib"),
         ("ingest records", r#"[{},{"intervalSecs":-1}]"#, "USAGE", "/1/intervalSecs"),
+        ("ingest plans", r#"[{},{"dialect":"nope"}]"#, "USAGE", "/1/planSource"),
     ] {
         let outcome = empty(&format!("canon {command} --input '{items}'"), None);
         assert_refused(&outcome, code, field);
         // The same batch with every element valid is not refused in preflight: the first element runs and fails with the missing repository.
-        let valid = items.replace(r#"{"kind":"change","after":"2026-02-01","before":"2026-01-02"}"#, r#"{"kind":"change"}"#).replace(r#"{"maxArtifactMib":0}"#, "{}").replace(r#"{"intervalSecs":-1}"#, "{}");
+        let valid = items
+            .replace(r#"{"kind":"change","after":"2026-02-01","before":"2026-01-02"}"#, r#"{"kind":"change"}"#)
+            .replace(r#"{"maxArtifactMib":0}"#, "{}")
+            .replace(r#"{"intervalSecs":-1}"#, "{}")
+            .replace(r#"{"dialect":"nope"}"#, "{}");
         let ran = empty(&format!("canon {command} --input '{valid}'"), None);
         assert_eq!((ran.exit, ran.code.as_deref(), ran.field.as_deref()), (1, Some("BATCH_INCOMPLETE"), Some("/0")), "{command}: {ran:?}");
     }

@@ -48,8 +48,8 @@ where
 /// Union several root directories into one deterministic, deduped
 /// file list — the shared primitive behind any adapter whose
 /// `scan_roots` returns more than one directory (design D5's Codex
-/// live+archived precedent; Wave 1's omp adapter unions `.omp` and
-/// `.pi` home directories the same way, `adapters::omp` module doc).
+/// live+archived precedent: a live and an archived directory unioned
+/// into one list).
 /// Dedup is by canonicalized path where possible (falls back to the
 /// raw path when canonicalization fails, e.g. a root that doesn't
 /// exist) — mirrors the donor's `push_unique_scan_task`

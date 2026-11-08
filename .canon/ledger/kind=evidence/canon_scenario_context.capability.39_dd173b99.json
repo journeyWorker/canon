@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T08:11:27.286666Z",
+  "attachments": [
+    {
+      "case": "context_capability_39_kinds_are_every_record_kind_under_its_user_facing_name",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "a69dbe2c45ea2f958a96eaff5c360a558b2beab0ace69ed333a49c32613ac39e"
+    },
+    {
+      "case": "context_capability_39_families_are_every_family_kind_in_order",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "a69dbe2c45ea2f958a96eaff5c360a558b2beab0ace69ed333a49c32613ac39e"
+    },
+    {
+      "case": "context_capability_39_every_kind_option_value_is_a_context_kind_and_purge_adds_the_retired_pair",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "a69dbe2c45ea2f958a96eaff5c360a558b2beab0ace69ed333a49c32613ac39e"
+    }
+  ],
+  "code_tree": "70967fc0bbef6a84def2008647bb9f1e2b55ffea",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "0b6982e537741175b6a7d4cb7dc2f3426a7dacea",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1483,
+  "scenario_id": "context.capability.39",
+  "schema": 1,
+  "staging_id": "adc2d9bd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

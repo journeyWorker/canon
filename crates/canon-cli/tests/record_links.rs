@@ -746,7 +746,7 @@ fn ingest_plans_14_the_other_hot_writers_print_the_hot_store_location_too() {
 }
 
 #[test]
-fn ingest_plans_14b_subject_and_change_writes_to_the_hot_store_print_its_location_too() {
+fn ingest_plans_14_subject_and_change_writes_to_the_hot_store_print_its_location_too() {
     let hot = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: hot\n  change: hot\n";
     let dir = init_repo(hot);
     let repo = dir.path();
@@ -965,7 +965,7 @@ fn hand_written_finding_add_blocker_and_should_fix_examples_name_the_introducing
 /// the ledger and prints no hot store line; `subject adopt` rewrites the
 /// change in the hot store and prints it.
 #[test]
-fn ingest_plans_14c_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line() {
+fn ingest_plans_14_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line() {
     let routing = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: local\n  change: hot\n";
     let dir = init_repo(routing);
     let repo = dir.path();

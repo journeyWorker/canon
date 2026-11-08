@@ -1243,14 +1243,13 @@ fn close_version_at(recorded: DateTime<Utc>, observed: DateTime<Utc>) -> DateTim
 ///    false. `crates/canon-store/sql/views.sql` reads the physical
 ///    files directly: `stg_records` is a plain `UNION ALL` over both
 ///    roots and folds nothing, so a mart sees BOTH versions of this
-///    run. Left alone that multiplied `mart_session_costs`'
-///    `total_cost`/`total_tokens` by the version count — one closed
-///    dispatch doubled a session's billed cost. The mart-side rule
+///    run. Left alone that multiplied a mart's run-derived sums by the
+///    version count: one closed dispatch counted twice. The mart-side rule
 ///    that now handles it is stated in that file's own
 ///    "Multi-version records" header section and applied per view:
 ///    every view whose join or aggregate needs CURRENT state folds
-///    its own key with `arg_max(body, "at")` (`mart_session_costs`'
-///    `runs`, `mart_session_run_handoff`'s `runs`, and four others),
+///    its own key with `arg_max(body, "at")` (`mart_run_observability`'s
+///    `runs` among them),
 ///    while the views for which a version IS the event being counted
 ///    — `mart_records_by_kind`'s physical census,
 ///    `mart_review_burndown`'s opened/resolved curve — deliberately
@@ -1311,9 +1310,8 @@ fn close_version_at(recorded: DateTime<Utc>, observed: DateTime<Utc>) -> DateTim
 /// `canon_store::tier::raw_record_at`) — the first two want precisely
 /// the version stamp, and the third is a days-to-months threshold no
 /// nanosecond can move. Every reader that reports run TIME reads a
-/// different field: `mart_session_costs`' bounds are the
-/// `token_usage` EVENT's own `at`, `mart_session_run_handoff` reads
-/// the session's and the handoff's, `mart_flywheel_funnel` reads no
+/// different field: `mart_run_observability` reads the run's own
+/// `started_at` and `ended_at`, `mart_flywheel_funnel` reads no
 /// timestamp at all, and `canon dispatch diff` compares the two homes
 /// of the SAME record, which carry an identical value
 /// ([`reconcile_runs`]).
@@ -3383,13 +3381,18 @@ mod tier_tests {
     fn ingest_removal_05_rewriting_the_same_run_is_not_an_error_and_other_content_is_a_new_version() {
         let tmp = repo_with_git_routed_runs();
         let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
+        let stored = run_objects(tmp.path()).len();
         assert_eq!(persist_run(tmp.path(), &begun.run), TierPersist::Persisted, "a byte-identical re-write is a no-op, not an error");
         assert_eq!(queried_runs(tmp.path()).len(), 1, "no second row");
+        assert_eq!(run_objects(tmp.path()).len(), stored, "a byte-identical re-write stores no second object");
         let mut other = begun.run.clone();
         other.envelope.actor.model = Some("another-model".into());
+        other.envelope.at += TimeDelta::seconds(1);
         assert_eq!(persist_run(tmp.path(), &other), TierPersist::Persisted);
+        assert_eq!(run_objects(tmp.path()).len(), stored + 1, "the other content is stored as a new version, neither dropped nor written over the first");
         let rows = queried_runs(tmp.path());
         assert_eq!(rows.len(), 1, "one run_id resolves to one row: {rows:?}");
+        assert!(rows[0].to_string().contains("another-model"), "the fold ranks the newer version first: {rows:?}");
     }
 
     /// [`close_version_at`]'s whole contract, including the two

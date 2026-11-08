@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::ids::{RoleId, RunId};
-use canon_model::records::Trajectory;
+use canon_model::records::{Run, RunStatus, Trajectory};
 use canon_model::{Subject, SubjectId, SubjectStatus};
 use canon_store::file_lock::FileLock;
 use canon_store::git_tier::GitTier;
@@ -149,6 +149,19 @@ fn purge_case() -> Case {
         git.write(&Trajectory::new(Envelope::new(1, RecordKind::Trajectory, Utc::now(), actor()), RunId::new(), None, None, None, None, Some(0.9))).unwrap();
     });
     Case { leaf: "purge", root, args: words(&["purge", "--kind", "trajectory", "--before", &cutoff]), env, change: Some(change), _keep: vec![Box::new(fixture)] }
+}
+
+/// The same purge over Run records: two before the cutoff, one after, so the preview deletes two and the newer run stays.
+fn purge_runs_case() -> Case {
+    let fixture = Fixture::new("  run: local\n", "");
+    let git = GitTier::new(fixture.git_root());
+    let run_at = |at: chrono::DateTime<Utc>| Run::new(Envelope::new(1, RecordKind::Run, at, actor()), RunId::new(), None, None, RunStatus::Succeeded, at, Some(at));
+    git.write(&run_at(Utc::now() - chrono::Duration::days(5))).unwrap();
+    git.write(&run_at(Utc::now() - chrono::Duration::days(4))).unwrap();
+    git.write(&run_at(Utc::now())).unwrap();
+    let root = fixture.root.path().to_path_buf();
+    let cutoff = (Utc::now() - chrono::Duration::days(1)).to_rfc3339();
+    Case { leaf: "purge", root, args: words(&["purge", "--kind", "run", "--before", &cutoff]), env: vec![], change: None, _keep: vec![Box::new(fixture)] }
 }
 
 fn tier_case() -> Case {
@@ -676,10 +689,10 @@ fn atip_planjcs_10_a_refused_commit_without_the_lock_file_leaves_the_tree_byte_i
     }
 }
 
-/// atip.planjcs.09: the purge preview lists its audit line, the commit writes that file and that line; nothing to delete, neither.
+/// atip.planjcs.09: the purge preview lists its audit line, the commit writes that file and that line; nothing to delete, neither. Run records, the kind the retired session records became.
 #[test]
 fn atip_planjcs_09_the_purge_preview_lists_the_audit_line_the_commit_writes() {
-    let case = purge_case();
+    let case = purge_runs_case();
     let preview = case.preview();
     let effects = preview["data"]["effects"].as_array().unwrap();
     assert_eq!(effects.len(), 3, "two deletes and the audit line: {preview}");
@@ -703,7 +716,7 @@ fn atip_planjcs_09_the_purge_preview_lists_the_audit_line_the_commit_writes() {
     assert_eq!(line["result_counts"], json!({"matched": 2, "deleted": 2}));
 
     // Nothing before the cutoff: no audit effect, and the commit writes no line.
-    let empty = purge_case();
+    let empty = purge_runs_case();
     let mut args = empty.args.clone();
     *args.last_mut().unwrap() = "2000-01-01".to_string();
     let run = |extra: &[&str]| {

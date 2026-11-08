@@ -118,8 +118,8 @@ struct DivergenceLineProbe {
 
 /// Parse one `.jsonl` file, line by line (design D2: "Each `.jsonl`
 /// file is read line-by-line"). A file that cannot even be opened
-/// yields an empty outcome (mirrors `adapters::omp::parse_pi_file`'s
-/// non-fatal-missing-file behavior) rather than a crash.
+/// yields an empty outcome (a non-fatal missing file) rather than a
+/// crash.
 fn parse_divergence_file(path: &Path) -> ArtifactParseOutcome {
     let Ok(file) = File::open(path) else {
         return ArtifactParseOutcome::empty();
