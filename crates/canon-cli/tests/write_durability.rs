@@ -5,10 +5,10 @@
 
 use std::path::Path;
 
-/// The section of the release this change ships in: `## Unreleased` until the release renames it `## 0.39.0`.
+/// The section of the release this change ships in: `## 0.39.0`.
 fn section() -> String {
     let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).expect("the CHANGELOG");
-    let start = ["\n## Unreleased", "\n## 0.39.0"].iter().find_map(|heading| changelog.find(heading)).expect("the CHANGELOG has an Unreleased or 0.39.0 section");
+    let start = changelog.find("\n## 0.39.0").expect("the CHANGELOG has a 0.39.0 section");
     let end = changelog[start + 1..].find("\n## ").map_or(changelog.len(), |at| start + 1 + at);
     changelog[start..end].to_string()
 }

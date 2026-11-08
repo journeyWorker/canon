@@ -484,11 +484,11 @@ fn gate_git_boundary_14_the_scan_is_wired_into_just_lint_the_clippy_job_and_the_
 
 /// The release check of F5: what the `Unreleased` section's git-boundary entry fails to say, one line per missing thing. Empty when the entry is complete.
 fn changelog_problems(changelog: &str) -> Vec<String> {
-    let Some(unreleased) = changelog.split("\n## ").nth(1).filter(|section| section.starts_with("Unreleased")) else {
-        return vec!["the first section is not Unreleased".to_string()];
+    let Some(unreleased) = changelog.split("\n## ").find(|section| section.starts_with("0.39.0")) else {
+        return vec!["the CHANGELOG has no 0.39.0 section".to_string()];
     };
     let Some(changed) = unreleased.split("\n### Changed").nth(1) else {
-        return vec!["Unreleased has no Changed section".to_string()];
+        return vec!["0.39.0 has no Changed section".to_string()];
     };
     let lines: Vec<&str> = changed.lines().collect();
     let Some(start) = lines.iter().position(|line| line.contains("canon-0-39-git-boundary")) else {

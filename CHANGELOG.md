@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.39.0 — 2026-11-08
+
+canon drops `canon ingest sessions` and the record kinds `session` and `event` (twelve record kinds remain), sends every git call through one path (the shell's git environment is ignored, a file name is read as it is, a deadline and an output limit apply), makes a directory or a glob declared as a surface go stale like a file, creates a new `.canon/hot.db` readable by its owner only, writes a record file to disk with its name before the command returns, judges a `context-pack add` text by six secret shapes, and makes `canon artifacts prune` delete the stale temp files of a killed blob write. It is BREAKING for callers: the `### Breaking` tables below name every command, key and column that moved.
+
 ### Breaking
 
 **`canon ingest sessions` is removed** (`canon-0-39-session-ingest-removal`, scenarios `ingest.sessions.01-16` retired with their `.feature` file; `ingest.sessions.16` is now `ingest.plans.14`): there is no replacement command. canon is the workflow from intent to evidence and gate; reading another product's transcript files (omp/pi, Claude Code, Codex, Hermes) is not part of it.

@@ -449,7 +449,7 @@ fn repo_root() -> PathBuf {
 /// `paths` of a risk tier keep theirs) and the Added entries (the advisory and the warnings).
 fn release_problems(changelog: &str) -> Vec<String> {
     let mut problems = Vec::new();
-    let Some(unreleased) = changelog.split("\n## ").nth(1).filter(|section| section.starts_with("Unreleased")) else { return vec!["the CHANGELOG has no Unreleased section".to_string()] };
+    let Some(unreleased) = changelog.split("\n## ").find(|section| section.starts_with("0.39.0")) else { return vec!["the CHANGELOG has no 0.39.0 section".to_string()] };
     let sections: Vec<&str> = unreleased.split("\n### ").collect();
     let section = |name: &str| sections.iter().find(|s| s.starts_with(name)).copied();
     let entry_of = |section: &str, needle: &str| -> Option<String> {
@@ -458,7 +458,7 @@ fn release_problems(changelog: &str) -> Vec<String> {
         Some(lines[start..].iter().enumerate().take_while(|(i, line)| *i == 0 || line.starts_with("  ")).map(|(_, line)| *line).collect::<Vec<_>>().join("\n"))
     };
     match section("Changed").and_then(|changed| entry_of(changed, "canon-0-39-staleness-scope")) {
-        None => problems.push("Unreleased has no Changed entry for canon-0-39-staleness-scope".to_string()),
+        None => problems.push("0.39.0 has no Changed entry for canon-0-39-staleness-scope".to_string()),
         Some(entry) => {
             for needle in ["src/**", "`Cargo.toml`", "`**`", "`paths`", "next release that breaks compatibility", "stale-evidence", "code.exclude"] {
                 if !entry.contains(needle) {
@@ -468,7 +468,7 @@ fn release_problems(changelog: &str) -> Vec<String> {
         }
     }
     match section("Added") {
-        None => problems.push("Unreleased has no Added section".to_string()),
+        None => problems.push("0.39.0 has no Added section".to_string()),
         Some(added) => {
             for needle in ["staleness_unresolvable", "STALENESS_UNRESOLVABLE", "SURFACE_REF_UNMATCHED", "base_missing", "base_not_ancestor", "git_unavailable", "git fetch --unshallow"] {
                 if !added.contains(needle) {
@@ -490,12 +490,12 @@ fn gate_staleness_scope_13_the_changelog_says_the_new_rule_the_advisory_and_the_
 /// gate.staleness-scope.14 (F5, failure path): a CHANGELOG without the entry, or without a piece of it, is named by what it lacks.
 #[test]
 fn gate_staleness_scope_14_a_changelog_without_the_entry_or_a_piece_of_it_is_named() {
-    let without = "# Changelog\n\n## Unreleased\n\n### Changed\n\n- an unrelated change\n\n## 0.38.0\n";
+    let without = "# Changelog\n\n## 0.39.0\n\n### Changed\n\n- an unrelated change\n\n## 0.38.0\n";
     let problems = release_problems(without);
-    assert_eq!(problems[0], "Unreleased has no Changed entry for canon-0-39-staleness-scope");
-    assert_eq!(problems[1], "Unreleased has no Added section");
+    assert_eq!(problems[0], "0.39.0 has no Changed entry for canon-0-39-staleness-scope");
+    assert_eq!(problems[1], "0.39.0 has no Added section");
 
-    let thin = "# Changelog\n\n## Unreleased\n\n### Changed\n\n- **x** (`canon-0-39-staleness-scope`): `src/**` is stale-evidence.\n\n### Added\n\n- `STALENESS_UNRESOLVABLE`.\n\n## 0.38.0\n";
+    let thin = "# Changelog\n\n## 0.39.0\n\n### Changed\n\n- **x** (`canon-0-39-staleness-scope`): `src/**` is stale-evidence.\n\n### Added\n\n- `STALENESS_UNRESOLVABLE`.\n\n## 0.38.0\n";
     let problems = release_problems(thin);
     assert!(problems.contains(&"the Changed entry does not say `next release that breaks compatibility`".to_string()), "{problems:?}");
     assert!(problems.contains(&"the Added section does not say `SURFACE_REF_UNMATCHED`".to_string()), "{problems:?}");

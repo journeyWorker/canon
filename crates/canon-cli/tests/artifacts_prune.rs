@@ -1087,10 +1087,10 @@ fn temp_release_problems(guides: &[(&str, String)], changelog: &str) -> Vec<Stri
             problems.push(format!("the guide `{name}` never names the stale `.tmp-` files"));
         }
     }
-    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("Unreleased"));
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.39.0"));
     let entry = unreleased.and_then(|section| section.split("\n- **").find(|entry| entry.contains("canon-0-39-prune-temps")));
     match entry {
-        None => problems.push("the Unreleased section has no entry of `canon-0-39-prune-temps`".to_string()),
+        None => problems.push("the 0.39.0 section has no entry of `canon-0-39-prune-temps`".to_string()),
         Some(entry) => {
             for (what, needle) in [("that prune deletes them", "`canon artifacts prune` deletes the stale temp files"), ("that verify counts them", "`canon artifacts verify` counts them"), ("`data.staleTemps`", "data.staleTemps"), ("the five minutes", "five minutes"), ("that git may hold one", "take it out of the commit")] {
                 if !entry.contains(needle) {
@@ -1121,7 +1121,7 @@ fn artifacts_prune_27_a_release_without_the_temp_file_announcement_fails_the_rel
     let repo = new_repo(None);
     let (mut guides, changelog) = (guides(&repo), changelog());
     let without_entry = changelog.replace("canon-0-39-prune-temps", "canon-0-39-other");
-    assert_eq!(temp_release_problems(&guides, &without_entry), ["the Unreleased section has no entry of `canon-0-39-prune-temps`"]);
+    assert_eq!(temp_release_problems(&guides, &without_entry), ["the 0.39.0 section has no entry of `canon-0-39-prune-temps`"]);
     let thin = changelog.replace("take it out of the commit", "ignore it");
     assert_eq!(temp_release_problems(&guides, &thin), ["the entry does not say that git may hold one (`take it out of the commit`)"]);
     guides[1].1 = guides[1].1.replace(".tmp-", "tmp");

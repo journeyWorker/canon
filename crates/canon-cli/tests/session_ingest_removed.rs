@@ -119,7 +119,7 @@ fn ingest_removal_12_the_readme_architecture_and_website_do_not_name_the_removed
 #[test]
 fn ingest_removal_13_the_changelog_lists_what_was_removed() {
     let changelog = fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("Unreleased") || section.starts_with("0.39")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.39")).unwrap_or_default();
     for needed in [
         "`canon ingest sessions`",
         "`CANON_INGEST_CLAUDE_SESSIONS_DIR`",
