@@ -1,0 +1,46 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-08T06:39:10.207701Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-clippy-ci",
+    "canon-0-30-spec-backfill",
+    "canon-0-30-ledger-naming",
+    "canon-0-31-ci",
+    "canon-0-31-fixes",
+    "canon-0-31-cli-ids",
+    "canon-0-32-changelog-just",
+    "canon-0-33-atip-l0",
+    "canon-0-36-evidence-audit",
+    "canon-0-37-approval-evidence",
+    "canon-0-38-code-scopes",
+    "canon-0-39-staleness-scope",
+    "canon-0-39-git-boundary"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-oco",
+      "role": "orchestrator"
+    },
+    "change": "canon-0-39-git-boundary",
+    "reason": "0.39 changes reopen the subject"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-oco",
+      "role": "orchestrator"
+    },
+    "reason": "0.39 changes reopen the subject"
+  },
+  "subject_id": "gate-trust-spine",
+  "summary": "",
+  "title": "Gate: the trust-spine evidence gate and its failure classes"
+}

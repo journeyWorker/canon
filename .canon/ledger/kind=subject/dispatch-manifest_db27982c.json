@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-11-08T06:39:24.466742Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-fixes",
+    "canon-0-33-atip-l0",
+    "canon-0-34-atip-1-1",
+    "canon-0-39-secret-scan"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-oco",
+      "role": "orchestrator"
+    },
+    "change": "canon-0-39-secret-scan",
+    "reason": "0.39 changes reopen the subject"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-oco",
+      "role": "orchestrator"
+    },
+    "reason": "0.39 changes reopen the subject"
+  },
+  "subject_id": "dispatch-manifest",
+  "summary": "",
+  "title": "Dispatch: run manifests and injected guidance"
+}
