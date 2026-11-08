@@ -17,8 +17,9 @@ fn markdown_under(dir: &Path, found: &mut Vec<PathBuf>) {
     }
 }
 
+/// dispatch.secret-scan.03 (F1): no `.md` under `canon/`, `docs/` and `.canon/` holds a secret span.
 #[test]
-fn no_markdown_file_of_the_repository_holds_a_secret_span() {
+fn dispatch_secret_scan_03_no_markdown_file_of_the_repository_holds_a_secret_span() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut files = Vec::new();
     for dir in ["canon", "docs", ".canon"] {

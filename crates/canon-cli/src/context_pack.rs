@@ -766,8 +766,9 @@ mod tests {
         assert!(matches!(create(dir.path(), &spec), Err(ContextPackError::SecretDetected { .. })));
     }
 
+    /// dispatch.secret-scan.13 (F2 failure path): the refusal names the file, the line and the rule, never the value, and stores nothing.
     #[test]
-    fn a_secret_refusal_names_the_file_the_line_and_the_rule_and_stores_nothing() {
+    fn dispatch_secret_scan_13_a_secret_refusal_names_the_file_the_line_and_the_rule_and_stores_nothing() {
         let dir = fixture();
         fs::write(dir.path().join("secret.txt"), b"one\ntwo\nkey AKIAIOSFODNN7EXAMPLE\n").unwrap();
         let spec = ContextPackSpec { selected_docs: vec![PathBuf::from("secret.txt")], ..Default::default() };
@@ -777,9 +778,9 @@ mod tests {
         assert!(!dir.path().join(CONTEXT_PACK_DIR).exists(), "a refusal stores nothing");
     }
 
-    /// F3: a text is judged the same whether a file holds it or an injected guidance does (each as written, not as its JSON).
+    /// dispatch.secret-scan.17 (F3 failure path): a text is judged the same whether a file holds it or an injected guidance does (each as written, not as its JSON).
     #[test]
-    fn a_text_gets_the_same_verdict_as_a_file_and_as_guidance() {
+    fn dispatch_secret_scan_17_a_text_gets_the_same_verdict_as_a_file_and_as_guidance() {
         let texts = [
             "risk-high",
             "task-list disk-usage mask-all Akiashi",
@@ -807,8 +808,9 @@ mod tests {
         }
     }
 
+    /// dispatch.secret-scan.16 (F3): a guidance title is scanned and the refusal names the strategy.
     #[test]
-    fn a_guidance_title_is_scanned_and_the_refusal_names_the_strategy() {
+    fn dispatch_secret_scan_16_a_guidance_title_is_scanned_and_the_refusal_names_the_strategy() {
         let dir = fixture();
         let guidance = ContextPackSpec { injected_guidance: vec![StrategyRef::new("s-9", "token\nsk-proj-abcdEFGH_ijkl-mnop1234", "plain")], ..Default::default() };
         let message = create(dir.path(), &guidance).unwrap_err().to_string();
@@ -834,17 +836,18 @@ mod tests {
         dir
     }
 
+    /// dispatch.secret-scan.26 (F5): the pack stores' status entries and the empty ones are dropped.
     #[test]
-    fn the_status_entries_of_the_pack_stores_and_the_empty_ones_are_dropped() {
+    fn dispatch_secret_scan_26_the_status_entries_of_the_pack_stores_and_the_empty_ones_are_dropped() {
         assert_eq!(filter_registry_status(b""), b"");
         assert_eq!(filter_registry_status(b"\0"), b"");
         assert_eq!(filter_registry_status(b"?? a\0"), b"?? a\0");
         assert_eq!(filter_registry_status(b"?? .canon/context-packs/\0?? a\0 M b\0?? .canon/dispatch/r.json\0?? .canon/prompts/\0"), b"?? a\0 M b\0");
     }
 
-    /// F5: a clean repository's pack is not dirty and carries the digest of "clean", also when an earlier pack left files in the pack store.
+    /// dispatch.secret-scan.24 (F5): a clean repository's pack is not dirty and carries the digest of "clean", also when an earlier pack left files in the pack store.
     #[test]
-    fn a_clean_repository_is_not_dirty_and_a_pack_it_left_does_not_dirty_it() {
+    fn dispatch_secret_scan_24_a_clean_repository_is_not_dirty_and_a_pack_it_left_does_not_dirty_it() {
         let dir = committed_fixture();
         let first = create(dir.path(), &ContextPackSpec::default()).unwrap();
         assert!(first.repo.commit.is_some());
@@ -858,9 +861,9 @@ mod tests {
         verify(dir.path(), &first.id).unwrap();
     }
 
-    /// F5: a changed tracked file or an untracked file outside the pack stores is dirty, and the digest is the diff, a NUL and each status entry with one NUL.
+    /// dispatch.secret-scan.25 (F5 failure path): a changed tracked file or an untracked file outside the pack stores is dirty, and the digest is the diff, a NUL and each status entry with one NUL.
     #[test]
-    fn a_change_outside_the_pack_stores_is_dirty_and_each_status_entry_ends_in_one_nul() {
+    fn dispatch_secret_scan_25_a_change_outside_the_pack_stores_is_dirty_and_each_status_entry_ends_in_one_nul() {
         let dir = committed_fixture();
         create(dir.path(), &ContextPackSpec::default()).unwrap();
         fs::write(dir.path().join("stray.txt"), b"x\n").unwrap();
@@ -879,9 +882,9 @@ mod tests {
         assert_eq!(tracked.repo.state_digest, digest(&state));
     }
 
-    /// F5: no git repository and no commit are read as no change, as before.
+    /// dispatch.secret-scan.27 (F5): no git repository and no commit are read as no change, as before.
     #[test]
-    fn no_repository_and_no_commit_are_no_change() {
+    fn dispatch_secret_scan_27_no_repository_and_no_commit_are_no_change() {
         let plain = tempdir().unwrap();
         let pack = create(plain.path(), &ContextPackSpec::default()).unwrap();
         assert_eq!((pack.repo.commit, pack.repo.dirty), (None, false));

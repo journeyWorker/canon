@@ -91,30 +91,54 @@ fn table() -> Vec<(String, Option<&'static str>)> {
     rows
 }
 
-/// F1, F2 and F4: every line of the table becomes a pack or is refused as the table says, and the scanner and `context-pack add` agree on each.
-#[test]
-fn every_line_of_the_table_is_judged_the_same_by_the_scanner_and_by_context_pack_add() {
-    let repo = repo();
-    for (line, rule) in table() {
-        let text = format!("{line}\n");
-        let spans = secret_scan::scan(&text);
-        assert_eq!(spans.first().map(|span| span.kind.rule_name()), rule, "the scanner on `{line}`");
-        match (add_file(repo.path(), &text), rule) {
-            (Ok(id), None) => assert!(id.starts_with("sha256:"), "`{line}`: {id}"),
-            (Err(error), Some(rule)) => {
-                assert_eq!(error["code"], "CONTEXT_INPUT_INVALID", "`{line}`: {error}");
-                assert_eq!(error["reason"], "SECRET", "`{line}`: {error}");
-                assert_eq!(error["message"], format!("selected context input contains plaintext secret material: doc.md (line 1, {rule})"), "`{line}`");
-            }
-            (Ok(_), Some(rule)) => panic!("`{line}` should be refused ({rule}) but became a pack"),
-            (Err(error), None) => panic!("`{line}` should become a pack but was refused: {error}"),
+/// One row of the table: the scanner and `context-pack add` both judge `line`, and judge it as the table says (`None`: plain text that becomes a pack).
+fn judge(repo: &Path, line: &str, rule: Option<&str>) {
+    let text = format!("{line}\n");
+    let spans = secret_scan::scan(&text);
+    assert_eq!(spans.first().map(|span| span.kind.rule_name()), rule, "the scanner on `{line}`");
+    match (add_file(repo, &text), rule) {
+        (Ok(id), None) => assert!(id.starts_with("sha256:"), "`{line}`: {id}"),
+        (Err(error), Some(rule)) => {
+            assert_eq!(error["code"], "CONTEXT_INPUT_INVALID", "`{line}`: {error}");
+            assert_eq!(error["reason"], "SECRET", "`{line}`: {error}");
+            assert_eq!(error["message"], format!("selected context input contains plaintext secret material: doc.md (line 1, {rule})"), "`{line}`");
         }
+        (Ok(_), Some(rule)) => panic!("`{line}` should be refused ({rule}) but became a pack"),
+        (Err(error), None) => panic!("`{line}` should become a pack but was refused: {error}"),
     }
 }
 
-/// F2: a refusal names the file, the line and the rule, never the value, and stores nothing.
+/// dispatch.secret-scan.01 (F1): the lines of the table that are plain text, the lookalikes and the lines just below a rule's minimum length, become packs.
 #[test]
-fn a_refusal_names_the_file_the_line_and_the_rule_and_stores_nothing() {
+fn dispatch_secret_scan_01_the_lines_that_only_look_like_secrets_become_packs() {
+    let repo = repo();
+    for (line, rule) in table().into_iter().filter(|(_, rule)| rule.is_none()) {
+        judge(repo.path(), &line, rule);
+    }
+}
+
+/// dispatch.secret-scan.14 (F2): the lines of the table that match a rule are refused with `CONTEXT_INPUT_INVALID`, reason `SECRET`, naming the rule.
+#[test]
+fn dispatch_secret_scan_14_the_lines_that_match_a_rule_are_refused_naming_the_rule() {
+    let repo = repo();
+    for (line, rule) in table().into_iter().filter(|(_, rule)| rule.is_some()) {
+        judge(repo.path(), &line, rule);
+    }
+}
+
+/// dispatch.secret-scan.23 (F4 failure path): every line of the table is judged as the table says, the scanner and `context-pack add` agree on each,
+/// and a line they judge differently fails the test.
+#[test]
+fn dispatch_secret_scan_23_every_line_of_the_table_is_judged_the_same_by_the_scanner_and_by_context_pack_add() {
+    let repo = repo();
+    for (line, rule) in table() {
+        judge(repo.path(), &line, rule);
+    }
+}
+
+/// dispatch.secret-scan.13 (F2 failure path): a refusal names the file, the line and the rule, never the value, and stores nothing.
+#[test]
+fn dispatch_secret_scan_13_a_refusal_names_the_file_the_line_and_the_rule_and_stores_nothing() {
     let repo = repo();
     let d = repo.path();
     let key = format!("AKIA{}", upper(16));
@@ -149,9 +173,9 @@ fn seed_strategy(repo: &Path, content: &str) -> StrategyId {
     id
 }
 
-/// F3: `dispatch begin` scans the injected guidance as written; the same text as a file or as guidance gets the same verdict.
+/// dispatch.secret-scan.15 (F3 failure path): `dispatch begin` scans the injected guidance as written and refuses a secret, naming the strategy; plain guidance becomes a pack.
 #[test]
-fn injected_guidance_is_scanned_with_the_same_rules_as_a_file() {
+fn dispatch_secret_scan_15_injected_guidance_is_scanned_with_the_same_rules_as_a_file() {
     let key = format!("AKIA{}", upper(16));
     let secret = repo();
     let id = seed_strategy(secret.path(), &format!("do not\ncommit {key}"));
@@ -171,9 +195,9 @@ fn injected_guidance_is_scanned_with_the_same_rules_as_a_file() {
     assert_eq!(b["data"]["injectedGuidance"][0]["content"], "risk-high");
 }
 
-/// F3: a quoted value in guidance is judged as written, not as its JSON text (whose `\"` would hide the quote), so the verdict is the file's.
+/// dispatch.secret-scan.17 (F3 failure path): a quoted value in guidance is judged as written, not as its JSON text (whose `\"` would hide the quote), so the verdict is the file's.
 #[test]
-fn a_quoted_value_in_guidance_is_refused_like_the_same_text_in_a_file() {
+fn dispatch_secret_scan_17_a_quoted_value_in_guidance_is_refused_like_the_same_text_in_a_file() {
     let repo = repo();
     let d = repo.path();
     for (text, rule) in [(r#"{"api_key": "abcd1234efgh"}"#, Some("named-value")), (r#"{"api_key": "short"}"#, None), ("risk-high", None)] {

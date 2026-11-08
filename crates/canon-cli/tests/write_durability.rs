@@ -45,13 +45,15 @@ fn changelog_problems(section: &str) -> Vec<String> {
     problems
 }
 
+/// tier.durability.15 (F8): the CHANGELOG names the fixes and the new `hot.db` mode.
 #[test]
-fn the_changelog_names_the_durability_fixes_and_the_new_hot_db_mode() {
+fn tier_durability_15_the_changelog_names_the_durability_fixes_and_the_new_hot_db_mode() {
     assert_eq!(changelog_problems(&section()), Vec::<String>::new());
 }
 
+/// tier.durability.16 (F8 failure path): a CHANGELOG without the entry or a piece of it is named by the release check.
 #[test]
-fn a_changelog_without_the_entry_or_a_piece_of_it_is_named_by_the_release_check() {
+fn tier_durability_16_a_changelog_without_the_entry_or_a_piece_of_it_is_named_by_the_release_check() {
     let section = section();
     assert_eq!(changelog_problems("## Unreleased\n\n### Fixed\n\n- Something else.\n").len(), 2 + 6 + 3, "an empty section names both entries and each piece of them");
     let without_entry: String = section.lines().filter(|l| !l.contains("canon-0-39-write-durability")).collect::<Vec<_>>().join("\n");
@@ -62,10 +64,10 @@ fn a_changelog_without_the_entry_or_a_piece_of_it_is_named_by_the_release_check(
     assert!(changelog_problems(&without_lock).iter().any(|p| p.contains("BEGIN IMMEDIATE")), "{:?}", changelog_problems(&without_lock));
 }
 
-/// F4: the fixed temp names of the four private write copies (`canon.yaml`, the legacy migration, the brief migration, the strategy activation file) are
+/// tier.durability.06 (F4): the fixed temp names of the four private write copies (`canon.yaml`, the legacy migration, the brief migration, the strategy activation file) are
 /// gone from every crate's source; the one write path is `canon_store::write_atomic`.
 #[test]
-fn no_source_outside_canon_store_keeps_a_private_temp_and_rename_write() {
+fn tier_durability_06_no_source_outside_canon_store_keeps_a_private_temp_and_rename_write() {
     fn sources(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
         for entry in std::fs::read_dir(dir).unwrap().flatten() {
             let path = entry.path();
