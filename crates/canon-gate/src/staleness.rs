@@ -696,7 +696,7 @@ mod tests {
     /// A commit that adds a file whose name is no UTF-8 string: the diff answer is unknown, never "stale" and never
     /// "clean" for the surface it also changed.
     #[test]
-    fn a_name_that_is_not_utf8_leaves_the_surface_query_unanswered_and_the_evidence_not_stale() {
+    fn gate_git_boundary_07_a_name_that_is_not_utf8_leaves_the_surface_query_unanswered_and_the_evidence_not_stale() {
         let dir = TempDir::new().unwrap();
         let repo = dir.path();
         init_repo(repo);

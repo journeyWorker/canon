@@ -379,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn a_commit_that_changed_a_name_that_is_not_utf8_closes_the_risk_check_as_an_unknown_analysis() {
+    fn gate_git_boundary_07_a_commit_that_changed_a_name_that_is_not_utf8_closes_the_risk_check_as_an_unknown_analysis() {
         let (dir, head) = repo_with_a_name_that_is_not_utf8();
         let mut ctx = context(vec![record("src/auth/login.rs", None)]);
         ctx.ctx.repo = dir.path().to_path_buf();

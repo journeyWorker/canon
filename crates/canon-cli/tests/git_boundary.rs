@@ -328,6 +328,9 @@ fn gate_git_boundary_07_a_name_that_is_not_utf8_gives_no_surface_and_never_a_sta
     let added = canon_env(repo, &evidence_add_args("surface", &["--surface-ref", "src/main.rs"]), &[], None);
     assert_eq!(added.status.code(), Some(0), "{}", String::from_utf8_lossy(&added.stderr));
     commit_all(repo, "evidence");
+    // The same commit changes the declared surface and adds the name: a lossy read of the list would call the evidence stale.
+    write(repo, "src/main.rs", "fn main() { /* changed */ }\n");
+    git(repo, &["add", "-A"]);
     let sha = commit_a_name_that_is_not_utf8(repo);
 
     let payload = canon_env(repo, &["evidence", "approval-payload", "--scenario", SCENARIO, "--project", "root", "--rev", &sha, "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z"], &[], None);
