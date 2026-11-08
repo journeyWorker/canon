@@ -1167,7 +1167,7 @@ routing:
     /// record kinds still loads. The keys route nothing, their values are
     /// never read, and the loader lists them for `canon migrate`.
     #[test]
-    fn retired_kind_keys_load_route_nothing_and_are_listed() {
+    fn tier_retired_01_retired_kind_keys_load_route_nothing_and_are_listed() {
         let yaml = "routing:\n  session: not-a-rung\n  event: [1, 2]\n  task: hot\naging:\n  event: whatever\n";
         let policy = TierPolicy::from_yaml(yaml).unwrap();
         assert_eq!(policy.retired_kind_keys, ["aging.event", "routing.event", "routing.session"]);
@@ -1177,7 +1177,7 @@ routing:
     }
 
     #[test]
-    fn a_misspelled_retired_kind_is_still_a_config_error() {
+    fn tier_retired_02_a_misspelled_retired_kind_is_still_a_config_error() {
         let err = TierPolicy::from_yaml("routing:\n  sesion: hot\n").unwrap_err();
         assert!(matches!(err, TierPolicyError::UnknownRecordKind { .. }), "{err}");
     }

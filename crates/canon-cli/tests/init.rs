@@ -538,12 +538,12 @@ fn check_config_fails_loud_on_a_sqlite_entry_missing_path() {
     assert!(report.contains("path"), "the parse error must name the missing `path` field: {report}");
 }
 
-/// spec.md "Fresh init writes without docker" — the s32 headline
+/// ingest.removal.14 (F2): spec.md "Fresh init writes without docker" — the s32 headline
 /// scenario: a bare `canon init` repo (no docker, no `CANON_*` env)
 /// immediately runs a Run-writing command (`canon dispatch begin`)
 /// cleanly, persisting into the scaffolded sqlite hot tier.
 #[test]
-fn init_then_dispatch_begin_writes_the_sqlite_hot_tier_with_zero_env_or_services() {
+fn ingest_removal_14_init_then_dispatch_begin_writes_the_sqlite_hot_tier_with_zero_env_or_services() {
     let dir = tempfile::tempdir().unwrap();
     assert!(run_canon(&["init", "--repo", "."], dir.path()).status.success());
     assert!(!dir.path().join(".canon/hot.db").exists(), "canon init itself must not eagerly create the hot tier's db file");

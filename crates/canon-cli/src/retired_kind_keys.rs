@@ -55,7 +55,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_retired_keys_are_listed_in_one_sorted_message() {
+    fn tier_retired_01_the_retired_keys_are_listed_in_one_sorted_message() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("canon.yaml"), "routing:\n  session: hot\n  event: hot\n  task: hot\naging:\n  event: { after: 7d, to: cold }\n").unwrap();
         let keys = found(dir.path());
@@ -65,7 +65,7 @@ mod tests {
     }
 
     #[test]
-    fn a_config_without_the_keys_or_one_that_does_not_parse_has_none() {
+    fn tier_retired_02_a_config_without_the_keys_or_one_that_does_not_parse_has_none() {
         let dir = tempfile::tempdir().unwrap();
         assert!(found(dir.path()).is_empty(), "no canon.yaml");
         std::fs::write(dir.path().join("canon.yaml"), "routing:\n  task: hot\n").unwrap();

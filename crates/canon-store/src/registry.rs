@@ -798,7 +798,7 @@ aging:
     }
 
     #[test]
-    fn a_retired_kind_is_purged_from_every_configured_tier_by_its_body_at_and_nothing_else() {
+    fn tier_retired_07_a_retired_kind_is_purged_from_every_configured_tier_by_its_body_at_and_nothing_else() {
         let dir = tempfile::tempdir().unwrap();
         let ledger = dir.path().join("ledger");
         let (old, new) = (retired_row("s-old", "2026-01-01T00:00:00Z"), retired_row("s-new", "2027-06-01T00:00:00Z"));
@@ -854,7 +854,7 @@ aging:
     }
 
     #[test]
-    fn a_retired_purge_needs_no_routing_and_names_only_configured_tiers() {
+    fn tier_retired_07_a_retired_purge_needs_no_routing_and_names_only_configured_tiers() {
         let dir = tempfile::tempdir().unwrap();
         let policy = TierPolicy::from_yaml("tiers:\n  local: { backend: git, root: ledger }\n").unwrap();
         write_json(&dir.path().join("ledger"), "kind=session/s_aaaaaaaa.json", &retired_row("s", "2026-01-01T00:00:00Z").to_string());
@@ -868,7 +868,7 @@ aging:
 
     #[cfg(unix)]
     #[test]
-    fn a_retired_purge_refuses_a_symlink() {
+    fn tier_retired_08_a_retired_purge_refuses_a_symlink() {
         let dir = tempfile::tempdir().unwrap();
         let ledger = dir.path().join("ledger");
         fs::create_dir_all(ledger.join("kind=session")).unwrap();
@@ -880,7 +880,7 @@ aging:
     }
 
     #[test]
-    fn every_other_kind_stays_closed_to_purge() {
+    fn tier_retired_08_every_other_kind_stays_closed_to_purge() {
         let registry = TierRegistry::new(TierPolicy::from_yaml("").unwrap(), None, None, None, None);
         let err = registry.purge(RecordKind::Change, Utc::now(), true).unwrap_err();
         assert_eq!(err.to_string(), "purge kind `change` is not allowed; allowed kinds: run, trajectory, session (retired), event (retired)");
