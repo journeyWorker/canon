@@ -482,19 +482,49 @@ fn gate_git_boundary_14_the_scan_is_wired_into_just_lint_the_clippy_job_and_the_
 
 // ── F5: the changelog ──
 
+/// The release check of F5: what the `Unreleased` section's git-boundary entry fails to say, one line per missing thing. Empty when the entry is complete.
+fn changelog_problems(changelog: &str) -> Vec<String> {
+    let Some(unreleased) = changelog.split("\n## ").nth(1).filter(|section| section.starts_with("Unreleased")) else {
+        return vec!["the first section is not Unreleased".to_string()];
+    };
+    let Some(changed) = unreleased.split("\n### Changed").nth(1) else {
+        return vec!["Unreleased has no Changed section".to_string()];
+    };
+    let lines: Vec<&str> = changed.lines().collect();
+    let Some(start) = lines.iter().position(|line| line.contains("canon-0-39-git-boundary")) else {
+        return vec!["no entry names `canon-0-39-git-boundary`".to_string()];
+    };
+    // The entry is its bullet and the indented bullets under it.
+    let entry = lines[start..].iter().enumerate().take_while(|(i, line)| *i == 0 || line.starts_with("  ")).map(|(_, line)| *line).collect::<Vec<_>>().join("\n");
+    ["GIT_DIR", "GIT_INDEX_FILE", "non-ASCII", "300 seconds", "8 MiB", "64 MiB", "approve again"]
+        .iter()
+        .filter(|needle| !entry.contains(**needle))
+        .map(|needle| format!("the entry does not say `{needle}`"))
+        .collect()
+}
+
 /// gate.git-boundary.15 (F5): the CHANGELOG's `Unreleased` section has the entry under Changed: it says the environment is ignored, a non-ASCII name is read as it
 /// is, the deadline and the limits, and that an approval recorded for such a commit is made again.
 #[test]
 fn gate_git_boundary_15_the_changelog_says_what_changed_and_when_to_approve_again() {
     let changelog = std::fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## ").nth(1).expect("an Unreleased section");
-    assert!(unreleased.starts_with("Unreleased"), "the first section is Unreleased: {}", &unreleased[..unreleased.len().min(40)]);
-    let changed = unreleased.split("\n### Changed").nth(1).unwrap_or_else(|| panic!("Unreleased has a Changed section"));
-    let lines: Vec<&str> = changed.lines().collect();
-    let start = lines.iter().position(|line| line.contains("canon-0-39-git-boundary")).expect("an entry names `canon-0-39-git-boundary`");
-    // The entry is its bullet and the indented bullets under it.
-    let entry = lines[start..].iter().enumerate().take_while(|(i, line)| *i == 0 || line.starts_with("  ")).map(|(_, line)| *line).collect::<Vec<_>>().join("\n");
+    assert_eq!(changelog_problems(&changelog), Vec::<String>::new());
+}
+
+/// gate.git-boundary.16 (F5, failure): a CHANGELOG with no git-boundary entry, or an entry that leaves out one of the things to say, fails the release check
+/// and names the one thing it never says; the real text passes.
+#[test]
+fn gate_git_boundary_16_a_changelog_entry_missing_an_item_fails_the_release_check() {
+    let changelog = std::fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
+    assert_eq!(changelog_problems(&changelog), Vec::<String>::new(), "the real text passes");
+    let without_entry = changelog.replace("canon-0-39-git-boundary", "canon-0-39-other");
+    assert_eq!(changelog_problems(&without_entry), ["no entry names `canon-0-39-git-boundary`"]);
+    // Each item is taken out of the entry alone, so the one failure is the one item.
+    let entry_start = changelog.find("`canon-0-39-git-boundary`").expect("the entry");
+    let entry_end = entry_start + changelog[entry_start..].find("\n\n").unwrap_or(changelog.len() - entry_start);
     for needle in ["GIT_DIR", "GIT_INDEX_FILE", "non-ASCII", "300 seconds", "8 MiB", "64 MiB", "approve again"] {
-        assert!(entry.contains(needle), "the entry does not say `{needle}`: {entry}");
+        let entry = &changelog[entry_start..entry_end];
+        let thin = format!("{}{}{}", &changelog[..entry_start], entry.replace(needle, "[removed]"), &changelog[entry_end..]);
+        assert_eq!(changelog_problems(&thin), [format!("the entry does not say `{needle}`")], "{needle}");
     }
 }

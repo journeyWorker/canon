@@ -849,3 +849,24 @@ fn ingest_plans_12_a_plans_source_naming_canon_is_refused() {
     );
     assert!(!dir.path().join(".canon/ledger").exists(), "nothing is imported");
 }
+
+/// ingest.removal.15 (F2 failure path): a plans source that holds no readable change (its root one level above `changes/`) is refused as in 0.38: exit 2,
+/// `INGEST_SOURCE_INVALID`, no data, no record and no plan cursor file.
+#[test]
+fn ingest_removal_15_a_source_with_no_readable_change_is_refused_and_writes_no_record_and_no_cursor_file() {
+    let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(
+        dir.path(),
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec\n",
+    );
+    write_change_dir(dir.path(), "widget-feature", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done"]);
+    let out = run_canon(&["ingest", "plans", "--json"], dir.path());
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    let body: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(body["error"]["code"], "INGEST_SOURCE_INVALID", "{body}");
+    assert!(body.get("data").is_none(), "{body}");
+    assert!(!dir.path().join(".canon/ledger/kind=change").exists() && !dir.path().join(".canon/ledger/kind=task").exists(), "no record is written");
+    let cursors = dir.path().join(".canon/ingest/cursors");
+    let plan_cursors = std::fs::read_dir(&cursors).map_or(0, |rd| rd.flatten().filter(|e| e.file_name().to_string_lossy().starts_with("plan-")).count());
+    assert_eq!(plan_cursors, 0, "no plan cursor file exists");
+}

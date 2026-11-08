@@ -166,3 +166,15 @@ Feature: ingest removal
     When canon dispatch begin runs there
     Then it exits 0 and the sqlite file exists
     And no service and no environment variable was needed
+
+  # canon: {"schema":1,"at":"2026-11-08T08:20:21Z","actor":{"agent_id":"impl-0-39","role":"implementer","session_id":"s-0-39-impl"}}
+  @subject:ingest-pipelines
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-39-session-ingest-removal.F2
+  @ingest.removal.15
+  Scenario: A plans source that yields no record is refused as before and writes neither a record nor a cursor file
+    Given a plans source whose root is one level above the change directories, so it holds no readable change
+    When canon ingest plans runs on it
+    Then it exits 2 with INGEST_SOURCE_INVALID and no data, as 0.38 did
+    And no change or task record is written and no plan cursor file exists under .canon/ingest/cursors

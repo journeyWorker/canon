@@ -135,3 +135,15 @@ Feature: gate git-boundary
   @gate.git-boundary.15
   Scenario: The CHANGELOG says the environment is ignored, the names, the deadline and limits, and when to approve again
     Given a step
+
+  # canon: {"schema":1,"at":"2026-11-08T08:20:08Z","actor":{"agent_id":"impl-0-39","role":"implementer","session_id":"s-0-39-impl"}}
+  @subject:gate-trust-spine
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-39-git-boundary.F5
+  @gate.git-boundary.16
+  Scenario: A CHANGELOG entry that leaves out the environment, the names, the limits or the re-approval note fails the release check, each missing item named
+    Given the CHANGELOG of this repo, and copies of it with no git-boundary entry, and with the entry lacking in turn GIT_DIR, GIT_INDEX_FILE, non-ASCII, 300 seconds, 8 MiB, 64 MiB or the sentence that an approval is to be made again
+    When the release check reads each copy
+    Then it passes on the real text and fails on each copy
+    And each failure names the entry or the one item the entry never says

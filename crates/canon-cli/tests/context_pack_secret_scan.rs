@@ -156,6 +156,34 @@ fn dispatch_secret_scan_13_a_refusal_names_the_file_the_line_and_the_rule_and_st
     assert!(!d.join(".canon/context-packs").exists());
 }
 
+/// dispatch.secret-scan.30 (F1 failure path): a manifest that selects a plain document and a document holding a secret is refused as a whole, naming the
+/// second file and its line and no value, and the refused selection leaves no pack; the plain document alone becomes a pack.
+#[test]
+fn dispatch_secret_scan_30_a_selection_with_a_secret_document_is_refused_as_a_whole_and_stores_no_pack() {
+    let repo = repo();
+    let d = repo.path();
+    let key = format!("AKIA{}", upper(16));
+    std::fs::write(d.join("plain.md"), "risk-high\nsk-live-123456\n").unwrap();
+    std::fs::write(d.join("secret.md"), format!("first line\nthe key is {key}\n")).unwrap();
+    let both = MANIFEST.replace(r#"["doc.md"]"#, r#"["plain.md","secret.md"]"#);
+    std::fs::write(d.join("both.json"), both).unwrap();
+    let out = canon(d, &["context-pack", "add", "--manifest", "both.json"]);
+    let b = body(&out);
+    assert_eq!((out.status.code(), &b["ok"]), (Some(2), &Value::Bool(false)), "{b}");
+    let error = &b["error"];
+    assert_eq!((error["code"].as_str(), error["reason"].as_str()), (Some("CONTEXT_INPUT_INVALID"), Some("SECRET")), "{error}");
+    assert_eq!(error["message"], "selected context input contains plaintext secret material: secret.md (line 2, aws-access-key-id)");
+    assert!(!error["message"].as_str().unwrap().contains(&key) && !error["message"].as_str().unwrap().contains("plain.md"), "{error}");
+    assert!(!d.join(".canon/context-packs").exists(), "the refused selection leaves nothing in the pack store, not even the plain document's pack");
+
+    let only_plain = MANIFEST.replace(r#"["doc.md"]"#, r#"["plain.md"]"#);
+    std::fs::write(d.join("plain.json"), only_plain).unwrap();
+    let out = canon(d, &["context-pack", "add", "--manifest", "plain.json"]);
+    let b = body(&out);
+    assert_eq!((out.status.code(), &b["ok"]), (Some(0), &Value::Bool(true)), "{b}");
+    assert!(b["data"]["id"].as_str().is_some_and(|id| id.starts_with("sha256:")), "{b}");
+}
+
 fn seed_strategy(repo: &Path, content: &str) -> StrategyId {
     let store = ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies"));
     let id = StrategyId::new();

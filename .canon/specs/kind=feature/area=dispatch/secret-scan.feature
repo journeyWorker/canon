@@ -348,3 +348,15 @@ Feature: Context pack secret scan and repository state
     When the release check reads each
     Then it names the missing section or the missing item
     And an entry that has them all is named by nothing
+
+  # canon: {"schema":1,"at":"2026-11-08T08:20:14Z","actor":{"agent_id":"impl-0-39","role":"implementer","session_id":"s-0-39-impl"}}
+  @subject:dispatch-manifest
+  @lane:behavior
+  @case:failure
+  @flow:canon-0-39-secret-scan.F1
+  @dispatch.secret-scan.30
+  Scenario: A selection of a plain document and a document that holds a secret is refused as a whole and stores no pack
+    Given a repo, a plain document, and a second document with an AWS key id on its second line, both selected by one manifest
+    When context-pack add runs on the manifest
+    Then it is refused with CONTEXT_INPUT_INVALID, reason SECRET, naming the second file and its line and no value
+    And the plain document alone becomes a pack, and the refused selection left no pack behind
