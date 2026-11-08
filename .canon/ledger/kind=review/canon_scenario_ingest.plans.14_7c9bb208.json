@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T08:17:07.586225Z",
+  "code_tree": "c0c590e15869a98eda183c476a3a15b15fb1deb6",
+  "kind": "review",
+  "pin": "f66a3ce88671bb0a6615c5d193b59147e53d1cb5",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:ingest_plans_14_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line",
+          "junit:ingest_plans_14_subject_and_change_writes_to_the_hot_store_print_its_location_too",
+          "junit:ingest_plans_14_the_other_hot_writers_print_the_hot_store_location_too"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "085427b934d969c43d5da4157887eee88fbea009b264c01d502c30ff4c279be7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-session-kinds-removal/brief.md"
+  },
+  "review_id": "01M6X3Q3G2FT3PHYZ35MF7YFR6",
+  "reviewer": "rev-0-39-ingest",
+  "scenario_id": "ingest.plans.14",
+  "schema": 2,
+  "worktree_dirty": false
+}

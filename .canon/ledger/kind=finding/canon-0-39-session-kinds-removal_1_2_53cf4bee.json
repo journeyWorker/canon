@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T08:16:49.071053Z",
+  "change_id": "canon-0-39-session-kinds-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/context_index.rs:55",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "c0c590e15869a98eda183c476a3a15b15fb1deb6",
+  "resolution_sha": "f66a3ce88671bb0a6615c5d193b59147e53d1cb5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "context.capability.39"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[standards] every_kind_option_value_is_a_context_kind skips the two retired names for purge and never asserts purge's closed set, so the third Then ('purge's closed values are two of those kinds plus the retired session and event') is only half checked: purge --kind could lose 'trajectory' or gain a third non-kind and the test would still need only 'every non-retired value is a context kind'. spec030_storage_gate asserts the order run, trajectory, session, event in its error text, which covers it indirectly.",
+  "worktree_dirty": false
+}

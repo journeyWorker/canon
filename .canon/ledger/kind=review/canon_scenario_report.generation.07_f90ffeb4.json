@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T08:17:07.586225Z",
+  "code_tree": "c0c590e15869a98eda183c476a3a15b15fb1deb6",
+  "kind": "review",
+  "pin": "f66a3ce88671bb0a6615c5d193b59147e53d1cb5",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:report_generation_07_snapshot_writes_nine_parquet_files_and_a_manifest_listing_exactly_them"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "83ef5e8d5ad6b01f235b169e3c2ab12bd78017a6bddd006cbe2653ace6f904e0",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-session-kinds-removal/brief.md"
+  },
+  "review_id": "01M6X3Q3G2FT3PHYZ35MF7YFR6",
+  "reviewer": "rev-0-39-ingest",
+  "scenario_id": "report.generation.07",
+  "schema": 2,
+  "worktree_dirty": false
+}

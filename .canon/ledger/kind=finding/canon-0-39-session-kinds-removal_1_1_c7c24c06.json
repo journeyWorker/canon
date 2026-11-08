@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T08:16:46.503598Z",
+  "change_id": "canon-0-39-session-kinds-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "fixed",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "c0c590e15869a98eda183c476a3a15b15fb1deb6",
+  "resolution_sha": "f66a3ce88671bb0a6615c5d193b59147e53d1cb5",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "context.capability.39",
+    "report.generation.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[standards] Both scenarios were reworded by this change (context.capability.39: purge's closed values are two kinds plus the retired pair; report.generation.07: nine tables, not ten) but have no evidence for the current text: their only evidence records are the 0.36 (impl-evidence-audit, 2026-11-04) and 0.35 (impl-gateclean, 2026-11-03) ones. The 0.39 run (3994 passed) bound the scenarios whose test names carry their id, and these two tests do not. report.generation.07's old record is bound to snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir, a case that no longer exists (renamed tier_retired_13_snapshot_writes_nine_parquet_files_and_a_manifest_under_the_given_dir in canon-cli/tests/report.rs; canon-report/tests/snapshot.rs still names its nine-table test snapshot_writes_ten_parquet_files_and_a_manifest_listing_exactly_them). context.capability.39's third Then is proved by every_kind_option_value_is_a_context_kind, not by the case its old evidence names (kinds_are_every_record_kind_under_its_user_facing_name). I ran all of these tests and they pass (86 + 78 targeted tests), but a review pins the latest evidence, so I cannot sign either until evidence is recorded for the current text and the cases that prove it: canon evidence add --scenario context.capability.39 and --scenario report.generation.07 with the cases above plus tier_retired_13 / snapshot_writes_ten_... for the report one and every_kind_option_value_is_a_context_kind for the context one. Blast radius: the gate lists them as stale reviews today, so the ship guard would not catch a wrong test.",
+  "worktree_dirty": false
+}
