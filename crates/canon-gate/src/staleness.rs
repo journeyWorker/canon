@@ -57,7 +57,9 @@
 //! A cell that reaches git (a green cell with an `evidence_sha` whose code tree is not the current one) has a
 //! base commit. When the base is not in the repository (`base_missing`: a shallow clone, a pruned commit) or
 //! git cannot answer (`git_unavailable`: no `git`, past its deadline or its output limit, or a failure that is
-//! neither yes nor no), the cell adds nothing, as before; a base that is there but not an ancestor of HEAD (`base_not_ancestor`) is computed as
+//! neither yes nor no), the cell adds nothing, as before. The same goes for the later queries: the changed paths
+//! (`git diff --name-only -z <base>..HEAD`) and the commits behind that git does not answer in time, or answers with a name that is
+//! not UTF-8, make the cell `git_unavailable` (counted once, by `gate check` and `status` alike); a base that is there but not an ancestor of HEAD (`base_not_ancestor`) is computed as
 //! `<base>..HEAD`, as before. [`Unresolvable`] counts the cells of each reason so `canon gate check` and
 //! `canon status` can say so: the verdicts, and the exit status, do not change.
 
@@ -434,7 +436,7 @@ impl GateCheck for StalenessCheck {
 /// [`GateContext::staleness_violations`] and [`GateContext::staleness_unresolvable`], which hold the result for the
 /// command: the staleness check, the risk check and the reports of what could not be read share it.
 pub(crate) fn compute(ctx: &GateContext) -> Staleness {
-    evaluate(ctx, ctx.code_tree.as_deref(), true)
+    evaluate(ctx, ctx.code_tree.as_deref())
 }
 
 /// The cells whose base commit git could not read, without the violations: `canon status` says what `canon gate
@@ -442,17 +444,16 @@ pub(crate) fn compute(ctx: &GateContext) -> Staleness {
 /// (the one `canon gate check` sets on its context); it is asked for only when a cell is unread without it, since
 /// a cell whose record's code tree is the current one never reaches git.
 pub fn unresolvable_cells(ctx: &GateContext, code_tree: impl FnOnce() -> Option<String>) -> Unresolvable {
-    let without = evaluate(ctx, None, false).unresolvable;
+    let without = evaluate(ctx, None).unresolvable;
     if without.is_empty() {
         return without;
     }
-    evaluate(ctx, code_tree().as_deref(), false).unresolvable
+    evaluate(ctx, code_tree().as_deref()).unresolvable
 }
 
 /// The staleness of every green cell as of `code_tree` (the code now, `None` when unknown), and the cells whose
-/// base commit could not be read. `queries` asks git for the changed paths and the commits behind: without them
-/// the violations are left out and git is asked only where a base stands.
-fn evaluate(ctx: &GateContext, code_tree: Option<&str>, queries: bool) -> Staleness {
+/// base commit could not be read, or whose changed paths or commits behind git could not answer.
+fn evaluate(ctx: &GateContext, code_tree: Option<&str>) -> Staleness {
     let mut memo = GitMemo::default();
     let repo = &ctx.ctx.repo;
     let now = ctx.now;
@@ -471,7 +472,8 @@ fn evaluate(ctx: &GateContext, code_tree: Option<&str>, queries: bool) -> Stalen
             continue;
         }
 
-        match memo.base(repo, sha.as_str()) {
+        let base = memo.base(repo, sha.as_str());
+        match base {
             // Nothing to compare: as it always was, the cell adds nothing.
             Base::Missing => {
                 unread.push((cell.subject.clone(), Unresolved::BaseMissing));
@@ -485,9 +487,9 @@ fn evaluate(ctx: &GateContext, code_tree: Option<&str>, queries: bool) -> Stalen
             Base::NotAncestor => unread.push((cell.subject.clone(), Unresolved::BaseNotAncestor)),
             Base::Ancestor => {}
         }
-        if !queries {
-            continue;
-        }
+        // A cell is counted once: a base that is not an ancestor and a range git cannot answer is one `git_unavailable` cell.
+        let not_ancestor_at = (base == Base::NotAncestor).then(|| unread.len() - 1);
+        let mut unanswered = false;
 
         let mut reasons: Vec<String> = Vec::new();
 
@@ -495,7 +497,9 @@ fn evaluate(ctx: &GateContext, code_tree: Option<&str>, queries: bool) -> Stalen
         if surface_scoped && !cell.surface_ref.is_empty() {
             // `None` (unresolvable diff query) contributes nothing
             // to this tier — never assumed stale.
-            if let Some(changed) = memo.changed_files_since(repo, sha.as_str()) {
+            let changed = memo.changed_files_since(repo, sha.as_str());
+            unanswered |= changed.is_none();
+            if let Some(changed) = changed {
                 let matched = match_surface(&cell.surface_ref, changed);
                 if !matched.paths.is_empty() {
                     reasons.push(format!(
@@ -512,10 +516,19 @@ fn evaluate(ctx: &GateContext, code_tree: Option<&str>, queries: bool) -> Stalen
         // The ceiling is an UNCONDITIONAL backstop (module doc) —
         // it always runs, even when the precise diff above came
         // back clean.
-        if let Some(commits_behind) = memo.commits_behind(repo, sha.as_str()) {
+        let commits_behind = memo.commits_behind(repo, sha.as_str());
+        unanswered |= commits_behind.is_none();
+        if let Some(commits_behind) = commits_behind {
             let ceiling = ctx.policy.max_commits_behind(&cell.raw, now).unwrap_or(DEFAULT_MAX_COMMITS_BEHIND);
             if commits_behind > ceiling {
                 reasons.push(format!("{commits_behind} commits behind HEAD (max_commits_behind={ceiling})"));
+            }
+        }
+
+        if unanswered {
+            match not_ancestor_at {
+                Some(at) => unread[at].1 = Unresolved::GitUnavailable,
+                None => unread.push((cell.subject.clone(), Unresolved::GitUnavailable)),
             }
         }
 
