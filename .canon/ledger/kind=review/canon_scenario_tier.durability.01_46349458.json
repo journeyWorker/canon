@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-durasecret",
+    "role": "reviewer",
+    "session_id": "s-0-39-durasecret-rev"
+  },
+  "at": "2026-11-08T07:37:26.089204Z",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "kind": "review",
+  "pin": "ef2e822a05d4aeb9bb858f714e83f665cc7b84a7",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atomic::tests::tier_durability_01_one_write_syncs_the_file_then_renames_then_syncs_the_parent_directory"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "3386f3878b4a08626a533b53b8c9f7e6ea58b629029629a085a507a42f012eef",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-write-durability/brief.md"
+  },
+  "review_id": "01M6X1EDT9XDRF9DGWHMP6KC5F",
+  "reviewer": "rev-0-39-durasecret",
+  "scenario_id": "tier.durability.01",
+  "schema": 2,
+  "worktree_dirty": false
+}
