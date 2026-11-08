@@ -14,8 +14,12 @@ use tempfile::TempDir;
 
 /// `canon <args> --json` in `dir`; `PATH` is replaced by `path` when given.
 fn canon_at(dir: &Path, args: &[&str], path: Option<&std::ffi::OsStr>) -> Output {
+    canon_with(dir, args, path, &[])
+}
+
+fn canon_with(dir: &Path, args: &[&str], path: Option<&std::ffi::OsStr>, env: &[(&str, &str)]) -> Output {
     let mut command = hermetic::canon();
-    command.args(args).arg("--json").current_dir(dir).env("CANON_ACTOR", "canon");
+    command.args(args).arg("--json").current_dir(dir).env("CANON_ACTOR", "canon").envs(env.iter().copied());
     if let Some(path) = path {
         command.env("PATH", path);
     }
@@ -236,9 +240,13 @@ fn gate_staleness_scope_05_a_surface_outside_the_repository_is_still_refused_as_
 
 /// The advisory of `gate check` and the warning of `status`, as the message each says (`None` when it says nothing).
 fn said(repo: &Path, path: Option<&std::ffi::OsStr>) -> (Option<String>, Option<String>) {
-    let gate = body(&canon_at(repo, &["gate", "check"], path));
+    said_with(repo, path, &[])
+}
+
+fn said_with(repo: &Path, path: Option<&std::ffi::OsStr>, env: &[(&str, &str)]) -> (Option<String>, Option<String>) {
+    let gate = body(&canon_with(repo, &["gate", "check"], path, env));
     let advisory = gate["data"]["advisories"].as_array().and_then(|list| list.iter().find(|a| a["kind"] == "staleness_unresolvable")).map(|a| a["message"].as_str().unwrap().to_string());
-    let status = body(&canon_at(repo, &["status"], path));
+    let status = body(&canon_with(repo, &["status"], path, env));
     let warning = status["meta"]["warnings"].as_array().and_then(|list| list.iter().find(|w| w["code"] == "STALENESS_UNRESOLVABLE")).map(|w| w["message"].as_str().unwrap().to_string());
     (advisory, warning)
 }
@@ -365,6 +373,61 @@ fn gate_staleness_scope_10_no_git_on_the_path_is_counted_as_git_unavailable() {
     let path = empty.path().as_os_str();
     let message = both_say(repo, Some(path));
     assert!(message.contains("git_unavailable 1") && !message.contains("base_missing"), "{message}");
+}
+
+/// A `git` ahead on the `PATH` that sleeps on `diff ... ..HEAD` and runs the real one otherwise.
+fn git_that_sleeps_on_the_range_diff(dir: &Path) -> std::ffi::OsString {
+    let original = std::env::var_os("PATH").unwrap();
+    let real = std::env::split_paths(&original).map(|d| d.join("git")).find(|p| p.is_file()).expect("git is on the PATH");
+    let script = format!("#!/bin/sh\ncase \" $* \" in\n  *\" diff \"*\"..HEAD\"*) sleep 30 ;;\nesac\nexec '{}' \"$@\"\n", real.display());
+    let wrapper = dir.join("git");
+    std::fs::write(&wrapper, script).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::env::join_paths(std::iter::once(dir.to_path_buf()).chain(std::env::split_paths(&original))).unwrap()
+}
+
+/// gate.staleness-scope.10 (F3, F4, failure path): the base probes answer but the `<base>..HEAD` diff runs past its deadline: the cell is `git_unavailable`, said by
+/// `gate check` and `status` alike, and no verdict changes (no `stale-evidence`).
+#[test]
+fn gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable() {
+    let origin = project_with_a_change_after_its_evidence();
+    let repo = origin.path();
+    let bin = TempDir::new().unwrap();
+    let path = git_that_sleeps_on_the_range_diff(bin.path());
+    let env = [("CANON_TEST_GIT_DEADLINE_MS", "1000")];
+    let (advisory, warning) = said_with(repo, Some(&path), &env);
+    assert!(advisory.as_deref().is_some_and(|m| m.contains("git_unavailable 1")) && advisory == warning, "{advisory:?} vs {warning:?}");
+    let gate = body(&canon_with(repo, &["gate", "check"], Some(&path), &env));
+    let stale = gate["data"]["violations"].as_array().cloned().unwrap_or_default().iter().filter(|v| v["class"] == "stale-evidence").count();
+    assert_eq!(stale, 0, "a query with no answer is not a stale verdict: {gate}");
+}
+
+/// gate.staleness-scope.10 (F3, F4, failure path): one commit changes the declared surface and adds a name no UTF-8 string spells; the diff cannot be read, so the
+/// cell is `git_unavailable` in `gate check` and `status`, and not stale.
+#[test]
+fn gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable() {
+    let dir = project(1, &["src/a.rs"]);
+    let repo = dir.path();
+    add_evidence_ok(repo, 1, "src/a.rs");
+    commit_all(repo, "evidence");
+    write(repo, "src/a.rs", "2");
+    git(repo, &["add", "-A"]);
+    let blob = {
+        let mut child = Command::new("git").args(["hash-object", "-w", "--stdin"]).current_dir(repo).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).spawn().unwrap();
+        std::io::Write::write_all(child.stdin.as_mut().unwrap(), b"x").unwrap();
+        String::from_utf8(child.wait_with_output().unwrap().stdout).unwrap().trim().to_string()
+    };
+    let mut entry = format!("100644 {blob}\tsrc/").into_bytes();
+    entry.extend_from_slice(b"\xff.rs\n");
+    let mut child = Command::new("git").args(["update-index", "--add", "--index-info"]).current_dir(repo).stdin(std::process::Stdio::piped()).spawn().unwrap();
+    std::io::Write::write_all(child.stdin.as_mut().unwrap(), &entry).unwrap();
+    assert!(child.wait().unwrap().success());
+    git(repo, &["commit", "-q", "-m", "surface changed and a name that is not UTF-8"]);
+
+    let message = both_say(repo, None);
+    assert!(message.contains("git_unavailable 1"), "{message}");
+    assert_eq!(stale(repo).1.len(), 0, "no list, no stale verdict");
 }
 
 /// gate.staleness-scope.12 (F4, failure path): with nothing unread neither says anything; the two report what the other does or both are silent.

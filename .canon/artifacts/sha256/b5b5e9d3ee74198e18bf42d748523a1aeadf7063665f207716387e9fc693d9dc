@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="3" skipped="0" failures="2" errors="0" uuid="dd46ab26-eeef-44ec-a7c4-cfeea59ccc4f" timestamp="2026-11-08T16:47:40.447+09:00" time="13.701">
+    <testsuite name="canon-cli::staleness_scope" tests="3" skipped="0" errors="0" failures="2">
+        <testcase name="gate_staleness_scope_10_no_git_on_the_path_is_counted_as_git_unavailable" classname="canon-cli::staleness_scope" timestamp="2026-11-08T16:47:40.447+09:00" time="12.102"/>
+        <testcase name="gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable" classname="canon-cli::staleness_scope" timestamp="2026-11-08T16:47:40.447+09:00" time="12.642">
+            <failure message="thread &apos;gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable&apos; (32042906) panicked at crates/canon-cli/tests/staleness_scope.rs:257:47" type="test failure with exit code 101">thread &apos;gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable&apos; (32042906) panicked at crates/canon-cli/tests/staleness_scope.rs:257:47:
+gate check has no staleness_unresolvable advisory
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable ... FAILED
+
+failures:
+
+failures:
+    gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 12.63s
+
+</system-out>
+            <system-err>
+thread &apos;gate_staleness_scope_10_a_name_that_is_not_utf8_in_the_range_is_counted_as_git_unavailable&apos; (32042906) panicked at crates/canon-cli/tests/staleness_scope.rs:257:47:
+gate check has no staleness_unresolvable advisory
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable" classname="canon-cli::staleness_scope" timestamp="2026-11-08T16:47:40.447+09:00" time="13.701">
+            <failure message="thread &apos;gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable&apos; (32042925) panicked at crates/canon-cli/tests/staleness_scope.rs:400:5" type="test failure with exit code 101">thread &apos;gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable&apos; (32042925) panicked at crates/canon-cli/tests/staleness_scope.rs:400:5:
+None vs None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable ... FAILED
+
+failures:
+
+failures:
+    gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 13.68s
+
+</system-out>
+            <system-err>
+thread &apos;gate_staleness_scope_10_a_range_diff_that_runs_past_its_deadline_is_counted_as_git_unavailable&apos; (32042925) panicked at crates/canon-cli/tests/staleness_scope.rs:400:5:
+None vs None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>
