@@ -98,7 +98,7 @@ fn parquet_columns(path: &std::path::Path) -> Vec<String> {
 }
 
 #[test]
-fn snapshot_writes_ten_parquet_files_and_a_manifest_listing_exactly_them() {
+fn report_generation_07_snapshot_writes_nine_parquet_files_and_a_manifest_listing_exactly_them() {
     if !support::duckdb_available() {
         eprintln!("skipping: `duckdb` CLI not found on PATH");
         return;
