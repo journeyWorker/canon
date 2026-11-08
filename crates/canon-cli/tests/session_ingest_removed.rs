@@ -331,6 +331,7 @@ fn ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evid
     let shallow = tempfile::tempdir().unwrap();
     let url = format!("file://{}", repo.display());
     git_in(shallow.path(), &["clone", "-q", "--depth", "1", &url, "."]);
+    // A clone has no scenario index; `gate check` builds it from the feature files, where the deleted one is not.
     let (stale, advisory) = stale_subjects(shallow.path());
     assert!(stale.is_empty(), "{stale:?}");
     let advisory = advisory.expect("a shallow clone has no base commit for the declared scenario");

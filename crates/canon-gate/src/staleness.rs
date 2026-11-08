@@ -62,6 +62,13 @@
 //! not UTF-8, make the cell `git_unavailable` (counted once, by `gate check` and `status` alike); a base that is there but not an ancestor of HEAD (`base_not_ancestor`) is computed as
 //! `<base>..HEAD`, as before. [`Unresolvable`] counts the cells of each reason so `canon gate check` and
 //! `canon status` can say so: the verdicts, and the exit status, do not change.
+//!
+//! # A scenario no feature file declares (0.39)
+//! A scenario cell whose scenario the corpus does not hold (the `.feature` file was deleted and `canon inventory sync`
+//! tombstoned it, so it is no longer among the declared scenarios every other check starts from) is absent for the
+//! gate: its old evidence is neither `stale-evidence` however many commits have passed, nor counted in [`Unresolvable`].
+//! A corpus with no scenario at all is not read (a kind routed off the git tier, an index not built), so no scenario is
+//! judged absent from it. A re-declared scenario is judged again.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -76,6 +83,7 @@ use crate::context::{GateCheck, GateContext};
 use crate::coverage::CellSubject;
 use crate::failure_class::{FailureClass, Violation};
 use crate::policy::{DEFAULT_MAX_COMMITS_BEHIND, DEFAULT_SURFACE_SCOPED};
+use crate::spec_coverage::latest_scenario;
 
 /// One (subject, role) cell's LATEST record's native staleness
 /// signals, read directly off `ctx.evidence` (module doc) — no longer
@@ -109,7 +117,24 @@ struct Candidate<'a> {
     /// discriminator, read off `record` rather than assumed.
     schema: u32,
     digest: String,
+    /// The cell is a scenario's (not a task's).
+    scenario: bool,
     record: &'a EvidenceRecord,
+}
+
+impl Candidate<'_> {
+    /// The cell is a scenario's and that scenario is not declared any more: the corpus holds scenarios and none of
+    /// them is this `(project_id, scenario_id)` (its `.feature` file was deleted and `canon inventory sync` dropped it,
+    /// or it never was one). Every other check starts from the declared scenarios, so the gate treats it as absent and
+    /// its old evidence is not judged: neither stale, nor counted among the cells whose base commit git could not read.
+    /// A corpus with no scenario at all is not read (a scenario kind routed off the git tier, an index not built yet):
+    /// nothing is known to be absent then, and a record with no `project_id` names no scenario, so both are judged as before.
+    fn of_an_undeclared_scenario(&self, ctx: &GateContext) -> bool {
+        match (self.scenario, &self.record.project_id, &self.record.scenario_id) {
+            (true, Some(project), Some(scenario)) => !ctx.scenarios.is_empty() && latest_scenario(ctx, project, scenario).is_none(),
+            _ => false,
+        }
+    }
 }
 
 /// Folds `ctx.evidence` to the LATEST record per (subject, role) cell
@@ -139,6 +164,7 @@ fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
             None => canon_store::partition::content_digest(&serde_json::to_value(record).unwrap_or_default()),
         };
         CellSubject::all_of(record).map(move |subject| Candidate {
+            scenario: matches!(subject, CellSubject::Scenario(_)),
             subject: subject.as_str().to_string(),
             role: role.clone(),
             at: record.envelope.at,
@@ -151,6 +177,7 @@ fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
     fold_latest_by_key(candidates, |c| (c.subject.clone(), c.role.clone()), |c| c.at, |c| c.schema, |c| c.digest.as_str())
         .into_values()
         .filter(|c| matches!(c.record.verdict, EvidenceVerdict::Faithful))
+        .filter(|c| !c.of_an_undeclared_scenario(ctx))
         .map(|c| GreenCell {
             subject: c.subject,
             evidence_sha: c.record.evidence_sha.clone(),

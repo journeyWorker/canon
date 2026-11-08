@@ -187,6 +187,6 @@ Feature: ingest removal
   @ingest.removal.16
   Scenario: The old evidence of a scenario whose feature file is deleted is not stale evidence once enough commits have passed
     Given two scenarios with green evidence, both past max_commits_behind, so the gate names both as stale-evidence, and one feature file then deleted and canon inventory sync run
-    When canon gate check runs
+    When canon gate check runs there, and in a shallow clone of it
     Then it names the scenario that is still declared as stale-evidence and does not name the deleted one
-    And the count of cells whose base commit git could not read does not include the deleted scenario
+    And the cells it counts as having no readable base commit in the clone include the declared scenario and not the deleted one
