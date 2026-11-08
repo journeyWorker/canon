@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-prune",
+    "role": "reviewer",
+    "session_id": "s-0-39-prune-rev"
+  },
+  "at": "2026-11-08T07:40:03.986245Z",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "kind": "review",
+  "pin": "ef2e822a05d4aeb9bb858f714e83f665cc7b84a7",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:artifacts_prune_18_an_unwritable_store_directory_refuses_the_commit_and_keeps_the_temp_files"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "034181b83cb96d5bf72907512ea99fb5ad6018d844a76f864e4f2ca58c8bd76f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-prune-temps/brief.md"
+  },
+  "review_id": "01M6X1K80JE8N60J6R2SC88PEZ",
+  "reviewer": "rev-0-39-prune",
+  "scenario_id": "artifacts.prune.18",
+  "schema": 2,
+  "worktree_dirty": false
+}
