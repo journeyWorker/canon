@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-gitstale",
+    "role": "reviewer",
+    "session_id": "s-0-39-gitstale-rev"
+  },
+  "at": "2026-11-08T07:40:12.734474Z",
+  "change_id": "canon-0-39-git-boundary",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/src/git.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-gitstale",
+  "round": 1,
+  "scenario_ids": [
+    "gate.git-boundary.02"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "gate.git-boundary.02 / F1 (spec fidelity): the env wipe is a deny list of 13 names, so the brief's headline 'the shell's git environment does not reach canon's git calls' (and the CHANGELOG title 'ignores the shell's git environment') is wider than what holds. Reproduced on the built binary with a dirty tracked file: context-pack add gives sha256:f4a9b35f..., the same command with GIT_DIFF_OPTS=-u0 gives sha256:fd5973a4..., and with GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.context GIT_CONFIG_VALUE_0=0 the same sha256:fd5973a4...; a global diff.context/diff.noprefix in HOME's gitconfig would do the same, and the brief keeps HOME on purpose. The brief enumerates the cleared list and its acceptance only names GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE, so this is not a defect against the approved text. Suggest also clearing GIT_DIFF_OPTS, GIT_CONFIG_COUNT and GIT_CONFIG_PARAMETERS (or pinning diff.context/noprefix/algorithm for the state-digest diff), or narrowing the wording to 'the repository and index variables'. Blast radius: only the context-pack state digest (git diff --binary HEAD) reads diff formatting; the staleness and tree calls read names or exit statuses.",
+  "worktree_dirty": false
+}

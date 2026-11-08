@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-gitstale",
+    "role": "reviewer",
+    "session_id": "s-0-39-gitstale-rev"
+  },
+  "at": "2026-11-08T07:40:23.663388Z",
+  "change_id": "canon-0-39-staleness-scope",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-gate/src/staleness.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-gitstale",
+  "round": 1,
+  "scenario_ids": [
+    "gate.staleness-scope.10"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "gate.staleness-scope.10 / F3 (spec fidelity): brief F3 defines git_unavailable as 'git cannot answer (cannot run, time out, unreadable output)', but only the two base probes (rev-parse --verify, merge-base --is-ancestor) feed the count. When the probes answer and the later changed-files query (git diff --name-only -z <base>..HEAD) times out, hits the output limit or returns a non-UTF-8 name, run_git returns None and the cell is dropped silently: no violation, no staleness_unresolvable advisory, no STALENESS_UNRESOLVABLE warning. Reproduced on the built binary: (a) a PATH wrapper that sleeps on 'diff ..HEAD' with CANON_TEST_GIT_DEADLINE_MS=1000: gate check ends in 2.3 s, violations [], advisories hold only spec_coverage_off; (b) one commit changing the declared surface src/a.rs and adding a name with byte 0xff: gate check clean, no advisory, status no warning. These are the silent skips this change set out to count; the bound test covers only 'no git on the PATH', where the probe itself fails. Fix: count the cell as git_unavailable when changed_files_since or commits_behind returns None for a cell that needed it, and add a test for a deadline and a non-UTF-8 name. Blast radius: status shares the count, so it is silent in the same cases; verdicts are unaffected.",
+  "worktree_dirty": false
+}

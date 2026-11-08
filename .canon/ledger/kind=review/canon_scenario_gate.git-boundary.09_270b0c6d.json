@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-gitstale",
+    "role": "reviewer",
+    "session_id": "s-0-39-gitstale-rev"
+  },
+  "at": "2026-11-08T07:40:47.743120Z",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "kind": "review",
+  "pin": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:git::tests::gate_git_boundary_09_a_call_past_its_deadline_is_stopped_and_names_the_subcommand_and_the_deadline",
+          "junit:git::tests::gate_git_boundary_09_a_grandchild_that_holds_the_pipes_is_not_waited_for",
+          "junit:git::tests::gate_git_boundary_09_a_limit_applies_to_each_stream_and_exactly_the_limit_is_allowed",
+          "junit:git::tests::gate_git_boundary_09_nine_mib_is_past_the_default_limit_and_inside_the_tree_listing_limit"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e31ad426b57c4da5aa877422e4238318852f3516b6ee557380ff74afc501e5d7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-git-boundary/brief.md"
+  },
+  "review_id": "01M6X1MJQZJS73YFHSZ2JWKGMR",
+  "reviewer": "rev-0-39-gitstale",
+  "scenario_id": "gate.git-boundary.09",
+  "schema": 2,
+  "worktree_dirty": false
+}
