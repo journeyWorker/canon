@@ -142,3 +142,5 @@ Source: 결함 D6과 D9의 곁가지(0.37.0 디버그 바이너리로 재현, `d
 - `redact()`, 가려 쓰기, `Secret<T>`, `S3Connection`의 `Debug`.
 - 팩의 git 호출이 외부 `GIT_*` 환경 변수를 비우는 일(D9의 본 줄기). 같은 함수를 보지만 이 변경은 빈 항목만 고친다.
 - 이미 저장된 팩의 다시 검사.
+
+Approved: Journey Hwang 2026-11-08T06:11:30Z — "승인 (canon 0.39 브리프 7개와 정책)" (relayed by planner planner-oco via ask) (code tree 7c28ab134d4701f16f343da5e87c7582b9521417) (brief sha256:0d493b618db2ed6612dd4b45c7867bcebe5a1230fdf433232c198f69b6c502f4)

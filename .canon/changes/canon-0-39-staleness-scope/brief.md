@@ -103,3 +103,5 @@ Source: 벤더 감사 보고서 D13·D14·R11a·R12(0.37.0으로 재현, docs/re
 - 못 읽은 셀을 엄격한 등급에서 stale로 읽는 정책.
 - 커밋하지 않은 작업 트리의 변경을 낡음으로 보는 일(검사는 지금도 `<기준>..HEAD`만 본다).
 - `canon evidence approval-payload`의 `--surface-ref`.
+
+Approved: Journey Hwang 2026-11-08T06:11:30Z — "승인 (canon 0.39 브리프 7개와 정책)" (relayed by planner planner-oco via ask) (code tree 7c28ab134d4701f16f343da5e87c7582b9521417) (brief sha256:4a7e750e702932f060d2d0757a37ad4344e4a8c02ce7be66e699ef3e59b5697b)

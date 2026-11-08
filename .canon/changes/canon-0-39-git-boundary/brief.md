@@ -123,3 +123,5 @@ canon은 git을 19곳에서 부르고 어느 호출에도 기한이나 출력 �
 - `crates/*/tests`의 통합 시험이 부르는 git.
 - 긴 수명 `cat-file` 자식의 읽기 기한. 로컬 객체만 읽는다.
 - 프로세스 그룹 종료, Windows 전용 처리, 기한을 바꾸는 릴리스 변수.
+
+Approved: Journey Hwang 2026-11-08T06:11:30Z — "승인 (canon 0.39 브리프 7개와 정책)" (relayed by planner planner-oco via ask) (code tree 7c28ab134d4701f16f343da5e87c7582b9521417) (brief sha256:27758f3201750e949344eabf456834909587125ab4009f9304f38cf39b31b4c5)

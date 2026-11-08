@@ -129,3 +129,5 @@ Source: canon 이슈 #138의 GC 항목 뒤에 남은 틈(D10, R4), `canon artifa
 - 프로세스 번호 확인과 새 crate, 쓰기마다의 자동 정리, 정해진 주기의 자동 실행.
 - 이미 커밋된 임시 파일을 git 기록에서 지우는 일.
 - 객체 저장소 계층의 쓰기 유예와 재사용 시 갱신.
+
+Approved: Journey Hwang 2026-11-08T06:11:30Z — "승인 (canon 0.39 브리프 7개와 정책)" (relayed by planner planner-oco via ask) (code tree 7c28ab134d4701f16f343da5e87c7582b9521417) (brief sha256:91473bcbb0c7ed81364e4ae259ccc551d2150003191c620e2ae9b448dd76c2b3)

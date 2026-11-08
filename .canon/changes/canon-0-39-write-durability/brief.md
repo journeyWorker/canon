@@ -198,3 +198,5 @@ canon이 디스크에 남기는 기록 파일은 거의 모두 한 함수, 곧 `
 - `hot.db` 스키마 버전 사다리, `quick_check`, `auto_vacuum`, 연결 풀 닫기 순서.
 - `write_rows`와 Postgres `rekey`.
 - 증거 블롭 임시 파일의 이름과 정리 정책.
+
+Approved: Journey Hwang 2026-11-08T06:11:30Z — "승인 (canon 0.39 브리프 7개와 정책)" (relayed by planner planner-oco via ask) (code tree 7c28ab134d4701f16f343da5e87c7582b9521417) (brief sha256:2b4394afff2b8ddce5554dfee1c640bf074353cbbe140c795af30b0a9048f733)

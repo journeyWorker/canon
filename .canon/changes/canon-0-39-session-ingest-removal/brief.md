@@ -146,3 +146,5 @@ canon은 의도에서 증거와 게이트까지 이어지는 워크플로를 다
 - 저장된 세션·실행·이벤트 기록과 고아 커서 파일의 삭제.
 - 대화 기록을 읽는 새 기능이나 외부 도구로의 안내.
 - `docs/research/**`와 `docs/design/cli-commands-0.28.md`의 옛 서술(역사 문서).
+
+Approved: Journey Hwang 2026-11-08T06:11:30Z — "승인 (canon 0.39 브리프 7개와 정책)" (relayed by planner planner-oco via ask) (code tree 7c28ab134d4701f16f343da5e87c7582b9521417) (brief sha256:295e70b9cf10dcc86f7a32a2a080429386ad0e0963e3736497e26271af4d0e14)

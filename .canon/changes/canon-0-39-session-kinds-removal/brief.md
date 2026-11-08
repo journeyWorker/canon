@@ -180,3 +180,5 @@ Source: 소유자 결정(2026-11-07, 세션 수집을 빼고 워크플로에 집
 - `canon-ingest` 크레이트 정리(안 쓰는 의존성, 이름 바꾸기)와 `ingest` 그룹 이름 바꾸기.
 - `Run`을 지우거나 `Run.session_id`, 행위자의 `session_id`를 바꾸는 일과 `canon dispatch`의 동작 변경.
 - `docs/research/**`와 옛 설계 문서의 서술(역사 문서).
+
+Approved: Journey Hwang 2026-11-08T06:11:30Z — "승인 (canon 0.39 브리프 7개와 정책)" (relayed by planner planner-oco via ask) (code tree 7c28ab134d4701f16f343da5e87c7582b9521417) (brief sha256:e2b67535f72b19511a22541b70dcf059de95f88fac74389a3c88b30cad984618)
