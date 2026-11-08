@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:41:49.816412Z",
+  "attachments": [
+    {
+      "case": "platformer.enemy.02: Losing every heart shows game over and returns to menu",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "dc374519f9d4ca7768b4ab545501c71527a1b448af6b5b10879cfd8e54125711"
+    }
+  ],
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "0.39 gate clean: the platformer suite re-run on the current tree: bun run test:junit in examples/platformer (19 tests passed)"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "platformer",
+  "run_seq": 16,
+  "scenario_id": "platformer.enemy.02",
+  "schema": 1,
+  "staging_id": "966c7280",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

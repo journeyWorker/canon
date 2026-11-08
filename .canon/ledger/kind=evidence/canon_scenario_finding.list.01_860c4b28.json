@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:39:34.443609Z",
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding finding_list_prints_each && cargo test -p canon-cli --test conformance (finding-list-open-json)"
+  },
+  "evidence_note": {
+    "summary": "0.39 gate clean: command re-run on the current tree: cargo nextest run --workspace (default profile, 4001 tests; the test of this record passed), from the clean worktree"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 58,
+  "scenario_id": "finding.list.01",
+  "schema": 1,
+  "staging_id": "9cafb21f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

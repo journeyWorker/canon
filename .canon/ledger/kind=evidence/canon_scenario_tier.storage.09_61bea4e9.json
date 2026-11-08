@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:46:47.034239Z",
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-store --lib fold::tests::an_equal_at_tie_goes_to_the_greater_schema_even_when_the_lower_schema_has_the_greater_digest"
+  },
+  "evidence_note": {
+    "summary": "0.39 gate clean: command re-run on the current tree: cargo nextest run --workspace (default profile, 4001 tests; the test of this record passed), from the clean worktree"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 275,
+  "scenario_id": "tier.storage.09",
+  "schema": 1,
+  "staging_id": "c8778c3d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
