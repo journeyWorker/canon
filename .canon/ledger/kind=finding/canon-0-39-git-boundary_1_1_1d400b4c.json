@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-gitstale",
+    "role": "reviewer",
+    "session_id": "s-0-39-gitstale-rev"
+  },
+  "at": "2026-11-08T07:40:08.736107Z",
+  "change_id": "canon-0-39-git-boundary",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/git_boundary.rs",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-gitstale",
+  "round": 1,
+  "scenario_ids": [
+    "gate.git-boundary.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "gate.git-boundary.07 (standards pass): the bound test proves neither Then step of the failure path. Its staleness half is vacuous: the non-UTF-8 commit adds src/\\xff.rs and leaves the declared surface src/main.rs untouched, so a lossy read of the diff would also report no stale-evidence and the assertion passes either way; the case that separates 'no answer' from 'clean' (one commit that changes the surface and adds the bad name) is only in the unbound canon-gate unit test staleness::tests::a_name_that_is_not_utf8_leaves_the_surface_query_unanswered_and_the_evidence_not_stale. The brief's 'the risk approval gives a violation' is not exercised at all: the CLI test only checks that approval-payload refuses; the violation is proved by the unbound risk::tests::a_commit_that_changed_a_name_that_is_not_utf8_closes_the_risk_check_as_an_unknown_analysis. I ran both unit tests and a black-box probe (one commit changing src/a.rs and adding a name with byte 0xff, surface src/a.rs: gate check clean, no stale-evidence) and the behaviour holds; the evidence bound to .07 does not show it. Fix: make the CLI test change the surface in the same commit and bind the two unit tests (or name them gate_git_boundary_07_*). Blast radius: .07 is the only scenario of the F2 failure path; the same weak setup lets a regression to lossy decoding pass CI.",
+  "worktree_dirty": false
+}
