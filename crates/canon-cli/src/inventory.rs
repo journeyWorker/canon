@@ -1021,6 +1021,8 @@ pub fn overlay_stale_index(ctx: &mut GateContext) {
     // one record at a time, and the pushes keep the plans' order.
     let replaced: BTreeSet<(&ProjectId, &ScenarioId)> = written.iter().map(|r| (&r.project_id, &r.scenario_id)).collect();
     ctx.scenarios.retain(|s| !replaced.contains(&(&s.project_id, &s.scenario_id)));
+    ctx.tombstoned_scenarios.retain(|key| !replaced.contains(&(&key.0, &key.1)));
+    ctx.tombstoned_scenarios.extend(written.iter().filter(|r| r.removed).map(|r| (r.project_id.clone(), r.scenario_id.clone())));
     ctx.scenarios.extend(written.into_iter().filter(|r| !r.removed));
     // The overlay normally runs before any derived read; invalidating keeps
     // that an optimisation, not a precondition (0.29 D2).
