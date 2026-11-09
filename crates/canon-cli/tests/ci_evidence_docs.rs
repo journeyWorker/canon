@@ -63,6 +63,19 @@ fn gate_ci_run_13_the_skills_and_the_changelog_carry_the_recipe_the_field_and_th
         assert!(added.contains(needle), "the CHANGELOG's Unreleased section lacks `{needle}`");
     }
     assert!(read("canon/skills/reference/role-implementer.md").contains("--from-ci"), "the generated command block of the implementer's guide lists --from-ci");
+
+    // The CHANGELOG says the schemaVersion the generated command spec has for the answer of `evidence add` and `evidence audit`.
+    let spec: serde_json::Value = serde_json::from_str(&read("docs/cli/canon.cli.json")).unwrap();
+    for command in ["evidence add", "evidence audit"] {
+        let entry = spec["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["command"] == command && c.get("outputs").is_some())
+            .unwrap_or_else(|| panic!("{command} has no outputs in the command spec"));
+        let version = entry["outputs"][0]["schemaVersion"].as_str().unwrap();
+        assert!(added.contains(&format!("`evidence add` and `evidence audit` is `{version}` (was `")), "{command}: the CHANGELOG says another meta.schemaVersion than the spec's `{version}`");
+    }
 }
 
 /// gate.ci-run.14 (F7, failure path): a generated block edited by hand, or left behind by a spec change, is not what the spec renders, and
