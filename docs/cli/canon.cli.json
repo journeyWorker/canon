@@ -33706,7 +33706,7 @@
               "type": "array"
             },
             "red": {
-              "description": "For a `shipped` subject, what makes its gate red now (0.18 D3):\nwhat the `verifying → shipped` guard would refuse it on\n([`crate::subject::shipped_gate_gaps`], the same checks), one\nphrase per failure class: `<n> <class> (first: <subject>)`.\nStatus then names the reopen command. Omitted when empty.",
+              "description": "For a `shipped` subject, what makes its gate red now (0.18 D3):\nwhat the `verifying → shipped` guard would refuse it on\n([`crate::subject::shipped_gate_gaps`], the same checks), one\nphrase per failure class: `<n> <class> (first: <subject>)`; a\n`spec_coverage.require_ci_run` violation adds its reason:\n`<n> <class>: <reason> (first: <subject>)` (0.40), and for any\nother subject whose status that policy's scope covers, it is the\nonly source. Status then names the reopen command (shipped) or\nthe CI record to make. Omitted when empty.",
               "items": {
                 "type": "string"
               },
