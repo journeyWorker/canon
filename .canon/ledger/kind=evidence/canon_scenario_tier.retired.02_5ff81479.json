@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T15:49:55.039499Z",
+  "attachments": [
+    {
+      "case": "retired_kind_keys::tests::tier_retired_02_a_config_without_the_keys_or_one_that_does_not_parse_has_none",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b609178efae635dbc57bbb6d57eab8c594c5c4ab8fd6bdcfb7b8f1123eadefb4"
+    },
+    {
+      "case": "tier_retired_02_a_misspelled_kind_in_routing_is_still_a_config_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b609178efae635dbc57bbb6d57eab8c594c5c4ab8fd6bdcfb7b8f1123eadefb4"
+    },
+    {
+      "case": "policy::tests::tier_retired_02_a_misspelled_retired_kind_is_still_a_config_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b609178efae635dbc57bbb6d57eab8c594c5c4ab8fd6bdcfb7b8f1123eadefb4"
+    }
+  ],
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.40/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d7ce4913f8fd717f549c30fb97c38f90d24d8ac5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 62,
+  "scenario_id": "tier.retired.02",
+  "schema": 1,
+  "staging_id": "dbc843dc",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

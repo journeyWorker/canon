@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T15:49:55.039499Z",
+  "attachments": [
+    {
+      "case": "atip_reasons_08_a_reason_never_changes_the_exit_or_the_retryable_value_and_a_different_one_is_a_different_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b609178efae635dbc57bbb6d57eab8c594c5c4ab8fd6bdcfb7b8f1123eadefb4"
+    },
+    {
+      "case": "atip_reasons_08_no_source_sets_an_exit_or_a_retryable_value_beside_the_registry_row",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b609178efae635dbc57bbb6d57eab8c594c5c4ab8fd6bdcfb7b8f1123eadefb4"
+    }
+  ],
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.40/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d7ce4913f8fd717f549c30fb97c38f90d24d8ac5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 218,
+  "scenario_id": "atip.reasons.08",
+  "schema": 1,
+  "staging_id": "b3a286aa",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
