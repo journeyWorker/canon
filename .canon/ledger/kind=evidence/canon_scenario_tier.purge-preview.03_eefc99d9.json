@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T13:13:07.206689Z",
+  "attachments": [
+    {
+      "case": "tier_purge_preview_03_a_preview_whose_tiers_all_attach_offers_the_commit_command_and_it_deletes",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "9191e666d1e224cc9567e5ba9e10d24ed63073c6296032f5e306aab8bc98e389"
+    }
+  ],
+  "code_tree": "36926aff7faf26d84438f4d610ebb6636f41c99a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/fix-0.40-followups/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "5eb67f96eeb768469667b673accf85acf7178702",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 6,
+  "scenario_id": "tier.purge-preview.03",
+  "schema": 1,
+  "staging_id": "9cef29f9",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

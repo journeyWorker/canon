@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="12" skipped="0" failures="0" errors="0" uuid="dffbade7-69f1-4d40-bf7a-4a685992fcae" timestamp="2026-11-09T22:10:21.146+09:00" time="94.735">
+    <testsuite name="canon-gate" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="artifact_store::tests::tier_durability_release_01_a_debug_build_traces_two_renames_then_one_directory_sync" classname="canon-gate" timestamp="2026-11-09T22:10:21.150+09:00" time="0.179"/>
+        <testcase name="staleness::tests::gate_tombstone_corpus_02_an_empty_corpus_with_an_empty_tombstone_set_does_not_make_a_scenario_undeclared" classname="canon-gate" timestamp="2026-11-09T22:10:21.150+09:00" time="2.511"/>
+        <testcase name="staleness::tests::gate_tombstone_corpus_01_a_tombstone_in_an_empty_corpus_makes_the_scenario_undeclared" classname="canon-gate" timestamp="2026-11-09T22:10:21.149+09:00" time="4.550"/>
+    </testsuite>
+    <testsuite name="canon-store" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="atomic::tests::tier_durability_release_01_a_debug_build_traces_file_sync_then_rename_then_directory_sync" classname="canon-store" timestamp="2026-11-09T22:10:21.329+09:00" time="0.064"/>
+        <testcase name="atomic::tests::tier_durability_release_02_every_trace_call_in_the_writers_stands_under_cfg_debug_assertions" classname="canon-store" timestamp="2026-11-09T22:10:21.393+09:00" time="0.029"/>
+    </testsuite>
+    <testsuite name="canon-cli::session_kinds_removal" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="tier_purge_preview_01_a_preview_with_a_tier_that_cannot_attach_names_it_and_offers_no_commit_command" classname="canon-cli::session_kinds_removal" timestamp="2026-11-09T22:10:21.150+09:00" time="4.779"/>
+        <testcase name="tier_purge_preview_02_committing_the_digest_of_that_preview_is_refused_and_deletes_nothing" classname="canon-cli::session_kinds_removal" timestamp="2026-11-09T22:10:21.150+09:00" time="4.792"/>
+        <testcase name="tier_purge_preview_03_a_preview_whose_tiers_all_attach_offers_the_commit_command_and_it_deletes" classname="canon-cli::session_kinds_removal" timestamp="2026-11-09T22:10:21.150+09:00" time="4.874"/>
+        <testcase name="tier_purge_preview_01_a_configured_tier_that_does_not_answer_is_a_retry_not_a_variable" classname="canon-cli::session_kinds_removal" timestamp="2026-11-09T22:10:21.149+09:00" time="94.732"/>
+    </testsuite>
+    <testsuite name="canon-cli::session_ingest_removed" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="gate_tombstone_corpus_02_a_corpus_that_is_not_read_still_judges_the_evidence" classname="canon-cli::session_ingest_removed" timestamp="2026-11-09T22:10:21.150+09:00" time="6.020"/>
+        <testcase name="gate_tombstone_corpus_01_a_last_feature_file_deleted_before_the_sync_is_not_stale_evidence" classname="canon-cli::session_ingest_removed" timestamp="2026-11-09T22:10:21.150+09:00" time="6.226"/>
+        <testcase name="gate_tombstone_corpus_01_the_old_evidence_of_the_last_deleted_scenario_is_not_stale_evidence_and_not_unresolvable" classname="canon-cli::session_ingest_removed" timestamp="2026-11-09T22:10:21.150+09:00" time="7.016"/>
+    </testsuite>
+</testsuites>

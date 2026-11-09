@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T13:12:51.176162Z",
+  "attachments": [
+    {
+      "case": "tier_purge_preview_01_a_preview_with_a_tier_that_cannot_attach_names_it_and_offers_no_commit_command",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "9191e666d1e224cc9567e5ba9e10d24ed63073c6296032f5e306aab8bc98e389"
+    },
+    {
+      "case": "tier_purge_preview_01_a_configured_tier_that_does_not_answer_is_a_retry_not_a_variable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "9191e666d1e224cc9567e5ba9e10d24ed63073c6296032f5e306aab8bc98e389"
+    }
+  ],
+  "code_tree": "36926aff7faf26d84438f4d610ebb6636f41c99a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/fix-0.40-followups/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "5eb67f96eeb768469667b673accf85acf7178702",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "tier.purge-preview.01",
+  "schema": 1,
+  "staging_id": "ea09b01f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
