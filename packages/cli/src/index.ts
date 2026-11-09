@@ -266,10 +266,39 @@ if (!binary) {
 const bundledSkills = join(cliDir, "dist", "skills");
 const checkoutSkills = join(workspaceRoot, "canon", "skills");
 const skillsSource = existsSync(join(bundledSkills, "SKILL.src.md")) ? bundledSkills : checkoutSkills;
-const result = spawnSync(binary, process.argv.slice(2), {
-  stdio: "inherit",
-  env: { ...process.env, CANON_SKILLS_SOURCE: skillsSource },
-});
+const args = process.argv.slice(2);
+const env = { ...process.env, CANON_SKILLS_SOURCE: skillsSource };
+
+// On macOS and Linux with Node 26.1 or later (or a Bun that reports it) the
+// launcher replaces itself with the binary (`process.execve`): no node process
+// (~39 MB) stays alive beside a long-running canon, the pid stays the one the
+// caller started, and signals reach canon directly. Returns only when that is
+// not possible here (Windows, an older Node, an exec the system refuses) —
+// nothing has run yet, and the child path below runs the binary and passes
+// its exit status on.
+function replaceWith(bin: string, argv: string[]): void {
+  // @types/node ^20 predates process.execve, so it is found with a guard.
+  if (process.platform === "win32" || !("execve" in process) || typeof process.execve !== "function") return;
+  // Before Node 26.1 a failed execve(2) aborts the process (SIGABRT, exit 134)
+  // instead of throwing (nodejs/node#62878); Bun 1.3 (reporting Node 24) too.
+  const [major = 0, minor = 0] = process.versions.node.split(".").map(Number);
+  if (major < 26 || (major === 26 && minor < 1)) return;
+  const execve: Function = process.execve;
+  // process.execve is experimental in Node 23.11 to 26 and announces itself
+  // with a warning on stderr; every canon command would print it.
+  const emitWarning = process.emitWarning;
+  process.emitWarning = () => {};
+  try {
+    execve.call(process, bin, [bin, ...argv], env);
+  } catch {
+    // Not replaced: the child path below reports the failure.
+  } finally {
+    process.emitWarning = emitWarning;
+  }
+}
+
+replaceWith(binary, args);
+const result = spawnSync(binary, args, { stdio: "inherit", env });
 
 // The launcher IS the `canon` users run, so the native binary's exit code
 // must survive it: scripts, CI, and hooks read only the status. canon's own
