@@ -110,18 +110,16 @@ const RUN_LOWER: &str = "01j0z9z9z9z9z9z9z9z9z9z9z9";
 
 // ── ledger.naming.01 ─────────────────────────────────────────────────────
 
-/// ledger.naming.01: each of the fourteen core kinds is written under
+/// ledger.naming.01: each of the twelve core kinds is written under
 /// `kind=<kind>/<components>_<digest8>.json` with the table's components in
 /// table order, one directory level and no `area=`; so is a plugin overlay.
 #[test]
 fn ledger_naming_01_every_kind_is_stored_under_the_one_name_rule() {
-    let expected: [(&str, &str); 14] = [
+    let expected: [(&str, &str); 12] = [
         ("change", "s1-state-model-join-spine"),
         ("task", "s1-state-model-join-spine+236.2"),
         ("scenario", "root_world.firstbuy-hotdeal.26"),
-        ("session", "f47ac10b-58cc-4372-a567-0e02b2c3d479"),
         ("run", RUN_LOWER),
-        ("event", "01j0z9z9z9z9z9z9z9z9z9z9z9_1"),
         ("handoff", "20260710-1432-ship-s1-a1b2"),
         ("review", "root_scenario_world.place-lock.01"),
         ("divergence", "root_world.place-lock.01_3_8"),
@@ -146,7 +144,7 @@ fn ledger_naming_01_every_kind_is_stored_under_the_one_name_rule() {
     assert_eq!(receipt.location, format!("kind=porting.coverage/root_world.place-lock.01_{}.json", d8(&overlay)));
     // One directory level: every directory under the root is `kind=<kind>` itself, no `area=`.
     let dirs = dirs_below(dir.path());
-    assert_eq!(dirs.len(), 15, "fourteen core kinds and one overlay, one level each: {dirs:?}");
+    assert_eq!(dirs.len(), 13, "twelve core kinds and one overlay, one level each: {dirs:?}");
     assert!(dirs.iter().all(|d| d.components().count() == 1 && d.to_string_lossy().starts_with("kind=")), "{dirs:?}");
     assert!(!dirs.iter().any(|d| d.to_string_lossy().contains("area=")), "{dirs:?}");
 }
@@ -220,7 +218,7 @@ fn ledger_naming_02_project_leads_tags_say_which_key_and_a_review_name_has_no_pi
 
 // ── ledger.naming.03 ─────────────────────────────────────────────────────
 
-const ROUTING_ALL_LOCAL: &str = "  finding: local\n  event: local\n  evidence: local\n  session: local\n  run: local\n  task: local\n";
+const ROUTING_ALL_LOCAL: &str = "  finding: local\n  divergence: local\n  evidence: local\n  run: local\n  task: local\n";
 
 /// The records of `canon query --kind <kind> --json --all`, in the order returned.
 fn queried(fixture: &support::Fixture, kind: &str) -> Vec<Value> {
@@ -257,16 +255,16 @@ fn ledger_naming_03_integers_are_plain_and_order_comes_from_the_body() {
     assert_eq!(loc2, format!("kind=finding/s42-close-the-open-loops_2_1_{}.json", d8(&r2)));
     assert_eq!(loc10, format!("kind=finding/s42-close-the-open-loops_10_1_{}.json", d8(&r10)));
 
-    // Events 10 then 9 of one run, one shared `at`.
-    let event = |seq: u64| {
-        let mut e = well_formed("event");
-        e["seq"] = json!(seq);
-        e["at"] = json!(at);
-        e
+    // Divergences of rounds 10 then 9 of one run sequence, one shared `at`.
+    let divergence = |round: u64| {
+        let mut d = well_formed("divergence");
+        d["round"] = json!(round);
+        d["at"] = json!(at);
+        d
     };
-    let (e10, e9) = (event(10), event(9));
-    assert_eq!(git.write(&raw(&e10)).unwrap().location, format!("kind=event/{RUN_LOWER}_10_{}.json", d8(&e10)));
-    assert_eq!(git.write(&raw(&e9)).unwrap().location, format!("kind=event/{RUN_LOWER}_9_{}.json", d8(&e9)));
+    let (d10, d9) = (divergence(10), divergence(9));
+    assert_eq!(git.write(&raw(&d10)).unwrap().location, format!("kind=divergence/root_world.place-lock.01_3_10_{}.json", d8(&d10)));
+    assert_eq!(git.write(&raw(&d9)).unwrap().location, format!("kind=divergence/root_world.place-lock.01_3_9_{}.json", d8(&d9)));
 
     // Two evidence records sharing `at`: different scenarios (components break the tie), and two with the
     // same key but different bodies (the digest breaks it).
@@ -286,8 +284,9 @@ fn ledger_naming_03_integers_are_plain_and_order_comes_from_the_body() {
 
     let findings = queried(&fixture, "finding");
     assert_eq!(findings.iter().map(|f| f["round"].as_u64().unwrap()).collect::<Vec<_>>(), [2, 10], "rounds compare as numbers, not as the text `10` < `2`");
-    let events = queried(&fixture, "event");
-    assert_eq!(events.iter().map(|e| e["seq"].as_u64().unwrap()).collect::<Vec<_>>(), [9, 10]);
+    // A scenario's divergence reads latest-only by default; `--history` returns every round.
+    let divergences = queried_with(&fixture, "divergence", &["--history"]);
+    assert_eq!(divergences.iter().map(|d| d["round"].as_u64().unwrap()).collect::<Vec<_>>(), [9, 10], "rounds compare as numbers, not as the text `10` < `9`");
 
     // Latest-only reads keep one version per key; `--history` returns every version, the ties among them in the rule's order.
     let evidence_order: Vec<String> = queried_with(&fixture, "evidence", &["--history"]).iter().map(|e| format!("{}/{}", e["scenario_id"].as_str().unwrap(), e["evidence_note"]["summary"].as_str().unwrap())).collect();
@@ -304,47 +303,46 @@ fn ledger_naming_03_integers_are_plain_and_order_comes_from_the_body() {
 /// key are one string that unescapes to the original, and query and its cursor show the raw value.
 #[test]
 fn ledger_naming_04_escaping_is_only_in_the_name_and_git_and_r2_agree() {
-    let value = "Sess/One_A";
-    assert_eq!(esc(value), "+53ess+2f+4fne+5f+41");
-    let mut session = well_formed("session");
-    session["session_id"] = json!(value);
+    let value = "Role_One/Repo_A/area/abcdef0";
+    assert_eq!(esc(value), "+52ole+5f+4fne+2f+52epo+5f+41+2farea+2fabcdef0");
+    let mut item = well_formed("strategy_item");
+    item["regime_key"] = json!(value);
     let mut run = well_formed("run");
     run["run_id"] = json!(RUN_ULID);
-    run["session_id"] = json!(value);
 
-    let fixture = support::Fixture::new("  session: local\n  run: local\n", "");
+    let fixture = support::Fixture::new("  strategy_item: local\n  run: local\n", "");
     let git = GitTier::new(fixture.git_root());
     let r2 = canon_store::r2_tier::R2Tier::local(fixture.r2_root(), "canon/").unwrap();
 
-    let git_session = git.write(&raw(&session)).unwrap();
-    assert_eq!(git_session.location, format!("kind=session/+53ess+2f+4fne+5f+41_{}.json", d8(&session)));
+    let git_item = git.write(&raw(&item)).unwrap();
+    assert_eq!(git_item.location, format!("kind=strategy_item/+52ole+5f+4fne+2f+52epo+5f+41+2farea+2fabcdef0_{}.json", d8(&item)));
     let git_run = git.write(&raw(&run)).unwrap();
     assert_eq!(git_run.location, format!("kind=run/{RUN_LOWER}_{}.json", d8(&run)), "26 lowercase characters");
     assert_eq!(stem_of(&git_run.location).rsplit_once('_').unwrap().0.len(), 26);
 
-    let r2_session = r2.write(&raw(&session)).unwrap();
+    let r2_item = r2.write(&raw(&item)).unwrap();
     let r2_run = r2.write(&raw(&run)).unwrap();
     let object_key = |location: &str| location.strip_prefix("canon/").unwrap().rsplit_once('.').unwrap().0.to_string();
-    assert_eq!(object_key(&r2_session.location), git_session.location.strip_suffix(".json").unwrap(), "the same string in git and R2");
+    assert_eq!(object_key(&r2_item.location), git_item.location.strip_suffix(".json").unwrap(), "the same string in git and R2");
     assert_eq!(object_key(&r2_run.location), git_run.location.strip_suffix(".json").unwrap());
-    assert_eq!(value_of_stem(&stem_of(&git_session.location)), value, "it unescapes to the original value");
-    assert!(fixture.r2_root().join(&r2_session.location).is_file());
+    assert_eq!(value_of_stem(&stem_of(&git_item.location)), value, "it unescapes to the original value");
+    assert!(fixture.r2_root().join(&r2_item.location).is_file());
 
     // A query, a cursor and a message show the value before escaping.
-    let o = fixture.run_canon(&["query", "--kind", "session", "--limit", "1"]);
+    let o = fixture.run_canon(&["query", "--kind", "strategy_item", "--limit", "1"]);
     assert!(o.status.success(), "{}", text(&o));
     let human = text(&o);
     assert!(human.contains(value) && !human.contains("+2f"), "the ID column shows the value: {human}");
-    let o = fixture.run_canon(&["query", "--kind", "session", "--json", "--limit", "1"]);
+    let o = fixture.run_canon(&["query", "--kind", "strategy_item", "--json", "--limit", "1"]);
     let doc = json_of(&o);
-    assert_eq!(doc["data"]["records"][0]["session_id"], value);
-    let mut second = session.clone();
-    second["session_id"] = json!("Sess/Two_B");
+    assert_eq!(doc["data"]["records"][0]["regime_key"], value);
+    let mut second = item.clone();
+    second["regime_key"] = json!("Role_Two/Repo_B/area/abcdef0");
     git.write(&raw(&second)).unwrap();
-    let paged = json_of(&fixture.run_canon(&["query", "--kind", "session", "--json", "--limit", "1"]));
+    let paged = json_of(&fixture.run_canon(&["query", "--kind", "strategy_item", "--json", "--limit", "1"]));
     let cursor = paged["meta"]["page"]["nextCursor"].as_str().expect("a second page exists");
     let decoded = cursor_position(cursor);
-    assert!(decoded.contains("Sess/One_A") && !decoded.contains("+2f"), "the cursor key names the value, not the escaped form: {decoded:?}");
+    assert!(decoded.contains(value) && !decoded.contains("+2f"), "the cursor key names the value, not the escaped form: {decoded:?}");
 }
 
 // ── ledger.naming.05 ─────────────────────────────────────────────────────
@@ -353,18 +351,18 @@ fn ledger_naming_04_escaping_is_only_in_the_name_and_git_and_r2_agree() {
 /// first 16 hex digits of the SHA-256 of the value; the value is still in the body.
 #[test]
 fn ledger_naming_05_a_long_name_hashes_its_free_text_component() {
-    let value = format!("Long/{}_end", "x".repeat(240));
+    let value = format!("Long_{}_End/Repo/area/abcdef0", "x".repeat(240));
     assert!(esc(&value).len() + 9 > 200);
-    let mut session = well_formed("session");
-    session["session_id"] = json!(value);
+    let mut item = well_formed("strategy_item");
+    item["regime_key"] = json!(value);
     let dir = tempfile::tempdir().unwrap();
     let git = GitTier::new(dir.path());
-    let receipt = git.write(&raw(&session)).unwrap();
+    let receipt = git.write(&raw(&item)).unwrap();
     let hash: String = Sha256::digest(value.as_bytes()).iter().take(8).map(|b| format!("{b:02x}")).collect();
-    assert_eq!(receipt.location, format!("kind=session/h{hash}_{}.json", d8(&session)));
+    assert_eq!(receipt.location, format!("kind=strategy_item/h{hash}_{}.json", d8(&item)));
     let stored: Value = serde_json::from_slice(&std::fs::read(dir.path().join(&receipt.location)).unwrap()).unwrap();
-    assert_eq!(stored["session_id"], value, "the original value is still in the body");
-    let read = git.read(&TierQuery::kind(RecordKind::Session)).unwrap();
+    assert_eq!(stored["regime_key"], value, "the original value is still in the body");
+    let read = git.read(&TierQuery::kind(RecordKind::StrategyItem)).unwrap();
     assert!(read.violations.is_empty(), "{:?}", read.violations);
     assert_eq!(read.records.len(), 1);
 }
@@ -558,13 +556,13 @@ fn cursor_position(cursor: &str) -> String {
 /// never the escaped form, and the digest is 8 hex digits.
 #[test]
 fn ledger_naming_10_query_shows_the_id_before_escaping() {
-    let fixture = support::Fixture::new("  session: local\n  review: local\n  evidence: local\n", "");
+    let fixture = support::Fixture::new("  strategy_item: local\n  review: local\n  evidence: local\n", "");
     let git = GitTier::new(fixture.git_root());
-    let mut s1 = well_formed("session");
-    s1["session_id"] = json!("Sess/One_A");
+    let mut s1 = well_formed("strategy_item");
+    s1["regime_key"] = json!("Role_One/Repo_A/area/abcdef0");
     s1["at"] = json!("2026-07-10T12:00:00Z");
     let mut s2 = s1.clone();
-    s2["session_id"] = json!("Sess/Two_B");
+    s2["regime_key"] = json!("Role_Two/Repo_B/area/abcdef0");
     s2["at"] = json!("2026-07-10T13:00:00Z");
     git.write(&raw(&s1)).unwrap();
     git.write(&raw(&s2)).unwrap();
@@ -573,20 +571,20 @@ fn ledger_naming_10_query_shows_the_id_before_escaping() {
     let evidence = well_formed("evidence");
     git.write(&raw(&evidence)).unwrap();
 
-    // `--json`: page through the sessions one at a time; each cursor names the raw value.
-    let first = json_of(&fixture.run_canon(&["query", "--kind", "session", "--json", "--limit", "1"]));
-    assert_eq!(first["data"]["records"][0]["session_id"], "Sess/One_A");
+    // `--json`: page through the strategy items one at a time; each cursor names the raw value.
+    let first = json_of(&fixture.run_canon(&["query", "--kind", "strategy_item", "--json", "--limit", "1"]));
+    assert_eq!(first["data"]["records"][0]["regime_key"], "Role_One/Repo_A/area/abcdef0");
     let cursor = first["meta"]["page"]["nextCursor"].as_str().expect("a second page");
     let key = cursor_position(cursor);
     let parts: Vec<&str> = key.split('|').collect();
-    assert_eq!(parts[1], "Sess/One_A", "the cursor key holds the value, not `+53ess+2f…`: {key}");
+    assert_eq!(parts[1], "Role_One/Repo_A/area/abcdef0", "the cursor key holds the value, not `+52ole+5f…`: {key}");
     assert!(parts[2].trim_end_matches("#1").len() == 8 && parts[2].trim_end_matches("#1").bytes().all(|b| b.is_ascii_hexdigit()), "digest8: {key}");
-    let second_page = json_of(&fixture.run_canon(&["query", "--kind", "session", "--json", "--limit", "1", "--cursor", cursor]));
-    assert_eq!(second_page["data"]["records"][0]["session_id"], "Sess/Two_B");
+    let second_page = json_of(&fixture.run_canon(&["query", "--kind", "strategy_item", "--json", "--limit", "1", "--cursor", cursor]));
+    assert_eq!(second_page["data"]["records"][0]["regime_key"], "Role_Two/Repo_B/area/abcdef0");
 
     // Human table: the ID column.
-    let human = text(&fixture.run_canon(&["query", "--kind", "session"]));
-    for id in ["Sess/One_A", "Sess/Two_B"] {
+    let human = text(&fixture.run_canon(&["query", "--kind", "strategy_item"]));
+    for id in ["Role_One/Repo_A/area/abcdef0", "Role_Two/Repo_B/area/abcdef0"] {
         assert!(human.lines().any(|l| l.contains(id)), "{id} in the ID column: {human}");
     }
     assert!(!human.contains("+2f") && !human.contains("+5f"), "never the escaped form: {human}");
@@ -602,23 +600,28 @@ fn ledger_naming_10_query_shows_the_id_before_escaping() {
 /// `<kind>:<components>:<digest8>` with the components unescaped.
 #[test]
 fn ledger_naming_11_effect_and_manifest_ids_follow_the_new_rule() {
-    let fixture = support::Fixture::new("  session: local\n", "  session: { after: 1d, to: cold }\n");
+    let fixture = support::Fixture::new("  strategy_item: local\n  run: local\n", "  strategy_item: { after: 1d, to: cold }\n");
     let git = GitTier::new(fixture.git_root());
-    let mut session = well_formed("session");
-    session["session_id"] = json!("Sess/One_A");
-    session["at"] = json!("2026-01-01T00:00:00Z");
-    git.write(&raw(&session)).unwrap();
-    let want = format!("session:Sess/One_A:{}", d8(&session));
+    let mut item = well_formed("strategy_item");
+    item["regime_key"] = json!("Role_One/Repo_A/area/abcdef0");
+    item["at"] = json!("2026-01-01T00:00:00Z");
+    git.write(&raw(&item)).unwrap();
+    let want = format!("strategy_item:Role_One/Repo_A/area/abcdef0:{}", d8(&item));
 
     let age = json_of(&fixture.run_canon(&["tier", "age", "--json"]));
     assert_eq!(age["data"]["effects"][0]["record"], want.as_str(), "tier age: {age}");
 
-    let export = json_of(&fixture.run_canon(&["export", "--kind", "session", "--json"]));
+    let export = json_of(&fixture.run_canon(&["export", "--kind", "strategy_item", "--json"]));
     let entry = &export["data"]["records"][0];
     assert_eq!(format!("{}:{}:{}", entry["kind"].as_str().unwrap(), entry["id"].as_str().unwrap(), entry["digest"].as_str().unwrap()), want, "export: {export}");
-    assert_eq!(export["data"]["contentDigests"][0], d8(&session).as_str());
+    assert_eq!(export["data"]["contentDigests"][0], d8(&item).as_str());
 
-    let purge = json_of(&fixture.run_canon(&["purge", "--kind", "session", "--before", "2026-06-01", "--json"]));
+    // `purge` takes only `run` and `trajectory` (and the retired `session` and `event`): a run.
+    let mut run = well_formed("run");
+    run["at"] = json!("2026-01-01T00:00:00Z");
+    git.write(&raw(&run)).unwrap();
+    let want = format!("run:{RUN_LOWER}:{}", d8(&run));
+    let purge = json_of(&fixture.run_canon(&["purge", "--kind", "run", "--before", "2026-06-01", "--json"]));
     let record = purge["data"]["effects"][0]["record"].as_str().unwrap();
     assert!(record.contains(&want), "purge names `{want}`: {record}");
     assert!(!record.contains("+2f") && !record.contains(".json"), "the components unescaped, not the path: {record}");

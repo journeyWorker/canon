@@ -15,6 +15,7 @@ path = "src/lib.rs"
 # crate reuses, never re-derives.
 canon-model.workspace = true
 canon-gate.workspace = true
+canon-store.workspace = true
 # `verdict::{VerdictRow, Polarity, Becomes}` ONLY — the frozen S4
 # artifact-ingest contract (S4Foundation commit 7b258b7a). This crate
 # never calls `derive_verdict`/touches `ArtifactEventKind`/adapter

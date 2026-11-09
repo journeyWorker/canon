@@ -190,9 +190,7 @@ impl StrategyId {
     /// no randomness, no ambient state (module doc's three broken
     /// joins).
     ///
-    /// Construction mirrors `canon-ingest::normalize::
-    /// deterministic_run_id` verbatim, the workspace's existing
-    /// deterministic-ULID precedent: `Ulid::from_parts(<the item's own
+    /// Construction uses a deterministic ULID: `Ulid::from_parts(<the item's own
     /// `recorded_at` in epoch millis>, <the low 128 bits of a sha256
     /// over the length-prefixed identity>)`. Keeping the ULID grammar
     /// is load-bearing — [`StrategyId::parse`], the `<id>.parquet`

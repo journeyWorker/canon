@@ -39,12 +39,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdin, ChildStdout, Stdio};
 
 use canon_gate::review_gate::in_effect_reviews;
 use canon_gate::spec_coverage::latest_scenarios;
 use canon_gate::GateContext;
 use canon_model::{ProjectId, Review, ScenarioId, SpecDigest};
+use canon_store::git::GitCall;
 
 /// What a pre-0.15 review's pinned commit holds for its scenario.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -188,7 +189,7 @@ impl PinReader {
         if let Some(files) = self.trees.get(&key) {
             return files.clone();
         }
-        let listed = git_command(&self.repo).args(["ls-tree", "-r", "--name-only", "-z", pin, "--", root]).output().ok().filter(|out| out.status.success());
+        let listed = GitCall::new(&self.repo).args(["ls-tree", "-r", "--name-only", "-z", pin, "--", root]).no_lazy_fetch().tree_listing().run().ok();
         let files: Vec<String> = listed
             .map(|out| out.stdout.split(|b| *b == 0).filter_map(|p| std::str::from_utf8(p).ok()).filter(|p| p.ends_with(".feature")).map(str::to_string).collect())
             .unwrap_or_default();
@@ -217,12 +218,6 @@ fn is_repo_root(path: &Path) -> bool {
     path.components().all(|component| component == Component::CurDir)
 }
 
-fn git_command(repo: &Path) -> Command {
-    let mut command = Command::new("git");
-    command.current_dir(repo).env("GIT_NO_LAZY_FETCH", "1");
-    command
-}
-
 /// One `git cat-file --batch` process: a request line in, a header and
 /// the object's bytes out.
 struct CatFile {
@@ -233,7 +228,7 @@ struct CatFile {
 
 impl CatFile {
     fn spawn(repo: &Path) -> Option<Self> {
-        let mut child = git_command(repo).args(["cat-file", "--batch"]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
+        let mut child = GitCall::new(repo).args(["cat-file", "--batch"]).no_lazy_fetch().command().stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
         let stdin = child.stdin.take()?;
         let stdout = BufReader::new(child.stdout.take()?);
         Some(Self { child, stdin, stdout })

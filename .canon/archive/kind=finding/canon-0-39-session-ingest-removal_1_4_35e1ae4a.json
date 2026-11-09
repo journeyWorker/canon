@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:40:51.920338Z",
+  "change_id": "canon-0-39-session-ingest-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "ingest.plans.14"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[standards] The evidence binds only ingest_plans_14_the_other_hot_writers_print_the_hot_store_location_too (ingest plans, ingest records, dispatch begin). The third Then (change new hotStore, subject leaves meta.x-canon.hotStore) is proved by ingest_plans_14b_... (and 14c the negative), which are not in the bound checks, the same shape as the 0.38 evidence of ingest.sessions.16. I ran 14, 14b and 14c: all pass. The body and the @flow:canon-0-30-record-links.F5 tag equal the old sessions.16 text. Bind 14b when evidence is next recorded.",
+  "worktree_dirty": false
+}

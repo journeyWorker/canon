@@ -129,7 +129,7 @@ fn every_command_that_needs_canon_state_refuses_without_a_canon_yaml() {
         &["subject", "new", "x", "--domain", "dev", "--title", "X"],
         &["inventory", "sync"],
         &["report", "build"],
-        &["ingest", "sessions"],
+        &["ingest", "records"],
         &["tier", "age"],
         &["ledger", "compact"],
         &["format"],

@@ -645,12 +645,7 @@ struct JournalReview {
 }
 
 fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("could not create {}: {e}", parent.display()))?;
-    }
-    let tmp = path.with_extension("canon-tmp");
-    std::fs::write(&tmp, bytes).map_err(|e| format!("could not write {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, path).map_err(|e| format!("could not replace {}: {e}", path.display()))
+    canon_store::write_atomic(path, bytes).map_err(|e| format!("could not write {}: {e}", path.display()))
 }
 
 fn read_journal(backup: &Path) -> Option<Journal> {

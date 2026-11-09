@@ -173,8 +173,8 @@ Feature: tier storage
   @flow:canon-0-30-spec-backfill.F2
   @tier.storage.16
   Scenario: Purge previews the removal set, then deletes exactly that set on the previewed digest
-    Given a repo routing sessions to the local rung and holding one session before the cutoff and one after it
-    When canon purge --kind session --before the cutoff is run bare, then with --commit and the planDigest it printed
+    Given a repo routing runs to the local rung and holding one run before the cutoff and one after it
+    When canon purge --kind run --before the cutoff is run bare, then with --commit and the planDigest it printed
     Then the bare run exits 0, prints the planDigest and says nothing was written, and no record is removed
     And the committed run exits 0 reporting one matched and one deleted
     And only the record before the cutoff is gone
@@ -188,5 +188,5 @@ Feature: tier storage
     Given the same repo with a preview of canon purge that printed a plan digest
     When canon purge is run with --commit and that digest but a later --before, with --kind change, with no --before, or with --commit and no --plan-digest
     Then the stale digest exits 2 with PLAN_STALE
-    And the other three exit 2 as usage errors, the kind one listing session, run, event and trajectory as the only kinds
+    And the other three exit 2 as usage errors, the kind one listing run and trajectory, and the retired session and event, as the only kinds
     And no record was deleted and the tree is unchanged

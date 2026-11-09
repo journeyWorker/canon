@@ -146,7 +146,7 @@ fn open_strategy_store(repo: &Path) -> ParquetStrategyStore {
 /// area-hash — the ONE retrieval-side `<area>`→`<hash>` derivation, NOT
 /// a second hash scheme. A subject/domain query has no single source
 /// event to digest (the write-path `<hash>` primitive,
-/// `canon_ingest::normalize::content_digest`, hashes a specific event's
+/// `canon_ingest::digest::content_digest`, hashes a specific event's
 /// join key), so the retrieval side derives the `<hash>` deterministically
 /// from the `<area>` value itself, exactly as the shipped pre-dispatch
 /// hook does — so a Rust-assembled candidate lands on the IDENTICAL

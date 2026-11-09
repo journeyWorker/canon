@@ -15,10 +15,10 @@ use crate::family::policy::PolicyFile;
 use crate::family::FamilyKind;
 use crate::handoff::Handoff;
 use crate::records::{
-    Change, Divergence, Event, EvidenceRecord, Finding, Review, Run, Scenario, Session, StrategyItem, Subject, Task, Trajectory,
+    Change, Divergence, EvidenceRecord, Finding, Review, Run, Scenario, StrategyItem, Subject, Task, Trajectory,
 };
 
-/// One `(kind, schema)` pair per one of the fourteen closed record kinds
+/// One `(kind, schema)` pair per one of the twelve closed record kinds
 /// (`RecordKind::ALL`'s own order). Every schema is produced by
 /// `schemars::schema_for!` directly against that kind's Rust type — a
 /// field added to the type changes only that kind's output (spec
@@ -29,9 +29,7 @@ pub fn record_schemas() -> Vec<(RecordKind, schemars::Schema)> {
         (RecordKind::Change, schema_for!(Change)),
         (RecordKind::Task, schema_for!(Task)),
         (RecordKind::Scenario, schema_for!(Scenario)),
-        (RecordKind::Session, schema_for!(Session)),
         (RecordKind::Run, schema_for!(Run)),
-        (RecordKind::Event, schema_for!(Event)),
         (RecordKind::Handoff, schema_for!(Handoff)),
         (RecordKind::Review, schema_for!(Review)),
         (RecordKind::Divergence, schema_for!(Divergence)),
@@ -45,7 +43,7 @@ pub fn record_schemas() -> Vec<(RecordKind, schemars::Schema)> {
 
 /// One `(kind, schema)` pair per one of the eleven [`FamilyKind`]
 /// entries (S11 task 1.1) — the artifact-family registry ALONGSIDE
-/// `record_schemas()`'s closed fourteen, never merged into it (see
+/// `record_schemas()`'s closed twelve, never merged into it (see
 /// `crate::family`'s module doc for why). Ledger's `run`/`drill` share
 /// [`LedgerRunRecord`]'s Rust type; `review`/`clear`/`code-review`/
 /// `design-review` share [`LedgerReviewRecord`]'s; `divergence` exports
@@ -110,10 +108,11 @@ pub fn pretty_family_schemas() -> Vec<(String, String)> {
 mod tests {
     use super::*;
 
+    /// tier.retired.12 (F5, failure path): one schema per record kind, so a leftover `session` schema fails this registry test.
     #[test]
-    fn emits_exactly_one_schema_per_record_kind() {
+    fn tier_retired_12_emits_exactly_one_schema_per_record_kind() {
         let schemas = record_schemas();
-        assert_eq!(schemas.len(), 14);
+        assert_eq!(schemas.len(), 12);
         let mut seen = std::collections::HashSet::new();
         for (kind, _) in &schemas {
             assert!(seen.insert(*kind), "{kind:?} emitted twice");

@@ -29,8 +29,9 @@ fn names(value: &Value) -> BTreeSet<String> {
     value.as_object().expect("an object").keys().cloned().collect()
 }
 
+/// context.capability.39: the kinds are every record kind under the one name every surface uses, evidence included; the cel section names the same.
 #[test]
-fn kinds_are_every_record_kind_under_its_user_facing_name() {
+fn context_capability_39_kinds_are_every_record_kind_under_its_user_facing_name() {
     let out = context(&[], &[]);
     assert!(out.status.success());
     let doc = data(&out);
@@ -41,26 +42,36 @@ fn kinds_are_every_record_kind_under_its_user_facing_name() {
     assert_eq!(doc["capabilityVersion"], 6);
 }
 
+/// context.capability.39: the families are every artifact family in order.
 #[test]
-fn families_are_every_family_kind_in_order() {
+fn context_capability_39_families_are_every_family_kind_in_order() {
     let doc = data(&context(&[], &[]));
     let got: Vec<&str> = doc["families"].as_array().unwrap().iter().map(|f| f["family"].as_str().unwrap()).collect();
     let expected: Vec<&str> = FamilyKind::ALL.iter().map(|f| f.as_str()).collect();
     assert_eq!(got, expected);
 }
 
+/// context.capability.39: every closed `--kind` value of query and export is a context kind, and purge's closed values are the same kinds plus the retired session and event.
 #[test]
-fn every_kind_option_value_is_a_context_kind() {
+fn context_capability_39_every_kind_option_value_is_a_context_kind_and_purge_adds_the_retired_pair() {
     let kinds = names(&data(&context(&[], &[]))["kinds"]);
     let mut root = canon_cli::cli::command();
     root.build();
     let mut checked = BTreeSet::new();
+    let mut purge_values: Vec<String> = Vec::new();
     for doc in canon_cli::spec::commands(&root).expect("the command documents are built") {
         for option in doc.options.iter().filter(|o| o.name == "kind" && o.possible_values.is_some()) {
             checked.insert(doc.command.clone());
+            if doc.command == "purge" {
+                purge_values = option.possible_values.iter().flatten().cloned().collect();
+            }
             for value in option.possible_values.iter().flatten() {
                 // A node of `canon search` is a record of any kind or a brief section: `brief` is no record kind.
                 if doc.command == "search" && value == "brief" {
+                    continue;
+                }
+                // `purge --kind` still takes the two kinds 0.39 retired, for one release, so stored rows can be deleted: they are no context kind.
+                if doc.command == "purge" && canon_store::policy::RETIRED_KIND_NAMES.contains(&value.as_str()) {
                     continue;
                 }
                 assert!(kinds.contains(value), "`{} --kind {value}` is not in context.kinds", doc.command);
@@ -70,6 +81,8 @@ fn every_kind_option_value_is_a_context_kind() {
     for command in ["query", "export", "purge"] {
         assert!(checked.contains(command), "{command} has a closed --kind set");
     }
+    // purge's closed set is exactly two context kinds plus the retired pair, in this order: a lost or added value fails here.
+    assert_eq!(purge_values, ["run", "trajectory", "session", "event"]);
 }
 
 #[test]

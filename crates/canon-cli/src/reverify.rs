@@ -262,7 +262,8 @@ impl CodeTreeMemo {
         Self { tree: std::cell::OnceCell::from(tree), ..Self::lazy() }
     }
 
-    fn get(&self, repo: &Path) -> Option<&str> {
+    /// The code tree now, computed on first use.
+    pub fn get(&self, repo: &Path) -> Option<&str> {
         self.tree.get_or_init(|| crate::git_rev::code_tree(repo, None).ok().map(|c| c.tree)).as_deref()
     }
 
@@ -357,7 +358,8 @@ fn scoped(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, scopes: &cra
     let Some(latest) = latest_evidence(&evidence) else { return Scoped::Unscoped };
     let (Some(sha), Some(tree)) = (latest.evidence_sha.as_ref(), latest.code_tree.as_deref()) else { return Scoped::Unscoped };
     let Some(changed) = code_tree.changed(repo, sha.as_str(), tree) else { return Scoped::Unscoped };
-    let inside: Vec<String> = changed.iter().filter(|path| patterns.iter().any(|glob| crate::git_rev::glob_matches(glob, path))).cloned().collect();
+    let globs = crate::code_scopes::compile(patterns);
+    let inside: Vec<String> = changed.iter().filter(|path| globs.iter().any(|glob| glob.matches(path))).cloned().collect();
     if inside.is_empty() {
         Scoped::Exempt(key.to_string())
     } else {

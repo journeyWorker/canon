@@ -30,7 +30,7 @@ Which backend currently implements a rung is a separate declaration,
     multi-agent concurrency.
   </Card>
   <Card title="cold — S3/R2" icon="seti:folder">
-    Bulk, shared, analytical. Raw transcripts, the full event log,
+    Bulk, shared, analytical. The full event log,
     Parquet marts, raw trajectories.
   </Card>
 </CardGrid>
@@ -39,12 +39,12 @@ A legacy backend name (`git`/`pg`/`r2`) used where a rung is expected —
 `routing.*`, `aging.*.to`, or a `tiers.*` key — is rejected with an
 explicit hint, never silently aliased. `canon init` scaffolds a fresh
 repo's `hot` rung as sqlite by default (`path: .canon/hot.db`) — zero
-services required for the first `canon ingest sessions`; the example
+services required for the first Run-writing command such as `canon dispatch begin`; the example
 below is this repo's own team-scale config (`hot: postgres`).
 
 ## Configuring `canon.yaml`
 
-Every one of canon's fourteen record kinds needs a `routing:` entry — an
+Every one of canon's twelve record kinds needs a `routing:` entry — an
 unrouted kind is a hard `StoreError::UnroutedKind` at the first
 write/query attempt, never a silently-dropped record. This repo's own
 config:
@@ -65,14 +65,11 @@ routing:
   strategy_item: local
   task: hot
   handoff: hot
-  session: hot
   run: hot
-  event: hot
   trajectory: cold
 
 aging:
   handoff: { after: 30d, to: cold }
-  event: { after: 7d, to: cold }
 ```
 
 Changing a `routing:` value moves **future** writes with no

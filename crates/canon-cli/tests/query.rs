@@ -521,7 +521,7 @@ fn fold_list_matches_pg_routing() {
         })
         .map(|k| k.as_str())
         .collect();
-    let fold_list: BTreeSet<&str> = ["task", "handoff", "session", "run", "event"].into_iter().collect();
+    let fold_list: BTreeSet<&str> = ["task", "handoff", "run"].into_iter().collect();
     assert_eq!(
         pg_routed, fold_list,
         "fold_pg_routed_kind's KIND allowlist (query.rs) must equal canon.yaml's postgres-routed set; \

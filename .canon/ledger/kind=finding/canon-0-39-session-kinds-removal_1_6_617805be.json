@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:41:50.444405Z",
+  "change_id": "canon-0-39-session-kinds-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/migrate_names.rs:647",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "tier.retired.05"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[spec fidelity] The scenario says the refusal 'names the key'; the CONFIG_INVALID message names the kinds generically ('a retired record kind (`session`, `event`) in <why>... delete the `session` and `event` keys under routing: and aging: by hand') and not the found key (routing.session) nor its line. The bound test asserts only 'by hand'. Still actionable; naming the found key would match the text.",
+  "worktree_dirty": false
+}

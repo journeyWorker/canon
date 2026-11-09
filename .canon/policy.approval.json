@@ -1,11 +1,11 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-06T17:37:41Z",
-  "note": "승인 위임(2026-11-01 대화) 하의 사실 정정: 윤초 안내는 직전 초의 다음 초",
+  "approved_at": "2026-11-09T03:52:03Z",
+  "note": "승인: F3 실패 경로를 코드 동작(새 버전 저장)에 맞춰 고친 브리프",
   "relay": {
-    "role": "orchestrator",
-    "actor": "orchestrator-main",
+    "role": "planner",
+    "actor": "planner-oco",
     "tool": "chat"
   }
 }

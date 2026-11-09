@@ -1453,7 +1453,7 @@ fn severity_slug(severity: FindingSeverity) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
+    use canon_store::git::GitCall;
     use super::*;
 
     /// A close by a caller who declared no role, whoever runs the tests: the role of the environment is never read here.
@@ -1514,16 +1514,15 @@ mod tests {
     fn git_repo() -> (tempfile::TempDir, Sha) {
         let dir = files();
         let git = |args: &[&str]| {
-            let status = Command::new("git").arg("-C").arg(dir.path()).args(args).status().expect("git must be on PATH for this test");
-            assert!(status.success(), "git {args:?} failed");
+            GitCall::new(dir.path()).args(args).run().unwrap_or_else(|error| panic!("{error}"));
         };
         git(&["init", "-q", "-b", "main"]);
         git(&["config", "user.email", "test@canon.invalid"]);
         git(&["config", "user.name", "canon test"]);
         git(&["add", "canon.yaml"]);
         git(&["commit", "-q", "-m", "initial"]);
-        let out = Command::new("git").arg("-C").arg(dir.path()).args(["rev-parse", "HEAD"]).output().expect("git rev-parse");
-        let head = Sha::parse(String::from_utf8(out.stdout).unwrap().trim()).expect("HEAD is a 40-hex sha");
+        let out = GitCall::new(dir.path()).args(["rev-parse", "HEAD"]).run().expect("git rev-parse");
+        let head = Sha::parse(out.stdout_trimmed()).expect("HEAD is a 40-hex sha");
         (dir, head)
     }
 

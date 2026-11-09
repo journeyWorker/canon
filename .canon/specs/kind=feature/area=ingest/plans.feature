@@ -133,3 +133,15 @@ Feature: ingest plans
     Given a new-format brief with a multi-line Intent paragraph and one with an empty Intent section
     When canon ingest plans imports them
     Then the summary is the first paragraph with whitespace normalized, and an empty Intent gives an empty summary
+
+  # canon: {"schema":1,"at":"2026-10-26T19:30:00Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-fix-2026-10-26"}}
+  @subject:ingest-pipelines
+  @case:happy
+  @flow:canon-0-30-record-links.F5
+  @ingest.plans.14
+  Scenario: The other commands that write hot records print the hot store location too
+    Given a repo whose hot rung is the sqlite file `.canon/hot.db`
+    When canon ingest plans, ingest records and dispatch begin run, and canon subject new, subject move, subject adopt, subject unadopt and change new write records that are routed to the hot rung
+    Then each output names the hot store path
+    And the --json documents of ingest plans carry it as `hotStore`
+    And the --json documents of change new carry it as `hotStore`, and those of the subject leaves as `meta.x-canon.hotStore`

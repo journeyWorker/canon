@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:04:54.089557Z",
+  "attachments": [
+    {
+      "case": "subject_lifecycle_57_a_relayed_migrate_commit_records_the_relay_in_the_backup_journal",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    },
+    {
+      "case": "subject_lifecycle_57_the_relay_option_of_migrate_is_never_ignored",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    }
+  ],
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1397,
+  "scenario_id": "subject.lifecycle.57",
+  "schema": 1,
+  "staging_id": "9dce052c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

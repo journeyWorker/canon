@@ -58,11 +58,6 @@ export default defineConfig({
           slug: "getting-started",
         },
         {
-          label: "Data & Privacy",
-          translations: { ko: "데이터 & 프라이버시" },
-          slug: "privacy",
-        },
-        {
           label: "Concepts",
           translations: { ko: "개념" },
           items: [

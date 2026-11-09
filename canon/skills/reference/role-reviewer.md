@@ -115,7 +115,7 @@ canon gate check --json
 ```
 ```text
 # Read stored records across every storage tier
-usage: canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence --json
@@ -150,7 +150,7 @@ canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
-usage: canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
 canon search timeout --kind finding --json

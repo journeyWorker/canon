@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T07:09:44.775906Z",
+  "attachments": [
+    {
+      "case": "atip_optionforms_05_a_rollback_signed_over_an_instant_is_recorded_when_the_time_is_written_in_any_spelling_of_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "f6440ad83a34d1507764ae450ef8532b2ee7ba12a724a751d3522c9b42bf7167"
+    }
+  ],
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "ef2e822a05d4aeb9bb858f714e83f665cc7b84a7",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 60,
+  "scenario_id": "atip.optionforms.05",
+  "schema": 1,
+  "staging_id": "be598ea5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

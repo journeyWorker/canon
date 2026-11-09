@@ -80,7 +80,7 @@ pub struct EvidenceAddArgs {
     /// RunId (ULID) of the run that produced this evidence
     #[arg(long = "run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
-    /// Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref
+    /// A path pattern from the repository root (src/, src/**) or effect:<kebab-slug>; persisted as surface_ref
     #[arg(long = "surface-ref", value_parser = crate::evidence::accept_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// The attesting actor's id (recorded as the attestation's author). One line of text: the white space around it is trimmed; a control character or line break inside it is refused

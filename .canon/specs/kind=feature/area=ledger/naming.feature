@@ -6,8 +6,8 @@ Feature: ledger naming
   @case:happy
   @flow:canon-0-30-ledger-naming.F1
   @ledger.naming.01
-  Scenario: Every one of the fifteen kinds is stored under the one name rule
-    Given a record of each of the fourteen core kinds and one plugin overlay record
+  Scenario: Every one of the thirteen kinds is stored under the one name rule
+    Given a record of each of the twelve core kinds and one plugin overlay record
     When each is written through its store
     Then the write output and the stored file are `kind=<kind>/<components>_<digest8>.json`, with the components the component table gives that kind, in table order
     And the directory is one level, `kind=<kind>/`, and no `area=` level exists
@@ -30,7 +30,7 @@ Feature: ledger naming
   @flow:canon-0-30-ledger-naming.F1
   @ledger.naming.03
   Scenario: Integers are written plain and every ordering comes from the body, not the name
-    Given findings of rounds 2 and 10, events 9 and 10 of one run, and two evidence records sharing one `at`
+    Given findings of rounds 2 and 10, divergences of one run whose round is 9 and 10, and two evidence records sharing one `at`
     When they are written and read back through the registry
     Then the names hold `2`, `10`, `9` and `10` with no padding
     And the order is the body's `at`, then the typed components in table order with numbers compared as numbers, then the body digest, whatever order the store scanned them in
@@ -41,7 +41,7 @@ Feature: ledger naming
   @flow:canon-0-30-ledger-naming.F1
   @ledger.naming.04
   Scenario: An id that needs escaping is escaped only in the name, and a run id is written lowercase, the same in git and R2
-    Given a session id with an uppercase letter, an underscore and a slash, and a run id that is an uppercase ULID
+    Given a strategy item regime key with an uppercase letter and an underscore in its free-text segments, and a run id that is an uppercase ULID
     When they are written to the git tier and to an R2 tier and read back
     Then every byte outside `[a-z0-9.-]` is `+` and two lowercase hex digits, and the run id is its 26 lowercase characters
     And the git path and the R2 object key are the same string, which unescapes to the original value
@@ -53,7 +53,7 @@ Feature: ledger naming
   @flow:canon-0-30-ledger-naming.F1
   @ledger.naming.05
   Scenario: A name over 200 bytes replaces its free-text component with a hash of the value
-    Given a session id long enough that its file name would pass 200 bytes
+    Given a strategy item regime key long enough that its file name would pass 200 bytes
     When it is written
     Then the free-text component is `h` and the first 16 hex digits of the SHA-256 of the value
     And the original value is still in the body

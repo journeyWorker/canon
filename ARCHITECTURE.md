@@ -60,8 +60,8 @@ are code contracts, not merely labels:
   record families. Every record carries the shared `Envelope`; typed IDs and
   the join spine connect work, execution, evidence, and memory. JSON Schema and
   `JOIN_SPINE.md` are generated from this Rust source.
-- [`canon-ingest`](crates/canon-ingest/src/lib.rs) parses external session,
-  artifact, and plan dialects into canonical rows and records. It has no
+- [`canon-ingest`](crates/canon-ingest/src/lib.rs) parses external artifact
+  and plan dialects into canonical rows and records. It has no
   storage dependency. `canon-cli` composes ingest with writes.
 - [`canon-store`](crates/canon-store/src/lib.rs) owns the `Tier` abstraction,
   `TierPolicy`, registry, atomic writes, cursors, and the single embedded
@@ -147,8 +147,7 @@ invented work reference.
 `Run` is the run-scoped join point for events and manifests. Its additive
 lineage captures provider/model plus `SkillSnapshot`, `ContextSnapshot`, and
 `PolicySnapshot`; `injected_guidance` records the exact strategy references
-provided at dispatch. Session adapters normalize external transcripts into
-this model. Missing optional lineage is preserved as missing data, not guessed
+provided at dispatch. Missing optional lineage is preserved as missing data, not guessed
 from a provider projection. Evidence:
 [`Run` and `RunLineage`](crates/canon-model/src/records.rs) and
 [`canon-ingest`](crates/canon-ingest/src/lib.rs).
@@ -220,7 +219,7 @@ described as improving agent outcomes.
 
 `canon.yaml` is the repository configuration source. Durable authored specs,
 reviews, divergences, evidence, findings, and strategies route to the local
-Git tier; live task/handoff/session/run/event state routes to the hot tier; raw
+Git tier; live task/handoff/run state routes to the hot tier; raw
 trajectories route to the cold tier. The exact routing is resolved by
 `canon-store`'s `TierPolicy`, not by callers branching on backend names.
 

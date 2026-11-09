@@ -1,4 +1,4 @@
-//! Every one of canon-model's fourteen record kinds round-trips through
+//! Every one of canon-model's twelve record kinds round-trips through
 //! `GitTier` using the SAME well-formed fixture corpus S1 already ships
 //! (`crates/canon-model/fixtures/well-formed/*.json`) — reusing S1's
 //! fixtures rather than a second hand-authored set keeps the two crates'

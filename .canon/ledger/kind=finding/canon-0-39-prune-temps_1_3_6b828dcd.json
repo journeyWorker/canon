@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-prune",
+    "role": "reviewer",
+    "session_id": "s-0-39-prune-rev"
+  },
+  "at": "2026-11-08T07:39:33.424624Z",
+  "change_id": "canon-0-39-prune-temps",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/artifacts_prune.rs:882",
+  "introduced_by": "ae8b64c1e8b5855ef171cd5c2fa0f054b56376bc",
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-prune",
+  "round": 1,
+  "scenario_ids": [
+    "artifacts.prune.18",
+    "artifacts.prune.19",
+    "artifacts.prune.21",
+    "artifacts.prune.29"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Standards: (a) the five-minute floor is pinned only from below (fixtures 4m30s and 1m are young, 6m is stale): a floor moved to 6 or 7 minutes stays green, and a floor of 5 vs 4m31s is not told apart; `STALE_AFTER` is a constant so the risk is a later edit. (b) artifacts.prune.18 and .21 use chmod 0555/0000 and so fail (loudly, not silently) when the suite runs as root; CI is ubuntu-latest `cargo test --workspace` as a non-root runner, so they run there. Neither changes a verdict.",
+  "worktree_dirty": false
+}

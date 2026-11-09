@@ -42,8 +42,6 @@ impl World {
             .env("TMPDIR", self.tmp.path())
             .env_remove("CODEX_HOME")
             .env_remove("HERMES_HOME")
-            .env_remove("CANON_INGEST_CLAUDE_SESSIONS_DIR")
-            .env_remove("CANON_INGEST_OMP_SESSIONS_DIR")
             .stdin(Stdio::null())
             .output()
             .expect("spawn canon")
@@ -288,13 +286,6 @@ fn atip_readwrites_04_every_dry_run_help_version_schema_and_skills_show_writes_n
         assert_eq!(world.snapshot(), before, "{argv:?} wrote");
     }
     assert!(previewed >= 10, "the previews that reach their work: {previewed}");
-    // ingest sessions reads `HOME`: the private one is empty
-    let sessions = world.home.path().join("sessions");
-    std::fs::create_dir_all(&sessions).unwrap();
-    let before = world.snapshot();
-    let out = world.canon(&["ingest", "sessions", "--home", sessions.to_str().unwrap(), "--all-workspaces", "--dry-run", "--json"]);
-    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
-    assert_eq!(world.snapshot(), before, "ingest sessions --dry-run wrote");
     // init previews in an empty directory, and `canon init` really would write there
     let empty = TempDir::new().unwrap();
     let out = world.canon_in(empty.path(), &["init", "--no-harness", "--dry-run", "--json"]);

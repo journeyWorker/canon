@@ -59,7 +59,7 @@ fn no_canon_gate_source_file_references_canon_report_or_its_marts() {
         "canon-report",
         "mart_scope_status",
         "mart_trust_matrix",
-        "mart_session_costs",
+        "mart_run_observability",
         "mart_role_memory",
         "mart_flywheel_funnel",
         "mart_review_burndown",

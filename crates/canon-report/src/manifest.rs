@@ -9,8 +9,8 @@
 //! module-level cross-reference already documents.
 
 use std::path::Path;
-use std::process::Command;
 
+use canon_store::git::GitCall;
 use serde::Serialize;
 
 /// One `manifest.json` `tables[]` entry — `file` is always
@@ -52,13 +52,12 @@ pub struct Manifest {
     /// — PLUS every namespaced overlay kind that tier holds, whatever
     /// it is named, discovered from the tier's own `kind=`
     /// directories rather than from any list
-    /// (`crate::digest`'s `overlay_kind_dirs`). It excludes exactly six
-    /// core kinds: `session`, `run`, `event`, `handoff`, `trajectory`,
-    /// `strategy_item`.
+    /// (`crate::digest`'s `overlay_kind_dirs`). It excludes exactly four
+    /// core kinds: `run`, `handoff`, `trajectory`, `strategy_item`.
     ///
-    /// So a snapshot whose `mart_session_costs`/`mart_role_memory`/
+    /// So a snapshot whose `mart_run_observability`/`mart_role_memory`/
     /// `mart_flywheel_funnel` rows moved — those are built from the
-    /// excluded six — can carry an UNCHANGED `source_digest`. A
+    /// excluded four — can carry an UNCHANGED `source_digest`. A
     /// snapshot whose `mart_scope_status` rows moved cannot, over
     /// VALIDATED core records and overlay inputs: that mart's inputs
     /// are `Scenario` (its driving side since s45), `Task.scenario_refs`
@@ -167,12 +166,10 @@ pub struct Manifest {
 /// export over a repo that simply isn't a git checkout (e.g. a fixture
 /// tempdir in a test).
 pub fn git_head_sha(repo_root: &Path) -> String {
-    Command::new("git")
+    GitCall::new(repo_root)
         .args(["rev-parse", "HEAD"])
-        .current_dir(repo_root)
-        .output()
+        .run()
         .ok()
-        .filter(|output| output.status.success())
         .and_then(|output| String::from_utf8(output.stdout).ok())
         .map(|sha| sha.trim().to_string())
         .filter(|sha| !sha.is_empty())

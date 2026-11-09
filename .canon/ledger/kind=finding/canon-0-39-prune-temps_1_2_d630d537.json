@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-prune",
+    "role": "reviewer",
+    "session_id": "s-0-39-prune-rev"
+  },
+  "at": "2026-11-08T07:38:44.933882Z",
+  "change_id": "canon-0-39-prune-temps",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/artifacts_prune.rs:1082",
+  "introduced_by": "26af3710afb895d8cf3a958a59651b6b28b0cd84",
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-prune",
+  "round": 1,
+  "scenario_ids": [
+    "artifacts.prune.26",
+    "artifacts.prune.27"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Standards: the guide check of artifacts.prune.26/27 reads GUIDES (canon, canon-storage, role-orchestrator) and passes when a guide contains `stale` and `.tmp-` anywhere; the CHANGELOG entry also names the canon-gate guide (which does carry the sentence at canon-gate.md:631) but nothing checks it, so dropping it there stays green. Blast radius: only a docs omission; the real guides were read and name the stale `.tmp-` files.",
+  "worktree_dirty": false
+}

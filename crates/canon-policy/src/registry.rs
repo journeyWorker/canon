@@ -279,11 +279,12 @@ mod tests {
     #[test]
     fn open_value_field_is_dyn() {
         let registry = SchemaRegistry::load();
-        let schema = registry.get(RecordKind::Event).unwrap();
+        let schema = registry.get(RecordKind::Handoff).unwrap();
         let fields = record_fields(schema);
-        // `Event.detail` is a deliberately open `serde_json::Value` field
+        // `HandoffBody.fields` is a deliberately open `serde_json::Value` field
         // (see schema_export.rs's own module doc) — no `type` key at all.
-        assert_eq!(fields.get("detail"), Some(&CelType::Dyn));
+        let CelType::Map(body) = fields.get("body").expect("a handoff has a body") else { panic!("body did not resolve to a Map") };
+        assert_eq!(body.get("fields"), Some(&CelType::Dyn));
     }
 
     #[test]

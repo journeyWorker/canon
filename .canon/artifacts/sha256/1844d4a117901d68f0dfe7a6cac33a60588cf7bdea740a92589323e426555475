@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="2" skipped="0" failures="0" errors="0" uuid="5de318a8-65c3-44c0-8ffc-d57b1c7503a5" timestamp="2026-11-08T16:42:01.462+09:00" time="3.229">
+    <testsuite name="canon-cli::artifacts_prune" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="artifacts_prune_27_a_release_without_the_temp_file_announcement_fails_the_release_check" classname="canon-cli::artifacts_prune" timestamp="2026-11-08T16:42:01.464+09:00" time="3.125"/>
+        <testcase name="artifacts_prune_26_the_guides_and_the_changelog_name_the_stale_temp_files" classname="canon-cli::artifacts_prune" timestamp="2026-11-08T16:42:01.464+09:00" time="3.227"/>
+    </testsuite>
+</testsuites>

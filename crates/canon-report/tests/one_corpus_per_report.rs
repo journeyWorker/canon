@@ -185,7 +185,6 @@ fn fetch_all_returns_every_panel_from_one_corpus() {
     // positionally, so a spec list and a struct that drifted apart
     // would mislabel whole panels without any query failing.
     assert_eq!(all.trust_matrix.columns, marts::TRUST_MATRIX_COLUMNS);
-    assert_eq!(all.session_costs.columns, marts::SESSION_COSTS_COLUMNS);
     assert_eq!(all.role_memory.columns, marts::ROLE_MEMORY_COLUMNS);
     assert_eq!(all.flywheel_funnel.columns, marts::FLYWHEEL_FUNNEL_COLUMNS);
     assert_eq!(all.review_burndown.columns, marts::REVIEW_BURNDOWN_COLUMNS);
@@ -193,6 +192,7 @@ fn fetch_all_returns_every_panel_from_one_corpus() {
     assert_eq!(all.subjects.columns, marts::SUBJECTS_COLUMNS);
     assert_eq!(all.review_rounds.columns, marts::REVIEW_ROUNDS_COLUMNS);
     assert_eq!(all.review_totals.columns, marts::REVIEW_TOTALS_COLUMNS);
+    assert_eq!(all.run_observability.columns, marts::RUN_OBSERVABILITY_COLUMNS);
 
     assert_eq!(all.review_rounds.rows.len(), 2, "two rounds recorded a finding: {:?}", all.review_rounds.rows);
     let total = &all.review_totals.rows[0];

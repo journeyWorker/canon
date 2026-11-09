@@ -65,7 +65,7 @@ use sqlx::Row;
 
 use crate::partition::resolve_name;
 use crate::policy::{Backend, Rung};
-use crate::tier::{AgeReport, AgingRule, PurgeCount, RawWrite, RowRekey, StoreError, StoredRecord, StoredRow, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{retired_purge_id, AgeReport, AgingRule, PurgeCount, RawWrite, RetiredKind, RowRekey, StoreError, StoredRecord, StoredRow, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 fn create_table_sql() -> &'static str {
     "CREATE TABLE IF NOT EXISTS records_history (\
@@ -150,6 +150,30 @@ fn delete_sql() -> &'static str {
 /// genuinely stuck writer still surfaces as an error rather than
 /// hanging forever.
 const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Create the db file at `path` mode 0600 when it does not exist yet (Unix); sqlx then opens it, and SQLite makes the `-wal` and `-shm`
+/// files with the main file's mode. A file that is already there is left exactly as it is: no chmod, so a command that only reads does not
+/// change metadata and a file owned by someone else still opens. Windows creates the file as before.
+fn create_owner_only(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        if let Err(e) = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(path) {
+            if e.kind() != std::io::ErrorKind::AlreadyExists {
+                return Err(e);
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = path;
+    Ok(())
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The test-only gap in [`SqliteTier::rekey`]: runs once, after a change's held-key `SELECT` and before its first write, on the calling thread.
+    static REKEY_GAP: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+}
 
 #[derive(Debug)]
 pub struct SqliteTier {
@@ -248,6 +272,7 @@ impl SqliteTier {
                         std::fs::create_dir_all(parent).map_err(|e| unavailable(e.to_string()))?;
                     }
                 }
+                create_owner_only(path).map_err(|e| unavailable(e.to_string()))?;
                 let opts = sqlx::sqlite::SqliteConnectOptions::new()
                     .filename(path)
                     .create_if_missing(true)
@@ -390,9 +415,13 @@ impl SqliteTier {
     /// its new `(kind, id, digest)` and body. A new key already held by the
     /// same JSON is a no-op (the old row goes); held by other JSON it is a
     /// [`StoreError::KeyConflict`] and nothing of the call is kept.
+    ///
+    /// The transaction is `BEGIN IMMEDIATE`: it takes the write lock before the first `SELECT`. A deferred `BEGIN` reads first, and when
+    /// another connection commits before this one upgrades to a write, SQLite fails the upgrade at once with `database is locked` (the
+    /// busy timeout does not apply to a stale read snapshot). Taking the lock first makes another writer wait out [`BUSY_TIMEOUT`] instead.
     pub fn rekey(&self, changes: &[RowRekey]) -> Result<(), StoreError> {
         self.rt.block_on(async {
-            let mut tx = self.pool.begin().await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await.map_err(|e| StoreError::Sql(e.to_string()))?;
             for change in changes {
                 let held = sqlx::query(select_body_sql())
                     .bind(&change.to.0)
@@ -402,6 +431,10 @@ impl SqliteTier {
                     .await
                     .map_err(|e| StoreError::Sql(e.to_string()))?
                     .map(|r| r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0);
+                #[cfg(test)]
+                if let Some(gap) = REKEY_GAP.with(|gap| gap.borrow_mut().take()) {
+                    gap();
+                }
                 let moves_onto_itself = change.from == change.to;
                 if let (Some(held), false) = (&held, moves_onto_itself) {
                     if *held != change.body {
@@ -490,6 +523,42 @@ impl Tier for SqliteTier {
             Ok(rows.iter()
                 .map(|r| crate::partition::purge_id(kind, &RawRecord(r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0), &r.get::<String, _>("id")))
                 .collect())
+        })
+    }
+    fn purge_retired_keys(&self, kind: RetiredKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError> {
+        self.rt.block_on(async {
+            let rows = sqlx::query("SELECT id, body FROM records_history WHERE kind = ? AND at < ? ORDER BY id, digest")
+                .bind(kind.as_str())
+                .bind(before)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| StoreError::Sql(e.to_string()))?;
+            Ok(rows.iter().map(|r| retired_purge_id(kind, &r.get::<String, _>("id"), &r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0)).collect())
+        })
+    }
+    fn purge_retired_before(&self, kind: RetiredKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
+        self.rt.block_on(async {
+            let matched = usize::try_from(sqlx::query(purge_count_sql())
+                .bind(kind.as_str())
+                .bind(before)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| StoreError::Sql(e.to_string()))?
+                .get::<i64, _>("count"))
+                .expect("a SQL COUNT is non-negative and fits usize");
+            let deleted = if dry_run {
+                0
+            } else {
+                usize::try_from(sqlx::query(purge_delete_sql())
+                    .bind(kind.as_str())
+                    .bind(before)
+                    .execute(&self.pool)
+                    .await
+                    .map_err(|e| StoreError::Sql(e.to_string()))?
+                    .rows_affected())
+                    .expect("deleted row count fits usize")
+            };
+            Ok(PurgeCount { matched, deleted })
         })
     }
     fn purge_before(&self, kind: RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
@@ -644,6 +713,129 @@ mod tests {
         assert!(!path.parent().unwrap().exists());
         let _tier = SqliteTier::connect(&path).unwrap();
         assert!(path.exists(), "the db file itself must exist after connect");
+    }
+
+    #[cfg(unix)]
+    fn mode_of(path: &Path) -> u32 {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    /// tier.durability.13 (F7): a new db file, and the `-wal` and `-shm` SQLite makes beside it, are owner-only.
+    #[cfg(unix)]
+    #[test]
+    fn tier_durability_13_a_new_hot_db_and_its_sidecars_are_owner_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".canon/hot.db");
+        let tier = SqliteTier::connect(&path).unwrap();
+        tier.write(&change(Utc::now(), "mode")).unwrap();
+        let sidecar = |suffix: &str| PathBuf::from(format!("{}{suffix}", path.display()));
+        assert!(sidecar("-wal").exists() && sidecar("-shm").exists(), "the tier is open and written, so SQLite has made its sidecars");
+        for file in [path.clone(), sidecar("-wal"), sidecar("-shm")] {
+            assert_eq!(mode_of(&file), 0o600, "{}", file.display());
+        }
+    }
+
+    /// tier.durability.14 (F7 failure path): an existing db file keeps its mode, written to or not.
+    #[cfg(unix)]
+    #[test]
+    fn tier_durability_14_an_existing_hot_db_keeps_its_mode() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hot.db");
+        drop(SqliteTier::connect(&path).unwrap());
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let tier = SqliteTier::connect(&path).unwrap();
+        tier.write(&change(Utc::now(), "mode")).unwrap();
+        assert_eq!(mode_of(&path), 0o644);
+        drop(tier);
+        drop(SqliteTier::connect_for_read(&path).unwrap());
+        assert_eq!(mode_of(&path), 0o644, "a read-only open does not touch the mode either");
+    }
+
+    /// One write by a second connection with no busy timeout, made on its own thread: `Ok` when it committed, the engine's message when it
+    /// was refused. It never waits, so a held write lock answers at once.
+    fn write_from_another_connection(path: &Path, id: &str) -> Result<(), String> {
+        let path = path.to_path_buf();
+        let id = id.to_string();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            rt.block_on(async {
+                let opts = sqlx::sqlite::SqliteConnectOptions::new().filename(&path).create_if_missing(false).busy_timeout(std::time::Duration::ZERO);
+                let mut conn = sqlx::ConnectOptions::connect(&opts).await.map_err(|e| e.to_string())?;
+                sqlx::query("INSERT INTO records_history (kind, id, at, digest, body) VALUES ('change', ?, '2026-01-01T00:00:00Z', 'other', '{}')")
+                    .bind(id)
+                    .execute(&mut conn)
+                    .await
+                    .map(drop)
+                    .map_err(|e| e.to_string())
+            })
+        })
+        .join()
+        .unwrap()
+    }
+
+    /// A tier holding one change `rekey-a`, with the key it moves from and the key it moves to.
+    struct RekeyFixture {
+        _dir: tempfile::TempDir,
+        path: PathBuf,
+        tier: SqliteTier,
+        a: Change,
+        from: (String, String, String),
+        to: (String, String, String),
+    }
+
+    fn rekey_fixture() -> RekeyFixture {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hot.db");
+        let tier = SqliteTier::connect(&path).unwrap();
+        let a = change(Utc::now(), "rekey-a");
+        let receipt = tier.write(&a).unwrap();
+        let from = ("change".to_string(), "rekey-a".to_string(), receipt.digest.clone());
+        let to = ("change".to_string(), "rekey-a2".to_string(), "deadbeef".to_string());
+        RekeyFixture { _dir: dir, path, tier, a, from, to }
+    }
+
+    /// 0.39 write-durability F6, deterministic: another connection writes in the gap between a rekey's held-key `SELECT` and its first write.
+    /// `rekey` itself holds the write lock from its first statement: the other write is refused while it runs, and `rekey` succeeds.
+    /// Putting the plain `BEGIN` back makes this fail with `database is locked`.
+    ///
+    /// tier.durability.11 (F6).
+    #[test]
+    fn tier_durability_11_rekey_takes_the_write_lock_first_so_a_writer_in_the_gap_cannot_make_it_fail() {
+        let RekeyFixture { _dir, path, tier, a, from, to } = rekey_fixture();
+        let seen = std::rc::Rc::new(std::cell::RefCell::new(None));
+        let record = std::rc::Rc::clone(&seen);
+        let gap_path = path.clone();
+        REKEY_GAP.with(|gap| *gap.borrow_mut() = Some(Box::new(move || *record.borrow_mut() = Some(write_from_another_connection(&gap_path, "gap-rekey")))));
+        tier.rekey(&[RowRekey { from, to, body: a.to_raw().0 }]).unwrap();
+        let in_gap = seen.borrow_mut().take().expect("the gap ran");
+        assert!(in_gap.as_ref().is_err_and(|e| e.contains("database is locked")), "the other writer is kept out while rekey runs: {in_gap:?}");
+        assert_eq!(write_from_another_connection(&path, "after"), Ok(()), "and may write once rekey has committed");
+        let ids: Vec<String> = tier
+            .rt
+            .block_on(async { sqlx::query("SELECT id FROM records_history ORDER BY id").fetch_all(&tier.pool).await })
+            .unwrap()
+            .into_iter()
+            .map(|r| r.get::<String, _>("id"))
+            .collect();
+        assert_eq!(ids, vec!["after".to_string(), "rekey-a2".to_string()]);
+    }
+
+    /// tier.durability.12 (F6 failure path): a plain `BEGIN` that reads first (what `rekey` used to do) loses: the other write commits in the gap, then
+    /// the upgrade fails with `database is locked` at once, busy timeout or not. This shows the gap is real, so the test above proves something.
+    #[test]
+    fn tier_durability_12_a_plain_begin_that_reads_first_fails_with_database_is_locked_when_a_writer_gets_in() {
+        let RekeyFixture { _dir, path, tier, from, to, .. } = rekey_fixture();
+        let plain = tier.rt.block_on(async {
+            let mut tx = tier.pool.begin().await.unwrap();
+            sqlx::query(select_body_sql()).bind(&to.0).bind(&to.1).bind(&to.2).fetch_optional(&mut *tx).await.unwrap();
+            let other = write_from_another_connection(&path, "gap-plain");
+            let update = sqlx::query("UPDATE records_history SET id = ? WHERE kind = ? AND id = ? AND digest = ?").bind(&to.1).bind(&from.0).bind(&from.1).bind(&from.2).execute(&mut *tx).await;
+            (other, update.map(drop).map_err(|e| e.to_string()))
+        });
+        assert_eq!(plain.0, Ok(()), "with a plain BEGIN nothing holds the write lock, so the other writer commits in the gap");
+        assert!(plain.1.as_ref().is_err_and(|e| e.contains("database is locked")), "and the upgrade then fails: {:?}", plain.1);
     }
 
     /// s32 spec.md "SqliteTier honors the store contract": "WAL

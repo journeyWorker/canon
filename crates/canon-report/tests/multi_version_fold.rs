@@ -1,7 +1,7 @@
 //! Acceptance: "a record stored as N versions at one natural key
 //! contributes to a mart exactly ONCE" — the regression guard for
 //! `crates/canon-store/sql/views.sql`'s "Multi-version records" header
-//! section, and specifically for the cost double-count the s42
+//! section, and specifically for the run double-count the s42
 //! re-review found.
 //!
 //! Every canon tier is APPEND-ONLY at a natural key
@@ -11,16 +11,14 @@
 //! versions; `views.sql` does not inherit that fold — `stg_records` is
 //! a plain `UNION ALL` — so every mart that joins or aggregates has to
 //! fold its own key. Before that fix, `canon dispatch begin`/`end`
-//! storing two `Run` versions per dispatch multiplied
-//! `mart_session_costs`' `total_cost` AND `total_tokens` by the
-//! version count, silently: `run_count` is `count(DISTINCT run_id)`
-//! and stayed correct, so a doubled bill read as an expensive run.
+//! storing two `Run` versions per dispatch showed one dispatched run as
+//! two contradictory rows in the run mart.
 //!
 //! Deliberately builds standalone per-scenario corpora rather than
 //! reusing `fixtures/corpus.rs` — that shared fixture writes exactly
 //! ONE version per natural key (which is why it never caught this),
-//! and this crate's precedent (`session_costs_multi_workspace.rs`) is
-//! one purpose-built corpus per documented scenario.
+//! and this crate's precedent is one purpose-built corpus per documented
+//! scenario.
 //!
 //! One test is a NEGATIVE guard: `mart_review_burndown` MUST keep
 //! reading the raw version stream, because for a divergence the
@@ -87,10 +85,9 @@ use canon_model::evidence::RawRecord;
 use canon_model::ids::{ChangeId, ProjectId, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
 use canon_model::records::DivergenceFields;
 use canon_model::records::{
-    Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, Run, RunStatus, Session, Subject, SubjectStatus, Task, TaskStatus,
+    Divergence, DivergenceStatus, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, Run, RunStatus, Subject, SubjectStatus, Task, TaskStatus,
 };
 use canon_report::marts;
-use canon_report::query;
 use canon_report::roots::Roots;
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
@@ -125,23 +122,14 @@ fn actor(role: &str) -> Actor {
     Actor::new("fold-fixture", RoleId::parse(role).unwrap())
 }
 
-/// One session, and ONE run persisted as the two versions `canon
-/// dispatch begin`/`end` actually write: `Running` at begin, then
-/// `Succeeded` re-stamped at a strictly greater `envelope.at`
-/// (`canon-cli`'s `close_version_at`). Both land in the git tier as
-/// distinct digest-suffixed objects, which is precisely the shape
-/// `stg_records` returns twice.
+/// ONE run persisted as the two versions `canon dispatch begin`/`end`
+/// actually write: `Running` at begin, then `Succeeded` re-stamped at a
+/// strictly greater `envelope.at` (`canon-cli`'s `close_version_at`).
+/// Both land in the git tier as distinct digest-suffixed objects, which
+/// is precisely the shape `stg_records` returns twice.
 fn dispatched_run_corpus(git_root: &std::path::Path) {
     let tier = GitTier::new(git_root);
     let session_id = SessionId::parse("fold-session").unwrap();
-    tier.write(&Session::new(
-        Envelope::new(1, RecordKind::Session, at(2026, 5, 1, 9), actor("dev")),
-        session_id.clone(),
-        "claude-code",
-        at(2026, 5, 1, 9),
-        Some(at(2026, 5, 1, 12)),
-    ))
-    .unwrap();
 
     let run_id = RunId::new();
     tier.write(&Run::new(
@@ -164,27 +152,10 @@ fn dispatched_run_corpus(git_root: &std::path::Path) {
         Some(at(2026, 5, 1, 11)),
     ))
     .unwrap();
-
-    // Exactly ONE `token_usage` event: $0.01 and 15 tokens, spent once.
-    tier.write(&Event::new(
-        Envelope::new(1, RecordKind::Event, at(2026, 5, 1, 10), Actor::new_unattributed("claude-code")),
-        run_id,
-        1,
-        "token_usage",
-        json!({
-            "provider_id": "anthropic",
-            "workspace_key": "canon",
-            "workspace_label": "canon",
-            "tokens": {"input": 10, "output": 5, "cache_read": 0, "cache_write": 0, "reasoning": 0, "total": 15},
-            "cost": 0.01,
-            "cost_source": "api",
-        }),
-    ))
-    .unwrap();
 }
 
 #[test]
-fn session_costs_charges_a_run_stored_as_two_versions_exactly_once() {
+fn run_observability_reports_a_run_stored_as_two_versions_once_with_its_latest_status() {
     if !support::duckdb_available() {
         eprintln!("skipping: `duckdb` CLI not found on PATH");
         return;
@@ -194,45 +165,12 @@ fn session_costs_charges_a_run_stored_as_two_versions_exactly_once() {
     dispatched_run_corpus(&git_root);
 
     let roots = Roots::new(git_root, dir.path().join("r2"), dir.path().join("learn"));
-    let result = marts::fetch_session_costs(&roots).unwrap();
-
-    assert_eq!(result.rows.len(), 1, "one session in one workspace must yield exactly one row, got {:?}", result.rows);
-    let row = &result.rows[0];
-
-    // `run_count` was ALWAYS right — `count(DISTINCT run_id)` absorbs
-    // the duplicate. Asserted anyway so a future fold regression can
-    // never be mistaken for a run_count regression.
-    assert_eq!(row["run_count"], 1, "one run, however many versions it is stored as");
-
-    // These two are the actual blocker. Unfolded, the `runs` CTE
-    // yielded one row per stored VERSION, the `token_usage` join fanned
-    // out, and both sums doubled to 0.02 / 30.
-    let cost = row["total_cost"].as_f64().unwrap();
-    assert!((cost - 0.01).abs() < 1e-9, "a run stored as two versions must be billed ONCE: expected 0.01, got {cost}");
-    assert_eq!(row["total_tokens"], 15, "a run stored as two versions must have its tokens counted ONCE");
-}
-
-#[test]
-fn session_run_handoff_reports_only_the_runs_latest_status() {
-    if !support::duckdb_available() {
-        eprintln!("skipping: `duckdb` CLI not found on PATH");
-        return;
-    }
-    let dir = tempfile::tempdir().unwrap();
-    let git_root = dir.path().join("ledger");
-    dispatched_run_corpus(&git_root);
-
-    let roots = Roots::new(git_root, dir.path().join("r2"), dir.path().join("learn"));
-    // No `fetch_*` wrapper exists for this mart (it is not a report
-    // panel) — read it the way `canon-report` reads every view.
-    let rows = query::run_query(&roots, "SELECT session_id, run_id, run_status FROM mart_session_run_handoff ORDER BY run_id;").unwrap();
+    let result = marts::fetch_run_observability(&roots).unwrap();
 
     // Unfolded this emitted TWO rows for one run, one claiming
-    // `running` and one `succeeded` — a view whose whole purpose is
-    // answering "what is this triple's state" reporting both answers
-    // at once, with no column saying which is current.
-    assert_eq!(rows.len(), 1, "one session/run pair must yield exactly one row, got {rows:?}");
-    assert_eq!(rows[0]["run_status"], "succeeded", "the surviving row must be the LATEST version, never the superseded `running` one");
+    // `running` and one `succeeded`, with no column saying which is current.
+    assert_eq!(result.rows.len(), 1, "one run must yield exactly one row, got {:?}", result.rows);
+    assert_eq!(result.rows[0]["status"], "succeeded", "the surviving row must be the LATEST version, never the superseded `running` one");
 }
 
 #[test]

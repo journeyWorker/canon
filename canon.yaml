@@ -52,12 +52,10 @@ routing:
   finding: local
   strategy_item: local
   # hot (live-queryable, shared, postgres-backed): in-flight
-  # task/handoff state + recent events.
+  # task/handoff/run state.
   task: hot
   handoff: hot
-  session: hot
   run: hot
-  event: hot
   # cold (bulk archive, shared, s3-backed): raw, reward-eligible
   # trajectories — cold from birth, no hot phase.
   trajectory: cold
@@ -65,7 +63,6 @@ routing:
 aging:
   # D3's own worked example values, verbatim (rung-renamed).
   handoff: { after: 30d, to: cold }
-  event: { after: 7d, to: cold }
 
 # canon's own changes live in .canon/changes/<slug>/ (`canon change new`
 # writes brief.md there); every reader reads them with no entry here.

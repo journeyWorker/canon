@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T08:12:41.761121Z",
+  "attachments": [
+    {
+      "case": "atip_planjcs_09_the_purge_preview_lists_the_audit_line_the_commit_writes",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "a69dbe2c45ea2f958a96eaff5c360a558b2beab0ace69ed333a49c32613ac39e"
+    }
+  ],
+  "code_tree": "70967fc0bbef6a84def2008647bb9f1e2b55ffea",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "0b6982e537741175b6a7d4cb7dc2f3426a7dacea",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 476,
+  "scenario_id": "atip.planjcs.09",
+  "schema": 1,
+  "staging_id": "5fba773a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -38,7 +38,7 @@ use parquet::arrow::ArrowWriter;
 
 use crate::partition::{content_digest, resolve_name, validate_body, validate_kind_matches_content};
 use crate::policy::Backend;
-use crate::tier::{raw_record_at, AgeReport, AgingRule, PurgeCount, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{raw_record_at, retired_purge_id, retired_record_at, AgeReport, AgingRule, PurgeCount, RetiredKind, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 /// The one Arrow/parquet schema every r2-tier object uses — uniform
 /// across all twelve record kinds (design's Risk-section "content-
@@ -467,6 +467,37 @@ impl R2Tier {
         Ok(())
     }
 
+    /// Every object of a retired kind with its rows' bodies, unvalidated (the kind has no type).
+    /// An object that is not readable parquet with a `body` column is left alone.
+    fn retired_objects(&self, kind: RetiredKind) -> Result<Vec<(ObjectPath, Vec<serde_json::Value>)>, StoreError> {
+        let list_prefix = ObjectPath::from(format!("{}kind={}", self.prefix, kind.as_str()));
+        let paths: Vec<ObjectPath> = self.rt.block_on(async {
+            let mut stream = self.store.list(Some(&list_prefix));
+            let mut paths = Vec::new();
+            while let Some(meta) = stream.next().await {
+                paths.push(meta.map_err(|e| StoreError::ObjectStore(e.to_string()))?.location);
+            }
+            Ok::<_, StoreError>(paths)
+        })?;
+        let mut out = Vec::new();
+        for path in paths {
+            self.ensure_local_path_safe(&path)?;
+            let bytes = self.rt.block_on(async {
+                let result = self.store.get(&path).await.map_err(|e| StoreError::ObjectStore(e.to_string()))?;
+                result.bytes().await.map_err(|e| StoreError::ObjectStore(e.to_string()))
+            })?;
+            let Ok(builder) = ParquetRecordBatchReaderBuilder::try_new(bytes) else { continue };
+            let Ok(reader) = builder.build() else { continue };
+            let mut rows = Vec::new();
+            for batch in reader.flatten() {
+                let Some(body_col) = batch.column_by_name("body").and_then(|c| c.as_any().downcast_ref::<StringArray>()) else { continue };
+                rows.extend((0..batch.num_rows()).filter_map(|i| serde_json::from_str::<serde_json::Value>(body_col.value(i)).ok()));
+            }
+            out.push((path, rows));
+        }
+        Ok(out)
+    }
+
     fn list_kind(&self, kind: RecordKind) -> Result<Vec<ObjectPath>, StoreError> {
         let list_prefix = ObjectPath::from(format!("{}kind={}", self.prefix, kind.as_str()));
         self.rt.block_on(async {
@@ -596,6 +627,30 @@ impl Tier for R2Tier {
         }
         keys.sort();
         Ok(keys)
+    }
+    fn purge_retired_keys(&self, kind: RetiredKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
+        let mut keys = Vec::new();
+        for (path, rows) in self.retired_objects(kind)? {
+            for body in rows.iter().filter(|body| retired_record_at(body).is_some_and(|at| at < before)) {
+                keys.push(retired_purge_id(kind, path.as_ref(), body));
+            }
+        }
+        keys.sort();
+        Ok(keys)
+    }
+    fn purge_retired_before(&self, kind: RetiredKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
+        let mut matched = 0;
+        let mut deleted = 0;
+        for (path, rows) in self.retired_objects(kind)? {
+            if rows.iter().any(|body| retired_record_at(body).is_some_and(|at| at < before)) {
+                matched += 1;
+                if !dry_run {
+                    self.rt.block_on(async { self.store.delete(&path).await.map_err(|e| StoreError::ObjectStore(e.to_string())) })?;
+                    deleted += 1;
+                }
+            }
+        }
+        Ok(PurgeCount { matched, deleted })
     }
     fn purge_before(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
         let mut matched = 0;

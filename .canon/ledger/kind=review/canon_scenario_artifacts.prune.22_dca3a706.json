@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-prune",
+    "role": "reviewer",
+    "session_id": "s-0-39-prune-rev"
+  },
+  "at": "2026-11-08T07:40:03.986245Z",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "kind": "review",
+  "pin": "ef2e822a05d4aeb9bb858f714e83f665cc7b84a7",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:artifacts_prune_22_a_temp_file_that_changed_since_the_preview_makes_the_plan_stale"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "69889512683a9c99f60272e4c79c4341964f04cec0c0a17cc21f1e54e9f6b9a7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-prune-temps/brief.md"
+  },
+  "review_id": "01M6X1K80JE8N60J6R2SC88PEZ",
+  "reviewer": "rev-0-39-prune",
+  "scenario_id": "artifacts.prune.22",
+  "schema": 2,
+  "worktree_dirty": false
+}

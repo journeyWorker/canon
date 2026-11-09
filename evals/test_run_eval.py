@@ -40,8 +40,8 @@ def task_for(root: pathlib.Path) -> dict:
 class CorpusTests(unittest.TestCase):
     def test_corpus_is_exactly_pinned_and_has_required_categories(self) -> None:
         tasks = RUNNER.load_tasks(HERE / "tasks.json")
-        self.assertEqual(len(tasks), 40)
-        self.assertEqual(len({tuple(task["allowed_diff_paths"]) for task in tasks.values()}), 40)
+        self.assertEqual(len(tasks), 37)
+        self.assertEqual(len({tuple(task["allowed_diff_paths"]) for task in tasks.values()}), 37)
         categories = {task["category"] for task in tasks.values()}
         for category in ("doc-schema-conflict", "plan-adapter", "stale-evidence-refusal", "env-diagnosis", "generated-output", "provider-projection", "run-lineage", "unsafe-approval"):
             self.assertIn(category, categories)
@@ -92,7 +92,7 @@ class GraderContractTests(unittest.TestCase):
         score = RUNNER.scoreboard(baseline, candidate, tasks, corpus_hash)
         self.assertEqual(score["baseline"]["success_at_1"], 1.0)
         self.assertIsNone(score["candidate"]["latency_ms"])
-        self.assertEqual(len(score["rows"]), 40)
+        self.assertEqual(len(score["rows"]), 37)
 
 
 if __name__ == "__main__":

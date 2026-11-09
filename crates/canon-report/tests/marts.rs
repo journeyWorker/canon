@@ -58,23 +58,27 @@ fn trust_matrix_matches_the_fixture_corpus_exactly() {
 }
 
 #[test]
-fn session_costs_matches_the_fixture_corpus_exactly() {
+fn run_observability_matches_the_fixture_corpus_exactly() {
     if !support::duckdb_available() {
         eprintln!("skipping: `duckdb` CLI not found on PATH");
         return;
     }
     let dir = tempfile::tempdir().unwrap();
-    let result = marts::fetch_session_costs(&inputs(dir.path()).roots).unwrap();
+    let result = marts::fetch_run_observability(&inputs(dir.path()).roots).unwrap();
 
-    assert_eq!(result.rows.len(), 1, "exactly one fixture session, got {:?}", result.rows);
-    let row = &result.rows[0];
-    assert_eq!(row["session_id"], corpus::session_costs::SESSION_ID);
-    assert_eq!(row["client"], corpus::session_costs::CLIENT);
-    assert_eq!(row["role"], corpus::session_costs::ROLE);
-    assert_eq!(row["workspace_label"], corpus::session_costs::WORKSPACE_LABEL);
-    assert_eq!(row["run_count"], corpus::session_costs::RUN_COUNT);
-    assert!((row["total_cost"].as_f64().unwrap() - corpus::session_costs::TOTAL_COST).abs() < 1e-9, "total_cost was {:?}", row["total_cost"]);
-    assert_eq!(row["total_tokens"], corpus::session_costs::TOTAL_TOKENS);
+    assert_eq!(result.rows.len(), corpus::run_observability::RUN_COUNT, "one row per fixture run, got {:?}", result.rows);
+    let named: Vec<_> = result.rows.iter().filter(|row| row["session_id"] == corpus::run_observability::SESSION_ID).collect();
+    assert_eq!(named.len(), 1, "exactly one fixture run names a session");
+    let row = named[0];
+    assert_eq!(row["status"], "succeeded");
+    // DuckDB prints a count column as text or as a number depending on the build; the value is what is pinned.
+    assert_eq!(row["guidance_count"].to_string().trim_matches('"'), "1");
+    assert_eq!(row["session_id_unknown"], false);
+    // The fixture's runs carry no `project_key` of their own and no session record fills one in.
+    assert_eq!(row["project_key_unknown"], true);
+    for removed in ["event_count", "token_event_count", "directive_event_count", "cost_source_count", "total_cost", "total_tokens", "first_event_at", "last_event_at", "event_times_unknown", "cost_unknown"] {
+        assert!(row.get(removed).is_none(), "`{removed}` left with the session and event kinds");
+    }
 }
 
 #[test]

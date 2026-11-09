@@ -1,7 +1,7 @@
 //! Per-source ingest watermark cursors (S3 §3, tasks 3.1/3.2).
 //!
-//! A `canon ingest sessions` pass persists one [`SourceCursor`] per
-//! adapter source through canon-store AFTER a successful, durable
+//! A `canon ingest plans` pass persists one [`SourceCursor`] per
+//! plan source through canon-store AFTER a successful, durable
 //! write, so the next pass can GATE its scan — skipping the
 //! parse/normalize/persist of files whose bytes are provably unchanged
 //! since they were last ingested. This turns `--watch`'s poll loop from
@@ -141,7 +141,7 @@ pub struct SourceCursor {
 /// [`SourceCursor::source_unchanged`]'s source-granularity skip and
 /// [`SourceCursor::is_ingested_unchanged`]'s single-file predicate
 /// they're built from: a caller whose adapter contract guarantees one
-/// file per session (module doc's `SessionAdapter` note) can gate at
+/// file per unit can gate at
 /// FILE granularity instead of re-parsing an entire source whenever
 /// any one of its files changes.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:04:54.089557Z",
+  "attachments": [
+    {
+      "case": "gate_staleness_scope_03_the_three_readers_of_a_pattern_with_a_slash_give_one_answer",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    }
+  ],
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 19,
+  "scenario_id": "gate.staleness-scope.03",
+  "schema": 1,
+  "staging_id": "eb471f4e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

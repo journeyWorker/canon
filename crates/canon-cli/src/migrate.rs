@@ -61,12 +61,12 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 
 use canon_ingest::markdown::field;
 use canon_ingest::plan_adapters::openspec::proposal_path;
 use canon_ingest::{find_plan_adapter, PlanSourceHandle};
 use canon_model::{paths, ChangeId, RecordKind};
+use canon_store::git::GitCall;
 use canon_store::tier::TierQuery;
 use serde_yaml::Value;
 
@@ -235,7 +235,12 @@ fn effects(repo: &Path, plan: &Plan, names: &migrate_names::Plan, config_changes
         out.push(Effect::path("remove", rel(repo, gitkeep)));
     }
     if config_changes {
-        out.push(Effect::path("rewrite", "canon.yaml"));
+        let rewrite = Effect::path("rewrite", "canon.yaml");
+        out.push(if names.retired_keys.is_empty() {
+            rewrite
+        } else {
+            rewrite.detail(format!("delete {}", names.retired_keys.iter().map(|key| format!("{} (`{}`)", key.lines(), key.key)).collect::<Vec<_>>().join(", ")))
+        });
     }
     if !plan.gitignore.is_empty() {
         out.push(Effect::path("rewrite", ".gitignore").detail(format!("add {}", plan.gitignore.join(", "))));
@@ -521,7 +526,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, relay_args: RelayArgs, json
     let drop_source = applied.error.is_none() && applied.briefs_done;
     let written = render_config(&renamed_config, &plan, applied.roots, drop_source)
         .map_err(|e| format!("could not rewrite canon.yaml: {e}"))
-        .and_then(|config| if config == text { Ok(()) } else { write_atomic(&canon_yaml, &config) });
+        .and_then(|config| if config == text { Ok(()) } else { canon_store::write_atomic(&canon_yaml, config.as_bytes()).map_err(|e| format!("failed to write {}: {e}", canon_yaml.display())) });
     if let Err(e) = written {
         return stopped("STOPPED", format!("{e}; canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "fix what the message names, then run `canon migrate` again; canon.yaml is unchanged").emit("canon migrate", json);
     }
@@ -1187,6 +1192,10 @@ fn print_names(names: &migrate_names::Plan, log: &mut crate::json_out::Log) {
     if !names.config_keys.is_empty() {
         log.line(format!("canon migrate: plan: canon.yaml: {} becomes `evidence`", names.config_keys.join(", ")));
     }
+    if !names.retired_keys.is_empty() {
+        let each = names.retired_keys.iter().map(|key| format!("{} (`{}`)", key.lines(), key.key)).collect::<Vec<_>>().join(", ");
+        log.line(format!("canon migrate: plan: canon.yaml: delete {each}; canon 0.39 has no `session` or `event` record kind (stored rows stay; `canon purge --kind session|event` deletes them)"));
+    }
     if !names.gitignore_lines.is_empty() {
         log.line("canon migrate: plan: .gitignore: `kind=evidence_record` becomes `kind=evidence`".to_string());
     }
@@ -1200,7 +1209,7 @@ fn print_plan(repo: &Path, plan: &Plan, names: &migrate_names::Plan, briefs: &mi
         log.line(line);
     }
     print_names(names, log);
-    let names_work = names.renames() || !names.config_keys.is_empty() || !names.gitignore_lines.is_empty();
+    let names_work = names.renames() || !names.config_keys.is_empty() || !names.retired_keys.is_empty() || !names.gitignore_lines.is_empty();
     if !plan.changes_files() && plan.left.is_empty() {
         if !names_work && briefs.is_empty() {
             log.line("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names");
@@ -1366,30 +1375,12 @@ fn move_file(repo: &Path, from: &Path, to: &Path, git: bool) -> Result<(), Strin
     move_dir(repo, from, to, git)
 }
 
-/// Write `path` whole or not at all: a temp file beside it, then a rename.
-fn write_atomic(path: &Path, text: &str) -> Result<(), String> {
-    let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("canon.yaml");
-    let temp = path.with_file_name(format!(".{name}.canon-migrate.tmp"));
-    let written = fs::write(&temp, text).and_then(|()| fs::rename(&temp, path));
-    if let Err(e) = written {
-        let _ = fs::remove_file(&temp);
-        return Err(format!("failed to write {}: {e}", path.display()));
-    }
-    Ok(())
-}
-
 fn git_run(repo: &Path, args: &[&str]) -> Result<(), String> {
-    let out = Command::new("git").args(args).current_dir(repo).output().map_err(|e| format!("could not run git: {e}"))?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(format!("`git {}` failed: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim()))
-    }
+    GitCall::new(repo).args(args).run().map(drop).map_err(|e| if e.is_exit() { format!("`git {}` failed: {}", args.join(" "), e.stderr_text()) } else { e.to_string() })
 }
 
 fn git_output(repo: &Path, args: &[&str]) -> Option<String> {
-    let out = Command::new("git").args(args).current_dir(repo).output().ok()?;
-    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+    GitCall::new(repo).args(args).run().ok().map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 fn in_git_work_tree(repo: &Path) -> bool {

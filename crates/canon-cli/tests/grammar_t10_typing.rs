@@ -20,7 +20,6 @@ use serde_json::Value;
 /// Statements that print serialized JSON outside `json_out`, as (file, needle in the statement, why).
 const PRINTS: &[(&str, &str, &str)] = &[
     ("learn.rs", "rollback record serializes", "human mode of `strategy rollback` prints the verbatim ledger record; `--json` goes through `json_out`"),
-    ("retention.rs", "options.open(path)", "appends the audit line to `.canon/audit/access.jsonl`: a file, not output"),
 ];
 
 /// Schemas that are deliberately opaque, as (definition name, why).

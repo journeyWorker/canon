@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T07:42:11.181973Z",
+  "attachments": [
+    {
+      "case": "artifacts_prune_26_the_guides_and_the_changelog_name_the_stale_temp_files",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "1844d4a117901d68f0dfe7a6cac33a60588cf7bdea740a92589323e426555475"
+    }
+  ],
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "7324df066b3e78efa59a3e184f920fa4173f2f5a",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 59,
+  "scenario_id": "artifacts.prune.26",
+  "schema": 1,
+  "staging_id": "90e98964",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

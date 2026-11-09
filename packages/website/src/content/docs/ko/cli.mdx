@@ -38,7 +38,7 @@ Commands without a group word.
 | `canon format` | `<dir>` (optional) | none | 읽기: Validate a spec/artifact corpus against canon's format | `canon format .canon/specs --json` |
 | `canon init` | none | none | 쓰기: Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home) | `canon init --json` |
 | `canon migrate` | none | none | 파괴적 (미리보기 후 `--commit --plan-digest`): Bring a repo from an earlier canon up to date | `canon migrate --json` |
-| `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | 파괴적 (미리보기 후 `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind session --before 2020-01-01T00:00:00Z --json` |
+| `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | 파괴적 (미리보기 후 `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind run --before 2020-01-01T00:00:00Z --json` |
 | `canon query` | none | `--kind <KIND>` | 읽기: Read stored records across every storage tier | `canon query --kind evidence --json` |
 | `canon retrieve` | none | `--for-role <ROLE>`, one of `--regime` or `--domain` | 읽기: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20 --json` |
 | `canon schema` | `<path>` (optional) (repeatable) | none | 읽기: Describe canon's own commands | `canon schema evidence add --json` |
@@ -192,13 +192,12 @@ Run evidence gates, promote staged records, install hooks.
 ### `canon ingest`
 
 {/* canon:generated cli-ingest begin */}
-Import agent sessions, records, and plans into canon's store.
+Import records and plans into canon's store.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
 | `canon ingest plans` | none | none | 쓰기: Import plans as Change/Task records | `canon ingest plans --json` |
 | `canon ingest records` | none | none | 쓰기: Import review/divergence/task/handoff records and derive verdicts | `canon ingest records --json` |
-| `canon ingest sessions` | none | none | 쓰기: Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes) | `canon ingest sessions --json` |
 {/* canon:generated cli-ingest end */}
 
 ### `canon inventory`
@@ -600,8 +599,8 @@ plan의 digest가 같을 때만 실행하고, 아니면 `PLAN_STALE`입니다. �
 `--dry-run`을 받습니다.
 
 ```bash
-canon purge --kind session --before 2020-01-01T00:00:00Z
-canon purge --kind session --before 2020-01-01T00:00:00Z --commit --plan-digest 0123456789abcdef
+canon purge --kind run --before 2020-01-01T00:00:00Z
+canon purge --kind run --before 2020-01-01T00:00:00Z --commit --plan-digest 0123456789abcdef
 ```
 
 **Done when:** 미리보기의 `planDigest`로 `--commit --plan-digest`를 실행해 exit `0`이

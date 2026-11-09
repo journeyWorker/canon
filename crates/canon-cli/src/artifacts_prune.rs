@@ -37,9 +37,18 @@
 //! # Git
 //! A deleted local blob leaves the working tree, so the removal needs a commit; the blob stays in git history until the repo owner
 //! shrinks that history, which is not this command's call. A deleted object of a tier is gone: the tier keeps no other copy.
+//!
+//! # Stale temp files (0.39)
+//! A blob write stages `.canon/artifacts/sha256/.tmp-<sha256>-<pid>-<nanos>` and renames it when complete; a write killed in between leaves it.
+//! The preview counts the **stale** ones (a regular file of that name shape, modified more than five minutes ago, [`crate::stale_temps`]) in
+//! `data.staleTemps` beside the blobs, and the commit deletes exactly the ones the plan lists, which are part of the plan digest: a plan with
+//! a temp file more or fewer is `PLAN_STALE`. A temp file is no finished blob, so deleting one changes no record; one git already tracks must
+//! be taken out of the commit that holds it. The commit checks each file again under the artifact-store lock and skips one that is gone, no
+//! longer a regular file or no longer old enough; a plan with temp files and no blob to delete still commits.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use canon_gate::artifact_store::{artifacts_config, bound_files, is_sha256_hex, store_dir, ArtifactStore, ArtifactStoreError, Binder, ObjectArtifacts, StoreLock, OBJECT_STORE_HINT};
 use canon_gate::{GateContext, GateCtx};
@@ -58,9 +67,16 @@ use crate::context::resolve_repo_root;
 use crate::json_out::Report;
 use crate::paging::{paginate, Page};
 use crate::safety::{digest_of, Effect, Mode, Plan, Preview, Reads};
+use crate::stale_temps;
 
 const CMD: &str = "canon artifacts prune";
 const LEAF: &str = "artifacts prune";
+
+/// What a stale temp file's deletion leaves for git: the file was never a blob, and nothing records it.
+const TEMP_GIT_NOTE: &str = "a stale temp file that git already tracks stays in the commit that holds it: take it out of the commit (`git rm`, then commit); deleting it here changes only the working tree";
+
+/// How many temp file names a preview lists; the totals count them all.
+const MAX_LISTED_TEMPS: usize = 50;
 
 /// Why a blob stays: the names the preview gives, in the order it lists them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -96,13 +112,15 @@ pub struct ArtifactsPruneReport {
     /// What the plan keeps, each blob with every reason it stays.
     pub keep: PruneKeep,
     /// What this run deleted: all zero in a preview.
-    pub deleted: PruneCounts,
+    pub deleted: PruneDeleted,
     /// Present when the plan deletes objects of a tier, which cannot be undone.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub irreversible: Option<String>,
     /// Present when the plan deletes local blobs: what stays in git.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub git_note: Option<String>,
+    /// The stale temp files of the local store the plan deletes (a dead write's leftovers), apart from the blobs.
+    pub stale_temps: PruneTemps,
     /// One page of the blobs the plan deletes, in digest order: empty in a commit (`meta.page` pages a preview).
     pub blobs: Vec<PruneBlob>,
     #[serde(flatten)]
@@ -110,8 +128,51 @@ pub struct ArtifactsPruneReport {
 }
 
 impl Report for ArtifactsPruneReport {
-    /// 1.1: the plan is `atip::plan::Preview` (`planDigest` is `sha256:` and 64 hex digits).
-    const SCHEMA_VERSION: &'static str = "1.1";
+    /// 1.1: the plan is `atip::plan::Preview` (`planDigest` is `sha256:` and 64 hex digits). 1.2: `staleTemps` and `deleted.staleTemps`.
+    const SCHEMA_VERSION: &'static str = "1.2";
+}
+
+/// What a run deleted: the blobs, and the stale temp files apart from them (a temp file is no blob and never counts as one).
+#[derive(Debug, Clone, Copy, Default, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PruneDeleted {
+    #[serde(flatten)]
+    pub counts: PruneCounts,
+    /// Stale temp files this run deleted.
+    pub stale_temps: TempCounts,
+}
+
+/// Files and bytes of a set of stale temp files.
+#[derive(Debug, Clone, Copy, Default, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TempCounts {
+    pub files: usize,
+    pub bytes: u64,
+}
+
+/// The stale temp files of the local store (`.tmp-<sha256>-<pid>-<nanos>`, a regular file modified more than five minutes ago): what a write that
+/// died left. They sit beside the blobs and are not counted among them, in a tier repo too (they are local files).
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PruneTemps {
+    /// How many the plan deletes, over the whole store (not only the names below).
+    pub files: usize,
+    /// Their bytes together.
+    pub bytes: u64,
+    /// The first 50 of them in name order, empty in a commit: `files` says how many there are in all.
+    pub items: Vec<TempFile>,
+    /// Present when the plan deletes temp files: a temp file already committed must be taken out of the commit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub git_note: Option<String>,
+}
+
+/// One stale temp file a plan deletes.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TempFile {
+    /// Its name in `.canon/artifacts/sha256`.
+    pub name: String,
+    pub bytes: u64,
 }
 
 /// Blobs and bytes of a set of blobs of the store.
@@ -363,6 +424,15 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
     let (kept, doomed): (Vec<&Blob>, Vec<&Blob>) = blobs.values().partition(|blob| !blob.reasons.is_empty());
     let delete = counts(doomed.iter().copied());
     let keep = counts(kept.iter().copied());
+    // The stale temp files of the local store: not blobs, so never in the keep or delete lists; a store directory that cannot be read is refused.
+    let temps = match stale_temps::find(&repo, SystemTime::now()) {
+        Ok(temps) => temps,
+        Err(e) => {
+            let message = format!("cannot read the local artifact store: {e}");
+            return crate::artifacts::store_refusal(&ArtifactStoreError::Io(e), message).hint("check that .canon/artifacts/sha256 is a readable directory, then run the command again").emit("canon artifacts prune", json);
+        }
+    };
+    let temp_bytes: u64 = temps.iter().map(|temp| temp.bytes).sum();
 
     // The plan: what goes (by tier, with the totals), and what it read: the blobs that go, the blobs that stay with their reasons and
     // every record the keep list came from.
@@ -375,10 +445,14 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
         let bytes: u64 = doomed.iter().filter_map(|blob| blob.object).sum();
         effects.push(Effect::record("delete", store.display("")).detail(format!("{} object(s), {bytes} bytes; data.blobs lists them; cannot be undone", delete.tier_objects)));
     }
+    if !temps.is_empty() {
+        effects.push(Effect::path("delete", format!("{}/.tmp-*", canon_model::paths::ARTIFACTS_SHA256_DIR)).detail(format!("{} stale temp file(s), {temp_bytes} bytes; data.staleTemps lists them", temps.len())));
+    }
     let reads = Reads::new()
         .path(&repo, "canon.yaml")
         .set("delete", doomed.iter().map(|blob| format!("{} local={} object={}", blob.digest, blob.local.as_ref().map_or(0, |(_, bytes)| *bytes), blob.object.map_or_else(|| "-".to_string(), |bytes| bytes.to_string()))))
         .set("keep", kept.iter().map(|blob| format!("{} {}", blob.digest, blob.reasons.iter().map(|reason| reason.as_str()).collect::<Vec<_>>().join(","))))
+        .set("stale-temps", temps.iter().map(|temp| format!("{} {}", temp.name, temp.bytes)))
         .set("records", bindings.state.iter());
     let plan = match Plan::new(LEAF, effects, reads) {
         Ok(plan) => plan.unpaged(),
@@ -386,11 +460,11 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
     };
 
     // A commit deletes local files and takes the store lock: refuse a store that cannot be written before anything goes.
-    if matches!(mode, Mode::Commit(_)) && !doomed.is_empty() {
+    if matches!(mode, Mode::Commit(_)) && !(doomed.is_empty() && temps.is_empty()) {
         let lock = repo.join(canon_model::paths::ARTIFACT_STORE_LOCK_FILE);
         let dir = store_dir(&repo);
         let mut targets: Vec<&Path> = vec![lock.as_path()];
-        if delete.local_copies > 0 {
+        if delete.local_copies > 0 || !temps.is_empty() {
             targets.push(dir.as_path());
         }
         if let Some(code) = crate::write_mode::refuse_unwritable(&targets, CMD, json) {
@@ -404,6 +478,12 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
 
     let irreversible = (delete.tier_objects > 0).then(|| format!("deleting an object of `{backend}` cannot be undone: the tier keeps no other copy ({} object(s), {} bytes)", delete.tier_objects, store_bytes(&doomed, |blob| blob.object)));
     let git_note = (delete.local_copies > 0).then(|| "a deleted local blob stays in git history; shrinking that history is the repo owner's call, not this command's".to_string());
+    let stale_temps_report = PruneTemps {
+        files: temps.len(),
+        bytes: temp_bytes,
+        items: temps.iter().take(MAX_LISTED_TEMPS).map(|temp| TempFile { name: temp.name.clone(), bytes: temp.bytes }).collect(),
+        git_note: (!temps.is_empty()).then(|| TEMP_GIT_NOTE.to_string()),
+    };
     let mut kept_reasons: BTreeMap<String, usize> = BTreeMap::new();
     for blob in &kept {
         for reason in &blob.reasons {
@@ -418,14 +498,14 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
     };
 
     let kept_after = keep_report.blobs;
-    let mut report = ArtifactsPruneReport { backend: backend.clone(), keep_days, delete, keep: keep_report, deleted: PruneCounts::default(), irreversible, git_note, blobs: Vec::new(), plan: plan.preview() };
+    let mut report = ArtifactsPruneReport { backend: backend.clone(), keep_days, delete, keep: keep_report, deleted: PruneDeleted::default(), irreversible, git_note, stale_temps: stale_temps_report, blobs: Vec::new(), plan: plan.preview() };
     if !commit {
         return preview(&plan, report, &doomed, page, json);
     }
 
     // The commit holds the artifact-store lock while it deletes (`main` holds the repository write lock for the whole run), so no writer
-    // adds a blob between the plan and the deletion.
-    let _lock = if doomed.is_empty() {
+    // adds a blob between the plan and the deletion, and no writer that takes the lock has a temp file in flight.
+    let _lock = if doomed.is_empty() && temps.is_empty() {
         None
     } else {
         match StoreLock::acquire(&repo) {
@@ -457,22 +537,52 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
             }
         }
     }
-    report.deleted = done;
+    // Then the temp files of the plan, and only those: each is checked again now that the lock is held (a file that is gone, no longer a
+    // regular file or no longer old enough is skipped), and no other old temp file is looked for.
+    let mut done_temps = TempCounts::default();
+    if stopped.is_none() {
+        let swept_at = SystemTime::now();
+        for temp in &temps {
+            match stale_temps::remove(temp, swept_at) {
+                Ok(Some(bytes)) => {
+                    done_temps.files += 1;
+                    done_temps.bytes += bytes;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    stopped = Some(Stop { object: false, message: format!("failed to remove {}: {e}", temp.path.display()), hint: "fix the permissions of the blob directory, then preview and commit again".to_string() });
+                    break;
+                }
+            }
+            #[cfg(debug_assertions)]
+            if done_temps.files == 1 {
+                if let Some(e) = crate::incomplete::injected_stop("artifacts-prune-temp-after-delete") {
+                    stopped = Some(Stop { object: false, message: format!("failed to delete the next stale temp file: {e}"), hint: "fix what the message names, then preview and commit again".to_string() });
+                    break;
+                }
+            }
+        }
+    }
+    report.deleted = PruneDeleted { counts: done, stale_temps: done_temps };
+    report.stale_temps.items.clear();
     report.plan = plan.committed();
 
     if let Some(stop) = stopped {
-        if done.blobs == 0 {
+        if done.blobs == 0 && done_temps.files == 0 {
             // Nothing was deleted: the same call can run again.
             return CliError::failed(stop.code(), format!("{}; nothing was deleted", stop.message)).hint(stop.hint).emit("canon artifacts prune", json);
         }
-        crate::incomplete::read_first("canon artifacts verify --json", "read what the stopped prune left: the blobs it deleted are gone and no blob a record binds was touched");
+        crate::incomplete::read_first("canon artifacts verify --json", "read what the stopped prune left: what it deleted is gone and no blob a record binds was touched");
         crate::json_out::prepend_next(crate::status::NextStep {
             command: format!("canon artifacts prune{} --json", keep_days.map_or_else(String::new, |days| format!(" --keep-days={days}"))),
-            why: "preview a new plan: the blobs this run deleted are no longer in it (the same --plan-digest is stale now)".into(),
+            why: "preview a new plan: what this run deleted is no longer in it (the same --plan-digest is stale now)".into(),
             actor: crate::status::StepActor::Agent,
             role: Some(crate::role::Role::Orchestrator),
         });
-        let incomplete = CliError::failed("ARTIFACTS_PRUNE_INCOMPLETE", format!("stopped after deleting {} of {} blob(s): {}", done.blobs, delete.blobs, stop.message))
+        let incomplete = CliError::failed(
+            "ARTIFACTS_PRUNE_INCOMPLETE",
+            format!("stopped after deleting {} of {} blob(s) and {} of {} stale temp file(s): {}", done.blobs, delete.blobs, done_temps.files, temps.len(), stop.message),
+        )
             .hint("what was deleted stays deleted and no blob a record binds was touched; read the state, deal with what the message names, then preview and commit a new plan (the same --plan-digest is stale now)");
         // The reason is the code of the part that failed.
         let incomplete = if stop.object { incomplete.reason("ARTIFACTS_STORE_FAILED") } else { incomplete.reason("WRITE_FAILED") };
@@ -493,7 +603,11 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
     if done.tier_objects > 0 {
         crate::say!(json, "{} object(s) of `{backend}` are deleted for good: the tier keeps no other copy", done.tier_objects);
     }
-    if doomed.is_empty() {
+    if done_temps.files > 0 {
+        crate::say!(json, "deleted {} stale temp file(s) ({} bytes) a write that died left; they were no finished blobs, so no record changed", done_temps.files, done_temps.bytes);
+        crate::say!(json, "{TEMP_GIT_NOTE}");
+    }
+    if doomed.is_empty() && temps.is_empty() {
         crate::json_out::mark_unchanged();
         crate::say!(json, "{CMD}: nothing to delete");
     }
@@ -584,6 +698,18 @@ fn preview(plan: &Plan, mut report: ArtifactsPruneReport, doomed: &[&Blob], page
     if let Some(note) = &report.git_note {
         crate::say!(json, "  {note}");
     }
+    if report.stale_temps.files > 0 {
+        crate::say!(json, "  delete {} stale temp file(s) ({} bytes) a write that died left in {}/; they are no finished blobs", report.stale_temps.files, report.stale_temps.bytes, canon_model::paths::ARTIFACTS_SHA256_DIR);
+        for temp in &report.stale_temps.items {
+            crate::say!(json, "    {} ({} bytes)", temp.name, temp.bytes);
+        }
+        if report.stale_temps.items.len() < report.stale_temps.files {
+            crate::say!(json, "    … and {} more (data.staleTemps counts them all)", report.stale_temps.files - report.stale_temps.items.len());
+        }
+        if let Some(note) = &report.stale_temps.git_note {
+            crate::say!(json, "  {note}");
+        }
+    }
     for blob in &listed {
         crate::say!(json, "  delete {} ({} bytes, {})", blob.sha256, blob.bytes, blob.stored_in.join(" and "));
     }
@@ -591,7 +717,7 @@ fn preview(plan: &Plan, mut report: ArtifactsPruneReport, doomed: &[&Blob], page
         crate::say!(json, "  {line}");
     }
     report.blobs = listed;
-    if doomed.is_empty() {
+    if doomed.is_empty() && report.stale_temps.files == 0 {
         // Nothing to delete: no commit command is offered.
         crate::say!(json, "  nothing to delete");
         if json {

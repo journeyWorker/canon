@@ -25,7 +25,7 @@ use crate::pg_tier::PgTier;
 use crate::policy::{Backend, BackendConfig, Rung, TierPolicy};
 use crate::r2_tier::R2Tier;
 use crate::sqlite_tier::SqliteTier;
-use crate::tier::{is_purgeable_kind, AgeReport, AgingRule, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{is_purgeable_kind, AgeReport, AgingRule, PurgeCount, PurgeKind, RetiredKind, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RungPurgeReport {
@@ -37,7 +37,7 @@ pub struct RungPurgeReport {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PurgeOutcome {
-    pub kind: RecordKind,
+    pub kind: PurgeKind,
     pub before: chrono::DateTime<chrono::Utc>,
     pub dry_run: bool,
     pub rungs: Vec<RungPurgeReport>,
@@ -56,12 +56,18 @@ impl<'a> RetentionService<'a> {
         Self { registry }
     }
 
-    pub fn purge(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeOutcome, StoreError> {
-        self.registry.purge(kind, before, dry_run)
+    pub fn purge(&self, kind: PurgeKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeOutcome, StoreError> {
+        match kind {
+            PurgeKind::Current(kind) => self.registry.purge(kind, before, dry_run),
+            PurgeKind::Retired(kind) => self.registry.purge_retired(kind, before, dry_run),
+        }
     }
 
-    pub fn purge_plan_keys(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
-        self.registry.purge_plan_keys(kind, before)
+    pub fn purge_plan_keys(&self, kind: PurgeKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
+        match kind {
+            PurgeKind::Current(kind) => self.registry.purge_plan_keys(kind, before),
+            PurgeKind::Retired(kind) => self.registry.purge_retired_plan_keys(kind, before),
+        }
     }
 }
 
@@ -258,7 +264,26 @@ impl TierRegistry {
         if !is_purgeable_kind(kind) {
             return Err(StoreError::PurgeKindUnsupported { kind: kind.as_str().to_string() });
         }
-        let mut rungs = self.tiers_for_read(kind)?;
+        let rungs = self.tiers_for_read(kind)?;
+        self.purge_rungs(PurgeKind::Current(kind), rungs, before, dry_run)
+    }
+
+    /// [`Self::purge`] for a [`RetiredKind`]. A retired kind has no routing, so
+    /// every rung `canon.yaml`'s `tiers:` configures is searched: the rows may sit in
+    /// any of them, and the routing keys that once said which are gone after
+    /// `canon migrate`.
+    pub fn purge_retired(&self, kind: RetiredKind, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeOutcome, StoreError> {
+        let rungs = self.policy.tiers.keys().copied().collect();
+        self.purge_rungs(PurgeKind::Retired(kind), rungs, before, dry_run)
+    }
+
+    fn purge_rungs(&self, kind: PurgeKind, mut rungs: Vec<Rung>, before: chrono::DateTime<chrono::Utc>, dry_run: bool) -> Result<PurgeOutcome, StoreError> {
+        let purge_one = |tier: &Arc<dyn Tier>, dry_run: bool| -> Result<PurgeCount, StoreError> {
+            match kind {
+                PurgeKind::Current(kind) => tier.purge_before(kind, before, dry_run),
+                PurgeKind::Retired(kind) => tier.purge_retired_before(kind, before, dry_run),
+            }
+        };
         rungs.sort();
         rungs.dedup();
         let mut attached = Vec::new();
@@ -273,7 +298,7 @@ impl TierRegistry {
 
         let mut preflight = Vec::with_capacity(attached.len());
         for (rung, tier) in &attached {
-            let count = tier.purge_before(kind, before, true)?;
+            let count = purge_one(tier, true)?;
             preflight.push(RungPurgeReport { rung: *rung, backend: tier.backend(), matched: count.matched, deleted: 0 });
         }
         if dry_run {
@@ -283,7 +308,7 @@ impl TierRegistry {
         let matched_total = preflight.iter().map(|report| report.matched).sum();
         let mut reports = Vec::with_capacity(attached.len());
         for (rung, tier) in attached {
-            match tier.purge_before(kind, before, false) {
+            match purge_one(&tier, false) {
                 Ok(count) => reports.push(RungPurgeReport { rung, backend: tier.backend(), matched: count.matched, deleted: count.deleted }),
                 Err(err) => {
                     let deleted = reports.iter().map(|report: &RungPurgeReport| report.deleted).sum();
@@ -307,13 +332,23 @@ impl TierRegistry {
         if !is_purgeable_kind(kind) {
             return Err(StoreError::PurgeKindUnsupported { kind: kind.as_str().to_string() });
         }
-        let mut rungs = self.tiers_for_read(kind)?;
+        let rungs = self.tiers_for_read(kind)?;
+        self.purge_keys_in(rungs, |tier| tier.purge_keys(kind, before))
+    }
+
+    /// [`Self::purge_plan_keys`] for a [`RetiredKind`] (every configured rung, as [`Self::purge_retired`]).
+    pub fn purge_retired_plan_keys(&self, kind: RetiredKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
+        let rungs = self.policy.tiers.keys().copied().collect();
+        self.purge_keys_in(rungs, |tier| tier.purge_retired_keys(kind, before))
+    }
+
+    fn purge_keys_in(&self, mut rungs: Vec<Rung>, keys_of: impl Fn(&Arc<dyn Tier>) -> Result<Vec<String>, StoreError>) -> Result<Vec<String>, StoreError> {
         rungs.sort();
         rungs.dedup();
         let mut keys = Vec::new();
         for rung in rungs {
             let Ok(tier) = self.handle(rung) else { continue };
-            for key in tier.purge_keys(kind, before)? {
+            for key in keys_of(&tier)? {
                 keys.push(format!("{}:{}:{key}", rung.as_str(), tier.backend().as_str()));
             }
         }
@@ -728,5 +763,128 @@ routing:
         assert!(message.contains("7 record(s) matched"));
         assert!(message.contains("at least 2 deleted"));
         assert!(message.contains("non-transactional"));
+    }
+
+    // ── 0.39: `purge --kind session|event` for one release ───────────────────
+
+    const RETIRED_POLICY: &str = r#"
+tiers:
+  local: { backend: git, root: ledger }
+  hot: { backend: sqlite, path: hot.db }
+  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_RETIRED_UNIT_UNSET, prefix: "canon/" }
+routing:
+  task: hot
+  session: hot
+  event: hot
+aging:
+  event: { after: 7d, to: cold }
+"#;
+
+    fn retired_row(session: &str, at: &str) -> serde_json::Value {
+        serde_json::json!({"schema": 1, "kind": "session", "at": at, "actor": {"agent_id": "old"}, "session_id": session, "client": "omp", "started_at": at})
+    }
+
+    fn write_json(root: &std::path::Path, relative: &str, body: &str) {
+        let path = root.join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, body).unwrap();
+    }
+
+    fn retired_registry(dir: &std::path::Path) -> TierRegistry {
+        let mut policy = TierPolicy::from_yaml(RETIRED_POLICY).unwrap();
+        policy.tiers.remove(&Rung::Cold);
+        let hot = crate::sqlite_tier::SqliteTier::connect(&dir.join("hot.db")).unwrap();
+        TierRegistry::new(policy, Some(GitTier::new(dir.join("ledger"))), None, None, Some(hot))
+    }
+
+    #[test]
+    fn tier_retired_07_a_retired_kind_is_purged_from_every_configured_tier_by_its_body_at_and_nothing_else() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger = dir.path().join("ledger");
+        let (old, new) = (retired_row("s-old", "2026-01-01T00:00:00Z"), retired_row("s-new", "2027-06-01T00:00:00Z"));
+        write_json(&ledger, "kind=session/s-old_aaaaaaaa.json", &old.to_string());
+        write_json(&ledger, "kind=session/s-new_bbbbbbbb.json", &new.to_string());
+        write_json(&ledger, "kind=session/area=x/nested_cccccccc.json", &old.to_string());
+        write_json(&ledger, "kind=session/not-json_dddddddd.json", "{ nope");
+        write_json(&ledger, "kind=session/no-at_eeeeeeee.json", "{\"kind\": \"session\"}");
+        write_json(&ledger, "kind=session/notes.txt", "not a record");
+        write_json(&ledger, "kind=event/e-old_ffffffff.json", &old.to_string());
+
+        // A hot row: a task is written, then its row becomes a `session` row, whose `at` column is kept.
+        let registry = retired_registry(dir.path());
+        let task = canon_model::records::Task::new(
+            Envelope::new(1, RecordKind::Task, "2026-01-02T00:00:00Z".parse().unwrap(), actor()),
+            canon_model::ids::TaskId::parse("s1#1").unwrap(),
+            "a task",
+            canon_model::records::TaskStatus::Open,
+            None,
+        );
+        let hot = crate::sqlite_tier::SqliteTier::connect(&dir.path().join("hot.db")).unwrap();
+        hot.write(&task).unwrap();
+        let row = hot.all_rows().unwrap().remove(0);
+        hot.rekey(&[crate::tier::RowRekey { from: (row.kind, row.id, row.digest), to: ("session".into(), "s-hot".into(), "11111111".into()), body: old.clone() }]).unwrap();
+
+        let before = chrono::DateTime::parse_from_rfc3339("2026-06-01T00:00:00Z").unwrap().with_timezone(&Utc);
+        let service = RetentionService::new(&registry);
+        let session = PurgeKind::Retired(RetiredKind::Session);
+
+        // The preview counts and deletes nothing; the routing keys of the policy are not read.
+        let keys = service.purge_plan_keys(session, before).unwrap();
+        assert_eq!(keys.len(), 3, "{keys:?}");
+        assert!(keys.iter().any(|k| k.starts_with("local:git:session:kind=session/s-old_aaaaaaaa.json:")), "{keys:?}");
+        assert!(keys.iter().any(|k| k.starts_with("local:git:session:kind=session/area=x/nested_cccccccc.json:")), "{keys:?}");
+        assert!(keys.iter().any(|k| k.starts_with("hot:sqlite:session:s-hot:")), "{keys:?}");
+        let preview = service.purge(session, before, true).unwrap();
+        assert_eq!((preview.kind, preview.dry_run), (session, true));
+        assert_eq!(preview.rungs.iter().map(|r| (r.rung, r.matched, r.deleted)).collect::<Vec<_>>(), [(Rung::Local, 2, 0), (Rung::Hot, 1, 0)]);
+        assert!(ledger.join("kind=session/s-old_aaaaaaaa.json").is_file());
+
+        let done = service.purge(session, before, false).unwrap();
+        assert_eq!(done.rungs.iter().map(|r| (r.rung, r.matched, r.deleted)).collect::<Vec<_>>(), [(Rung::Local, 2, 2), (Rung::Hot, 1, 1)]);
+        assert!(!ledger.join("kind=session/s-old_aaaaaaaa.json").exists() && !ledger.join("kind=session/area=x/nested_cccccccc.json").exists());
+        for kept in ["kind=session/s-new_bbbbbbbb.json", "kind=session/not-json_dddddddd.json", "kind=session/no-at_eeeeeeee.json", "kind=session/notes.txt", "kind=event/e-old_ffffffff.json"] {
+            assert!(ledger.join(kept).exists(), "{kept} is not a purge candidate of `session` before the cutoff");
+        }
+        assert!(hot.all_rows().unwrap().is_empty());
+
+        // The other retired kind has its own files; a second run finds nothing.
+        let event = service.purge(PurgeKind::Retired(RetiredKind::Event), before, false).unwrap();
+        assert_eq!(event.rungs.iter().map(|r| r.deleted).sum::<usize>(), 1);
+        assert!(service.purge_plan_keys(session, before).unwrap().is_empty());
+    }
+
+    #[test]
+    fn tier_retired_07_a_retired_purge_needs_no_routing_and_names_only_configured_tiers() {
+        let dir = tempfile::tempdir().unwrap();
+        let policy = TierPolicy::from_yaml("tiers:\n  local: { backend: git, root: ledger }\n").unwrap();
+        write_json(&dir.path().join("ledger"), "kind=session/s_aaaaaaaa.json", &retired_row("s", "2026-01-01T00:00:00Z").to_string());
+        let registry = TierRegistry::new(policy, Some(GitTier::new(dir.path().join("ledger"))), None, None, None);
+        let outcome = registry.purge_retired(RetiredKind::Session, Utc::now(), false).unwrap();
+        assert_eq!(outcome.rungs.iter().map(|r| (r.rung, r.deleted)).collect::<Vec<_>>(), [(Rung::Local, 1)]);
+
+        let none = TierRegistry::new(TierPolicy::from_yaml("routing:\n  task: hot\n").unwrap(), None, None, None, None);
+        assert!(none.purge_retired(RetiredKind::Event, Utc::now(), false).unwrap().rungs.is_empty(), "no `tiers:`, nothing to search");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tier_retired_08_a_retired_purge_refuses_a_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger = dir.path().join("ledger");
+        fs::create_dir_all(ledger.join("kind=session")).unwrap();
+        std::os::unix::fs::symlink(dir.path(), ledger.join("kind=session/link.json")).unwrap();
+        let policy = TierPolicy::from_yaml("tiers:\n  local: { backend: git, root: ledger }\n").unwrap();
+        let registry = TierRegistry::new(policy, Some(GitTier::new(&ledger)), None, None, None);
+        let err = registry.purge_retired(RetiredKind::Session, Utc::now(), false).unwrap_err();
+        assert!(err.to_string().contains("symlink"), "{err}");
+    }
+
+    #[test]
+    fn tier_retired_08_every_other_kind_stays_closed_to_purge() {
+        let registry = TierRegistry::new(TierPolicy::from_yaml("").unwrap(), None, None, None, None);
+        let err = registry.purge(RecordKind::Change, Utc::now(), true).unwrap_err();
+        assert_eq!(err.to_string(), "purge kind `change` is not allowed; allowed kinds: run, trajectory, session (retired), event (retired)");
+        assert_eq!((PurgeKind::parse("session"), PurgeKind::parse("run"), PurgeKind::parse("change")), (Some(PurgeKind::Retired(RetiredKind::Session)), Some(PurgeKind::Current(RecordKind::Run)), None));
+        assert_eq!(PurgeKind::names(), ["run", "trajectory", "session", "event"]);
     }
 }

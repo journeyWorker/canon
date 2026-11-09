@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-gitstale",
+    "role": "reviewer",
+    "session_id": "s-0-39-gitstale-rev"
+  },
+  "at": "2026-11-08T07:40:47.743120Z",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "kind": "review",
+  "pin": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_git_boundary_01_evidence_add_records_the_repos_commit_and_code_tree_whatever_git_dir_the_shell_holds",
+          "junit:git::tests::gate_git_boundary_01_the_command_clears_the_repository_variables_and_fixes_the_rest"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "2de19af2374c40a9bd3d42ac6d09954561113d0eeb218af392ab516be8eb8ae7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-git-boundary/brief.md"
+  },
+  "review_id": "01M6X1MJQZJS73YFHSZ2JWKGMR",
+  "reviewer": "rev-0-39-gitstale",
+  "scenario_id": "gate.git-boundary.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -223,19 +223,10 @@ fn is_regime_key(s: &str) -> bool {
 }
 
 /// `session_id` deliberately validates only "non-empty opaque token",
-/// never a single fixed shape (e.g. strict UUID parsing). The vendored
-/// adapter code proves the derivation *source* is not uniform across
-/// agent CLIs — Claude Code and Codex trust the transcript filename
-/// stem (`claudecode.rs:370-374`, `codex.rs:232-237`), while omp/pi
-/// trust only an in-file session-header `id` field and never parse the
-/// filename (`pi.rs:102-127`) — so a `SessionId` newtype that hard-codes
-/// "UUID" would reject a correctly-derived omp/pi session id.
-/// The vendored launcher project's own adoption brief flags this
-/// explicitly; its recommendation is that
-/// *which* source each adapter trusts is an S3 (`canon-ingest`)
-/// per-adapter decision, not a grammar this type should encode — S1
-/// owns only the type's shape-validation (opaque, non-empty, no control
-/// characters), not provenance.
+/// never a single fixed shape (e.g. strict UUID parsing): the token comes
+/// from outside canon (an agent CLI's own session identifier, carried on a
+/// `Run` and on an `Actor`), so this type owns only shape-validation
+/// (opaque, non-empty, no control characters), not provenance.
 fn is_session_id(s: &str) -> bool {
     !s.is_empty() && s.trim() == s && !s.chars().any(char::is_control)
 }
@@ -260,14 +251,14 @@ join_key_newtype!(
 
 join_key_newtype!(
     SessionId,
-    grammar: "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format",
-    joins: "session ↔ cost ↔ run ↔ trajectory"
+    grammar: "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format",
+    joins: "run ↔ actor"
 );
 
 join_key_newtype!(
     HandoffId,
     grammar: "the donor CLI's handoff-id grammar: `YYYYMMDD-HHmm-<topic-slug>-<nonce>`",
-    joins: "handoff ↔ session ↔ change"
+    joins: "handoff ↔ run ↔ change"
 );
 
 join_key_newtype!(
@@ -550,7 +541,7 @@ impl SpecDigest {
     }
 }
 
-/// `run_id`: a ULID (join-spine table: "run ↔ events ↔ manifest").
+/// `run_id`: a ULID (join-spine table: "run ↔ manifest").
 /// Wraps [`ulid::Ulid`] directly rather than a validated `String` — a
 /// ULID's own parser is the grammar check, and its canonical
 /// Crockford-base32 `Display`/`FromStr` are already exactly what the
@@ -561,7 +552,7 @@ pub struct RunId(ulid::Ulid);
 
 impl RunId {
     pub const GRAMMAR: &'static str = "ULID (Crockford base32, 26 chars) — `ulid::Ulid`";
-    pub const JOINS: &'static str = "run ↔ events ↔ manifest";
+    pub const JOINS: &'static str = "run ↔ manifest";
 
     pub fn new() -> Self {
         Self(ulid::Ulid::new())
@@ -612,7 +603,7 @@ impl JsonSchema for RunId {
         json_schema!({
             "type": "string",
             "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
-            "description": "ULID (Crockford base32, 26 chars) — joins: run ↔ events ↔ manifest",
+            "description": "ULID (Crockford base32, 26 chars) — joins: run ↔ manifest",
         })
     }
 }

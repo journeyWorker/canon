@@ -9,7 +9,7 @@
 //!   app.bulkread: ["app/bulk/**"]   # the surface `app.bulkread` (area.surface) wins over `app`
 //! ```
 //!
-//! A pattern is a `code.exclude` glob ([`crate::git_rev::glob_matches`]). A
+//! A pattern is a `code.exclude` glob ([`canon_model::path_glob`]). A
 //! scenario's scope is its surface's key, else its area's key, else none.
 //!
 //! The scopes only shorten what an approved chore asks for
@@ -26,7 +26,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use canon_model::path_glob::{Anchor, Glob};
 use canon_model::{paths, ScenarioId};
+use canon_store::git::GitCall;
 
 /// The `code_scopes` of a repo's policy and whether the policy stands approved.
 #[derive(Debug, Default)]
@@ -84,7 +86,8 @@ impl CodeScopes {
             let Some(files) = files else { continue };
             let dead_key = !live(patterns, Some(files));
             for pattern in patterns {
-                if !files.iter().any(|file| crate::git_rev::glob_matches(pattern, file)) {
+                let glob = Glob::new(pattern, Anchor::Anywhere);
+                if !files.iter().any(|file| glob.matches(file)) {
                     let rule = if dead_key { "; no pattern of the key matches a file, so the key declares no scope and its scenarios follow the 0.37 rule" } else { "" };
                     out.push(format!("code scope `{key}`: the pattern `{pattern}` matches no file of the code tree{rule}; fix it in {} and have the human approve the policy again", paths::POLICY_FILE));
                 }
@@ -98,7 +101,13 @@ impl CodeScopes {
 /// (`files`). A key none of whose patterns matches, or a tree that cannot be listed,
 /// declares no scope: the scenarios follow the rule without scopes.
 pub fn live(patterns: &[String], files: Option<&[String]>) -> bool {
-    files.is_some_and(|files| patterns.iter().any(|pattern| files.iter().any(|file| crate::git_rev::glob_matches(pattern, file))))
+    let globs = compile(patterns);
+    files.is_some_and(|files| globs.iter().any(|glob| files.iter().any(|file| glob.matches(file))))
+}
+
+/// The patterns of a scope, compiled once to be matched against many paths: a `code.exclude` glob, a name at any depth.
+pub fn compile(patterns: &[String]) -> Vec<Glob> {
+    patterns.iter().map(|pattern| Glob::new(pattern, Anchor::Anywhere)).collect()
 }
 
 /// The `code_scopes` of policy text: the keys, and why they could not be read.
@@ -151,7 +160,7 @@ pub fn changed_since_approval(repo: &Path) -> Option<Vec<String>> {
 
 /// The policy file as it was when its digest was `digest`, from git history.
 fn approved_bytes(repo: &Path, digest: &str) -> Option<String> {
-    let git = |args: &[&str]| std::process::Command::new("git").current_dir(repo).args(args).output().ok().filter(|o| o.status.success()).map(|o| o.stdout);
+    let git = |args: &[&str]| GitCall::new(repo).args(args).run().ok().map(|output| output.stdout);
     let revs = git(&["log", "--format=%H", "--", paths::POLICY_FILE])?;
     for rev in String::from_utf8_lossy(&revs).lines() {
         let Some(bytes) = git(&["show", &format!("{rev}:{}", paths::POLICY_FILE)]) else { continue };

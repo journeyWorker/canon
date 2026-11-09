@@ -35,7 +35,7 @@ Commands without a group word.
 | `canon format` | `<dir>` (optional) | none | read: Validate a spec/artifact corpus against canon's format | `canon format .canon/specs --json` |
 | `canon init` | none | none | write: Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home) | `canon init --json` |
 | `canon migrate` | none | none | destructive (preview, then `--commit --plan-digest`): Bring a repo from an earlier canon up to date | `canon migrate --json` |
-| `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | destructive (preview, then `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind session --before 2020-01-01T00:00:00Z --json` |
+| `canon purge` | none | `--kind <KIND>`, `--before <TIMESTAMP>` | destructive (preview, then `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind run --before 2020-01-01T00:00:00Z --json` |
 | `canon query` | none | `--kind <KIND>` | read: Read stored records across every storage tier | `canon query --kind evidence --json` |
 | `canon retrieve` | none | `--for-role <ROLE>`, one of `--regime` or `--domain` | read: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20 --json` |
 | `canon schema` | `<path>` (optional) (repeatable) | none | read: Describe canon's own commands | `canon schema evidence add --json` |
@@ -189,13 +189,12 @@ Run evidence gates, promote staged records, install hooks.
 ### `canon ingest`
 
 {/* canon:generated cli-ingest begin */}
-Import agent sessions, records, and plans into canon's store.
+Import records and plans into canon's store.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
 | `canon ingest plans` | none | none | write: Import plans as Change/Task records | `canon ingest plans --json` |
 | `canon ingest records` | none | none | write: Import review/divergence/task/handoff records and derive verdicts | `canon ingest records --json` |
-| `canon ingest sessions` | none | none | write: Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes) | `canon ingest sessions --json` |
 {/* canon:generated cli-ingest end */}
 
 ### `canon inventory`
@@ -602,8 +601,8 @@ plan recomputed now has the same digest (`PLAN_STALE`, exit `2`, otherwise).
 never carry `--commit` or `--plan-digest`.
 
 ```bash
-canon purge --kind session --before 2026-01-01T00:00:00Z
-canon purge --kind session --before 2026-01-01T00:00:00Z --commit --plan-digest 0123456789abcdef
+canon purge --kind run --before 2026-01-01T00:00:00Z
+canon purge --kind run --before 2026-01-01T00:00:00Z --commit --plan-digest 0123456789abcdef
 ```
 
 **Done when:** the committed run reports `committed: true`; a following bare

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="1" skipped="0" failures="1" errors="0" uuid="5cce23bd-9b43-418b-a9d4-1d905c8c5fa9" timestamp="2026-11-08T17:31:21.276+09:00" time="4.109">
+    <testsuite name="canon-cli::session_ingest_removed" tests="1" skipped="0" errors="0" failures="1">
+        <testcase name="ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evidence" classname="canon-cli::session_ingest_removed" timestamp="2026-11-08T17:31:21.277+09:00" time="4.105">
+            <failure message="thread &apos;ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evidence&apos; (34343030) panicked at crates/canon-cli/tests/session_ingest_removed.rs:329:5" type="test failure with exit code 101">thread &apos;ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evidence&apos; (34343030) panicked at crates/canon-cli/tests/session_ingest_removed.rs:329:5:
+assertion `left == right` failed: the tombstoned scenario is absent for the staleness check, the declared one is not
+  left: [&quot;gone.leaf.01&quot;, &quot;kept.leaf.01&quot;]
+ right: [&quot;kept.leaf.01&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evidence ... FAILED
+
+failures:
+
+failures:
+    ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evidence
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 4.08s
+
+</system-out>
+            <system-err>
+thread &apos;ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evidence&apos; (34343030) panicked at crates/canon-cli/tests/session_ingest_removed.rs:329:5:
+assertion `left == right` failed: the tombstoned scenario is absent for the staleness check, the declared one is not
+  left: [&quot;gone.leaf.01&quot;, &quot;kept.leaf.01&quot;]
+ right: [&quot;kept.leaf.01&quot;]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>

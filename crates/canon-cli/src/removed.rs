@@ -15,6 +15,15 @@ use crate::removed_028::{Kind, Row, ROWS, V31};
 /// of it was the 0.23 spelling.
 pub const KIND_COMMANDS: &[&str] = &["export", "purge", "query"];
 
+/// The commands whose `--kind` read a record kind that canon 0.39 retired (`session`, `event`).
+/// `purge` is not one: it still deletes the rows of both for one release.
+pub const RETIRED_KIND_COMMANDS: &[&str] = &["export", "query", "search"];
+
+/// `value` when it names one of the two retired record kinds.
+fn retired_kind(value: &str) -> Option<&'static str> {
+    canon_store::policy::RETIRED_KIND_NAMES.iter().copied().find(|name| *name == value)
+}
+
 /// The canonical `--kind` value a removed `<kind>_record` one stood for.
 fn kind_replacement(old: &str) -> Option<&'static str> {
     let stem = old.strip_suffix("_record")?;
@@ -39,6 +48,9 @@ pub struct Removed {
     /// The typed line with every removed option on it replaced (without `canon`), when the removal is one of an
     /// option the line can be corrected for as a whole; the hint shows it, and it runs as it stands.
     pub line: Option<String>,
+    /// Set when the spelling is a record kind that no longer exists (`--kind session`), not a renamed one: the
+    /// refusal says so, lists the twelve kinds that remain, and points at `canon purge` for the rows already stored.
+    pub retired_kind: bool,
 }
 
 impl Removed {
@@ -50,6 +62,9 @@ impl Removed {
 
     /// The usage error's message.
     pub fn message(&self) -> String {
+        if self.retired_kind {
+            return format!("{} was removed in {}: the `session` and `event` record kinds no longer exist", self.used, self.since);
+        }
         format!("{} was removed in {}", self.used, self.since)
     }
 
@@ -58,8 +73,20 @@ impl Removed {
         self.replacement.clone()
     }
 
+    /// The usage error's `expected` as a list: [`Self::expected`], or for a retired record kind the kinds that remain.
+    pub fn expected_values(&self) -> Vec<String> {
+        if self.retired_kind {
+            return canon_model::envelope::RecordKind::ALL.iter().map(|kind| kind.as_str().to_string()).collect();
+        }
+        vec![self.expected()]
+    }
+
     /// The usage error's hint: the old spelling, the release that removed it, the new one, or the whole corrected line.
     pub fn hint(&self) -> String {
+        if self.retired_kind {
+            let kind = self.used.rsplit(' ').next().unwrap_or("session");
+            return format!("rows of the retired kinds that are already stored stay in the store and nothing reads them; `canon purge --kind {kind} --before <date>` deletes them (this release only)");
+        }
         let shown = match &self.line {
             Some(line) => format!("canon {line}"),
             None if self.replacement.starts_with('-') => self.replacement.clone(),
@@ -80,7 +107,7 @@ impl Removed {
     }
 
     fn from_row(row: &'static Row, command: String, used: String, field: String) -> Removed {
-        Removed { command, used, replacement: row.new.to_string(), note: row.note, field, since: row.since, line: None }
+        Removed { command, used, replacement: row.new.to_string(), note: row.note, field, since: row.since, line: None, retired_kind: false }
     }
 
     /// A removed option whose value became an operand: the replacement is the line the caller typed, on the
@@ -111,13 +138,13 @@ impl Removed {
         }
         // No value was typed, so there is no operand to fill in: the leaf says it, with the row's note.
         let Some(operand) = operand else {
-            return Removed { command: command.clone(), used: used.clone(), replacement: leaf.to_string(), note: row.note, field: used, since: row.since, line: None };
+            return Removed { command: command.clone(), used: used.clone(), replacement: leaf.to_string(), note: row.note, field: used, since: row.since, line: None, retired_kind: false };
         };
         let mut words: Vec<String> = leaf.split(' ').map(str::to_string).collect();
         words.push(shell_word(&operand));
         words.extend(args.iter().zip(&taken).filter(|(_, taken)| !**taken).map(|(arg, _)| shell_word(arg)));
         let line = words.join(" ");
-        Removed { command, used: used.clone(), replacement: line.clone(), note: row.note, field: used, since: row.since, line: Some(line) }
+        Removed { command, used: used.clone(), replacement: line.clone(), note: row.note, field: used, since: row.since, line: Some(line), retired_kind: false }
     }
 
     /// A removed option that is renamed in place: the whole typed line with every removed option replaced. A `--providers` list
@@ -139,7 +166,7 @@ impl Removed {
         }
         // The note of a `--providers` row says what the corrected line already shows.
         let note = if row.old == "--providers" { "" } else { row.note };
-        Removed { command, used: used.clone(), replacement: row.new.to_string(), note, field: used, since: row.since, line: Some(words.join(" ")) }
+        Removed { command, used: used.clone(), replacement: row.new.to_string(), note, field: used, since: row.since, line: Some(words.join(" ")), retired_kind: false }
     }
 }
 
@@ -246,9 +273,14 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
             match cmd.get_arguments().find(|a| a.get_long() == Some(name)) {
                 Some(arg) => {
                     let value = inline.or_else(|| args.get(i + 1).map(String::as_str));
+                    if name == "kind" && RETIRED_KIND_COMMANDS.contains(&here.as_str()) && hits.is_empty() {
+                        if let Some(old) = value.and_then(retired_kind) {
+                            return Some(Removed { command: here, used: format!("--kind {old}"), replacement: String::new(), note: "", field: "--kind".into(), since: "0.39.0", line: None, retired_kind: true });
+                        }
+                    }
                     if name == "kind" && KIND_COMMANDS.contains(&here.as_str()) && hits.is_empty() {
                         if let Some((old, new)) = value.and_then(|v| kind_replacement(v).map(|n| (v, n))) {
-                            return Some(Removed { command: here, used: format!("--kind {old}"), replacement: format!("--kind {new}"), note: "", field: "--kind".into(), since: "0.24.0", line: None });
+                            return Some(Removed { command: here, used: format!("--kind {old}"), replacement: format!("--kind {new}"), note: "", field: "--kind".into(), since: "0.24.0", line: None, retired_kind: false });
                         }
                     }
                     if arg.get_action().takes_values() && inline.is_none() {
@@ -374,6 +406,30 @@ mod tests {
         }
         assert_eq!(kind_replacement("nonsense_record"), None);
         assert_eq!(kind_replacement("evidence"), None);
+    }
+
+    /// 0.39: `--kind session|event` on the reading commands is refused with the twelve kinds that remain and a pointer to `purge`;
+    /// `purge` still takes them for one release.
+    #[test]
+    fn tier_retired_09_a_retired_record_kind_is_refused_on_the_reading_commands_only() {
+        use clap::Arg;
+        let tree = Command::new("canon")
+            .subcommand(Command::new("query").arg(Arg::new("kind").long("kind")))
+            .subcommand(Command::new("export").arg(Arg::new("kind").long("kind")))
+            .subcommand(Command::new("search").arg(Arg::new("text")).arg(Arg::new("kind").long("kind")))
+            .subcommand(Command::new("purge").arg(Arg::new("kind").long("kind")));
+        let args = |words: &[&str]| words.iter().map(ToString::to_string).collect::<Vec<_>>();
+        for (words, command, kind) in [(&["query", "--kind", "session"][..], "query", "session"), (&["export", "--kind=event"], "export", "event"), (&["search", "x", "--kind", "session"], "search", "session")] {
+            let removed = find(&tree, &args(words)).unwrap_or_else(|| panic!("{words:?} is refused"));
+            assert_eq!((removed.command.as_str(), removed.field.as_str(), removed.since), (command, "--kind", "0.39.0"));
+            assert!(removed.message().contains(&format!("--kind {kind} was removed in 0.39.0")) && removed.message().contains("no longer exist"), "{}", removed.message());
+            assert_eq!(removed.expected_values(), RecordKind::ALL.iter().map(|k| k.as_str().to_string()).collect::<Vec<_>>(), "the twelve kinds that remain");
+            assert!(removed.hint().contains(&format!("canon purge --kind {kind} --before <date>")), "{}", removed.hint());
+            assert!(!removed.hint().starts_with("canon "), "a sentence, not a command line (spec 7.1.2)");
+        }
+        assert_eq!(find(&tree, &args(&["purge", "--kind", "session"])), None, "purge still deletes the stored rows");
+        assert_eq!(find(&tree, &args(&["query", "--kind", "run"])), None);
+        assert_eq!(find(&tree, &args(&["query", "--kind", "evidence"])), None);
     }
 
     /// A tree shaped like the real one: `change new` renamed `--subject`, and

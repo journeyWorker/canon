@@ -29,13 +29,17 @@
 //!    the old keys; [`revert`] restores the backup and reverts the moves, and
 //!    the old Postgres/R2 keys come from that journal.
 //! 9. A second run finds nothing to move: [`plan`] is empty.
+//!
+//! 0.39 adds one step to 4: the `routing`/`aging` keys naming the retired record kinds (`session`, `event`) are
+//! deleted line by line ([`rewrite_config`]); stored rows and files of those kinds are left alone (`canon purge`
+//! deletes them) and every step that walks the ledger or the databases skips the two kinds.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use canon_model::layout;
 use canon_model::{EvidenceRecord, RecordKind};
+use canon_store::git::GitCall;
 use canon_store::policy::{BackendConfig, TierPolicy, LEGACY_EVIDENCE_KEY};
 use canon_store::r2_tier::{ObjectRekey, R2Tier};
 use canon_store::sqlite_tier::SqliteTier;
@@ -141,6 +145,23 @@ pub struct Skipped {
     pub why: String,
 }
 
+/// The lines of one `canon.yaml` key naming a retired record kind (1-based, inclusive): the key's own line and the
+/// more indented lines of its value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetiredKeyLines {
+    /// `routing.session`, `aging.event`.
+    pub key: String,
+    pub first: usize,
+    pub last: usize,
+}
+
+impl RetiredKeyLines {
+    /// `line 58` or `lines 67-69`.
+    pub fn lines(&self) -> String {
+        if self.first == self.last { format!("line {}", self.first) } else { format!("lines {}-{}", self.first, self.last) }
+    }
+}
+
 /// Everything the renaming would do.
 #[derive(Debug, Default)]
 pub struct Plan {
@@ -149,6 +170,8 @@ pub struct Plan {
     pub gitignore_lines: Vec<usize>,
     /// The `canon.yaml` keys spelled the 0.29 way.
     pub config_keys: Vec<String>,
+    /// The `canon.yaml` lines that name a retired record kind, which the migrate deletes.
+    pub retired_keys: Vec<RetiredKeyLines>,
     /// The sqlite file and its re-keyed rows.
     pub sqlite: Option<(PathBuf, RowPlan)>,
     pub postgres: Option<(String, String, RowPlan)>,
@@ -164,6 +187,7 @@ impl Plan {
         self.moves.is_empty()
             && self.gitignore_lines.is_empty()
             && self.config_keys.is_empty()
+            && self.retired_keys.is_empty()
             && self.sqlite.is_none()
             && self.postgres.is_none()
             && self.s3.is_none()
@@ -312,7 +336,7 @@ fn core_kind(dir: &str) -> Option<RecordKind> {
 pub fn plan(repo: &Path, text: &str) -> Result<Plan, String> {
     let policy = TierPolicy::from_yaml_at(text, repo).map_err(|e| format!("canon.yaml cannot be read: {e}"))?;
     let ledger = canon_gate::GateCtx::from_repo(repo).map_err(|e| e.to_string())?.ledger_root;
-    let mut plan = Plan { config_keys: policy.legacy_kind_keys.clone(), ..Plan::default() };
+    let mut plan = Plan { config_keys: policy.legacy_kind_keys.clone(), retired_keys: retired_key_lines(text), ..Plan::default() };
     plan_files(repo, &ledger, &mut plan)?;
     plan.gitignore_lines = std::fs::read_to_string(repo.join(".gitignore"))
         .map(|t| t.lines().enumerate().filter(|(_, l)| !l.trim_start().starts_with('#') && l.contains(canon_store::partition::LEGACY_KIND_DIR)).map(|(i, _)| i + 1).collect())
@@ -373,6 +397,10 @@ fn plan_files(repo: &Path, ledger: &Path, plan: &mut Plan) -> Result<(), String>
             let kind_dir = dir.file_name().to_string_lossy().trim_start_matches("kind=").to_string();
             let mut files = Vec::new();
             files_under(&dir.path(), &mut files);
+            // A retired kind's files are never renamed or refused: nothing reads them and `canon purge` deletes them.
+            if canon_store::policy::RETIRED_KIND_NAMES.contains(&kind_dir.as_str()) {
+                continue;
+            }
             for file in files {
                 let relative = file.strip_prefix(&root).unwrap_or(&file).to_path_buf();
                 if file.extension().is_none_or(|e| e != "json") || !canon_store::partition::is_old_layout_path(&relative) {
@@ -435,10 +463,7 @@ fn git_tracked(repo: &Path, dirs_or_files: &[String]) -> BTreeSet<String> {
         return BTreeSet::new();
     }
     let kind_dirs: BTreeSet<String> = dirs_or_files.iter().filter_map(|p| p.find("/kind=").map(|i| p[..i + 1 + p[i + 1..].find('/').unwrap_or(p.len() - i - 1)].to_string())).collect();
-    let Ok(out) = Command::new("git").args(["ls-files", "-z", "--"]).args(&kind_dirs).current_dir(repo).output() else { return BTreeSet::new() };
-    if !out.status.success() {
-        return BTreeSet::new();
-    }
+    let Ok(out) = GitCall::new(repo).args(["ls-files", "-z", "--"]).args(&kind_dirs).tree_listing().run() else { return BTreeSet::new() };
     String::from_utf8_lossy(&out.stdout).split('\0').filter(|p| !p.is_empty()).map(str::to_string).collect()
 }
 
@@ -532,10 +557,14 @@ fn plan_databases(repo: &Path, policy: &TierPolicy, plan: &mut Plan) -> Result<(
 
 // -------------------------------------------------------- canon.yaml / .gitignore
 
-/// `canon.yaml` text with its `routing`/`aging` keys spelled the 0.30 way. Only the key names change:
-/// comments and layout stay, and the result is refused unless it parses to the old document with those
-/// keys renamed and nothing else different.
+/// `canon.yaml` text with its `routing`/`aging` keys spelled the 0.30 way and the keys of the retired record kinds
+/// deleted. Only those lines change: comments and layout stay, and the result is refused unless it parses to
+/// the old document with exactly those keys renamed or removed and nothing else different.
 pub fn rewrite_config(text: &str) -> Result<String, String> {
+    remove_retired_keys(&rename_evidence_key(text)?)
+}
+
+fn rename_evidence_key(text: &str) -> Result<String, String> {
     if !text.contains(LEGACY_EVIDENCE_KEY) {
         return Ok(text.to_string());
     }
@@ -566,6 +595,106 @@ pub fn rewrite_config(text: &str) -> Result<String, String> {
     }
     if after != expected {
         return Err("canon.yaml spells the `evidence_record` key in a form canon cannot rewrite safely (a flow mapping or an anchor); rename `routing.evidence_record` and `aging.evidence_record` to `evidence` by hand, then run `canon migrate` again".to_string());
+    }
+    Ok(out)
+}
+
+
+/// The 1-based lines of every `routing`/`aging` key that names a retired record kind in `text`.
+pub fn retired_key_lines(text: &str) -> Vec<RetiredKeyLines> {
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let indent = |line: &str| line.len() - line.trim_start_matches([' ', '\t']).len();
+    let blank_or_comment = |line: &str| line.trim().is_empty() || line.trim_start().starts_with('#');
+    let mut found = Vec::new();
+    let mut section = String::new();
+    let mut child_indent: Option<usize> = None;
+    let mut at = 0;
+    while at < lines.len() {
+        let line = lines[at];
+        let trimmed = line.trim_start();
+        if !line.starts_with([' ', '\t', '#', '\n', '\r']) && !trimmed.is_empty() {
+            section = trimmed.split(':').next().unwrap_or_default().trim().to_string();
+            child_indent = None;
+        } else if matches!(section.as_str(), "routing" | "aging") && !blank_or_comment(line) {
+            let here = indent(line);
+            let direct = *child_indent.get_or_insert(here) == here;
+            let key = trimmed.split(':').next().unwrap_or_default().trim().trim_matches(['"', '\'']);
+            if direct && trimmed.contains(':') && canon_store::policy::RETIRED_KIND_NAMES.contains(&key) {
+                let mut last = at;
+                while let Some(next) = lines.get(last + 1) {
+                    if !next.trim().is_empty() && indent(next) > here {
+                        last += 1;
+                    } else {
+                        break;
+                    }
+                }
+                found.push(RetiredKeyLines { key: format!("{section}.{key}"), first: at + 1, last: last + 1 });
+                at = last;
+            }
+        }
+        at += 1;
+    }
+    found
+}
+
+/// `text` without the lines [`retired_key_lines`] finds; a section left with no key is `{}`.
+fn remove_retired_keys(text: &str) -> Result<String, String> {
+    let before: serde_yaml::Value = serde_yaml::from_str(text).map_err(|e| format!("canon.yaml is not valid YAML: {e}"))?;
+    let has = |name: &str| before.get(name).and_then(serde_yaml::Value::as_mapping).is_some_and(|map| canon_store::policy::RETIRED_KIND_NAMES.iter().any(|retired| map.contains_key(*retired)));
+    if !has("routing") && !has("aging") {
+        return Ok(text.to_string());
+    }
+    let hand = |why: &str| format!("canon.yaml names a retired record kind (`session`, `event`) in {why}; delete the `session` and `event` keys under `routing:` and `aging:` by hand, then run `canon migrate` again");
+    let found = retired_key_lines(text);
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    for key in &found {
+        let first = lines[key.first - 1];
+        let value = first.split_once(':').map_or("", |(_, rest)| rest).trim_start();
+        if value.starts_with(['&', '*', '!']) {
+            return Err(hand("a form canon cannot delete safely (an anchor, an alias or a tag)"));
+        }
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut header: Option<usize> = None;
+    let mut kept_children: std::collections::BTreeMap<usize, usize> = std::collections::BTreeMap::new();
+    let mut header_of: std::collections::BTreeMap<usize, usize> = std::collections::BTreeMap::new();
+    for (at, line) in lines.iter().enumerate() {
+        let trimmed = line.trim_start();
+        if !line.starts_with([' ', '\t', '#', '\n', '\r']) && !trimmed.is_empty() {
+            let section = trimmed.split(':').next().unwrap_or_default().trim();
+            header = matches!(section, "routing" | "aging").then_some(at);
+        } else if let Some(h) = header {
+            let removed = found.iter().any(|key| key.first <= at + 1 && at < key.last);
+            if !removed && !trimmed.is_empty() && !trimmed.starts_with('#') {
+                *kept_children.entry(h).or_default() += 1;
+            }
+            header_of.insert(at, h);
+        }
+    }
+    let emptied: Vec<usize> = found.iter().filter_map(|key| header_of.get(&(key.first - 1)).copied()).filter(|h| !kept_children.contains_key(h)).collect();
+    for (at, line) in lines.iter().enumerate() {
+        if found.iter().any(|key| key.first <= at + 1 && at < key.last) {
+            continue;
+        }
+        if emptied.contains(&at) {
+            let (head, rest) = line.split_once(':').unwrap_or((line, ""));
+            let newline = if line.ends_with("\r\n") { "\r\n" } else if line.ends_with('\n') { "\n" } else { "" };
+            let tail = rest.trim_end_matches(['\r', '\n']);
+            out.push_str(&format!("{head}: {{}}{}{newline}", if tail.trim().is_empty() { String::new() } else { tail.to_string() }));
+        } else {
+            out.push_str(line);
+        }
+    }
+    let after: serde_yaml::Value = serde_yaml::from_str(&out).map_err(|e| format!("canon.yaml without the retired keys would not parse: {e}"))?;
+    let mut expected = before;
+    for name in ["routing", "aging"] {
+        let Some(map) = expected.get_mut(name).and_then(serde_yaml::Value::as_mapping_mut) else { continue };
+        for retired in canon_store::policy::RETIRED_KIND_NAMES {
+            map.remove(retired);
+        }
+    }
+    if after != expected {
+        return Err(hand("a form canon cannot delete line by line (a flow mapping, a key that continues on later lines, or a shared anchor)"));
     }
     Ok(out)
 }
@@ -641,13 +770,11 @@ fn journal_rows(path: String, rows: &RowPlan) -> JournalRows {
 }
 
 fn git(repo: &Path, args: &[&str], stdin: Option<&str>) -> Result<(), String> {
-    use std::io::Write;
-    let mut child = Command::new("git").args(args).current_dir(repo).stdin(if stdin.is_some() { std::process::Stdio::piped() } else { std::process::Stdio::null() }).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped()).spawn().map_err(|e| format!("could not run git: {e}"))?;
-    if let (Some(text), Some(mut pipe)) = (stdin, child.stdin.take()) {
-        pipe.write_all(text.as_bytes()).map_err(|e| format!("could not feed git: {e}"))?;
+    let mut call = GitCall::new(repo).args(args);
+    if let Some(text) = stdin {
+        call = call.stdin(text.as_bytes());
     }
-    let out = child.wait_with_output().map_err(|e| format!("could not run git: {e}"))?;
-    if out.status.success() { Ok(()) } else { Err(format!("`git {}` failed: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim())) }
+    call.run().map(drop).map_err(|e| if e.is_exit() { format!("`git {}` failed: {}", args.join(" "), e.stderr_text()) } else { e.to_string() })
 }
 
 /// Stage the renames of tracked files the way `git mv` does: the old path leaves the index, the new one joins it.
@@ -849,7 +976,7 @@ pub fn revert(repo: &Path, backup: &Path) -> Result<(), String> {
 }
 
 fn is_git_tree(repo: &Path) -> bool {
-    Command::new("git").args(["rev-parse", "--is-inside-work-tree"]).current_dir(repo).output().is_ok_and(|out| out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "true")
+    GitCall::new(repo).args(["rev-parse", "--is-inside-work-tree"]).run().is_ok_and(|out| out.stdout_trimmed() == "true")
 }
 
 // ------------------------------------------------------------------- preview
@@ -1027,10 +1154,7 @@ fn scan(repo: &Path, scope: &[String]) -> Result<Tree, String> {
 
 /// `git ls-files -s` entries (`<mode> <sha> <stage>\t<path>`) of the scope.
 fn index_entries(repo: &Path, scope: &[String]) -> Result<Vec<String>, String> {
-    let out = Command::new("git").args(["ls-files", "-s", "-z"]).current_dir(repo).output().map_err(|e| format!("could not run git: {e}"))?;
-    if !out.status.success() {
-        return Err(format!("`git ls-files` failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
-    }
+    let out = GitCall::new(repo).args(["ls-files", "-s", "-z"]).tree_listing().run().map_err(|e| if e.is_exit() { format!("`git ls-files` failed: {}", e.stderr_text()) } else { e.to_string() })?;
     Ok(String::from_utf8_lossy(&out.stdout).split('\0').filter(|e| e.split_once('\t').is_some_and(|(_, path)| in_scope(scope, path))).map(str::to_string).collect())
 }
 
@@ -1400,4 +1524,60 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
         crate::json_out::data("migrate", &MigrateReport { steps: log.into_lines(), backup_dir: Some(relative), index_records_written: None, index: None, plan: committed });
     }
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The repo's own `canon.yaml` shape before 0.39: three retired keys among live ones.
+    const OLD: &str = "routing:\n  # hot\n  task: hot\n  session: hot\n  run: hot\n  event: hot\n  trajectory: cold\n\naging:\n  handoff: { after: 30d, to: cold }\n  event: { after: 7d, to: cold }\n\nplans:\n  sources: []\n";
+
+    #[test]
+    fn tier_retired_04_the_retired_keys_are_found_by_line_and_deleted_alone() {
+        let found = retired_key_lines(OLD);
+        assert_eq!(found.iter().map(|k| (k.key.as_str(), k.first, k.last)).collect::<Vec<_>>(), [("routing.session", 4, 4), ("routing.event", 6, 6), ("aging.event", 11, 11)]);
+        let rewritten = rewrite_config(OLD).unwrap();
+        assert_eq!(rewritten, "routing:\n  # hot\n  task: hot\n  run: hot\n  trajectory: cold\n\naging:\n  handoff: { after: 30d, to: cold }\n\nplans:\n  sources: []\n");
+        assert!(retired_key_lines(&rewritten).is_empty(), "a second run finds nothing");
+        assert_eq!(rewrite_config(&rewritten).unwrap(), rewritten);
+    }
+
+    #[test]
+    fn tier_retired_04_a_section_left_without_keys_becomes_an_empty_mapping() {
+        let text = "routing:\n  session: hot\naging: # why\n  event:\n    after: 7d\n    to: cold\nplans:\n  sources: []\n";
+        assert_eq!(retired_key_lines(text).iter().map(|k| (k.first, k.last)).collect::<Vec<_>>(), [(2, 2), (4, 6)], "the key and the lines of its value");
+        assert_eq!(rewrite_config(text).unwrap(), "routing: {}\naging: {} # why\nplans:\n  sources: []\n");
+    }
+
+    #[test]
+    fn tier_retired_04_the_legacy_evidence_key_is_renamed_in_the_same_pass() {
+        let text = "routing:\n  evidence_record: local\n  session: hot\n";
+        assert_eq!(rewrite_config(text).unwrap(), "routing:\n  evidence: local\n");
+    }
+
+    #[test]
+    fn tier_retired_04_a_config_without_the_keys_is_returned_byte_for_byte() {
+        let text = "# comment\nrouting:\n    task:   hot # kept\n";
+        assert_eq!(rewrite_config(text).unwrap(), text);
+    }
+
+    #[test]
+    fn tier_retired_05_forms_that_cannot_be_deleted_by_line_are_refused_with_a_hand_edit_hint() {
+        for text in [
+            "routing: { session: hot, task: hot }\n",
+            "routing:\n  session: &shared hot\n  task: *shared\n",
+            "routing:\n  session: !!str hot\n",
+        ] {
+            let err = rewrite_config(text).unwrap_err();
+            assert!(err.contains("by hand") && err.contains("`session`"), "{text:?}: {err}");
+        }
+    }
+
+    #[test]
+    fn tier_retired_04_only_the_direct_keys_of_routing_and_aging_count() {
+        let text = "tiers:\n  hot: { backend: sqlite, path: .canon/hot.db }\nspecs:\n  session: kept\nrouting:\n  task: hot\n";
+        assert!(retired_key_lines(text).is_empty());
+        assert_eq!(rewrite_config(text).unwrap(), text);
+    }
 }

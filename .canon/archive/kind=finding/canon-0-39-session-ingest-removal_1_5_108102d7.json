@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:40:56.590157Z",
+  "change_id": "canon-0-39-session-ingest-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "ingest.removal.02",
+    "ingest.removal.07"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[spec fidelity] Two Then steps are narrower in the tests than in the text. ingest.removal.02 says no document names 'the removed report' but the tests grep only 'ingest sessions', 'session-ingest' and IngestSessionsReport (schema output); ingest.removal.07 says 'the old section changed no result' but the test asserts only a CONFIG_ code and never compares with the same broken file without the ingest: section. Behaviour is fine (run by hand). Also stale comments name deleted things: crates/canon-ingest/src/scanner.rs:52 and artifact_adapters/divergence.rs:121 cite adapters::omp; crates/canon-cli/src/dispatch.rs:1246-1315 cite mart_session_costs, mart_session_run_handoff and token_usage events.",
+  "worktree_dirty": false
+}

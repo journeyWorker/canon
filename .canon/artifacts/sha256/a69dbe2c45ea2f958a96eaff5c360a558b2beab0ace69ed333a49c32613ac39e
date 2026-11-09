@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="10" skipped="0" failures="0" errors="0" uuid="704e85cc-d60d-445c-b914-3577fce4608b" timestamp="2026-11-08T17:10:54.376+09:00" time="9.705">
+    <testsuite name="canon-cli" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="dispatch::tier_tests::ingest_removal_05_rewriting_the_same_run_is_not_an_error_and_other_content_is_a_new_version" classname="canon-cli" timestamp="2026-11-08T17:10:54.379+09:00" time="1.894"/>
+    </testsuite>
+    <testsuite name="canon-report::snapshot" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="report_generation_07_snapshot_writes_nine_parquet_files_and_a_manifest_listing_exactly_them" classname="canon-report::snapshot" timestamp="2026-11-08T17:10:54.380+09:00" time="2.216"/>
+    </testsuite>
+    <testsuite name="canon-cli::context_index" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="context_capability_39_kinds_are_every_record_kind_under_its_user_facing_name" classname="canon-cli::context_index" timestamp="2026-11-08T17:10:54.379+09:00" time="9.162"/>
+        <testcase name="context_capability_39_families_are_every_family_kind_in_order" classname="canon-cli::context_index" timestamp="2026-11-08T17:10:54.379+09:00" time="9.174"/>
+        <testcase name="context_capability_39_every_kind_option_value_is_a_context_kind_and_purge_adds_the_retired_pair" classname="canon-cli::context_index" timestamp="2026-11-08T17:10:54.379+09:00" time="9.341"/>
+    </testsuite>
+    <testsuite name="canon-cli::record_links" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="ingest_plans_14_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line" classname="canon-cli::record_links" timestamp="2026-11-08T17:10:54.379+09:00" time="9.321"/>
+        <testcase name="ingest_plans_14_the_other_hot_writers_print_the_hot_store_location_too" classname="canon-cli::record_links" timestamp="2026-11-08T17:10:54.379+09:00" time="9.426"/>
+        <testcase name="ingest_plans_14_subject_and_change_writes_to_the_hot_store_print_its_location_too" classname="canon-cli::record_links" timestamp="2026-11-08T17:10:54.379+09:00" time="9.701"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_planjcs" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_planjcs_09_the_purge_preview_lists_the_audit_line_the_commit_writes" classname="canon-cli::atip_planjcs" timestamp="2026-11-08T17:10:54.379+09:00" time="9.478"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_constraints" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="atip_constraints_26_a_stateless_fault_in_a_later_element_beats_the_first_elements_missing_repository" classname="canon-cli::atip_constraints" timestamp="2026-11-08T17:10:54.379+09:00" time="9.621"/>
+    </testsuite>
+</testsuites>

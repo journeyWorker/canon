@@ -579,8 +579,12 @@ fn atip_optionvalues_13_a_command_that_declares_another_domain_for_the_same_name
     assert!(sweep_problems(&refs, &[]).iter().any(|problem| problem.contains("`--disposition` has closed sets that are not nested")));
     // The allowed names are the allowed ones: every name has one domain in the real documents (`--harness` too, since `canon-0-38-provider-option`), and a seeded fault is found by name.
     let refs: Vec<&Value> = real.iter().collect();
-    assert!(sweep_problems(&refs, &[]).is_empty(), "{:?}", sweep_problems(&refs, &[]));
-    // `--kind` has closed sets that are nested today; a set that is not nested is found, and the allowed name skips it.
+    // 0.39: `purge --kind` keeps the retired `session` and `event` for one release and no other command reads them, so `--kind` is the one name whose closed
+    // sets are not nested (ALLOWED says so); every other name is. The release that removes the retired values nests it again.
+    let problems = sweep_problems(&refs, &[]);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].contains("`--kind` has closed sets that are not nested") && problems[0].contains("run,trajectory,session,event"), "{problems:?}");
+    // `--kind` has closed sets that are nested but for the retired values; a set that is not nested is found, and the allowed name skips it.
     let mut seeded = real.clone();
     let doc = seeded.iter_mut().find(|doc| doc["command"] == "query").expect("query");
     let option = doc["options"].as_array_mut().expect("options").iter_mut().find(|option| option["name"] == "kind").expect("kind");

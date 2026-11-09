@@ -559,7 +559,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("canon.yaml"), "specs:\n  roots:\n    - id: app-a\n      root: specs\n").unwrap();
         for git_args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
-            assert!(std::process::Command::new("git").args(git_args).current_dir(dir.path()).status().unwrap().success());
+            canon_store::git::GitCall::new(dir.path()).args(git_args).run().unwrap_or_else(|error| panic!("{error}"));
         }
         dir
     }

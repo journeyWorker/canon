@@ -117,6 +117,10 @@ fn old_files(root: &Path) -> Vec<String> {
         if !name.starts_with("kind=") || !entry.file_type().is_ok_and(|t| t.is_dir()) {
             continue;
         }
+        // A retired kind's files (`kind=session/`, `kind=event/`) are never counted: nothing reads or renames them.
+        if canon_store::policy::RETIRED_KIND_NAMES.contains(&name.trim_start_matches("kind=")) {
+            continue;
+        }
         let legacy_dir = name == LEGACY_KIND_DIR;
         let mut files = Vec::new();
         files_under(&entry.path(), &mut files);

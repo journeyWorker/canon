@@ -205,7 +205,7 @@ pub fn routed_targets(canon_yaml: &Path, kinds: &[RecordKind]) -> Vec<PathBuf> {
     let mut targets = Vec::new();
     for kind in kinds {
         if let Ok(rung) = policy.tier_for(*kind) {
-            add_rung_targets(&mut targets, &policy, &base, rung, *kind);
+            add_rung_targets(&mut targets, &policy, &base, rung, kind.as_str());
         }
     }
     targets
@@ -220,7 +220,20 @@ pub fn resident_targets(canon_yaml: &Path, kind: RecordKind) -> Vec<PathBuf> {
     let routed = policy.tier_for(kind).ok();
     let aged = policy.aging.get(&kind).map(|rule| rule.to);
     for rung in routed.into_iter().chain(aged) {
-        add_rung_targets(&mut targets, &policy, &base, rung, kind);
+        add_rung_targets(&mut targets, &policy, &base, rung, kind.as_str());
+    }
+    targets
+}
+
+/// The local paths rows of a retired kind (named `name`, `kind=<name>/`) can occupy: those of every rung `canon.yaml`
+/// configures, since a retired kind has no routing (`canon purge --kind session|event` removes from all of them).
+pub fn retired_resident_targets(canon_yaml: &Path, name: &str) -> Vec<PathBuf> {
+    let Some((policy, base)) = read_policy(canon_yaml) else { return Vec::new() };
+    let mut targets = Vec::new();
+    let mut rungs: Vec<Rung> = policy.tiers.keys().copied().collect();
+    rungs.sort();
+    for rung in rungs {
+        add_rung_targets(&mut targets, &policy, &base, rung, name);
     }
     targets
 }
@@ -231,7 +244,7 @@ pub fn move_targets(canon_yaml: &Path, kind: RecordKind, from: Rung, to: Rung) -
     let Some((policy, base)) = read_policy(canon_yaml) else { return Vec::new() };
     let mut targets = Vec::new();
     for rung in [from, to] {
-        add_rung_targets(&mut targets, &policy, &base, rung, kind);
+        add_rung_targets(&mut targets, &policy, &base, rung, kind.as_str());
     }
     targets
 }
@@ -245,14 +258,14 @@ fn read_policy(canon_yaml: &Path) -> Option<(TierPolicy, PathBuf)> {
 }
 
 /// Adds the local path `kind` records occupy in `rung`, when the rung has one.
-fn add_rung_targets(targets: &mut Vec<PathBuf>, policy: &TierPolicy, base: &Path, rung: Rung, kind: RecordKind) {
+fn add_rung_targets(targets: &mut Vec<PathBuf>, policy: &TierPolicy, base: &Path, rung: Rung, kind: &str) {
     let mut add = |path: PathBuf| {
         if !targets.contains(&path) {
             targets.push(path);
         }
     };
     match policy.tiers.get(&rung) {
-        Some(BackendConfig::Git(config)) => add(base.join(&config.root).join(format!("kind={}", kind.as_str()))),
+        Some(BackendConfig::Git(config)) => add(base.join(&config.root).join(format!("kind={kind}"))),
         Some(BackendConfig::Sqlite(config)) => {
             add(config.path.clone());
             if let Some(directory) = config.path.parent().filter(|p| !p.as_os_str().is_empty()) {

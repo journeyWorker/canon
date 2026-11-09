@@ -1,15 +1,11 @@
 {
   "generated_at": "2026-07-11T00:00:00Z",
   "source_git_sha": "fixture0000",
-  "source_digest": "e6957d683323",
+  "source_digest": "811d889442b9",
   "tables": [
     {
       "table": "mart_trust_matrix",
       "file": "mart_trust_matrix.parquet"
-    },
-    {
-      "table": "mart_session_costs",
-      "file": "mart_session_costs.parquet"
     },
     {
       "table": "mart_role_memory",

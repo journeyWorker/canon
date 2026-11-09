@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:42:23.263016Z",
+  "change_id": "canon-0-39-session-kinds-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/atip_planjcs.rs:138",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "atip.planjcs.09"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] The reworded scenario now says 'a repo with Run records before a cutoff and one after' (brief F9: the session records become Run records), but the bound test atip_planjcs_09 runs purge_case(), which purges --kind trajectory over trajectories planted by old_trajectories(); no Run record is written. The rule proved (the preview lists the audit line the commit writes; nothing to delete, no line) is kind-independent and the test passes, so the sentence is wrong rather than the behaviour: say 'trajectory records' in the scenario, or make purge_case use runs. Blast radius: atip.planjcs.10 and the other purge_case users share the fixture.",
+  "worktree_dirty": false
+}

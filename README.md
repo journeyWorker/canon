@@ -1,7 +1,7 @@
 # canon
 
 Harness knowledge substrate: systematic spec planning, machine-enforced task
-completion, unified agent-session logging, and accumulation-driven harness
+completion, and accumulation-driven harness
 improvement — one Rust core, distributed as `bunx @journeykit/canon` (installed bin:
 `canon`), usable from any repo.
 

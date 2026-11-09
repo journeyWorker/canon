@@ -35,7 +35,7 @@ fn stdout(output: &Output) -> String {
 }
 
 /// Invariant 1 (capability query, not validation): `canon context` exits 0
-/// and emits a full surface (every one of the fourteen registered kinds,
+/// and emits a full surface (every one of the twelve registered kinds,
 /// every enum domain, every join key) even though the SAME corpus fails
 /// `canon fmt --check` with real violations.
 #[test]
@@ -54,7 +54,7 @@ fn context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check()
 
     let text = stdout(&context_output);
     assert!(text.contains("\n\ncapabilityVersion:"), "expected the outline body to lead with capabilityVersion: after the header:\n{text}");
-    assert!(text.contains("kinds (14):"), "expected all fourteen record kinds regardless of corpus violations:\n{text}");
+    assert!(text.contains("kinds (12):"), "expected all twelve record kinds regardless of corpus violations:\n{text}");
     assert!(text.contains("enums ("), "expected the enums section present:\n{text}");
     assert!(text.contains("joinKeys ("), "expected the joinKeys section present:\n{text}");
     assert!(text.contains("cel:"), "expected the S13 CEL binding section present in the default outline:\n{text}");
@@ -63,8 +63,8 @@ fn context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check()
     assert!(json_output.status.success(), "canon context --json must also exit 0 against a violating corpus");
     let json: serde_json::Value = serde_json::from_slice(&json_output.stdout).expect("--json output must parse as JSON");
     let json = json["data"].clone();
-    assert_eq!(json["kinds"].as_object().map(serde_json::Map::len), Some(14), "JSON surface must list all fourteen kinds");
-    assert_eq!(json["cel"].as_object().map(serde_json::Map::len), Some(14), "JSON surface must carry a per-kind cel section for all fourteen kinds");
+    assert_eq!(json["kinds"].as_object().map(serde_json::Map::len), Some(12), "JSON surface must list all twelve kinds");
+    assert_eq!(json["cel"].as_object().map(serde_json::Map::len), Some(12), "JSON surface must carry a per-kind cel section for all twelve kinds");
     let task_cel = &json["cel"]["task"];
     assert!(task_cel["fields"].as_object().is_some_and(|f| !f.is_empty()), "cel.task.fields must be non-empty: {json}");
     assert!(task_cel["functions"].as_array().is_some_and(|f| !f.is_empty()), "cel.task.functions must be non-empty: {json}");
@@ -79,7 +79,7 @@ fn context_with_no_repo_flag_defaults_to_cwd_and_still_exits_zero() {
     let dir = tempfile::tempdir().unwrap();
     let output = hermetic::canon().arg("context").current_dir(dir.path()).output().expect("spawn canon binary");
     assert!(output.status.success(), "canon context with no --repo must default to `.` and still exit 0");
-    assert!(stdout(&output).contains("kinds (14):"));
+    assert!(stdout(&output).contains("kinds (12):"));
 }
 
 /// D7/task 1.4: `canon context` invoked from a SUBDIRECTORY of a fixture

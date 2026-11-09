@@ -12,6 +12,10 @@
 //! altered, `2` when the store cannot be used or reached — an unreachable
 //! store is a refusal, never a pass.
 //!
+//! It also counts the stale staging temp files of the local store (0.39, [`crate::stale_temps`]) and says to run `canon artifacts prune` for
+//! them; it never deletes one, and they never change the exit: they are no bound file's problem. A local store directory it cannot read leaves
+//! the count unknown, which it says (never as zero).
+//!
 //! # `move --tier <tier> [--commit --plan-digest D]`
 //! Moves a repo's local blobs to the object-store tier `--tier` names. The bare
 //! run previews (the uploads and removals as `effects[]`, with a `planDigest`)
@@ -207,7 +211,12 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> u8 {
     for line in &problem_lines {
         crate::say!(json, "  problem {line}");
     }
+    let temps = StaleTempsFound::read(&repo);
+    if let Some(line) = temps.line() {
+        crate::say!(json, "  {line}");
+    }
     let data = ArtifactsVerifyReport {
+        stale_temps: temps,
         backend: match artifacts_config(&repo).map(|c| c.backend) {
             Ok(ArtifactsBackend::Tier { name, .. }) => name,
             _ => "local".to_string(),
@@ -249,10 +258,48 @@ pub struct ArtifactsVerifyReport<'a> {
     pub stored: usize,
     /// Files proven by the working tree alone (local store only).
     pub working_tree_only: usize,
+    /// The stale staging temp files a dead write left in the local store: they change neither `problems` nor the exit.
+    pub stale_temps: StaleTempsFound,
     pub problems: Vec<VerifyProblem<'a>>,
 }
 
-impl crate::json_out::Report for ArtifactsVerifyReport<'_> {}
+impl crate::json_out::Report for ArtifactsVerifyReport<'_> {
+    /// 1.1: `staleTemps`.
+    const SCHEMA_VERSION: &'static str = "1.1";
+}
+
+/// What `artifacts verify` found of the stale temp files (`.tmp-<sha256>-<pid>-<nanos>` older than five minutes) of the local store.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StaleTempsFound {
+    /// How many there are; absent when the store directory could not be read (the count is then unknown, not zero).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub files: Option<usize>,
+    /// Their bytes together; absent with `files`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bytes: Option<u64>,
+    /// Why the store directory could not be read, when it could not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unreadable: Option<String>,
+}
+
+impl StaleTempsFound {
+    fn read(repo: &Path) -> Self {
+        match crate::stale_temps::find(repo, std::time::SystemTime::now()) {
+            Ok(found) => Self { files: Some(found.len()), bytes: Some(found.iter().map(|temp| temp.bytes).sum()), unreadable: None },
+            Err(e) => Self { files: None, bytes: None, unreadable: Some(e.to_string()) },
+        }
+    }
+
+    /// The line the human output gets: none when there are none.
+    fn line(&self) -> Option<String> {
+        match (self.files, self.bytes, &self.unreadable) {
+            (Some(files), Some(bytes), _) if files > 0 => Some(format!("stale temp file(s) {files} ({bytes} bytes) left by writes that died; `canon artifacts prune` lists and deletes them")),
+            (_, _, Some(why)) => Some(format!("stale temp files: could not be counted, the artifact store directory cannot be read: {why}")),
+            _ => None,
+        }
+    }
+}
 
 /// One bound file `artifacts verify` found missing or altered.
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]

@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-prune",
+    "role": "reviewer",
+    "session_id": "s-0-39-prune-rev"
+  },
+  "at": "2026-11-08T07:47:27.681603Z",
+  "change_id": "canon-0-39-prune-temps",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md:67",
+  "introduced_by": "26af3710afb895d8cf3a958a59651b6b28b0cd84",
+  "kind": "finding",
+  "resolution_code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "resolution_sha": "7324df066b3e78efa59a3e184f920fa4173f2f5a",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-prune",
+  "round": 1,
+  "scenario_ids": [
+    "artifacts.prune.26"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards: the Unreleased CHANGELOG entry says meta.schemaVersion of artifacts prune is 1.2 (was 1.1), but the binary built from this tree emits 1.3 (was 1.2): the report's SCHEMA_VERSION is 1.2 and prune carries state in data, so json_out::bumped adds one minor; a success preview printed meta.schemaVersion 1.3, and `canon schema artifacts prune --json` and docs/cli/canon.cli.json say 1.3. Fix the sentence to `1.3` (was `1.2`); the verify figure 1.1 (was 1.0) is right. Blast radius: no check pins the version sentence (artifacts.prune.26/27 look for five substrings only), so a wrong contract version in the release notes passes the release check.",
+  "worktree_dirty": false
+}

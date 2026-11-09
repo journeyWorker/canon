@@ -163,7 +163,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
         "write_lock.rs",
         &[
             "artifacts move", "artifacts prune", "artifacts store", "brief approve", "change new", "context-pack add", "dashboard", "dispatch begin", "dispatch end", "divergence accept", "divergence add", "divergence defer",
-            "divergence resolve", "evidence add", "evidence audit", "feature new", "finding add", "finding close", "gate install-hooks", "gate promote", "ingest plans", "ingest records", "ingest sessions", "init",
+            "divergence resolve", "evidence add", "evidence audit", "feature new", "finding add", "finding close", "gate install-hooks", "gate promote", "ingest plans", "ingest records", "init",
             "inventory sync", "ledger compact", "migrate", "plugin sync", "policy approve", "prompt add", "purge", "review change", "review scenario", "scenario new", "skills install", "strategy promote",
             "strategy rollback", "subject adopt", "subject move", "subject new", "subject unadopt", "task done", "tier age",
         ],

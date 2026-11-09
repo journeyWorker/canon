@@ -198,6 +198,26 @@ it is `ARTIFACTS_STORE_FAILED` (an object) or `WRITE_FAILED` (a local file); aft
 some, `ARTIFACTS_PRUNE_INCOMPLETE` names what was deleted, and a new preview
 lists what remains.
 
+A blob write stages `.canon/artifacts/sha256/.tmp-<sha256>-<pid>-<nanos>` and
+renames it when it is complete; a write killed in between (SIGKILL, a power
+cut) leaves the file, and nothing else removes it. `canon artifacts prune`
+counts the **stale** ones (a regular file of exactly that name shape, modified
+more than five minutes ago; a younger file may be a live write, and a link, a
+directory, a file stamped in the future or a name of another shape such as
+`.tmp-notes` is never touched) in `data.staleTemps` (`files`, `bytes` and the
+first names), apart from the blobs, and the commit deletes exactly the ones the
+plan lists. They are part of the plan digest, so a temp file added or removed
+since the preview is `PLAN_STALE`; the commit checks each again under the
+store lock and skips one that changed; a repo with only temp files and no blob
+to delete still gets the `--commit` command. `canon artifacts verify` takes no
+lock and deletes nothing: it prints one line with the count and bytes and
+`canon artifacts prune` when there are any, `data.staleTemps` always carries
+`files` and `bytes` (`unreadable` instead, never a zero, when the store
+directory cannot be read), and the exit follows the bound files alone. A temp
+file is no finished blob, so deleting it changes no record. One that was
+already committed is a tracked file: take it out of the commit (`git rm`, then
+commit); the preview's `staleTemps.gitNote` says so.
+
 ## What `canon report build` does and doesn't read
 
 canon exposes layered `stg_`/`int_`/`mart_` query views; `canon report build`
@@ -223,7 +243,11 @@ is the canonical data-lifecycle boundary: the bare run previews: it prints the r
 its `planDigest` and deletes nothing; `--commit --plan-digest <planDigest>` deletes only if
 the plan recomputed now has the same digest (`PLAN_STALE`, exit 2, when the
 data moved). The only purgeable kinds are
-`session`, `run`, `event`, and `trajectory`; the cutoff applies to every
+`run` and `trajectory`, plus the retired `session` and `event` (kept for this
+release only so stored rows can be deleted — delete them now, after the next
+release only direct database access remains; they read no routing, so they
+find rows in every configured tier even after `canon migrate` removes the
+`routing:`/`aging:` keys); the cutoff applies to every
 routed rung and every configured aging destination, including retained
 historical versions. For `trajectory`, the command also purges the
 operator-local Parquet learn store under `learn.root` in `canon.yaml`;

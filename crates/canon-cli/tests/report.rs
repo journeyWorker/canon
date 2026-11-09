@@ -89,6 +89,37 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
     assert!(stderr(&drift).contains("DRIFT"), "{}", stderr(&drift));
 }
 
+/// tier.retired.14 (F6, failure path): the report has no `## Session costs` and `## Run observability` names only the Run columns; a `REPORT.md` built by 0.38 (it has the
+/// section) is DRIFT (exit 1) until `canon report build` writes it again (exit 0).
+#[test]
+fn tier_retired_14_a_0_38_report_with_the_session_costs_section_is_drift_until_it_is_rebuilt() {
+    if !duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
+    let write = run_canon(&["report", "build", "--repo", "."], dir.path());
+    assert!(write.status.success(), "stderr: {}", stderr(&write));
+    let report_path = dir.path().join(".canon/REPORT.md");
+    let report = std::fs::read_to_string(&report_path).unwrap();
+    assert!(!report.contains("## Session costs") && !report.contains("mart_session_costs"), "{report}");
+    let observability = report.split("## Run observability").nth(1).expect("the section stays").split("\n## ").next().unwrap();
+    assert!(!observability.contains("event_count") && !observability.contains("total_cost") && observability.contains("child run count"), "{observability}");
+
+    // What 0.38 wrote: the same report with the cost section after the trust matrix.
+    let old = report.replacen("## Role memory", "## Session costs\n\nToken/cost grouped by session (`mart_session_costs`).\n\n_No rows._\n\n## Role memory", 1);
+    std::fs::write(&report_path, old).unwrap();
+    let check = run_canon(&["report", "check", "--repo", "."], dir.path());
+    assert_eq!(check.status.code(), Some(1), "a 0.38 report is drift; stderr: {}", stderr(&check));
+    assert!(stderr(&check).contains("DRIFT"), "{}", stderr(&check));
+
+    let rebuilt = run_canon(&["report", "build", "--repo", "."], dir.path());
+    assert!(rebuilt.status.success(), "stderr: {}", stderr(&rebuilt));
+    let check = run_canon(&["report", "check", "--repo", "."], dir.path());
+    assert_eq!(check.status.code(), Some(0), "rebuilt, no drift; stderr: {}", stderr(&check));
+}
+
 /// Every file (with its bytes) and every directory (with `None`) under `dir`.
 fn files_under(dir: &Path) -> Vec<(std::path::PathBuf, Option<Vec<u8>>)> {
     let mut out = Vec::new();
@@ -138,8 +169,9 @@ fn report_check_over_empty_sources_reports_no_drift_creates_nothing_and_leaves_n
     assert!(std::fs::read_dir(scratch.path()).unwrap().next().is_none(), "the seeded scratch must be gone when the run ends");
 }
 
+/// tier.retired.13 (F6): the snapshot is nine tables with a manifest listing exactly those, none of them the session costs.
 #[test]
-fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
+fn tier_retired_13_snapshot_writes_nine_parquet_files_and_a_manifest_under_the_given_dir() {
     if !duckdb_available() {
         eprintln!("skipping: `duckdb` CLI not found on PATH");
         return;
@@ -151,12 +183,11 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
     let output = run_canon(&["report", "snapshot", "--repo", ".", snapshot_dir.to_str().unwrap()], dir.path());
 
     assert!(output.status.success(), "canon report --snapshot must exit 0; stderr: {}", stderr(&output));
-    assert!(stdout(&output).contains("10 table(s)"), "{}", stdout(&output));
+    assert!(stdout(&output).contains("9 table(s)"), "{}", stdout(&output));
 
     // New marts append; established table order never moves.
     let tables = [
         "mart_trust_matrix",
-        "mart_session_costs",
         "mart_role_memory",
         "mart_flywheel_funnel",
         "mart_review_burndown",
@@ -182,7 +213,7 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
     let listed: Vec<(&str, &str)> =
         manifest["tables"].as_array().unwrap().iter().map(|entry| (entry["table"].as_str().unwrap(), entry["file"].as_str().unwrap())).collect();
     let expected_listing: Vec<(&str, String)> = tables.iter().map(|table| (*table, format!("{table}.parquet"))).collect();
-    assert_eq!(listed, expected_listing.iter().map(|(table, file)| (*table, file.as_str())).collect::<Vec<_>>(), "the manifest lists exactly those ten tables");
+    assert_eq!(listed, expected_listing.iter().map(|(table, file)| (*table, file.as_str())).collect::<Vec<_>>(), "the manifest lists exactly those nine tables");
 
     // `--snapshot` never wrote/touched `.canon/REPORT.md` — it is a
     // distinct action from the default write mode.

@@ -1,6 +1,6 @@
 ---
 title: 예제
-description: 네 가지 엔드투엔드 워크스루 — 레포 연결, 증거 루프, 세션 텔레메트리, 플랜 가져오기 — 그리고 도그푸드 사례 연구.
+description: 네 가지 엔드투엔드 워크스루 — 레포 연결, 증거 루프, 플랜 가져오기 — 그리고 도그푸드 사례 연구.
 ---
 
 import { Steps } from "@astrojs/starlight/components";
@@ -24,9 +24,9 @@ import { Steps } from "@astrojs/starlight/components";
    바로 동작하는 `canon.yaml`을 씁니다. `canon init`은 내구성 있고
    리뷰 가능한 레코드에는 Git을, 대량으로 발생하는 운영 레코드에는
    로컬 SQLite를 사용합니다. PostgreSQL과 S3 호환 스토리지는 선택적
-   스케일업 백엔드입니다. canon-model의 14개 레코드 종류 중 9개는
+   스케일업 백엔드입니다. canon-model의 12개 레코드 종류 중 9개는
    환경 변수가 필요 없는 `local`(git 백엔드) rung으로 라우팅되고,
-   `task`, `handoff`, `session`, `run`, `event`는 `hot`(기본값
+   `task`, `handoff`, `run`은 `hot`(기본값
    SQLite, `.canon/hot.db`, gitignore 처리됨)으로 라우팅됩니다.
    주석 처리된 `postgres`/`s3` 스탠자는 스케일업 전환 방법을
    보여주며, 실제로 동작하는 `specs.roots[]` 항목 하나와 비어 있는
@@ -52,9 +52,7 @@ import { Steps } from "@astrojs/starlight/components";
      change: local
      task: hot
      scenario: local
-     session: hot
      run: hot
-     event: hot
      handoff: hot
      review: local
      divergence: local
@@ -187,9 +185,9 @@ import { Steps } from "@astrojs/starlight/components";
    bunx @journeykit/canon report build
    ```
 
-   10개 리포트 mart(트러스트 매트릭스, 세션 비용, 역할별 메모리,
+   9개 리포트 mart(트러스트 매트릭스, 역할별 메모리,
    플라이휠 퍼널, 리뷰 번다운 및 5개의 추가 운영 mart를 포함하며
-   `mart_run_observability`가 열 번째 리포트 mart입니다)를
+   `mart_run_observability`가 아홉 번째 리포트 mart입니다)를
    `.canon/REPORT.md`에 렌더링합니다 — 생성된 파일이며 절대 손으로
    편집하지 않습니다. scope status와 subjects는 리포트/스냅샷 출력에
    포함되지만 대시보드 패널은 아닙니다. `canon gate check`를 CI에
@@ -201,60 +199,7 @@ import { Steps } from "@astrojs/starlight/components";
 **Done when:** `canon gate check`가 `clean (0 violations)`(exit `0`)이면 끝입니다.
 남은 위반은 같은 출력에 실패 클래스별로 나오고, `canon status`가 다음 명령을 줍니다.
 
-## 3. 세션 텔레메트리
-
-에이전트 CLI 트랜스크립트를 티어드 스토리지로 적재한 뒤 다시
-읽어봅니다.
-
-<Steps>
-
-1. **한 번 적재하고, 이후 watch.**
-
-   ```bash
-   bunx @journeykit/canon ingest sessions
-   bunx @journeykit/canon ingest sessions --watch   # 30초마다 폴링 (--interval-secs)
-   ```
-
-   등록된 모든 어댑터(`omp`, `hermes`, `claude`, `codex`)를
-   스캔하여 `Session` / `Run` / `Event` 레코드로 정규화하고,
-   `canon query`가 쓰는 것과 동일한 티어 해석을 통해 적재합니다.
-   소스별 워터마크 커서가 지난 실행과 바이트 단위로 동일한
-   소스는 건너뛰므로 — 정상 상태의 `--watch` 루프는 실제로
-   변경된 것만 다시 파싱합니다. `--full`로 전체 재스캔을 강제할
-   수 있습니다.
-
-2. **레코드 다시 조회.**
-
-   ```bash
-   bunx @journeykit/canon query --kind session --json
-   bunx @journeykit/canon query --kind run --since 2026-07-01
-   ```
-
-   해당 종류가 존재할 수 있는 모든 티어에 걸쳐 읽기를 팬아웃하고
-   `at` 기준으로 병합합니다. `--json`은 병합된 레코드 본문을
-   출력하고, 생략하면 사람이 읽기 좋은 테이블로 출력합니다.
-
-3. **대시보드 열기.**
-
-   ```bash
-   bunx @journeykit/canon dashboard
-   ```
-
-   새 Parquet 스냅샷을 생성하고(내부적으로 `canon report snapshot
-   .canon/dashboard-snapshot`을 실행) 빌드된
-   `packages/dashboard` 앱을 로컬에서 그 스냅샷을 가리켜
-   서빙합니다. 스냅샷에는 `mart_run_observability`와 scope/subjects
-   상태를 포함한 10개 리포트 mart가 모두 들어가지만, 대시보드는
-   의도적으로 7개 패널만 렌더링합니다. 다른 곳에서 생성한 스냅샷
-   (예: 다운로드한 CI 아티팩트)을 그대로 서빙하려면
-   `--snapshot <dir>`을 넘기세요.
-
-</Steps>
-
-**Done when:** `canon ingest sessions`가 exit `0`으로 끝나고
-`canon query --kind session`이 가져온 세션을 보여 주면 끝입니다.
-
-## 4. superpowers 플랜 가져오기
+## 3. superpowers 플랜 가져오기
 
 superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 레코드로 미러링합니다 — 손으로 다시 작성할 필요가 없습니다.
@@ -312,7 +257,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 보여 주면 끝입니다(게이트는 이 미러를 읽지 않으므로 `canon gate check` 결과는
 그대로입니다).
 
-## 5. 서브젝트-도메인 루프
+## 4. 서브젝트-도메인 루프
 
 서브젝트를 저작하고, import된 change를 그 아래로 adopt하고,
 서브젝트 스코프 가이던스를 꺼낸 뒤, 증거 게이팅된 라이프사이클을

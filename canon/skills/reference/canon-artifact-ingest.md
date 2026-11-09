@@ -71,8 +71,6 @@ promotion/demotion.
 
 ## What this skill does NOT cover
 
-- Session/cost ingestion (`canon ingest sessions`) — a different
-  pipeline; see the `canon-session-ingest` skill.
 - Strategy promotion/demotion mechanics — see the `canon-learn` skill;
   this skill only produces the verdict evidence promotion reads.
 - The `regime_key` grammar itself — see `canon-retrieve`, which derives

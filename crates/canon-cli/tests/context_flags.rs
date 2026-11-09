@@ -54,7 +54,7 @@ fn every_removed_spelling_is_a_usage_error_that_names_the_replacement() {
         (&["skills", "check", "--target", "."], "--repo"),
         (&["skills", "install", "--target", "."], "--repo"),
         (&["skills", "doctor", "--target", "."], "--repo"),
-        (&["ingest", "sessions", "--canon-yaml", "canon.yaml"], "--repo"),
+        (&["ingest", "records", "--canon-yaml", "canon.yaml"], "--repo"),
         (&["query", "--kind", "change", "--canon-yaml", "canon.yaml"], "--repo"),
         (&["tier", "age", "--canon-yaml", "canon.yaml"], "--repo"),
         (&["format", "--check", "spec"], "format"),

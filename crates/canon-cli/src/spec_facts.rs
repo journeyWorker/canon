@@ -133,7 +133,6 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("task done").idem(ReplaySafe).out(&[report("TaskDoneReport")]),
     leaf("ingest records").idem(ReplaySafe).out(&[report("IngestRecordsReport")]),
     leaf("ingest plans").idem(ReplaySafe).out(&[report("IngestPlansReport")]),
-    leaf("ingest sessions").idem(ReplaySafe).out(&[report("IngestSessionsReport")]),
     leaf("init").idem(ReplaySafe).out(&[when(report("InitReport"), "--check is not given"), when(report("InitCheckReport"), "--check is given")]),
     leaf("inventory sync").idem(ReplaySafe).out(&[report("InventorySyncReport")]),
     leaf("strategy approval-payload").out(&[artifact("application/octet-stream", "StrategyApprovalPayloadReport")]).operands(&[operand("strategy_id", "The StrategyId (ULID) whose approval payload is printed")]),

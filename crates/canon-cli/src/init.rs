@@ -60,13 +60,13 @@ use crate::skills::{self, Provider};
 
 /// Kinds routed to `hot` by [`skeleton_yaml`] (s32 `sqlite-hot-backend`):
 /// the same hot-class set the tiered-storage docs/this repo's own
-/// `canon.yaml` already use (task/handoff/session/run/event) --
+/// `canon.yaml` already use (task/handoff/run) --
 /// `canon init` can now afford to route them there by default because
 /// `hot`'s sqlite backend needs no operator-supplied credential
 /// (unlike postgres's `dsn_env` or s3's `bucket_env`, which `init`
 /// still can't guess -- `cold`-class kinds stay on `local`). Every
 /// OTHER kind (`RecordKind::ALL` minus this set) routes to `local`.
-const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, RecordKind::Session, RecordKind::Run, RecordKind::Event];
+const HOT_KINDS: [RecordKind; 3] = [RecordKind::Task, RecordKind::Handoff, RecordKind::Run];
 
 /// The lines [`scaffold_gitignore`] ensures are present in
 /// `<repo>/.gitignore`, each under its own comment: one glob covering
@@ -101,8 +101,7 @@ const GITIGNORE_LINES: [(&str, &str); 12] = [
 ];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
-/// fourteen wire strings (s36: `subject` is the reviewed 13th kind;
-/// s43: `finding` the 14th)
+/// twelve wire strings
 /// routed to either `local` (git-backed) or `hot`
 /// (sqlite-backed, [`HOT_KINDS`]) -- the two zero-env-var rungs (s32
 /// `sqlite-hot-backend`: sqlite needs no operator-supplied credential,
@@ -127,7 +126,7 @@ fn skeleton_yaml() -> String {
     out.push_str("# canon.yaml -- scaffolded by `canon init` (s19 canon-init-scaffold).\n");
     out.push_str("# `local` (git-backed) and `hot` (sqlite-backed, s32 sqlite-hot-\n");
     out.push_str("# backend) both need zero operator-supplied credentials, so every\n");
-    out.push_str("# kind below is already routed -- task/handoff/session/run/event to\n");
+    out.push_str("# kind below is already routed -- task/handoff/run to\n");
     out.push_str("# `hot`, everything else to `local`. Flip a `routing:` line to `cold`\n");
     out.push_str("# once you have a real `bucket_env` credential `init` cannot guess\n");
     out.push_str("# (see the commented `tiers.cold` stanza below; s27\n");
@@ -856,6 +855,9 @@ pub fn run_check_config(repo: &Path, json: bool) -> u8 {
 
     let mut all_ok = true;
     let mut report = String::new();
+
+    // 0.39: keys for the retired `session`/`event` kinds load and route nothing; `canon migrate` deletes them.
+    crate::retired_kind_keys::announce(repo, true);
 
     // s29 design D9: `TierPolicy::from_yaml_at` has no `canon-store`
     // dependency to call `validate_schema_ident` itself, so a

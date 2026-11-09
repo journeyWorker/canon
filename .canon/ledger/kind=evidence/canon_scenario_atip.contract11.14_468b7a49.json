@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:04:54.089557Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_14_a_refused_trace_leaves_a_fresh_index_as_it_was_and_a_trace_that_answers_still_writes_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    },
+    {
+      "case": "atip_contract11_14_a_search_of_an_empty_text_is_refused_and_writes_no_index",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    },
+    {
+      "case": "atip_contract11_14_a_trace_of_an_id_no_record_says_is_refused_and_writes_no_index",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    },
+    {
+      "case": "atip_contract11_14_a_trace_of_an_operand_with_no_shape_is_refused_and_writes_no_index",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    }
+  ],
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 442,
+  "scenario_id": "atip.contract11.14",
+  "schema": 1,
+  "staging_id": "14384cad",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

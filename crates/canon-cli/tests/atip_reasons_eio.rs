@@ -221,7 +221,7 @@ fn atip_reasons_12_every_call_site_that_reads_answers_its_subjects_unavailable_c
     unavailable(&run(d, Some("*/.canon/policy.yaml"), &[], &["policy", "approve", "--approver", "alice"]), "POLICY_UNAVAILABLE", &["policy", "approve"]);
 
     // RETENTION_TIERS: the canon.yaml a purge or an export reads its tiers from.
-    unavailable(&run(d, Some("*/canon.yaml"), &[], &["export", "--kind", "session", "--output", "out.json"]), "RETENTION_TIERS_UNAVAILABLE", &["export"]);
+    unavailable(&run(d, Some("*/canon.yaml"), &[], &["export", "--kind", "run", "--output", "out.json"]), "RETENTION_TIERS_UNAVAILABLE", &["export"]);
     unavailable(&run(d, Some("*/canon.yaml"), &[], &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z"]), "RETENTION_TIERS_UNAVAILABLE", &["purge"]);
 }
 
@@ -506,13 +506,13 @@ fn atip_reasons_14_a_postgres_dsn_that_is_set_and_unreachable_is_unavailable_and
     git(d, &["add", "-A"]);
     git(d, &["commit", "-q", "-m", "postgres"]);
 
-    let unset = run(d, None, &[], &["export", "--kind", "session", "--output", "out.json"]);
+    let unset = run(d, None, &[], &["export", "--kind", "run", "--output", "out.json"]);
     let document = body(&unset);
     assert_eq!((unset.status.code(), document["error"]["code"].as_str(), document["error"]["retryable"].as_bool()), (Some(2), Some("RETENTION_TIERS_REQUIRED"), Some(false)), "{document}");
 
     // A host name that cannot resolve (`.invalid` is reserved for it): refused at once, with no wait for a pool to time out.
     let dsn = [("CANON_PG_DSN", "postgres://canon:canon@no-such-host.invalid:5432/canon")];
-    let unreachable = run(d, None, &dsn, &["export", "--kind", "session", "--output", "out.json"]);
+    let unreachable = run(d, None, &dsn, &["export", "--kind", "run", "--output", "out.json"]);
     let document = body(&unreachable);
     assert_eq!((unreachable.status.code(), document["error"]["code"].as_str(), document["error"]["retryable"].as_bool()), (Some(2), Some("RETENTION_TIERS_UNAVAILABLE"), Some(true)), "{document}");
     assert!(document.get("data").is_none(), "a refusal carries no data: {document}");
@@ -521,13 +521,13 @@ fn atip_reasons_14_a_postgres_dsn_that_is_set_and_unreachable_is_unavailable_and
 
     // `query` and `tier age` read through the same tiers: a tier that did not answer is `*_UNAVAILABLE` for them too, and its message says the tier "did not
     // answer" (the DSN is set), not that it is "not attached (no live DSN)".
-    let query = run(d, None, &dsn, &["query", "--kind", "session"]);
+    let query = run(d, None, &dsn, &["query", "--kind", "run"]);
     let document = unavailable_tier(&query, "REPO_UNAVAILABLE", &["query"]);
     assert!(!document["error"]["message"].as_str().unwrap().contains("no live DSN"), "{document}");
     let age = run(d, None, &dsn, &["tier", "age"]);
     unavailable_tier(&age, "TIER_UNAVAILABLE", &["tier", "age"]);
     // With the DSN unset they say "not attached": no refusal a repeat can pass.
-    let unset_query = body(&run(d, None, &[], &["query", "--kind", "session"]));
+    let unset_query = body(&run(d, None, &[], &["query", "--kind", "run"]));
     assert_eq!(unset_query["error"]["code"], "QUERY_FAILED", "{unset_query}");
     assert!(unset_query["error"]["message"].as_str().unwrap().contains("is not attached"), "{unset_query}");
 
@@ -535,14 +535,14 @@ fn atip_reasons_14_a_postgres_dsn_that_is_set_and_unreachable_is_unavailable_and
     // retryable), `CONFIG_INVALID` (reason `TIERS`) for `query` and `tier age`. Only a well-formed DSN is tried at all.
     for bad in ["", "not a dsn", "postgres://no-port-and-a-space here/x"] {
         let dsn = [("CANON_PG_DSN", bad)];
-        for command in [&["export", "--kind", "session", "--output", "out.json"][..], &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z"]] {
+        for command in [&["export", "--kind", "run", "--output", "out.json"][..], &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z"]] {
             let out = run(d, None, &dsn, command);
             let document = body(&out);
             assert_eq!((out.status.code(), document["error"]["code"].as_str(), document["error"]["retryable"].as_bool()), (Some(2), Some("RETENTION_TIERS_INVALID"), Some(false)), "{bad:?} {command:?}: {document}");
             assert!(document["error"]["message"].as_str().unwrap().contains("DSN"), "{document}");
             assert!(document.get("data").is_none() && !d.join("out.json").exists(), "a refusal changes nothing: {document}");
         }
-        for command in [&["query", "--kind", "session"][..], &["tier", "age"]] {
+        for command in [&["query", "--kind", "run"][..], &["tier", "age"]] {
             let out = run(d, None, &dsn, command);
             let document = body(&out);
             assert_eq!((out.status.code(), document["error"]["code"].as_str(), document["error"]["reason"].as_str(), document["error"]["retryable"].as_bool()), (Some(2), Some("CONFIG_INVALID"), Some("TIERS"), Some(false)), "{bad:?} {command:?}: {document}");

@@ -158,7 +158,7 @@ canon evidence approval-payload --scenario auth.login.01 --project root --approv
 ```
 ```text
 # Export a redacted retention manifest without deleting records
-usage: canon export --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--before <TIMESTAMP>] [--after <TIMESTAMP>] [--output <FILE>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>] [--dry-run] [--input]
+usage: canon export --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--before <TIMESTAMP>] [--after <TIMESTAMP>] [--output <FILE>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>] [--dry-run] [--input]
 ```
 ```bash
 canon export --kind evidence --output evidence.json --json
@@ -204,13 +204,6 @@ usage: canon ingest records [--watch] [--interval-secs <N>] [--dry-run] [--run <
 ```
 ```bash
 canon ingest records --json
-```
-```text
-# Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)
-usage: canon ingest sessions [--watch] [--interval-secs <N>] [--home <DIR>] [--full] [--all-workspaces] [--dry-run] [--input]
-```
-```bash
-canon ingest sessions --json
 ```
 ```text
 # Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
@@ -272,15 +265,15 @@ canon prompt show reviewer@v1 --json
 ```
 ```text
 # Remove allowlisted records older than a cutoff
-usage: canon purge --kind <session|run|event|trajectory> --before <TIMESTAMP> [--commit --plan-digest <PLAN_DIGEST>] [--input]
+usage: canon purge --kind <run|trajectory|session|event> --before <TIMESTAMP> [--commit --plan-digest <PLAN_DIGEST>] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <PLAN_DIGEST>` with that digest acts
 ```
 ```bash
-canon purge --kind session --before 2020-01-01T00:00:00Z --json
+canon purge --kind run --before 2020-01-01T00:00:00Z --json
 ```
 ```text
 # Read stored records across every storage tier
-usage: canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence --json
@@ -329,14 +322,14 @@ canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
-usage: canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
 canon search timeout --kind finding --json
 ```
 ```text
 # Run canon's built-in fixture self-tests
-usage: canon selftest [--suite <trust-spine-gate|tiered-storage|typed-authoring-vocabulary|policy-expressions|format-authority|session-ingest|canon-context|artifact-ingest|spec-ledger-selftest|plugin-overlays|plan-import>]
+usage: canon selftest [--suite <trust-spine-gate|tiered-storage|typed-authoring-vocabulary|policy-expressions|format-authority|canon-context|artifact-ingest|spec-ledger-selftest|plugin-overlays|plan-import>]
 ```
 ```bash
 canon selftest --suite trust-spine-gate --json
@@ -650,8 +643,10 @@ canon ledger compact
 
 `canon artifacts move --tier <tier>` moves the local artifact store to an
 object store and removes the local blobs, `canon artifacts prune` deletes the
-blobs no record binds any more (a deleted local blob stays in git history; a
-deleted object of a tier is gone for good), and `purge` deletes records. They
+blobs no record binds any more and the stale `.tmp-` files a killed write left
+in the store (a deleted local blob stays in git history; a deleted object of a
+tier is gone for good; `canon artifacts verify` only counts the temp files), and
+`purge` deletes records. They
 are the repo owner's decisions, not steps of the loop: run the preview, give
 the human the effects, and run the commit only on their answer. If the repo is
 large, the store is slow or the human has not asked for it, do not run it.

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-durasecret",
+    "role": "reviewer",
+    "session_id": "s-0-39-durasecret-rev"
+  },
+  "at": "2026-11-08T07:37:06.156419Z",
+  "change_id": "canon-0-39-write-durability",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/src/atomic.rs",
+  "introduced_by": "e0571acf6147980c3e573c17cdd64cf86d4e3061",
+  "kind": "finding",
+  "reviewed_sha": "ef2e822a05d4aeb9bb858f714e83f665cc7b84a7",
+  "reviewer": "rev-0-39-durasecret",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Standards pass, tier.durability.04/.05/.07: the failure halves `return` early when run as root, so as root they report passed without exercising the failure path (04 and 05 print `skipped: running as root` and their names say skipped-as-root as the brief asks; the migrate half of 07 skips silently and its name does not say so). Checked: CI (.github/workflows/test.yml, `ubuntu-latest` hosted runner, no container, `cargo test --workspace`) runs as the non-root `runner` user, and I ran all three here as uid 501 with --no-capture: no skip line, all PASS. Blast radius: a root-run build (docker CI, a root dev shell) shows these three green with the failure path unexercised; nothing else checks it.",
+  "worktree_dirty": false
+}

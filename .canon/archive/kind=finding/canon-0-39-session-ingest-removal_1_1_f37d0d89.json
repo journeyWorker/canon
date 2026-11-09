@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:40:24.537470Z",
+  "change_id": "canon-0-39-session-ingest-removal",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "disposition": "open",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "ingest.removal.05"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] The approved brief's F3 failure path says writing a Run the store already holds 'with other content' is 'rejected as now', but persist_idempotent (moved unchanged from 0.38, crates/canon-cli/src/tiers.rs:528) only swallows DuplicatePath, which the git tier raises for a byte-identical path; other content hashes to another path and is stored as a new version the read fold ranks. Confirmed black-box on a git-routed repo: dispatch begin then end leaves two kind=run objects and one folded row (a second end is DISPATCH_CONFLICT ALREADY_ENDED from the manifest, not from the tier). The scenario text and the code agree with each other and with 0.38; the brief wording is wrong, so the owner should amend the brief or confirm 'new version' is the intended contract. Blast radius: nothing else changed; the sqlite hot tier is not exercised by this test.",
+  "worktree_dirty": false
+}

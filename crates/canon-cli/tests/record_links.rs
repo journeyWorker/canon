@@ -706,7 +706,7 @@ fn init_repo(yaml: &str) -> tempfile::TempDir {
     dir
 }
 
-const ROUTED_HOT: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  session: hot\n  run: hot\n  event: hot\n  change: hot\n  task: hot\n  trajectory: hot\n";
+const ROUTED_HOT: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  run: hot\n  change: hot\n  task: hot\n  trajectory: hot\n";
 
 const WITH_HOT: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\n";
 
@@ -734,29 +734,7 @@ fn authoring_init_102_init_check_says_so_when_no_hot_store_is_configured_and_nam
 }
 
 #[test]
-fn ingest_sessions_15_a_command_that_writes_hot_records_prints_the_hot_store_location() {
-    let dir = init_repo(ROUTED_HOT);
-    let home = tempfile::tempdir().unwrap();
-    let transcripts = home.path().join(".claude/projects/-work-app");
-    std::fs::create_dir_all(&transcripts).unwrap();
-    let turn = |kind: &str, at: &str, message: Value| serde_json::json!({"type": kind, "sessionId": "s-15", "timestamp": at, "cwd": "/work/app", "message": message}).to_string();
-    let lines = [
-        turn("user", "2026-10-26T10:00:00Z", serde_json::json!({"role": "user", "content": "go"})),
-        turn("assistant", "2026-10-26T10:00:05Z", serde_json::json!({"role": "assistant", "model": "m", "content": [{"type": "text", "text": "done"}]})),
-    ];
-    std::fs::write(transcripts.join("s-15.jsonl"), lines.join("\n") + "\n").unwrap();
-    let home_arg = home.path().to_str().unwrap();
-
-    let human = canon(&["ingest", "sessions", "--home", home_arg, "--all-workspaces"], dir.path());
-    assert!(text(&human).contains("hot store: .canon/hot.db"), "{}", text(&human));
-    let doc = json(&canon(&["ingest", "sessions", "--home", home_arg, "--all-workspaces", "--json"], dir.path()));
-    assert_eq!(doc["data"]["hotStore"], ".canon/hot.db", "{doc}");
-    let written = canon(&["query", "--kind", "session", "--json"], dir.path());
-    assert!(json(&written)["data"]["records"].as_array().is_some_and(|r| !r.is_empty()), "the session was written: {}", text(&written));
-}
-
-#[test]
-fn ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too() {
+fn ingest_plans_14_the_other_hot_writers_print_the_hot_store_location_too() {
     let dir = init_repo(ROUTED_HOT);
     let repo = dir.path();
     let plans = canon(&["ingest", "plans", "--json"], repo);
@@ -768,7 +746,7 @@ fn ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too() {
 }
 
 #[test]
-fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_location_too() {
+fn ingest_plans_14_subject_and_change_writes_to_the_hot_store_print_its_location_too() {
     let hot = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: hot\n  change: hot\n";
     let dir = init_repo(hot);
     let repo = dir.path();
@@ -982,12 +960,12 @@ fn hand_written_finding_add_blocker_and_should_fix_examples_name_the_introducing
     assert!(problems.is_empty(), "these examples raise a blocker or should-fix without --introduced-rev or --introduced-unknown:\n{}", problems.join("\n"));
 }
 
-/// ingest.sessions.16: the hot store line names only a write that went
+/// ingest.plans.14: the hot store line names only a write that went
 /// there. With only `change` routed hot, `subject new` writes the subject to
 /// the ledger and prints no hot store line; `subject adopt` rewrites the
 /// change in the hot store and prints it.
 #[test]
-fn ingest_sessions_16c_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line() {
+fn ingest_plans_14_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line() {
     let routing = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: local\n  change: hot\n";
     let dir = init_repo(routing);
     let repo = dir.path();

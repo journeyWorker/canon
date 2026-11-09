@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T07:46:28.602739Z",
+  "code_tree": "084fb79d31fa4eb89922ff92cd18931af69634b0",
+  "kind": "review",
+  "pin": "d682e18ddf5cbdce5eba95735b10def5e5ae2e4f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:tier_retired_10_the_twelve_kinds_still_read"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "bde7e5e1ad856c57c364b69e3a379e5cc9ed65b30d4c8f6121925a0ccd0983de",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-session-kinds-removal/brief.md"
+  },
+  "review_id": "01M6X1YZKTZVA3V93A6CMHCC9Z",
+  "reviewer": "rev-0-39-ingest",
+  "scenario_id": "tier.retired.10",
+  "schema": 2,
+  "worktree_dirty": false
+}

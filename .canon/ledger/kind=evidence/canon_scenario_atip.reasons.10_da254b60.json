@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:04:54.089557Z",
+  "attachments": [
+    {
+      "case": "read_cause::tests::atip_reasons_10_the_kind_of_an_error_is_read_before_its_raw_number",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    },
+    {
+      "case": "atip_reasons_10_the_seam_fails_a_read_with_eio_and_the_cause_is_the_one_a_repeat_can_pass",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    }
+  ],
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 192,
+  "scenario_id": "atip.reasons.10",
+  "schema": 1,
+  "staging_id": "851ee3cd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -47,6 +47,5 @@ query --kind evidence --all --json
 query --kind review --all --json
 query --kind finding --all --json
 query --kind divergence --all --json
-query --kind session --all --json
 query --kind run --all --json
 query --kind strategy_item --all --json

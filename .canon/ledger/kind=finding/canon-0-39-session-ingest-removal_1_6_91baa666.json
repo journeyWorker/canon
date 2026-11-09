@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-ingest",
+    "role": "reviewer",
+    "session_id": "s-0-39-ingest-rev"
+  },
+  "at": "2026-11-08T09:10:10.261470Z",
+  "change_id": "canon-0-39-session-ingest-removal",
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "disposition": "open",
+  "file_ref": "crates/canon-gate/src/staleness.rs:129",
+  "introduced_by": "57b21202b04d8aa9caa179f209023b2e06996318",
+  "kind": "finding",
+  "reviewed_sha": "d924532b16880be97f6d058acf7e3142fd3efddb",
+  "reviewer": "rev-0-39-ingest",
+  "round": 1,
+  "scenario_ids": [
+    "ingest.removal.16"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[standards] The fix is minimal and correct for the case it names (verified: the scenario's red record at b676851dd is divergent, green after; the ingest_removal_16 test compares literal subject lists before and after the delete and in a shallow clone; tombstones are dropped by without_removed in context.rs so latest_scenario is None for them). Guard edge: of_an_undeclared_scenario returns false when ctx.scenarios is empty, so a repo that deletes its LAST scenario keeps that scenario's old evidence judged stale-evidence. Probed on the real binary: one scenario, evidence, four commits (max_commits_behind 2), feature file deleted and inventory sync run: gate check still lists stale-evidence only.leaf.01. The empty-corpus guard exists to avoid judging every cell when the scenario kind is routed off the git tier or the index is unbuilt; the two cases are not told apart. Rare, no test pins it either way, and it does not affect this repo; worth a line in the staleness.rs module doc or a distinguishing check. Blast radius: the filter sits in fold_latest_green_cells, so it also removes a scenario cell with an undeclared id (a typo'd evidence --scenario) from staleness; coverage checks elsewhere still name it.",
+  "worktree_dirty": false
+}

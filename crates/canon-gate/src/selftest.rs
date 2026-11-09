@@ -69,6 +69,7 @@ use canon_model::{
     RecordKind, Review, RoleId, ScenarioId, Sha, Subject, SubjectId, SubjectStatus, TaskId, TrustLifecycle,
 };
 use canon_policy::SchemaRegistry;
+use canon_store::git::GitCall;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
 use chrono::{DateTime, Utc};
@@ -135,13 +136,11 @@ fn write_evidence_with(ledger_root: &Path, record: &EvidenceRecord, extra: &[(&s
 }
 
 fn git(dir: &Path, args: &[&str]) {
-    let status = std::process::Command::new("git").arg("-C").arg(dir).args(args).status().expect("git must be on PATH for the stale-evidence selftest fixture");
-    assert!(status.success(), "git {args:?} failed while building the stale-evidence selftest fixture");
+    GitCall::new(dir).args(args).run().unwrap_or_else(|error| panic!("{error} while building the stale-evidence selftest fixture"));
 }
 
 fn git_output(dir: &Path, args: &[&str]) -> String {
-    let output = std::process::Command::new("git").arg("-C").arg(dir).args(args).output().expect("git must be on PATH for the stale-evidence selftest fixture");
-    assert!(output.status.success(), "git {args:?} failed while building the stale-evidence selftest fixture");
+    let output = GitCall::new(dir).args(args).run().unwrap_or_else(|error| panic!("{error} while building the stale-evidence selftest fixture"));
     String::from_utf8(output.stdout).expect("git output is UTF-8")
 }
 

@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:41:10.153085Z",
+  "attachments": [
+    {
+      "case": "review_add_and_subject_status_need_no_sync_step",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "c2cb3ff70e95b829e5cabaadac268a7cfa2c98aa6946a3716c6d319f0986afc6"
+    }
+  ],
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "0.39 gate clean: the same cases re-run on the current tree: cargo nextest run --workspace (default profile, 4001 tests)"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 362,
+  "scenario_id": "inventory.sync.41",
+  "schema": 1,
+  "staging_id": "543a7e6e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

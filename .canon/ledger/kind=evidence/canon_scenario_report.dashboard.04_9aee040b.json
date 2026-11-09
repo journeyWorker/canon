@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-0-39",
+    "role": "implementer",
+    "session_id": "s-0-39-impl"
+  },
+  "at": "2026-11-08T09:04:54.089557Z",
+  "attachments": [
+    {
+      "case": "dashboard::tests::report_dashboard_04_the_demo_fixture_is_never_served_from_either_source",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    },
+    {
+      "case": "report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served_and_says_why",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    },
+    {
+      "case": "report_dashboard_04_serves_an_explicit_snapshot_without_duckdb",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "91bad4a11583f2897b24f5ae7ff687f0431d6e8bc2c137fcc68a9fd8e50aac37"
+    }
+  ],
+  "code_tree": "b9562dad12a2f04f09b8e3fca72e098f3876cef0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d440295197b624ae2be1315fdfb170dbb9e61959",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 527,
+  "scenario_id": "report.dashboard.04",
+  "schema": 1,
+  "staging_id": "780b7fa1",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

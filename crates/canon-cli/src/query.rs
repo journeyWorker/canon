@@ -20,6 +20,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use canon_model::envelope::RecordKind;
+use canon_store::tier::PurgeKind;
 use canon_model::evidence::RawRecord;
 use canon_model::ids::{ChangeId, ProjectId, ScenarioId, TaskId};
 use canon_model::records::Scenario;
@@ -109,10 +110,25 @@ pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind>
 }
 
 /// `purge --kind`'s clap parser: the record kinds purge accepts
-/// ([`canon_store::tier::PURGEABLE_KINDS`]), a closed subset of [`kind_parser`]'s.
-pub fn purgeable_kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
-    let visible = canon_store::tier::PURGEABLE_KINDS.iter().map(|k| clap::builder::PossibleValue::new(k.as_str()));
-    crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
+/// ([`canon_store::tier::PURGEABLE_KINDS`]) and, for one release, the two retired
+/// ones ([`canon_store::tier::RetiredKind`]), which only delete rows an older canon
+/// stored. The retired names are listed last and say so in `--help`.
+pub fn purge_kind_parser() -> impl clap::builder::TypedValueParser<Value = PurgeKind> {
+    let current = canon_store::tier::PURGEABLE_KINDS.iter().map(|k| clap::builder::PossibleValue::new(k.as_str()));
+    let retired = canon_store::tier::RetiredKind::ALL.iter().map(|k| clap::builder::PossibleValue::new(k.as_str()).help("retired in 0.39, leaves next release: deletes rows an older canon stored"));
+    crate::cli_error::closed_set(current.chain(retired).collect::<Vec<_>>(), parse_purge_kind)
+}
+
+/// `purge --kind`'s value: a purgeable record kind or a retired one.
+pub fn parse_purge_kind(s: &str) -> Result<PurgeKind, PurgeKindError> {
+    PurgeKind::parse(s).ok_or_else(|| PurgeKindError::Unknown(s.to_string()))
+}
+
+/// `purge --kind` named no kind purge accepts.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum PurgeKindError {
+    #[error("purge kind `{0}` is not allowed; allowed kinds: run, trajectory, session (retired), event (retired)")]
+    Unknown(String),
 }
 
 /// `--change`'s `clap` value parser — grammar-level `ChangeId::parse`
@@ -277,7 +293,7 @@ fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
 /// N-independent-versions. The hot-routed set is asserted to equal this
 /// list by `fold_list_matches_pg_routing` (tests/query.rs).
 fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
-    if !matches!(kind, RecordKind::Task | RecordKind::Handoff | RecordKind::Session | RecordKind::Run | RecordKind::Event) {
+    if !matches!(kind, RecordKind::Task | RecordKind::Handoff | RecordKind::Run) {
         return records;
     }
     fold_latest_by_natural_key(kind, records)
@@ -395,9 +411,7 @@ fn is_key_ordered(kind: RecordKind) -> bool {
         kind,
         RecordKind::Task
             | RecordKind::Handoff
-            | RecordKind::Session
             | RecordKind::Run
-            | RecordKind::Event
             | RecordKind::Subject
             | RecordKind::Finding
             | RecordKind::Scenario
@@ -574,9 +588,7 @@ pub fn format_human(outcome: &QueryOutcome) -> String {
     format_human_with_sensitive(outcome, false)
 }
 
-/// Human output is intentionally a metadata table, so it never includes
-/// event bodies even when sensitive output was authorized for another
-/// formatter.
+/// Human output is intentionally a metadata table: ids and digests, never record bodies.
 pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: bool) -> String {
     let since_desc = outcome.since.map_or_else(|| "none".to_string(), |s| s.to_rfc3339());
     let mut out = format!("canon query --kind {} --since {}: {} record(s)", outcome.kind.as_str(), since_desc, outcome.records.len());
@@ -617,72 +629,8 @@ pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: b
     finish_human(out, outcome)
 }
 
-/// Replace the open-ended parts of an event body that commonly carry
-/// transcript text or credentials. The stored [`RawRecord`] is never
-/// modified; this is a presentation-only projection.
-fn redacted_event_record(raw: &RawRecord) -> Value {
-    let mut record = raw.0.clone();
-    if let Some(detail) = record.as_object_mut().and_then(|object| object.get_mut("detail")) {
-        if detail.is_string() {
-            *detail = Value::String("[REDACTED]".to_string());
-        } else {
-            redact_event_detail(detail);
-        }
-    }
-    record
-}
-
-fn redact_event_detail(value: &mut Value) {
-    match value {
-        Value::Object(object) => {
-            let keys: Vec<String> = object.keys().cloned().collect();
-            for key in keys {
-                if key.eq_ignore_ascii_case("text") {
-                    object.remove(&key);
-                } else if sensitive_detail_key(&key) {
-                    object.insert(key, Value::String("[REDACTED]".to_string()));
-                } else if let Some(child) = object.get_mut(&key) {
-                    redact_event_detail(child);
-                }
-            }
-        }
-        Value::Array(values) => {
-            for value in values {
-                redact_event_detail(value);
-            }
-        }
-        Value::String(_) => {}
-        Value::Null | Value::Bool(_) | Value::Number(_) => {}
-    }
-}
-
-fn sensitive_detail_key(key: &str) -> bool {
-    let compact = key.chars().filter(char::is_ascii_alphanumeric).map(|character| character.to_ascii_lowercase()).collect::<String>();
-    matches!(
-        compact.as_str(),
-        "credential"
-            | "credentials"
-            | "password"
-            | "passwd"
-            | "secret"
-            | "secrets"
-            | "token"
-            | "accesstoken"
-            | "refreshtoken"
-            | "apikey"
-            | "authorization"
-            | "auth"
-            | "cookie"
-            | "privatekey"
-            | "clientsecret"
-            | "raw"
-            | "rawdetail"
-    ) || compact.ends_with("token") || compact.ends_with("apikey") || compact.ends_with("secret")
-}
-
-fn query_record(kind: RecordKind, raw: &RawRecord, include_sensitive: bool) -> Value {
+fn query_record(kind: RecordKind, raw: &RawRecord) -> Value {
     match kind {
-        RecordKind::Event if !include_sensitive => redacted_event_record(raw),
         RecordKind::Change => change_record(raw),
         _ => raw.0.clone(),
     }
@@ -691,8 +639,7 @@ fn query_record(kind: RecordKind, raw: &RawRecord, include_sensitive: bool) -> V
 /// A change as `--json` shows it (0.18 D4): a version written before
 /// 0.18 carries one `subject_id`, shown as the one-element `subject_ids`
 /// the model reads it as, so every version names its subjects the same
-/// way. Presentation only, like event redaction: the stored record is
-/// never modified.
+/// way. Presentation only: the stored record is never modified.
 fn change_record(raw: &RawRecord) -> Value {
     let mut record = raw.0.clone();
     if let Some(object) = record.as_object_mut() {
@@ -784,11 +731,11 @@ pub struct QueryRollup {
     pub total: usize,
 }
 
-/// Event bodies are redacted by default; the full merged record bodies appear
-/// only when the caller has already passed `--include-sensitive` through policy
-/// validation.
-pub fn report(outcome: &QueryOutcome, include_sensitive: bool) -> QueryReport {
-    let records = outcome.records.iter().map(|r| QueryRecord(query_record(outcome.kind, r, include_sensitive))).collect();
+/// No record kind carries a redacted body (the `event` kind, the one that did, is
+/// gone), so `--include-sensitive` changes nothing here; the flag stays accepted
+/// and validated against policy.
+pub fn report(outcome: &QueryOutcome, _include_sensitive: bool) -> QueryReport {
+    let records = outcome.records.iter().map(|r| QueryRecord(query_record(outcome.kind, r))).collect();
     base_report(outcome, records)
 }
 
@@ -806,7 +753,7 @@ fn base_report(outcome: &QueryOutcome, records: Vec<QueryRecord>) -> QueryReport
     }
 }
 
-/// One record of `--json`, as the ledger holds it (an event's body redacted unless sensitive output was allowed, a
+/// One record of `--json`, as the ledger holds it (a
 /// change's `subject_ids`, a `--plugin` overlay): its members are its kind's own, in the kind's own snake_case. The
 /// schema lists every member any kind's record schema declares, so `--fields` can name them.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -1028,16 +975,16 @@ pub fn run_with_plugin(
 /// (spec.md: "no default or guessed value is invented"). Never called
 /// by `main.rs::run_query` unless `projections` is non-empty — the
 /// empty case calls [`report`] verbatim instead.
-pub fn report_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], include_sensitive: bool) -> QueryReport {
-    let records = outcome.records.iter().map(|raw| QueryRecord(merge_overlay_fields(outcome.kind, raw, projections, include_sensitive))).collect();
+pub fn report_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], _include_sensitive: bool) -> QueryReport {
+    let records = outcome.records.iter().map(|raw| QueryRecord(merge_overlay_fields(outcome.kind, raw, projections))).collect();
     let mut report = base_report(outcome, records);
     report.plugin = Some(plugin_id.to_string());
     report.overlays = Some(projections.iter().map(|p| p.identity.clone()).collect());
     report
 }
 
-fn merge_overlay_fields(kind: RecordKind, raw: &RawRecord, projections: &[OverlayProjection], include_sensitive: bool) -> Value {
-    let Some(key) = scenario_key(raw) else { return query_record(kind, raw, include_sensitive) };
+fn merge_overlay_fields(kind: RecordKind, raw: &RawRecord, projections: &[OverlayProjection]) -> Value {
+    let Some(key) = scenario_key(raw) else { return query_record(kind, raw) };
     let mut overlay_obj = serde_json::Map::new();
     for projection in projections {
         if let Some(fields) = projection.projected.get(&key) {
@@ -1045,9 +992,9 @@ fn merge_overlay_fields(kind: RecordKind, raw: &RawRecord, projections: &[Overla
         }
     }
     if overlay_obj.is_empty() {
-        return query_record(kind, raw, include_sensitive);
+        return query_record(kind, raw);
     }
-    let mut merged = query_record(kind, raw, include_sensitive);
+    let mut merged = query_record(kind, raw);
     if let Some(obj) = merged.as_object_mut() {
         obj.insert("overlay".to_string(), Value::Object(overlay_obj));
     }
@@ -1113,63 +1060,5 @@ mod tests {
         let known = RecordKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", ");
         assert_eq!(parse_kind("bogus").unwrap_err().to_string(), format!("unknown record kind `bogus` (expected one of: {known})"));
         assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
-    }
-
-    fn event_outcome() -> QueryOutcome {
-        QueryOutcome {
-            kind: RecordKind::Event,
-            since: None,
-            records: vec![RawRecord(serde_json::json!({
-                "schema": 1,
-                "kind": "event",
-                "at": "2026-01-01T00:00:00Z",
-                "event_id": "evt-1",
-                "run_id": "run-1",
-                "seq": 1,
-                "label": "tool_result",
-                "detail": {
-                    "text": "directive contains secret prose",
-                    "api_key": "credential-value",
-                    "nested": {"raw": "raw credential value", "safe": "retained"},
-                },
-            }))],
-            violation_count: 0,
-            rollup: None,
-            page: None,
-            references: None,
-        }
-    }
-
-    #[test]
-    fn json_query_redacts_event_text_and_credentials_by_default() {
-        let outcome = event_outcome();
-        let payload = serde_json::to_value(report(&outcome, false)).unwrap();
-        let detail = &payload["records"][0]["detail"];
-
-        assert!(detail.get("text").is_none(), "event text must be omitted by default: {payload}");
-        assert_eq!(detail["api_key"], "[REDACTED]");
-        assert_eq!(detail["nested"]["raw"], "[REDACTED]");
-        assert_eq!(detail["nested"]["safe"], "retained");
-        assert!(!payload.to_string().contains("credential-value"));
-        assert!(!payload.to_string().contains("secret prose"));
-    }
-
-    #[test]
-    fn json_query_includes_event_detail_only_for_authorized_projection() {
-        let outcome = event_outcome();
-        let payload = serde_json::to_value(report(&outcome, true)).unwrap();
-        let detail = &payload["records"][0]["detail"];
-
-        assert_eq!(detail["text"], "directive contains secret prose");
-        assert_eq!(detail["api_key"], "credential-value");
-        assert_eq!(detail["nested"]["raw"], "raw credential value");
-    }
-
-    #[test]
-    fn human_query_is_metadata_only_and_never_emits_event_detail() {
-        let output = format_human(&event_outcome());
-        assert!(output.contains("event"));
-        assert!(!output.contains("directive contains secret prose"));
-        assert!(!output.contains("credential-value"));
     }
 }

@@ -28,7 +28,7 @@ fn multi_tier_config_renders_the_boundary_note_naming_exactly_the_kinds_not_read
     let roots = support::corpus::build(dir.path());
     write_canon_yaml(
         dir.path(),
-        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_TB1, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_TB1, prefix: \"canon/\" }\nrouting:\n  task: hot\n  session: hot\n  change: local\n  scenario: cold\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN_TB1, schema: canon_v1 }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET_TB1, prefix: \"canon/\" }\nrouting:\n  task: hot\n  handoff: hot\n  change: local\n  scenario: cold\n",
     );
     let inputs = ReportInputs::new(dir.path(), roots);
 
@@ -39,7 +39,7 @@ fn multi_tier_config_renders_the_boundary_note_naming_exactly_the_kinds_not_read
     // Exactly the kinds not read directly, sorted: the bullets of that section and no others.
     let section = content.split("## Kinds not read directly").nth(1).unwrap().split("\n## ").next().unwrap();
     let named: Vec<&str> = section.lines().filter_map(|line| line.strip_prefix("- `").and_then(|rest| rest.strip_suffix('`'))).collect();
-    assert_eq!(named, ["scenario", "session", "task"], "the s3-backed (cold) scenario, and the postgres-backed session and task, sorted; a local (git-backed) change never:\n{content}");
+    assert_eq!(named, ["handoff", "scenario", "task"], "the s3-backed (cold) scenario, and the postgres-backed handoff and task, sorted; a local (git-backed) change never:\n{content}");
     assert!(!content.contains("- `change`\n"), "a local (git-backed)-routed kind must never be named:\n{content}");
 
     // Placement: after `## Inputs (digest)`, before `## Trust matrix`.

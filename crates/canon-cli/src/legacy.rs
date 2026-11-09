@@ -391,8 +391,7 @@ pub enum LegacyError {
 }
 
 fn write_file(path: &Path, bytes: &[u8]) -> Result<(), LegacyError> {
-    let temp = path.with_extension("canon-migrate.tmp");
-    fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, path)).map_err(|source| LegacyError::Write { path: path.to_path_buf(), source })
+    canon_store::write_atomic(path, bytes).map_err(|source| LegacyError::Write { path: path.to_path_buf(), source })
 }
 
 /// The repo-relative `/`-separated form of `path` under `repo`.
@@ -518,6 +517,8 @@ pub fn announce(repo: &Path) {
     let legacy = detect(repo);
     // A 0.29 ledger layout (0.30 `ledger-naming`): the same `canon migrate` step; one step when both hold.
     crate::old_layout::announce(repo, legacy.is_none());
+    // 0.39 `session-kinds-removal`: `canon.yaml` keys for the retired kinds; one `canon migrate` step when another already leads.
+    crate::retired_kind_keys::announce(repo, legacy.is_none() && crate::old_layout::detect(repo).is_none());
     // 0.31 `brief-format`: a brief in the 0.30 format.
     crate::old_briefs::announce(repo);
     if let Some(found) = legacy {
@@ -538,10 +539,13 @@ pub fn warn_stale_guide(repo: &Path) {
 mod tests {
     use super::*;
 
+    /// tier.durability.07 (F4 failure path): a legacy write that cannot happen is an error that keeps its cause and reads as it did.
     #[test]
-    fn migrate_failures_read_as_before_and_keep_their_cause() {
+    fn tier_durability_07_migrate_failures_read_as_before_and_keep_their_cause() {
         let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("missing").join("hook.json");
+        // A file where the parent directory belongs: `write_atomic` creates a missing parent, so only this stops the write.
+        fs::write(dir.path().join("blocked"), b"").unwrap();
+        let file = dir.path().join("blocked").join("hook.json");
         let write = write_file(&file, b"x").unwrap_err();
         assert!(write.to_string().starts_with(&format!("could not write {}: ", file.display())), "{write}");
         assert!(std::error::Error::source(&write).is_some());

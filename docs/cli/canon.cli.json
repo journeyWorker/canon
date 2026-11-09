@@ -3,7 +3,7 @@
   "cli": {
     "about": "Specs, evidence gates, and agent memory for your repo",
     "name": "canon",
-    "version": "0.38.0"
+    "version": "0.39.0"
   },
   "commands": [
     {
@@ -250,7 +250,7 @@
       "outputs": [
         {
           "schemaRef": "#/schemas/ArtifactsPruneReport",
-          "schemaVersion": "1.2"
+          "schemaVersion": "1.3"
         }
       ],
       "summary": "Delete the artifact blobs no record binds any more (the bare run previews; --commit --plan-digest deletes)",
@@ -364,7 +364,8 @@
       ],
       "outputs": [
         {
-          "schemaRef": "#/schemas/ArtifactsVerifyReport"
+          "schemaRef": "#/schemas/ArtifactsVerifyReport",
+          "schemaVersion": "1.1"
         }
       ],
       "summary": "Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes)",
@@ -2359,7 +2360,7 @@
           "domain": {
             "pattern": "^\\P{White_Space}([^\\n\\r\u0000]*\\P{White_Space})?$"
           },
-          "help": "Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref",
+          "help": "A path pattern from the repository root (src/, src/**) or effect:<kebab-slug>; persisted as surface_ref",
           "name": "surface-ref",
           "repeatable": true,
           "valueName": "PATH_OR_EFFECT"
@@ -2932,9 +2933,7 @@
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -4024,8 +4023,21 @@
       },
       "kind": "command",
       "options": [
-        "watch",
-        "interval-secs",
+        {
+          "help": "Keep polling instead of exiting after one pass",
+          "name": "watch",
+          "valueType": "switch"
+        },
+        {
+          "default": 30,
+          "domain": {
+            "minimum": 0
+          },
+          "help": "Seconds between polls",
+          "name": "interval-secs",
+          "valueName": "N",
+          "valueType": "integer"
+        },
         "repo",
         "dry-run",
         {
@@ -4051,76 +4063,6 @@
         }
       ],
       "summary": "Import review/divergence/task/handoff records and derive verdicts",
-      "x-canon": {
-        "roles": [
-          "orchestrator"
-        ]
-      }
-    },
-    {
-      "command": "ingest sessions",
-      "effect": "write",
-      "errors": [
-        "CONFIG_DENIED",
-        "CONFIG_INVALID",
-        "CONFIG_REQUIRED",
-        "CONFIG_UNAVAILABLE",
-        "INGEST_FAILED",
-        "LAYOUT_MIGRATION_REQUIRED",
-        "REPO_LOCK_UNAVAILABLE",
-        "ROLE_INVALID",
-        "WRITE_DENIED",
-        "WRITE_INVALID"
-      ],
-      "examples": [
-        "canon ingest sessions --json"
-      ],
-      "idempotency": "replay-safe",
-      "input": {
-        "argumentsRef": "#/schemas/IngestSessionsArguments",
-        "batch": true,
-        "example": {},
-        "maxBytes": 8388608,
-        "maxItems": 10000
-      },
-      "kind": "command",
-      "options": [
-        "watch",
-        "interval-secs",
-        {
-          "defaultNote": "$HOME",
-          "help": "The scan root's home directory (defaults to $HOME)",
-          "name": "home",
-          "valueName": "DIR",
-          "valueType": "path"
-        },
-        "repo",
-        {
-          "help": "Ignore watermark cursors and re-parse every in-scope file",
-          "name": "full",
-          "valueType": "switch"
-        },
-        {
-          "help": "Scan every workspace on this machine, not just this project",
-          "name": "all-workspaces",
-          "valueType": "switch"
-        },
-        "dry-run",
-        "as"
-      ],
-      "outputs": [
-        {
-          "schemaRef": "#/schemas/IngestSessionsReport",
-          "schemaVersion": "1.1"
-        },
-        {
-          "batch": true,
-          "schemaRef": "#/schemas/BatchIngestSessionsReport",
-          "schemaVersion": "1.1",
-          "when": "--input is an array or NDJSON"
-        }
-      ],
-      "summary": "Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)",
       "x-canon": {
         "roles": [
           "orchestrator"
@@ -5004,27 +4946,27 @@
         "WRITE_INVALID"
       ],
       "examples": [
-        "canon purge --kind session --before 2020-01-01T00:00:00Z --json"
+        "canon purge --kind run --before 2020-01-01T00:00:00Z --json"
       ],
       "idempotency": "replay-safe",
       "input": {
         "argumentsRef": "#/schemas/PurgeArguments",
         "example": {
           "before": "2020-01-01T00:00:00Z",
-          "kind": "session"
+          "kind": "run"
         },
         "maxBytes": 8388608
       },
       "kind": "command",
       "options": [
         {
-          "help": "The record kind to purge (session, run, event or trajectory)",
+          "help": "The record kind to purge: run or trajectory. `session` and `event` are retired in 0.39 and leave the next release; they delete rows an older canon stored",
           "name": "kind",
           "possibleValues": [
-            "session",
             "run",
-            "event",
-            "trajectory"
+            "trajectory",
+            "session",
+            "event"
           ],
           "required": true,
           "valueType": "enum"
@@ -5088,9 +5030,7 @@
           "if": {
             "in": [
               "scenario",
-              "session",
               "run",
-              "event",
               "handoff",
               "review",
               "divergence",
@@ -5113,9 +5053,7 @@
           "if": {
             "in": [
               "scenario",
-              "session",
               "run",
-              "event",
               "handoff",
               "review",
               "divergence",
@@ -5139,9 +5077,7 @@
               "change",
               "task",
               "scenario",
-              "session",
               "run",
-              "event",
               "handoff",
               "review",
               "divergence",
@@ -5181,9 +5117,7 @@
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -5265,7 +5199,6 @@
               "change_ids",
               "claimed_at",
               "claimed_by",
-              "client",
               "code_tree",
               "completed_at",
               "content",
@@ -5285,7 +5218,6 @@
               "introduced_by",
               "introduced_unknown",
               "kind",
-              "label",
               "lane",
               "lifecycle",
               "lineage",
@@ -5299,7 +5231,6 @@
               "pins",
               "pr",
               "project_id",
-              "project_key",
               "provenance_ref",
               "reason",
               "regime_key",
@@ -5346,8 +5277,6 @@
               "title",
               "to_role",
               "verdict",
-              "workspace_key",
-              "workspace_label",
               "worktree_dirty"
             ],
             "records": "/records"
@@ -6240,9 +6169,7 @@
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -6314,7 +6241,6 @@
             "typed-authoring-vocabulary",
             "policy-expressions",
             "format-authority",
-            "session-ingest",
             "canon-context",
             "artifact-ingest",
             "spec-ledger-selftest",
@@ -6543,7 +6469,6 @@
             "canon-report-dashboard",
             "canon-retrieve",
             "canon-review",
-            "canon-session-ingest",
             "canon-storage",
             "canon-subject",
             "canon-vocab",
@@ -7603,14 +7528,6 @@
     {
       "about": "Default actor id (`--actor`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`",
       "name": "CANON_ACTOR"
-    },
-    {
-      "about": "An extra directory `ingest sessions` scans for Claude Code sessions, besides `~/.claude/projects`",
-      "name": "CANON_INGEST_CLAUDE_SESSIONS_DIR"
-    },
-    {
-      "about": "An extra directory `ingest sessions` scans for omp sessions, besides the default roots",
-      "name": "CANON_INGEST_OMP_SESSIONS_DIR"
     },
     {
       "about": "Connection string of the Postgres tier (falls back to `DATABASE_URL`)",
@@ -9800,21 +9717,9 @@
         "schemaVersion": 1
       },
       {
-        "kind": "session",
-        "partition": "kind=session/{session_id}_{digest8}.json",
-        "schema": "crates/canon-model/schemas/session.schema.json",
-        "schemaVersion": 1
-      },
-      {
         "kind": "run",
         "partition": "kind=run/{run_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/run.schema.json",
-        "schemaVersion": 1
-      },
-      {
-        "kind": "event",
-        "partition": "kind=event/{run_id}_{seq}_{digest8}.json",
-        "schema": "crates/canon-model/schemas/event.schema.json",
         "schemaVersion": 1
       },
       {
@@ -10616,7 +10521,6 @@
       "old": "--canon-yaml",
       "rule": "D5",
       "scope": [
-        "ingest sessions",
         "query",
         "tier age"
       ],
@@ -11374,7 +11278,7 @@
               "description": "What the plan deletes, over the whole store (not only the page below)."
             },
             "deleted": {
-              "$ref": "#/schemas/PruneCounts",
+              "$ref": "#/schemas/PruneDeleted",
               "description": "What this run deleted: all zero in a preview."
             },
             "effects": {
@@ -11420,6 +11324,10 @@
               "description": "The digest of the plan (`sha256:` and 64 lower-case hex digits); `--commit --plan-digest` repeats it.",
               "type": "string"
             },
+            "staleTemps": {
+              "$ref": "#/schemas/PruneTemps",
+              "description": "The stale temp files of the local store the plan deletes (a dead write's leftovers), apart from the blobs."
+            },
             "unchanged": {
               "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
               "type": "boolean"
@@ -11438,6 +11346,7 @@
             "delete",
             "keep",
             "deleted",
+            "staleTemps",
             "blobs",
             "planDigest",
             "effects",
@@ -11579,6 +11488,47 @@
           ],
           "type": "object"
         },
+        "PruneDeleted": {
+          "description": "What a run deleted: the blobs, and the stale temp files apart from them (a temp file is no blob and never counts as one).",
+          "properties": {
+            "blobs": {
+              "description": "Distinct blobs (digests).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "bytes": {
+              "description": "Bytes of every copy of them.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "localCopies": {
+              "description": "Copies in the local directory.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "staleTemps": {
+              "$ref": "#/schemas/TempCounts",
+              "description": "Stale temp files this run deleted."
+            },
+            "tierObjects": {
+              "description": "Objects in the tier.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blobs",
+            "bytes",
+            "localCopies",
+            "tierObjects",
+            "staleTemps"
+          ],
+          "type": "object"
+        },
         "PruneKeep": {
           "description": "The blobs a plan keeps.",
           "properties": {
@@ -11614,6 +11564,82 @@
             "bytes",
             "reasons",
             "items"
+          ],
+          "type": "object"
+        },
+        "PruneTemps": {
+          "description": "The stale temp files of the local store (`.tmp-<sha256>-<pid>-<nanos>`, a regular file modified more than five minutes ago): what a write that\ndied left. They sit beside the blobs and are not counted among them, in a tier repo too (they are local files).",
+          "properties": {
+            "bytes": {
+              "description": "Their bytes together.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "files": {
+              "description": "How many the plan deletes, over the whole store (not only the names below).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "gitNote": {
+              "description": "Present when the plan deletes temp files: a temp file already committed must be taken out of the commit.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "items": {
+              "description": "The first 50 of them in name order, empty in a commit: `files` says how many there are in all.",
+              "items": {
+                "$ref": "#/schemas/TempFile"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "files",
+            "bytes",
+            "items"
+          ],
+          "type": "object"
+        },
+        "TempCounts": {
+          "description": "Files and bytes of a set of stale temp files.",
+          "properties": {
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "files": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "files",
+            "bytes"
+          ],
+          "type": "object"
+        },
+        "TempFile": {
+          "description": "One stale temp file a plan deletes.",
+          "properties": {
+            "bytes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "name": {
+              "description": "Its name in `.canon/artifacts/sha256`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "bytes"
           ],
           "type": "object"
         }
@@ -12026,6 +12052,10 @@
               },
               "type": "array"
             },
+            "staleTemps": {
+              "$ref": "#/schemas/StaleTempsFound",
+              "description": "The stale staging temp files a dead write left in the local store: they change neither `problems` nor the exit."
+            },
             "stored": {
               "description": "Files whose blob is in the store.",
               "format": "uint",
@@ -12045,9 +12075,41 @@
             "bound",
             "stored",
             "workingTreeOnly",
+            "staleTemps",
             "problems"
           ],
           "title": "ArtifactsVerifyReport",
+          "type": "object"
+        },
+        "StaleTempsFound": {
+          "description": "What `artifacts verify` found of the stale temp files (`.tmp-<sha256>-<pid>-<nanos>` older than five minutes) of the local store.",
+          "properties": {
+            "bytes": {
+              "description": "Their bytes together; absent with `files`.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "files": {
+              "description": "How many there are; absent when the store directory could not be read (the count is then unknown, not zero).",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "unreadable": {
+              "description": "Why the store directory could not be read, when it could not.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
           "type": "object"
         },
         "VerifyProblem": {
@@ -19384,7 +19446,7 @@
               "type": "string"
             },
             "surfaceRef": {
-              "description": "Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref",
+              "description": "A path pattern from the repository root (src/, src/**) or effect:<kebab-slug>; persisted as surface_ref",
               "items": {
                 "type": "string"
               },
@@ -20705,9 +20767,7 @@
                 "change",
                 "task",
                 "scenario",
-                "session",
                 "run",
-                "event",
                 "handoff",
                 "review",
                 "divergence",
@@ -21086,9 +21146,7 @@
                 "change",
                 "task",
                 "scenario",
-                "session",
                 "run",
-                "event",
                 "handoff",
                 "review",
                 "divergence",
@@ -22732,7 +22790,7 @@
               "type": "array"
             },
             "kind": {
-              "description": "`spec_coverage_off`, `policy_approval`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.",
+              "description": "`spec_coverage_off`, `policy_approval`, `chore_code_scopes`, `code_scopes`, `staleness_unresolvable`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.",
               "type": "string"
             },
             "message": {
@@ -23682,7 +23740,7 @@
           "type": "object"
         },
         "Change": {
-          "description": "A change: the top of the join spine's `change_id` row (change ↔\ntasks ↔ specs). `subject_ids` links an imported plan change to every\ndurable [`Subject`] it was adopted under (0.18 D4: a change may belong\nto several subjects; per-task subjects are out of scope). It is a\nplain `pub` field left empty by [`Change::new`] and appended to by\n`canon-cli`'s `subject adopt` at adoption time (mirroring how\n[`Session::project_key`] is set outside this crate), never derived\nhere. Skipped when empty, so an unadopted change carries no key.\n\n# Old records\nThe ledger is append-only. A change written before 0.18 carries a\nsingle `subject_id` string; it reads as a one-element `subject_ids`\n([`one_or_many_subjects`]) and is never rewritten. Renaming the field\nis a format generation change on a kind whose `at` can be byte-stable\n(plan import), so [`RecordKind::Change`] is at schema `2`.",
+          "description": "A change: the top of the join spine's `change_id` row (change ↔\ntasks ↔ specs). `subject_ids` links an imported plan change to every\ndurable [`Subject`] it was adopted under (0.18 D4: a change may belong\nto several subjects; per-task subjects are out of scope). It is a\nplain `pub` field left empty by [`Change::new`] and appended to by\n`canon-cli`'s `subject adopt` at adoption time (a plain field set\noutside this crate), never derived\nhere. Skipped when empty, so an unadopted change carries no key.\n\n# Old records\nThe ledger is append-only. A change written before 0.18 carries a\nsingle `subject_id` string; it reads as a one-element `subject_ids`\n([`one_or_many_subjects`]) and is never rewritten. Renaming the field\nis a format generation change on a kind whose `at` can be byte-stable\n(plan import), so [`RecordKind::Change`] is at schema `2`.",
           "properties": {
             "actor": {
               "$ref": "#/schemas/Actor"
@@ -24188,14 +24246,12 @@
           "type": "object"
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -24216,7 +24272,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "SubjectId": {
@@ -24302,7 +24358,7 @@
       "kind": "schemas",
       "schemas": {
         "ArtifactAdapterSummary": {
-          "description": "One registered adapter's contribution to this pass — mirrors\n`crate::ingest::AdapterSummary`'s per-adapter shape, generalized\nwith a `status` field so a `Records`-source read failure is a\nvisible, distinct outcome (module doc's \"documented seam\"), never\ncollapsed into the same zero-events shape an unconfigured\n`Path`-source adapter reports.",
+          "description": "One registered adapter's contribution to this pass — mirrors\na per-adapter summary shape, generalized\nwith a `status` field so a `Records`-source read failure is a\nvisible, distinct outcome (module doc's \"documented seam\"), never\ncollapsed into the same zero-events shape an unconfigured\n`Path`-source adapter reports.",
           "properties": {
             "adapterId": {
               "type": "string"
@@ -24876,816 +24932,6 @@
             "regimeKey",
             "verdictCount",
             "superseded"
-          ],
-          "type": "object"
-        }
-      }
-    },
-    "ingest sessions": {
-      "command": "ingest sessions",
-      "kind": "schemas",
-      "schemas": {
-        "AdapterCounts": {
-          "description": "One adapter's scan counts in `ingest sessions`' report.",
-          "properties": {
-            "client": {
-              "type": "string"
-            },
-            "filesScanned": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "malformedRecords": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "reparsed": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "rowsParsed": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "skippedUnchanged": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "client",
-            "filesScanned",
-            "reparsed",
-            "skippedUnchanged",
-            "rowsParsed",
-            "malformedRecords"
-          ],
-          "type": "object"
-        },
-        "BatchIngestSessionsReport": {
-          "description": "`Batch<Name>Report`: the `data` of a leaf run with a JSON array or NDJSON as `--input`.\n`R` is the leaf's ordinary report; the binary itself carries each element's report as JSON.",
-          "properties": {
-            "items": {
-              "items": {
-                "$ref": "#/schemas/BatchItem"
-              },
-              "type": "array"
-            },
-            "nextOmitted": {
-              "description": "How many further `meta.next` steps were left out past the limit",
-              "minimum": 1,
-              "type": "integer"
-            },
-            "unchanged": {
-              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
-              "type": "boolean"
-            },
-            "waitingOn": {
-              "additionalProperties": {
-                "minimum": 0,
-                "type": "integer"
-              },
-              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
-              "type": "object"
-            }
-          },
-          "required": [
-            "items"
-          ],
-          "title": "BatchReport",
-          "type": "object"
-        },
-        "BatchIngestSessionsReportIngestSessionsReport": {
-          "description": "`canon ingest sessions`' report (`IngestSessionsReport`): the counts the\nhuman summary prints, plus `unwritten` (the metadata of what could not be\npersisted) when the store's tiers were unreachable.",
-          "properties": {
-            "adapters": {
-              "items": {
-                "$ref": "#/schemas/AdapterCounts"
-              },
-              "type": "array"
-            },
-            "degradeReason": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "dryRun": {
-              "description": "True when `--dry-run` previewed the pass without writing.",
-              "type": "boolean"
-            },
-            "eventsWritten": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "hotStore": {
-              "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run`.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "malformedRecords": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "rowsSkipped": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "runsWritten": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "scope": {
-              "type": "string"
-            },
-            "sessionsNormalized": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "unwritten": {
-              "anyOf": [
-                {
-                  "$ref": "#/schemas/Unwritten"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          },
-          "required": [
-            "dryRun",
-            "scope",
-            "adapters",
-            "sessionsNormalized",
-            "malformedRecords",
-            "rowsSkipped",
-            "runsWritten",
-            "eventsWritten",
-            "hotStore",
-            "degradeReason",
-            "unwritten"
-          ],
-          "type": "object"
-        },
-        "BatchItem": {
-          "description": "One element of a batch, in input order.",
-          "properties": {
-            "data": {
-              "anyOf": [
-                {
-                  "$ref": "#/schemas/BatchIngestSessionsReportIngestSessionsReport"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
-            },
-            "error": {
-              "anyOf": [
-                {
-                  "$ref": "#/schemas/ErrorBody"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
-            },
-            "index": {
-              "description": "0-based position in the input.",
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "status": {
-              "$ref": "#/schemas/ItemStatus"
-            }
-          },
-          "required": [
-            "index",
-            "status"
-          ],
-          "type": "object"
-        },
-        "ErrorBody": {
-          "description": "The `error` member of a failure envelope. Field order is the document\norder: `code` first. An optional member with no value is left out of the\ndocument, so the body validates against the contract's error schema.",
-          "properties": {
-            "code": {
-              "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
-              "type": "string"
-            },
-            "details": {
-              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
-              "items": {
-                "$ref": "#/schemas/ErrorDetailBody"
-              },
-              "type": [
-                "array",
-                "null"
-              ]
-            },
-            "expected": {
-              "description": "The valid values of `field`, when it takes a closed set.",
-              "items": {
-                "type": "string"
-              },
-              "type": [
-                "array",
-                "null"
-              ]
-            },
-            "field": {
-              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "hint": {
-              "description": "A working invocation or the next step.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "message": {
-              "type": "string"
-            },
-            "reason": {
-              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "received": {
-              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "retryable": {
-              "description": "True only where running the same command again can succeed; equal to the registry row's.",
-              "type": "boolean"
-            },
-            "suggestions": {
-              "description": "The nearest valid commands, options or values.",
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message",
-            "retryable"
-          ],
-          "type": "object"
-        },
-        "ErrorDetailBody": {
-          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
-          "properties": {
-            "code": {
-              "type": "string"
-            },
-            "expected": {
-              "items": {
-                "type": "string"
-              },
-              "type": [
-                "array",
-                "null"
-              ]
-            },
-            "field": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "hint": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "message": {
-              "type": "string"
-            },
-            "reason": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "received": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "suggestions": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "code",
-            "message"
-          ],
-          "type": "object"
-        },
-        "IngestSessionsArguments": {
-          "additionalProperties": false,
-          "properties": {
-            "allWorkspaces": {
-              "description": "Scan every workspace on this machine, not just this project",
-              "type": "boolean"
-            },
-            "dryRun": {
-              "description": "Validate fully and report what would be written, without writing anything",
-              "type": "boolean"
-            },
-            "full": {
-              "description": "Ignore watermark cursors and re-parse every in-scope file",
-              "type": "boolean"
-            },
-            "home": {
-              "description": "The scan root's home directory (defaults to $HOME)",
-              "type": "string"
-            },
-            "intervalSecs": {
-              "description": "Seconds between polls",
-              "pattern": "^-?(0|[1-9][0-9]*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
-            },
-            "watch": {
-              "description": "Keep polling instead of exiting after one pass",
-              "type": "boolean"
-            }
-          },
-          "title": "`canon ingest sessions` arguments after the --input document is merged with the command line",
-          "type": "object"
-        },
-        "IngestSessionsReport": {
-          "description": "`canon ingest sessions`' report (`IngestSessionsReport`): the counts the\nhuman summary prints, plus `unwritten` (the metadata of what could not be\npersisted) when the store's tiers were unreachable.",
-          "properties": {
-            "adapters": {
-              "items": {
-                "$ref": "#/schemas/AdapterCounts"
-              },
-              "type": "array"
-            },
-            "degradeReason": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "dryRun": {
-              "description": "True when `--dry-run` previewed the pass without writing.",
-              "type": "boolean"
-            },
-            "eventsWritten": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "hotStore": {
-              "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run`.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "malformedRecords": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "nextOmitted": {
-              "description": "How many further `meta.next` steps were left out past the limit",
-              "minimum": 1,
-              "type": "integer"
-            },
-            "rowsSkipped": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "runsWritten": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "scope": {
-              "type": "string"
-            },
-            "sessionsNormalized": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "unchanged": {
-              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
-              "type": "boolean"
-            },
-            "unwritten": {
-              "anyOf": [
-                {
-                  "$ref": "#/schemas/Unwritten"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "waitingOn": {
-              "additionalProperties": {
-                "minimum": 0,
-                "type": "integer"
-              },
-              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
-              "type": "object"
-            }
-          },
-          "required": [
-            "dryRun",
-            "scope",
-            "adapters",
-            "sessionsNormalized",
-            "malformedRecords",
-            "rowsSkipped",
-            "runsWritten",
-            "eventsWritten",
-            "hotStore",
-            "degradeReason",
-            "unwritten"
-          ],
-          "title": "IngestSessionsReport",
-          "type": "object"
-        },
-        "Input": {
-          "additionalProperties": false,
-          "properties": {
-            "allWorkspaces": {
-              "type": "boolean"
-            },
-            "dryRun": {
-              "type": "boolean"
-            },
-            "full": {
-              "type": "boolean"
-            },
-            "home": {
-              "type": "string"
-            },
-            "intervalSecs": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "pattern": "^-?(0|[1-9][0-9]*)$",
-                  "type": "string"
-                }
-              ]
-            },
-            "watch": {
-              "type": "boolean"
-            }
-          },
-          "type": "object"
-        },
-        "ItemStatus": {
-          "description": "What happened to one element of a batch.",
-          "oneOf": [
-            {
-              "const": "written",
-              "description": "The element ran and wrote.",
-              "type": "string"
-            },
-            {
-              "const": "unchanged",
-              "description": "The element ran and found its record already present with identical content.",
-              "type": "string"
-            },
-            {
-              "const": "failed",
-              "description": "The element ran and failed; `error` says why.",
-              "type": "string"
-            },
-            {
-              "const": "skipped",
-              "description": "An earlier element failed, so this one never ran.",
-              "type": "string"
-            }
-          ]
-        },
-        "RunId": {
-          "description": "ULID (Crockford base32, 26 chars) — joins: run ↔ events ↔ manifest",
-          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
-          "type": "string"
-        },
-        "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
-          "type": "string"
-        },
-        "Unwritten": {
-          "description": "The metadata-only account of what an ingest pass could not persist.",
-          "properties": {
-            "adapters": {
-              "items": {
-                "$ref": "#/schemas/UnwrittenAdapter"
-              },
-              "type": "array"
-            },
-            "counts": {
-              "$ref": "#/schemas/UnwrittenCounts"
-            },
-            "dryRun": {
-              "description": "True when `--dry-run` previewed the pass without writing.",
-              "type": "boolean"
-            },
-            "events": {
-              "items": {
-                "$ref": "#/schemas/UnwrittenEvent"
-              },
-              "type": "array"
-            },
-            "failure": {
-              "$ref": "#/schemas/UnwrittenFailure"
-            },
-            "runs": {
-              "items": {
-                "$ref": "#/schemas/UnwrittenRun"
-              },
-              "type": "array"
-            },
-            "scope": {
-              "type": "string"
-            },
-            "sessions": {
-              "items": {
-                "$ref": "#/schemas/UnwrittenSession"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "dryRun",
-            "scope",
-            "adapters",
-            "counts",
-            "sessions",
-            "runs",
-            "events",
-            "failure"
-          ],
-          "type": "object"
-        },
-        "UnwrittenAdapter": {
-          "description": "One adapter's scan counts in the unwritten metadata.",
-          "properties": {
-            "clientId": {
-              "type": "string"
-            },
-            "filesScanned": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "malformedRecords": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "reparsed": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "rowsParsed": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "skippedUnchanged": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "clientId",
-            "filesScanned",
-            "reparsed",
-            "rowsParsed",
-            "malformedRecords",
-            "skippedUnchanged"
-          ],
-          "type": "object"
-        },
-        "UnwrittenCounts": {
-          "description": "The counts of the unwritten metadata.",
-          "properties": {
-            "events": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "eventsWritten": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "malformedRecords": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "rowsSkipped": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "runs": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "runsWritten": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "sessions": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "sessionsNormalized": {
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "sessions",
-            "runs",
-            "events",
-            "sessionsNormalized",
-            "runsWritten",
-            "eventsWritten",
-            "malformedRecords",
-            "rowsSkipped"
-          ],
-          "type": "object"
-        },
-        "UnwrittenEvent": {
-          "description": "One event that was not persisted: its place and digest, never its detail.",
-          "properties": {
-            "at": {
-              "format": "date-time",
-              "type": "string"
-            },
-            "digest": {
-              "type": "string"
-            },
-            "label": {
-              "type": "string"
-            },
-            "runId": {
-              "$ref": "#/schemas/RunId"
-            },
-            "seq": {
-              "format": "uint64",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "runId",
-            "seq",
-            "at",
-            "label",
-            "digest"
-          ],
-          "type": "object"
-        },
-        "UnwrittenFailure": {
-          "description": "Why the pass did not reach a durable tier.",
-          "properties": {
-            "class": {
-              "type": "string"
-            },
-            "reason": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "class",
-            "reason"
-          ],
-          "type": "object"
-        },
-        "UnwrittenRun": {
-          "description": "One run that was not persisted.",
-          "properties": {
-            "digest": {
-              "type": "string"
-            },
-            "parentRunId": {
-              "anyOf": [
-                {
-                  "$ref": "#/schemas/RunId"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "runId": {
-              "$ref": "#/schemas/RunId"
-            },
-            "sessionId": {
-              "anyOf": [
-                {
-                  "$ref": "#/schemas/SessionId"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          },
-          "required": [
-            "runId",
-            "sessionId",
-            "parentRunId",
-            "digest"
-          ],
-          "type": "object"
-        },
-        "UnwrittenSession": {
-          "description": "One session that was not persisted: identity and digest, no content.",
-          "properties": {
-            "client": {
-              "type": "string"
-            },
-            "digest": {
-              "type": "string"
-            },
-            "projectKey": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "sessionId": {
-              "$ref": "#/schemas/SessionId"
-            },
-            "workspaceKey": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "workspaceLabel": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "sessionId",
-            "client",
-            "workspaceKey",
-            "workspaceLabel",
-            "projectKey",
-            "digest"
           ],
           "type": "object"
         }
@@ -28573,7 +27819,7 @@
       "kind": "schemas",
       "rejects": [
         [
-          "canon purge --kind session --before 2026-02-30 --json"
+          "canon purge --kind run --before 2026-02-30 --json"
         ]
       ],
       "schemas": {
@@ -28613,10 +27859,10 @@
             },
             "kind": {
               "enum": [
-                "session",
                 "run",
-                "event",
-                "trajectory"
+                "trajectory",
+                "session",
+                "event"
               ]
             }
           },
@@ -28630,12 +27876,12 @@
               "type": "string"
             },
             "kind": {
-              "description": "The record kind to purge (session, run, event or trajectory)",
+              "description": "The record kind to purge: run or trajectory. `session` and `event` are retired in 0.39 and leave the next release; they delete rows an older canon stored",
               "enum": [
-                "session",
                 "run",
-                "event",
-                "trajectory"
+                "trajectory",
+                "session",
+                "event"
               ]
             }
           },
@@ -28864,7 +28110,7 @@
               "description": "a member of the records of: handoff"
             },
             "actor": {
-              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
             },
             "approval": {
               "description": "a member of the records of: evidence"
@@ -28873,7 +28119,7 @@
               "description": "a member of the records of: review"
             },
             "at": {
-              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
             },
             "attachments": {
               "description": "a member of the records of: evidence"
@@ -28905,9 +28151,6 @@
             "claimed_by": {
               "description": "a member of the records of: handoff"
             },
-            "client": {
-              "description": "a member of the records of: session"
-            },
             "code_tree": {
               "description": "a member of the records of: review, divergence, evidence, finding"
             },
@@ -28924,7 +28167,7 @@
               "description": "a member of the records of: scenario"
             },
             "detail": {
-              "description": "a member of the records of: event, divergence"
+              "description": "a member of the records of: divergence"
             },
             "disposition": {
               "description": "a member of the records of: finding"
@@ -28933,7 +28176,7 @@
               "description": "a member of the records of: subject"
             },
             "ended_at": {
-              "description": "a member of the records of: session, run"
+              "description": "a member of the records of: run"
             },
             "evidence_note": {
               "description": "a member of the records of: task"
@@ -28963,10 +28206,7 @@
               "description": "a member of the records of: finding"
             },
             "kind": {
-              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
-            },
-            "label": {
-              "description": "a member of the records of: event"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
             },
             "lane": {
               "description": "a member of the records of: scenario"
@@ -29006,9 +28246,6 @@
             },
             "project_id": {
               "description": "a member of the records of: scenario, review, divergence, evidence"
-            },
-            "project_key": {
-              "description": "a member of the records of: session"
             },
             "provenance_ref": {
               "description": "a member of the records of: review"
@@ -29065,7 +28302,7 @@
               "description": "a member of the records of: divergence, finding"
             },
             "run_id": {
-              "description": "a member of the records of: run, event, trajectory, evidence"
+              "description": "a member of the records of: run, trajectory, evidence"
             },
             "run_seq": {
               "description": "a member of the records of: divergence, evidence"
@@ -29083,13 +28320,13 @@
               "description": "a member of the records of: task"
             },
             "schema": {
-              "description": "a member of the records of: change, task, scenario, session, run, event, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
             },
             "seq": {
-              "description": "a member of the records of: event, handoff, finding"
+              "description": "a member of the records of: handoff, finding"
             },
             "session_id": {
-              "description": "a member of the records of: session, run, trajectory"
+              "description": "a member of the records of: run, trajectory"
             },
             "severity": {
               "description": "a member of the records of: finding"
@@ -29104,7 +28341,7 @@
               "description": "a member of the records of: strategy_item"
             },
             "started_at": {
-              "description": "a member of the records of: session, run"
+              "description": "a member of the records of: run"
             },
             "state": {
               "description": "a member of the records of: handoff"
@@ -29147,12 +28384,6 @@
             },
             "verdict": {
               "description": "a member of the records of: evidence"
-            },
-            "workspace_key": {
-              "description": "a member of the records of: session"
-            },
-            "workspace_label": {
-              "description": "a member of the records of: session"
             },
             "worktree_dirty": {
               "description": "a member of the records of: review, divergence, evidence, finding"
@@ -35406,14 +34637,12 @@
           ]
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -35459,7 +34688,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -36008,14 +35237,12 @@
           "type": "object"
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -36061,7 +35288,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -36719,14 +35946,12 @@
           ]
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -36772,7 +35997,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -37050,14 +36275,12 @@
           "type": "string"
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -37103,7 +36326,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -37586,14 +36809,12 @@
           ]
         },
         "RecordKind": {
-          "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+          "description": "The twelve closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A thirteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
             "change",
             "task",
             "scenario",
-            "session",
             "run",
-            "event",
             "handoff",
             "review",
             "divergence",
@@ -37639,7 +36860,7 @@
           "type": "string"
         },
         "SessionId": {
-          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "description": "opaque, non-empty agent-CLI session token — this type validates shape only, never a single fixed format — joins: run ↔ actor",
           "type": "string"
         },
         "StatusOverride": {
@@ -38967,7 +38188,7 @@
       {
         "command": "ingest",
         "kind": "group",
-        "summary": "Import agent sessions, records, and plans into canon's store"
+        "summary": "Import records and plans into canon's store"
       },
       {
         "command": "ingest plans",
@@ -38983,16 +38204,6 @@
         "command": "ingest records",
         "effect": "write",
         "summary": "Import review/divergence/task/handoff records and derive verdicts",
-        "x-canon": {
-          "roles": [
-            "orchestrator"
-          ]
-        }
-      },
-      {
-        "command": "ingest sessions",
-        "effect": "write",
-        "summary": "Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)",
         "x-canon": {
           "roles": [
             "orchestrator"
@@ -39624,21 +38835,6 @@
         "valueName": "REV"
       },
       {
-        "help": "Keep polling instead of exiting after one pass",
-        "name": "watch",
-        "valueType": "switch"
-      },
-      {
-        "default": 30,
-        "domain": {
-          "minimum": 0
-        },
-        "help": "Seconds between polls",
-        "name": "interval-secs",
-        "valueName": "N",
-        "valueType": "integer"
-      },
-      {
         "help": "Sync exactly one ad hoc root, overriding canon.yaml's specs.roots[]",
         "name": "spec-root",
         "valueName": "DIR",
@@ -39786,12 +38982,12 @@
     },
     {
       "code": "DISPATCH_RUN_COPIES_DIVERGE",
-      "fix": "Run `canon dispatch end` or `canon ingest sessions` to bring the two copies back together.",
+      "fix": "Run `canon dispatch end` to bring the two copies back together.",
       "meaning": "a run's tier copy and its dispatch manifest differ; the tier copy is used"
     },
     {
       "code": "DISPATCH_TIER_NOT_PERSISTED",
-      "fix": "Fix the tier the message names, then run `canon ingest sessions` so the tier holds the run.",
+      "fix": "Fix the tier the message names, then run `canon dispatch end` again so the tier holds the run.",
       "meaning": "a dispatch begin or end could not be persisted to the run's routed tier; the manifest file is the only home of the record"
     },
     {
@@ -39910,6 +39106,11 @@
       "meaning": "a report was built from a ledger where some record kinds are not read directly from their routed tier"
     },
     {
+      "code": "RETIRED_KIND_KEYS",
+      "fix": "Run `canon migrate --json` to preview deleting the lines, then `canon migrate --commit --plan-digest <digest>`.",
+      "meaning": "canon.yaml still names the `session` or `event` record kind under `routing` or `aging`; canon 0.39 has no such kinds, so the keys route and age nothing"
+    },
+    {
       "code": "RETRIEVE_REGIME_FELL_BACK",
       "fix": "Pass the regime that holds the guidance you want with --regime, or record guidance under the requested regime.",
       "meaning": "`retrieve` served guidance from a regime derived by fallback instead of the one asked for"
@@ -39960,6 +39161,11 @@
       "meaning": "the search index file was not a usable database, so it was deleted and rebuilt"
     },
     {
+      "code": "STALENESS_UNRESOLVABLE",
+      "fix": "Read the base commits: in a shallow clone run `git fetch --unshallow`, and check that `git` runs in this repository; a base that is not an ancestor of HEAD (a squash merge, a rebase) is judged as `<base>..HEAD`, so record fresh evidence on the code as it stands to clear it.",
+      "meaning": "some (subject, role) cells of passing evidence could not be checked for staleness against their base commit: it is not in this repository (`base_missing`: a shallow clone, a pruned commit), it is not an ancestor of HEAD (`base_not_ancestor`), or git did not answer (`git_unavailable`); the message counts the cells of each reason and names the first subjects. `canon gate check` says the same as its `staleness_unresolvable` advisory; verdicts and exit statuses are unchanged"
+    },
+    {
       "code": "STRATEGY_DEMOTED",
       "fix": "Review the contradicting trajectory before promoting the strategy again.",
       "meaning": "later contradictory evidence demoted an active strategy while its promotion was blocked"
@@ -39973,6 +39179,11 @@
       "code": "SUBJECT_REOPENED",
       "fix": "Keep the follow-up in its change, then scenario, evidence and review, before shipping again.",
       "meaning": "a shipped subject was reopened for a follow-up change; shipping again runs every guard"
+    },
+    {
+      "code": "SURFACE_REF_UNMATCHED",
+      "fix": "Spell the value as a file, a directory or a pattern from the repository root that matches at least one file, then record the evidence again (a pattern that matches nothing yet is allowed: it is recorded).",
+      "meaning": "a `--surface-ref` value that is not `effect:...` matches no file of the working tree: it is a path pattern read from the repository root (`src/` and `src` the directory, `src/**`, `src/*.rs`; `*` and `?` do not cross `/`, `**` does), so evidence that declares it can never go stale; the value is recorded as given"
     },
     {
       "code": "TASK_PROOF_IS_CANON_COMMAND",

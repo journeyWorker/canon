@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-gitstale",
+    "role": "reviewer",
+    "session_id": "s-0-39-gitstale-rev"
+  },
+  "at": "2026-11-08T08:25:30.950262Z",
+  "code_tree": "5cd1ec8887637575fa1e9b8098349efd5c0a78e5",
+  "kind": "review",
+  "pin": "17891a373adae02a97bef2777d317bc6d8590474",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_git_boundary_16_a_changelog_entry_missing_an_item_fails_the_release_check"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "054376886538198837cd7fe145c9306b6b1f5eb297f81ce2224cee777e4091bb",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-git-boundary/brief.md"
+  },
+  "review_id": "01M6X46F26BV9GK96PJWKFEG0H",
+  "reviewer": "rev-0-39-gitstale",
+  "scenario_id": "gate.git-boundary.16",
+  "schema": 2,
+  "worktree_dirty": false
+}

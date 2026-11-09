@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-39-gitstale",
+    "role": "reviewer",
+    "session_id": "s-0-39-gitstale-rev"
+  },
+  "at": "2026-11-08T08:25:50.788259Z",
+  "code_tree": "5cd1ec8887637575fa1e9b8098349efd5c0a78e5",
+  "kind": "review",
+  "pin": "17891a373adae02a97bef2777d317bc6d8590474",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:ingest_removal_15_a_source_with_no_readable_change_is_refused_and_writes_no_record_and_no_cursor_file"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "8c1505aa1f2b2150fb48eae39f7b7b4c0b1e055e5201fa73a52a3651b98ba485",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-39-session-ingest-removal/brief.md"
+  },
+  "review_id": "01M6X472E4MCA9ED7532VFBWKS",
+  "reviewer": "rev-0-39-gitstale",
+  "scenario_id": "ingest.removal.15",
+  "schema": 2,
+  "worktree_dirty": false
+}

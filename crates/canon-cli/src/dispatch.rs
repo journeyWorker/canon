@@ -28,9 +28,8 @@
 //! `Run` through `canon_store::registry::TierRegistry` — the one write
 //! path every other record uses — reached through
 //! [`crate::tiers::build_lenient_tiers_for_kinds`] and
-//! [`crate::ingest::persist_idempotent`], the exact machinery `canon
-//! ingest sessions` writes its own `Run`s with, never a second write
-//! convention for one kind. [`persist_run`] holds that whole contract:
+//! [`crate::tiers::persist_idempotent`], the one write convention for
+//! the `Run` kind. [`persist_run`] holds that whole contract:
 //! which rung, what a re-write at one `run_id` does there, and why an
 //! unreachable rung degrades instead of failing the dispatch.
 //!
@@ -302,7 +301,7 @@ impl DispatchError {
             | Self::ManifestUnavailable { .. }
             | Self::ContextPack(ContextPackError::UnsafePath(_)
                 | ContextPackError::MissingInput(_)
-                | ContextPackError::SecretDetected(_)
+                | ContextPackError::SecretDetected { .. }
                 | ContextPackError::PromptBundle { .. }) => true,
             Self::ContextPack(_) => false,
             // A concurrent close and a filesystem failure are both
@@ -413,10 +412,7 @@ impl TierPersist {
 /// Persist `run` through the SAME `TierRegistry` write path every
 /// other canon record uses (s42 task 1.1): `crate::tiers::
 /// build_lenient_tiers_for_kinds` for the rung `run` routes to, then
-/// [`crate::ingest::persist_idempotent`] — literally the helper
-/// `canon ingest sessions` persists its own `Run`s with, so a
-/// dispatched run and an ingested run cannot drift into two write
-/// conventions for one kind.
+/// [`crate::tiers::persist_idempotent`].
 ///
 /// # What a re-write at one `run_id` does, per backend
 /// `Run`'s partition natural key IS its `run_id`
@@ -453,7 +449,7 @@ impl TierPersist {
 /// Returns [`TierPersist::Degraded`] — never an `Err` — for an
 /// unroutable kind, an unreachable rung, and an unreadable or
 /// malformed `canon.yaml` alike. The last one is a deliberate
-/// departure from `crate::ingest`, where a malformed `canon.yaml`
+/// departure from the `canon ingest` commands, where a malformed `canon.yaml`
 /// fails the command loud: there, the tier write IS the output, so
 /// writing nothing must be loud. Here the manifest — already written,
 /// carrying every field this record has — is the primary artifact and
@@ -481,7 +477,7 @@ pub fn persist_run(repo: &Path, run: &Run) -> TierPersist {
     };
     let configured_reason = loaded.policy.tier_for(RecordKind::Run).ok().and_then(|rung| loaded.unavailable_reasons.get(&rung).cloned());
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
-    match crate::ingest::persist_idempotent(&registry, run) {
+    match crate::tiers::persist_idempotent(&registry, run) {
         Ok(()) => TierPersist::Persisted,
         Err(err) => TierPersist::Degraded {
             reason: match configured_reason {
@@ -1015,9 +1011,8 @@ pub fn parse_run_id(s: &str) -> Result<RunId, canon_model::ids::JoinKeyError> {
 
 /// `canon dispatch end --status`'s clap `value_parser`. The domain is
 /// exactly the two TERMINAL outcomes a dispatcher can report about its
-/// own run: `pending`/`running` are not terminal, and `aborted` is an
-/// ingest-time classification of a transcript that stopped, not
-/// something a closing dispatcher observes about itself.
+/// own run: `pending`/`running` are not terminal, and `aborted` is
+/// not something a closing dispatcher observes about itself.
 pub fn run_status_parser() -> impl clap::builder::TypedValueParser<Value = RunStatus> {
     crate::cli_error::closed_set(["succeeded", "failed"], parse_run_status)
 }
@@ -1225,9 +1220,7 @@ fn close_version_at(recorded: DateTime<Utc>, observed: DateTime<Utc>) -> DateTim
 /// through the SAME atomic write [`begin`] used to create it (s40),
 /// and re-persist the closed `Run` through the SAME [`persist_run`]
 /// path `begin` used (s42 task 1.2). Before s40, `begin` minted
-/// `RunStatus::Running` and nothing in the CLI ever closed it — only
-/// session ingest, reconstructing a finished transcript post hoc, ever
-/// wrote a terminal status — so every dispatched run stayed `Running`
+/// `RunStatus::Running` and nothing in the CLI ever closed it, so every dispatched run stayed `Running`
 /// forever and the flywheel funnel's last stage had nothing to compute
 /// from.
 ///
@@ -1250,14 +1243,13 @@ fn close_version_at(recorded: DateTime<Utc>, observed: DateTime<Utc>) -> DateTim
 ///    false. `crates/canon-store/sql/views.sql` reads the physical
 ///    files directly: `stg_records` is a plain `UNION ALL` over both
 ///    roots and folds nothing, so a mart sees BOTH versions of this
-///    run. Left alone that multiplied `mart_session_costs`'
-///    `total_cost`/`total_tokens` by the version count — one closed
-///    dispatch doubled a session's billed cost. The mart-side rule
+///    run. Left alone that multiplied a mart's run-derived sums by the
+///    version count: one closed dispatch counted twice. The mart-side rule
 ///    that now handles it is stated in that file's own
 ///    "Multi-version records" header section and applied per view:
 ///    every view whose join or aggregate needs CURRENT state folds
-///    its own key with `arg_max(body, "at")` (`mart_session_costs`'
-///    `runs`, `mart_session_run_handoff`'s `runs`, and four others),
+///    its own key with `arg_max(body, "at")` (`mart_run_observability`'s
+///    `runs` among them),
 ///    while the views for which a version IS the event being counted
 ///    — `mart_records_by_kind`'s physical census,
 ///    `mart_review_burndown`'s opened/resolved curve — deliberately
@@ -1318,9 +1310,8 @@ fn close_version_at(recorded: DateTime<Utc>, observed: DateTime<Utc>) -> DateTim
 /// `canon_store::tier::raw_record_at`) — the first two want precisely
 /// the version stamp, and the third is a days-to-months threshold no
 /// nanosecond can move. Every reader that reports run TIME reads a
-/// different field: `mart_session_costs`' bounds are the
-/// `token_usage` EVENT's own `at`, `mart_session_run_handoff` reads
-/// the session's and the handoff's, `mart_flywheel_funnel` reads no
+/// different field: `mart_run_observability` reads the run's own
+/// `started_at` and `ended_at`, `mart_flywheel_funnel` reads no
 /// timestamp at all, and `canon dispatch diff` compares the two homes
 /// of the SAME record, which carry an identical value
 /// ([`reconcile_runs`]).
@@ -1670,9 +1661,8 @@ fn declared_edges(tasks: &[Value]) -> BTreeSet<TaskEdge> {
 /// A run missing EITHER field contributes no edge as a child — which,
 /// on this repo today, is every one of its 5079 ingested runs
 /// (`task_id` on 0 of them). That is a legitimately EMPTY observed
-/// side and a normal zero-edge report, never an error: session ingest
-/// reconstructs a run from a transcript that cannot know a plan task,
-/// and only `canon dispatch begin --task` binds one. A run missing
+/// side and a normal zero-edge report, never an error: only
+/// `canon dispatch begin --task` binds a plan task to a run. A run missing
 /// only `parent_run_id` is still usable as a PARENT — a root dispatch
 /// bound to a task is exactly the far end of the first edge.
 ///
@@ -1908,7 +1898,7 @@ fn reconcile_runs(tier: Vec<Value>, manifests: Vec<Value>, notes: &mut Vec<crate
             if let Some(incumbent) = by_run.get(&run_id) {
                 if incumbent.record != record {
                     divergences.push(format!(
-                        "run `{run_id}` differs between its {} copy (used) and its {source} copy (ignored) on: {} — the two sources are out of sync; re-run `canon dispatch end` (or `canon ingest sessions`) to bring them back together",
+                        "run `{run_id}` differs between its {} copy (used) and its {source} copy (ignored) on: {} — the two sources are out of sync; re-run `canon dispatch end` to bring them back together",
                         incumbent.source,
                         describe_divergence(&incumbent.record, &record)
                     ));
@@ -3381,6 +3371,28 @@ mod tier_tests {
         let round_tripped: Run = serde_json::from_str(&manifest).expect("the manifest deserializes as a Run");
         assert_eq!(round_tripped.envelope.at, ended.run.envelope.at, "RFC3339 `AutoSi` keeps all nine fractional digits");
         assert_eq!(round_tripped.ended_at, Some(ended_at));
+    }
+
+    /// ingest.removal.05 (F3, failure path): `persist_idempotent` (moved to `crate::tiers` with the removal of
+    /// `canon ingest sessions`): writing a Run the tier already holds,
+    /// byte for byte, is not an error; the same run id with other content
+    /// is a new version the fold ranks, never a silent overwrite.
+    #[test]
+    fn ingest_removal_05_rewriting_the_same_run_is_not_an_error_and_other_content_is_a_new_version() {
+        let tmp = repo_with_git_routed_runs();
+        let begun = begin(tmp.path(), &role(), &regime(), "canon", &DispatchBinding::default(), &DispatchMetadata::default()).expect("the dispatch begins");
+        let stored = run_objects(tmp.path()).len();
+        assert_eq!(persist_run(tmp.path(), &begun.run), TierPersist::Persisted, "a byte-identical re-write is a no-op, not an error");
+        assert_eq!(queried_runs(tmp.path()).len(), 1, "no second row");
+        assert_eq!(run_objects(tmp.path()).len(), stored, "a byte-identical re-write stores no second object");
+        let mut other = begun.run.clone();
+        other.envelope.actor.model = Some("another-model".into());
+        other.envelope.at += TimeDelta::seconds(1);
+        assert_eq!(persist_run(tmp.path(), &other), TierPersist::Persisted);
+        assert_eq!(run_objects(tmp.path()).len(), stored + 1, "the other content is stored as a new version, neither dropped nor written over the first");
+        let rows = queried_runs(tmp.path());
+        assert_eq!(rows.len(), 1, "one run_id resolves to one row: {rows:?}");
+        assert!(rows[0].to_string().contains("another-model"), "the fold ranks the newer version first: {rows:?}");
     }
 
     /// [`close_version_at`]'s whole contract, including the two
