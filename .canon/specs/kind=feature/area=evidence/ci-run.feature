@@ -52,7 +52,7 @@ Feature: evidence ci-run
   @case:failure
   @flow:canon-0-40-ci-evidence.F2
   @evidence.ci-run.06
-  Scenario: --from-ci outside GitHub Actions (GITHUB_ACTIONS not true, or an empty GITHUB_RUN_ID) is refused as CI_ENV_MISSING naming the variable, and nothing is written
+  Scenario: --from-ci outside GitHub Actions (GITHUB_ACTIONS not true, or an empty GITHUB_RUN_ID) is refused as CI_ENV_REQUIRED naming the variable, and nothing is written
     Given a step
 
   # canon: {"schema":1,"at":"2026-11-09T10:21:40Z","actor":{"agent_id":"spec-ci-evidence","role":"planner"}}
@@ -61,7 +61,7 @@ Feature: evidence ci-run
   @case:failure
   @flow:canon-0-40-ci-evidence.F2
   @evidence.ci-run.07
-  Scenario: --from-ci on a work tree that differs from HEAD (an untracked junit.xml) is refused as CI_WORKTREE_DIRTY, and nothing is written
+  Scenario: --from-ci on a work tree that differs from HEAD (an untracked junit.xml) is refused as CI_WORKTREE_CONFLICT, and nothing is written
     Given a step
 
   # canon: {"schema":1,"at":"2026-11-09T10:21:59Z","actor":{"agent_id":"spec-ci-evidence","role":"planner"}}
