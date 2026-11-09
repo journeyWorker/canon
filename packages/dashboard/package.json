@@ -1,6 +1,6 @@
 {
   "name": "@canon-dev/dashboard",
-  "version": "0.39.0",
+  "version": "0.39.1",
   "description": "canon — zero-network DuckDB-Wasm dashboard rendering six dashboard panels over nine report snapshot marts.",
   "license": "MIT",
   "private": true,
