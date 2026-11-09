@@ -16,7 +16,7 @@ const launcherSource = join(import.meta.dir, "..", "src", "index.ts");
 // runtime can do it safely (Node 26.1 or later): a long-running canon keeps
 // no node process beside it. Elsewhere (Windows, an older Node) it runs the
 // binary as a child. The launcher runs under `node`, as `bin.js` does for
-// every npm user (CI installs Node 26).
+// every npm user (the test and publish workflows install Node 26).
 function runStub(
   script: string,
   opts: { stdin?: Buffer; withoutExecve?: boolean; executable?: boolean } = {},
