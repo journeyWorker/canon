@@ -299,14 +299,38 @@ fn artifacts_object_zstd_09_prune_lists_both_forms_of_a_digest_once_and_deletes_
     assert!(done.status.success(), "{}", text(&done));
     assert_eq!(repo.objects(), vec![format!("{}.zst", sha(V2))], "both names of the orphan are gone, the bound blob stays");
     assert!(repo.canon(&["artifacts", "verify", "--full"]).status.success());
-    // The state the plan read includes the form of each object: a form that appears after the preview makes the plan stale.
-    repo.put_zst(O1);
+    // The state the plan read includes the form of each object: the same digest at the same size, held as `.zst` first and as a plain object when
+    // the commit runs, is a different state, so the plan is stale.
+    std::fs::write(repo.zst(O1), vec![0u8; O1.len()]).unwrap();
     let stale_preview = repo.ok(&["artifacts", "prune", "--json"]);
     let digest = json(&stale_preview)["data"]["planDigest"].as_str().unwrap().to_string();
+    std::fs::remove_file(repo.zst(O1)).unwrap();
     repo.put_plain(O1);
     let stale = repo.canon(&["artifacts", "prune", "--commit", "--plan-digest", &digest, "--json"]);
     assert_eq!(stale.status.code(), Some(2), "{}", text(&stale));
     assert_eq!(json(&stale)["error"]["code"], "PLAN_STALE");
+    assert!(repo.plain(O1).exists(), "a stale plan deletes nothing");
+}
+
+/// artifacts.object-zstd.10 (F5 failure, CLI): the store deletes the `.zst` of a digest and refuses the plain name: no blob is counted, yet something is
+/// gone, so the answer is `ARTIFACTS_PRUNE_INCOMPLETE` (never "nothing was deleted") and a new plan lists what remains.
+#[test]
+fn artifacts_object_zstd_10_a_half_deleted_digest_is_prune_incomplete_not_nothing_deleted() {
+    let repo = new_repo(Some(ARTIFACTS_COLD));
+    repo.attest("smoke.json", V2);
+    repo.put_zst(O1);
+    let preview = repo.ok(&["artifacts", "prune", "--json"]);
+    let body = json(&preview);
+    // The plain name appears after the preview as a directory the store cannot delete as an object; the plan's state is unchanged for the listing.
+    std::fs::create_dir_all(repo.plain(O1)).unwrap();
+    std::fs::write(repo.plain(O1).join("x"), b"x").unwrap();
+    let digest = body["data"]["planDigest"].as_str().unwrap().to_string();
+    let run = repo.canon(&["artifacts", "prune", "--commit", "--plan-digest", &digest, "--json"]);
+    assert_eq!(run.status.code(), Some(1), "{}", text(&run));
+    let out = json(&run);
+    assert_eq!(out["error"]["code"], "ARTIFACTS_PRUNE_INCOMPLETE", "{out}");
+    assert!(!out["error"]["message"].as_str().unwrap().contains("nothing was deleted"), "{out}");
+    assert!(!repo.zst(O1).exists(), "the `.zst` is gone");
 }
 
 /// artifacts.object-zstd.10 (F5 failure): the refused-second-delete case needs a store that refuses one name; `canon-store`'s test of the same id drives it.

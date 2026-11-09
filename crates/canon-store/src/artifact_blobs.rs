@@ -170,6 +170,9 @@ pub enum BlobError {
     /// An uploaded object did not read back as what was sent.
     #[error("uploaded {key} but it did not verify: {reason}")]
     Unverified { key: String, reason: String },
+    /// A delete removed the first object of a digest and the store refused the second: what was deleted stays deleted.
+    #[error("{0}")]
+    PartlyDeleted(String),
 }
 
 fn store_err(e: impl std::fmt::Display) -> BlobError {
@@ -394,7 +397,9 @@ impl ObjectBlobStore {
                 return Ok(false);
             }
         }
-        if self.probe_raw(digest)? == (Probe::Present { size }) {
+        // A `.zst` that is there but altered is never covered by a plain object: the reader prefers the `.zst`, so it is uploaded again.
+        let zst_altered = matches!(self.probe_zst(digest)?, Some(ZstHead { probe: Probe::Altered(_), .. }));
+        if !zst_altered && self.probe_raw(digest)? == (Probe::Present { size }) {
             return Ok(false);
         }
         let compressed = compress(&bytes).map_err(|e| BlobError::Store(format!("compressing {} failed: {e}", self.key(digest))))?;
@@ -427,12 +432,6 @@ impl ObjectBlobStore {
     /// Every digest the store holds under the prefix, in either form, sorted.
     pub fn list(&self) -> Result<Vec<String>, BlobError> {
         Ok(self.list_objects()?.into_iter().map(|entry| entry.digest).collect())
-    }
-
-    /// Every digest the store holds under the prefix with the bytes its
-    /// objects take (both forms summed), sorted by digest.
-    pub fn list_sized(&self) -> Result<Vec<(String, u64)>, BlobError> {
-        Ok(self.list_objects()?.into_iter().map(|entry| (entry.digest.clone(), entry.bytes())).collect())
     }
 
     /// Every digest the store holds, one entry per digest, with the size of
@@ -477,7 +476,7 @@ impl ObjectBlobStore {
             Err(e) => Err(e),
         };
         gone(self.rt.block_on(self.store.delete(&zst))).map_err(|e| BlobError::Store(format!("could not delete {}: {e}", self.key(digest))))?;
-        gone(self.rt.block_on(self.store.delete(&raw))).map_err(|e| BlobError::Store(format!("deleted {}, but could not delete {}: {e}", self.key(digest), self.raw_key(digest))))
+        gone(self.rt.block_on(self.store.delete(&raw))).map_err(|e| BlobError::PartlyDeleted(format!("deleted {}, but could not delete {}: {e}", self.key(digest), self.raw_key(digest))))
     }
 }
 
@@ -735,6 +734,19 @@ mod tests {
         assert_eq!(both.list().unwrap(), vec![d.clone()], "one digest, however many forms");
     }
 
+    /// artifacts.object-zstd.03 (F2): an altered `.zst` is not covered by a plain object beside it: `put` uploads the `.zst` again and the HEAD passes.
+    #[test]
+    fn artifacts_object_zstd_03_put_replaces_an_altered_zst_even_when_a_plain_object_exists() {
+        let bytes = report(50_000);
+        let (memory, blobs) = store();
+        let d = put_legacy(&memory, &blobs, &bytes);
+        overwrite_zst(&memory, &blobs, &d, b"damaged".to_vec(), &[(DIGEST_META, d.clone()), (SIZE_META, bytes.len().to_string()), (STORED_SIZE_META, "999".to_string())]);
+        assert!(matches!(blobs.probe(&d).unwrap(), Probe::Altered(_)));
+        assert!(blobs.put(&d, bytes.clone()).unwrap(), "the `.zst` is uploaded again");
+        assert_eq!(blobs.probe(&d).unwrap(), Probe::Present { size: bytes.len() as u64 });
+        assert_eq!(blobs.verify_full(&d).unwrap(), Probe::Present { size: bytes.len() as u64 });
+    }
+
     /// artifacts.object-zstd.04 (F2 failure): no object of either form is `Missing`; a `.zst` whose size differs from the `canon-stored-size` it recorded (a
     /// truncated upload) is `Altered` at the HEAD, as is a metadata digest that is not its name.
     #[test]
@@ -844,7 +856,6 @@ mod tests {
         ];
         expected.sort_by(|x, y| x.digest.cmp(&y.digest));
         assert_eq!(listed, expected);
-        assert_eq!(blobs.list_sized().unwrap().iter().find(|(d, _)| *d == da).unwrap().1, expected.iter().find(|e| e.digest == da).unwrap().bytes());
         blobs.delete(&da).unwrap();
         assert_eq!(blobs.list().unwrap(), vec![db.clone()], "both names of the first digest are gone, the other stays");
         blobs.delete(&da).unwrap();

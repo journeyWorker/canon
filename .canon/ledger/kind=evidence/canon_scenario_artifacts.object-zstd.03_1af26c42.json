@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T13:06:39.393452Z",
+  "attachments": [
+    {
+      "case": "artifact_blobs::tests::artifacts_object_zstd_03_put_replaces_an_altered_zst_even_when_a_plain_object_exists",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "cedaedb6fb08c00e80b72c04f89e6436b2cdda28d39d01c96c5222d1c06a9224"
+    },
+    {
+      "case": "artifact_blobs::tests::artifacts_object_zstd_03_a_zst_object_and_a_plain_object_answer_the_same",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "cedaedb6fb08c00e80b72c04f89e6436b2cdda28d39d01c96c5222d1c06a9224"
+    },
+    {
+      "case": "artifacts_object_zstd_03_gate_check_and_verify_answer_the_same_for_zst_and_plain_objects",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "cedaedb6fb08c00e80b72c04f89e6436b2cdda28d39d01c96c5222d1c06a9224"
+    }
+  ],
+  "code_tree": "3883ddab76952397116cfaf906679951ebec1b35",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/fix-0.40-zstd/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "91db25de76048937f7319cc342a95b83504e3e59",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "artifacts.object-zstd.03",
+  "schema": 1,
+  "staging_id": "e34bbc80",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
