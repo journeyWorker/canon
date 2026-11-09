@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T12:40:14.453294Z",
+  "change_id": "canon-0-40-ci-evidence",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": ".canon/changes/canon-0-40-ci-evidence/brief.md:97",
+  "introduced_by": "df5bc3a9fd3f41a7bad6441c08fd48fb8e7db5ed",
+  "kind": "finding",
+  "reviewed_sha": "7fd0e5f0f8ecbb7e709a4c2d50ba691886156e06",
+  "reviewer": "rev-0-40-ci",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.ci-run.06",
+    "evidence.ci-run.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (the brief): the approved brief names the refusals CI_ENV_MISSING and CI_WORKTREE_DIRTY (brief.md F2 detail l.97-98, F2 acceptance l.151-152, last acceptance line l.171) but atip/1 7.2.1 fixes fifteen conditions (INVALID REQUIRED NOT_FOUND EXISTS CONFLICT STALE EXPIRED DENIED UNSUPPORTED TOO_LARGE CORRUPT UNAVAILABLE FAILED INCOMPLETE TIMEOUT); MISSING and DIRTY are not among them, so atip_codenames_03 would fail. I AGREE with CI_ENV_REQUIRED and CI_WORKTREE_CONFLICT (code, registry, fixture, scenarios 06/07, skill, CHANGELOG and tests all use them, and both codes are in `canon schema --error`). The defect: the approved brief (sha256:fd7d0625...) was never amended and the texts of evidence.ci-run.06 and .07 were edited after approval (2a30f0ea4), so brief and scenarios disagree. Fix: the planner amends the four places and a human re-approves. Blast radius: documentation only; no code or record depends on the old names.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T12:43:59.032006Z",
+  "change_id": "canon-0-40-ci-evidence",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/status.rs:1114",
+  "introduced_by": "622d2529c8a9cc0329231d6bc397539ff32d863d",
+  "kind": "finding",
+  "reviewed_sha": "7fd0e5f0f8ecbb7e709a4c2d50ba691886156e06",
+  "reviewer": "rev-0-40-ci",
+  "round": 1,
+  "scenario_ids": [
+    "gate.ci-run.02",
+    "gate.ci-run.03",
+    "gate.ci-run.04",
+    "gate.ci-run.06"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Spec fidelity: the brief (F4 acceptance: 'status' red and the guard's refusal 'give the same reason') and the titles of gate.ci-run.02/03/04/06 say the reason is named in status too. `canon status` shows a shipped subject's red as `1 uncovered-cell (first: game.run.01)`: shipped_red groups by class and prints no reason, so no_ci_run, dirty_worktree, short_run and code_tree_unknown are indistinguishable there and other_code_tree is only 'stale-evidence'. gate check and the ship guard do name the reason (verified live). assert_three_readers asserts only the class and the scenario id in status, so the claim is not proven. Also status's red exists for shipped subjects only: with the allowed `scope: [verifying, shipped]` a verifying subject whose newest evidence is a person's is red in gate check and clean in status (probed). Fix: put the reason in the status red line (the first violation's `spec_coverage.require_ci_run: <reason>`) and assert it, or amend the brief and scenarios to say status gives the class only and the human accepts that. Blast radius: shipped_red serves every guard check, so changing its line changes status text for all of them (conformance cases).",
+  "worktree_dirty": false
+}
