@@ -309,8 +309,12 @@ pub struct SubjectSummary {
     /// For a `shipped` subject, what makes its gate red now (0.18 D3):
     /// what the `verifying → shipped` guard would refuse it on
     /// ([`crate::subject::shipped_gate_gaps`], the same checks), one
-    /// phrase per failure class: `<n> <class> (first: <subject>)`.
-    /// Status then names the reopen command. Omitted when empty.
+    /// phrase per failure class: `<n> <class> (first: <subject>)`; a
+    /// `spec_coverage.require_ci_run` violation adds its reason:
+    /// `<n> <class>: <reason> (first: <subject>)` (0.40), and for any
+    /// other subject whose status that policy's scope covers, it is the
+    /// only source. Status then names the reopen command (shipped) or
+    /// the CI record to make. Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub red: Vec<String>,
     /// The flow steps of the briefs of every tagged change the subject answers
@@ -990,7 +994,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         .collect();
     let review_due = rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n)));
     let stale_reviews = gap_count(ReviewGapKind::Stale);
-    let red = if subject.status == SubjectStatus::Shipped { shipped_red(repo, ctx, &derived.code_tree, subject) } else { Vec::new() };
+    let red = gate_red(repo, ctx, &derived.code_tree, subject);
 
     // The subject answers for its tagged, approved and chore changes (0.31);
     // a pending draft is shown, never judged.
@@ -1108,18 +1112,33 @@ fn brief_with_findings(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, c
     Some(brief)
 }
 
-/// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]):
-/// the ship guard's own gaps ([`crate::subject::shipped_gate_gaps`]),
-/// grouped by failure class in the order the guard reports them.
-fn shipped_red(repo: &Path, ctx: &GateContext, code_tree: &crate::reverify::CodeTreeMemo, subject: &Subject) -> Vec<String> {
-    let mut classes: Vec<(&'static str, usize, String)> = Vec::new();
-    for violation in crate::subject::shipped_gate_gaps(repo, ctx, code_tree, subject) {
-        match classes.iter_mut().find(|(class, _, _)| *class == violation.class.as_str()) {
-            Some((_, count, _)) => *count += 1,
-            None => classes.push((violation.class.as_str(), 1, violation.subject)),
+/// What makes a subject's gate red ([`SubjectSummary::red`]): for a `shipped` subject the ship guard's own
+/// gaps ([`crate::subject::shipped_gate_gaps`]), for any other subject `spec_coverage.require_ci_run`'s
+/// violations when the policy's scope covers its status ([`canon_gate::ci_run::subject_violations`], the rule
+/// `gate check` applies), grouped by failure class (and, for `require_ci_run`, its reason) in the order the
+/// guard reports them.
+fn gate_red(repo: &Path, ctx: &GateContext, code_tree: &crate::reverify::CodeTreeMemo, subject: &Subject) -> Vec<String> {
+    let violations = if subject.status == SubjectStatus::Shipped {
+        crate::subject::shipped_gate_gaps(repo, ctx, code_tree, subject)
+    } else {
+        canon_gate::ci_run::subject_violations(ctx, &subject.subject_id, subject.status, || code_tree.get(repo).map(str::to_string))
+    };
+    let mut classes: Vec<(&'static str, Option<String>, usize, String)> = Vec::new();
+    for violation in violations {
+        let class = violation.class.as_str();
+        let reason = canon_gate::ci_run::reason_of(&violation.detail).map(str::to_string);
+        match classes.iter_mut().find(|(c, r, _, _)| *c == class && *r == reason) {
+            Some((_, _, count, _)) => *count += 1,
+            None => classes.push((class, reason, 1, violation.subject)),
         }
     }
-    classes.into_iter().map(|(class, count, first)| format!("{count} {class} (first: {first})")).collect()
+    classes
+        .into_iter()
+        .map(|(class, reason, count, first)| match reason {
+            Some(reason) => format!("{count} {class}: {reason} (first: {first})"),
+            None => format!("{count} {class} (first: {first})"),
+        })
+        .collect()
 }
 
 /// `canon subject move <id> --to verifying --reason …`: the reopen command
@@ -1657,7 +1676,9 @@ pub fn render(report: &StatusReport) -> String {
                 }
             }
             if !s.red.is_empty() {
-                if awaits_brief(s) {
+                if status != SubjectStatus::Shipped {
+                    let _ = writeln!(out, "      gate: red — {}; record the whole suite from CI (`canon evidence add --all-scenarios --from-ci`, see the canon-gate skill)", s.red.join(", "));
+                } else if awaits_brief(s) {
                     let _ = writeln!(out, "      gate: red — {}; reopening is refused until the brief above is approved (answer it, or remove its `@flow:` tags, after which `canon subject unadopt` can take the change back)", s.red.join(", "));
                 } else {
                     let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));

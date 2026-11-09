@@ -643,9 +643,19 @@ the suite's run, and it proves nothing about who set the variables; the `url`
 is what a person checks. The policy that asks for it, and what a partial run
 is, is `spec_coverage.require_ci_run` (see `canon-policy`).
 
-A GitHub Actions job, in the order that matters:
+A GitHub Actions job, in the order that matters. Run it on `push` to the
+branch that ships (and, for a record you only upload, on `pull_request`); a
+`pull_request` run checks out a detached merge ref, so only a `push` run can
+commit and push the records. The JUnit file comes from a nextest profile
+(`.config/nextest.toml`: `[profile.ci.junit]` with `path = "junit.xml"` writes
+`target/nextest/ci/junit.xml`, under gitignored `target/`):
 
 ```yaml
+on:
+  push:
+    branches: [main]
+  pull_request:
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -655,6 +665,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0           # staleness and the code tree read history
+      # 0. canon on the runner: the npm package carries the binary (`bunx @journeykit/canon` works the same).
+      - run: npm install --global @journeykit/canon
       # 1. The tests write JUnit to a gitignored path (`target/` here), never beside the sources.
       - run: cargo nextest run --workspace --profile ci
       # 2. Record the run. `if: always()`: a failed run is recorded too, so the divergent verdicts are on the ledger.
@@ -674,9 +686,10 @@ jobs:
           path: |
             .canon/ledger
             .canon/artifacts
-      #    Way 2: commit and push them (needs `permissions: contents: write`).
+      #    Way 2: commit and push them (needs `permissions: contents: write`), on a push event only:
+      #    a pull_request run has no branch to push to.
       #    A push made with GITHUB_TOKEN does not start a new workflow run.
-      - if: always()
+      - if: always() && github.event_name == 'push'
         run: |
           git add .canon/ledger .canon/artifacts
           git -c user.name=canon-ci -c user.email=canon-ci@users.noreply.github.com commit -m "ci: record run $GITHUB_RUN_ID" || true
