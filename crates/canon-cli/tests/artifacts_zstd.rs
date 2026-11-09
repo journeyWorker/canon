@@ -155,7 +155,7 @@ fn artifacts_object_zstd_01_evidence_add_uploads_a_zst_object_and_keeps_no_local
     let repo = new_repo(Some(ARTIFACTS_COLD));
     repo.attest("smoke.json", V1);
     assert_eq!(repo.objects(), vec![format!("{}.zst", sha(V1))], "one `.zst` object and no plain object");
-    assert_eq!(zstd::decode_all(&std::fs::read(repo.zst(V1)).unwrap()[..]).unwrap(), V1);
+    assert_eq!(zstd::decode_all(std::fs::read(repo.zst(V1)).unwrap().as_slice()).unwrap(), V1);
     assert!(!repo.path().join(".canon/artifacts").exists(), "no local copy is kept");
     repo.report("smoke.json", br#"{"at":"later"}"#);
     let gate = repo.canon(&["gate", "check"]);
@@ -259,7 +259,7 @@ fn artifacts_object_zstd_07_move_uploads_zst_objects_and_skips_a_digest_the_tier
     assert_eq!((body["data"]["uploaded"].as_u64(), body["data"]["alreadyInStore"].as_u64(), body["data"]["removedLocal"].as_u64()), (Some(1), Some(1), Some(2)), "{body}");
     assert_eq!(repo.objects().len(), 2);
     assert!(repo.zst(V1).exists() && repo.plain(V2).exists() && !repo.zst(V2).exists(), "{:?}", repo.objects());
-    assert_eq!(zstd::decode_all(&std::fs::read(repo.zst(V1)).unwrap()[..]).unwrap(), V1);
+    assert_eq!(zstd::decode_all(std::fs::read(repo.zst(V1)).unwrap().as_slice()).unwrap(), V1);
     assert!(!repo.path().join(".canon/artifacts").exists());
     assert!(repo.canon(&["artifacts", "verify", "--full"]).status.success());
 }

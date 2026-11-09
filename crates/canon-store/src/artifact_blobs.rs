@@ -345,7 +345,7 @@ impl ObjectBlobStore {
                 let mut input = InBuffer::around(&chunk);
                 loop {
                     let before = input.pos();
-                    let mut output = OutBuffer::around(&mut out[..]);
+                    let mut output = OutBuffer::around(out.as_mut_slice());
                     let hint = match decoder.run(&mut input, &mut output) {
                         Ok(hint) => hint,
                         Err(e) => return Ok(Probe::Altered(format!("the object does not decompress: {e}"))),
@@ -661,7 +661,7 @@ mod tests {
     /// Varied but compressible bytes of `len`.
     fn report(len: usize) -> Vec<u8> {
         const LINE: &[u8] = b"<testcase name=\"case\" time=\"0.01\"/>\n";
-        (0..len).map(|i| LINE[i % LINE.len()] ^ ((i / 4096) as u8 & 3)).collect()
+        (0..len).map(|i| LINE[i % LINE.len()] ^ u8::try_from((i / 4096) & 3).unwrap()).collect()
     }
 
     /// artifacts.object-zstd.01 (F1): a new blob is one `<digest>.zst` object (no plain one); the frame decompresses to the bytes, names its content size and
@@ -677,11 +677,11 @@ mod tests {
         assert_eq!(blobs.raw_key(&d), format!("artifacts/sha256/{d}"));
         let stored = stored_zst(&memory, &blobs, &d);
         assert!(stored.len() < bytes.len() / 4, "a report shrinks: {} of {}", stored.len(), bytes.len());
-        assert_eq!(zstd::decode_all(&stored[..]).unwrap(), bytes);
+        assert_eq!(zstd::decode_all(stored.as_slice()).unwrap(), bytes);
         assert_eq!(zstd::zstd_safe::get_frame_content_size(&stored).unwrap(), Some(bytes.len() as u64), "the frame header carries the content size");
         let mut flipped = stored.clone();
         *flipped.last_mut().unwrap() ^= 1;
-        assert!(zstd::decode_all(&flipped[..]).is_err(), "the frame carries a content checksum");
+        assert!(zstd::decode_all(flipped.as_slice()).is_err(), "the frame carries a content checksum");
         assert_eq!(meta_of(&memory, &blobs, &d, DIGEST_META).as_deref(), Some(d.as_str()), "the digest is the plain bytes'");
         assert_eq!(meta_of(&memory, &blobs, &d, SIZE_META), Some(bytes.len().to_string()));
         assert_eq!(meta_of(&memory, &blobs, &d, STORED_SIZE_META), Some(stored.len().to_string()));
@@ -690,10 +690,10 @@ mod tests {
         assert!(!blobs.put(&d, bytes).unwrap(), "second put finds it and uploads nothing");
         assert_eq!(blobs.list().unwrap(), vec![d]);
         // Bytes that do not shrink are written the same way.
-        let noise: Vec<u8> = (0..4096u32).map(|i| (i.wrapping_mul(2_654_435_761) >> 13) as u8).collect();
+        let noise: Vec<u8> = (0..4096u32).map(|i| u8::try_from((i.wrapping_mul(2_654_435_761) >> 13) & 0xff).unwrap()).collect();
         let n = digest(&noise);
         assert!(blobs.put(&n, noise.clone()).unwrap());
-        assert_eq!(zstd::decode_all(&stored_zst(&memory, &blobs, &n)[..]).unwrap(), noise);
+        assert_eq!(zstd::decode_all(stored_zst(&memory, &blobs, &n).as_slice()).unwrap(), noise);
     }
 
     /// artifacts.object-zstd.02 (F1 failure): bytes that do not hash to the digest are refused as `Changed` and nothing is uploaded, in either form.

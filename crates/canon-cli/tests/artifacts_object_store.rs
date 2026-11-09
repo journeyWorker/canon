@@ -86,7 +86,7 @@ impl Repo {
     fn read_object(&self, bytes: &[u8]) -> Vec<u8> {
         let path = self.object(bytes);
         let stored = std::fs::read(&path).unwrap();
-        if path.extension().is_some_and(|e| e == "zst") { zstd::decode_all(&stored[..]).unwrap() } else { stored }
+        if path.extension().is_some_and(|e| e == "zst") { zstd::decode_all(stored.as_slice()).unwrap() } else { stored }
     }
 
     /// The blob the local store holds for `bytes`.
