@@ -83,7 +83,8 @@
 //! `canon.yaml`'s `artifact_store: { backend: local | <tier>, prefix: artifacts/ }`
 //! moves the bytes off git: [`ArtifactStore`] is the local directory above
 //! (the default, no credentials) or the object-store tier named by
-//! `backend`, keyed `<prefix>sha256/<digest>`. Records keep only digests.
+//! `backend`, keyed `<prefix>sha256/<digest>.zst` (one zstd frame; an older canon's plain
+//! `<prefix>sha256/<digest>` object is still read). Records keep only digests.
 //! The rules above hold unchanged, asked of the store instead of the
 //! directory, with two differences: the store is asked once per distinct
 //! digest (a HEAD and its size/digest metadata; `canon artifacts verify
@@ -531,7 +532,7 @@ fn copy_hashed(reader: &mut impl Read, file: &mut File) -> std::io::Result<Strin
 /// `artifact_store: { backend: <tier>, prefix: artifacts/ }`.
 ///
 /// With an object store, a write uploads by digest key
-/// (`<prefix>sha256/<digest>`), reads it back, and keeps no local copy;
+/// (`<prefix>sha256/<digest>.zst`, zstd-compressed), reads it back, and keeps no local copy;
 /// the gate asks the store (one HEAD plus size/digest metadata per
 /// distinct digest; [`ArtifactStore::observe`] with `full` downloads and
 /// re-hashes). A store that cannot be reached is
@@ -595,11 +596,19 @@ impl ArtifactStore {
         }
     }
 
+    /// The directory-like key blobs live under, as printed to operators (`<tier>:<prefix>sha256/`).
+    pub fn display_dir(&self) -> String {
+        match self {
+            ArtifactStore::Local => format!("{}/", paths::ARTIFACTS_SHA256_DIR),
+            ArtifactStore::Object(object) => format!("{}:{}", object.tier, object.blobs.dir_key()),
+        }
+    }
+
     /// Where the store keeps blobs, for a sentence ("under …").
     pub fn location(&self) -> String {
         match self {
             ArtifactStore::Local => format!("{}/", paths::ARTIFACTS_SHA256_DIR),
-            ArtifactStore::Object(object) => format!("the `{}` object store ({})", object.tier, object.blobs.key("")),
+            ArtifactStore::Object(object) => format!("the `{}` object store ({})", object.tier, object.blobs.dir_key()),
         }
     }
 
@@ -647,6 +656,11 @@ impl ObjectArtifacts {
     /// Every digest the store holds with the size of its object, sorted by digest.
     pub fn list_sized(&self) -> Result<Vec<(String, u64)>, ArtifactStoreError> {
         self.blobs.list_sized().map_err(|e| self.error(e))
+    }
+
+    /// Every digest the store holds, with the size of each object form (`.zst`, uncompressed), sorted by digest.
+    pub fn list_objects(&self) -> Result<Vec<canon_store::artifact_blobs::ObjectEntry>, ArtifactStoreError> {
+        self.blobs.list_objects().map_err(|e| self.error(e))
     }
 
     /// Delete the object for `digest` (`canon artifacts prune`); one the store already lacks is no error. Irreversible: the store keeps
