@@ -621,7 +621,9 @@ Where those bytes live is `canon.yaml`'s `artifact_store: { backend: local |
 <s3 tier>, prefix: artifacts/ }` (default `local`: the directory above,
 git-tracked, no credentials). With an object-store tier, `evidence add`,
 `review scenario` and `artifacts store` upload each blob under
-`<prefix>sha256/<digest>` and keep nothing locally. `canon gate check` and
+`<prefix>sha256/<digest>.zst` (one zstd frame of the bound bytes; the digest is
+that of the bytes before compression; a plain `<prefix>sha256/<digest>` object
+of an older canon is still read) and keep nothing locally. `canon gate check` and
 `canon artifacts verify [--full]` ask the store (a HEAD per digest; `--full`
 downloads and re-hashes) and refuse, never pass, when it cannot be reached.
 `canon artifacts move --tier <tier>` (a preview; `--commit --plan-digest` acts) moves an existing local

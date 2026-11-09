@@ -82,9 +82,18 @@ impl Repo {
         self.path().join(".canon/artifacts/sha256").join(sha(bytes))
     }
 
-    /// The object a bucket holds for `bytes`.
+    /// The object a bucket holds for `bytes`: the `.zst` canon writes, or (when only that exists) the uncompressed name of an older canon.
     fn object(&self, bytes: &[u8]) -> PathBuf {
-        self.store.path().join("artifacts/sha256").join(sha(bytes))
+        let plain = self.store.path().join("artifacts/sha256").join(sha(bytes));
+        let zst = plain.with_extension("zst");
+        if zst.exists() || !plain.exists() { zst } else { plain }
+    }
+
+    /// The bytes behind the object of `bytes`: a `.zst` is decompressed, an uncompressed object is read as it is.
+    fn read_object(&self, bytes: &[u8]) -> Vec<u8> {
+        let path = self.object(bytes);
+        let stored = std::fs::read(&path).unwrap();
+        if path.extension().is_some_and(|e| e == "zst") { zstd::decode_all(stored.as_slice()).unwrap() } else { stored }
     }
 
     /// A blob in the local store that no record binds.
@@ -555,7 +564,7 @@ fn artifacts_prune_10_an_object_store_tier_is_pruned_by_the_same_rule() {
         assert!(!repo.object(gone).exists());
     }
     assert!(!repo.blob(O3).exists());
-    assert_eq!(std::fs::read(repo.object(V2)).unwrap(), V2);
+    assert_eq!(repo.read_object(V2), V2);
     let full = repo.canon(&["artifacts", "verify", "--full", "--json"]);
     assert_eq!(full.status.code(), Some(0), "{}", text(&full));
     assert_eq!(repo.canon(&["gate", "check", "--json"]).status.code(), Some(0));

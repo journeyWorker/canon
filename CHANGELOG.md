@@ -4,11 +4,13 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
-### Fixed
+### Added
 
-- **A scenario whose last feature file was deleted is not judged `stale-evidence`** (`canon-0-40-retire-followups`, scenarios `gate.tombstone-corpus.01-02`). `canon inventory sync` writes a tombstone for a scenario no feature file declares, and the gate now reads the tombstone itself: in a repository whose last `.feature` file was deleted, the old evidence of the deleted scenarios is neither `stale-evidence` nor counted in `staleness_unresolvable`, where 0.39 could not tell the empty list from "no corpus read". A repository whose scenarios are not read (the kind routed off the git tier, no index) is judged as before.
-- **`canon migrate` names the retired key it cannot delete** (`tier.retired-keys.01-02`): the `CONFIG_INVALID` refusal says `routing.session` (and the line, for an anchor, an alias or a tag) instead of only the two kind names; keys it could delete are not listed. Exit code, code and the unchanged file are as before.
-- **The durability trace is debug-only** (`tier.durability-release.01-02`): the `canon_store::atomic::trace` module and its `Event` type exist in debug builds only, and a release build of `write_atomic` and the artifact store no longer copies a path for each trace call, as the 0.39 write-durability brief said.
+**Object-store blobs are zstd frames** (`canon-0-40-object-store-zstd`, scenarios `artifacts.object-zstd.01-14`): a blob that `evidence add`, `review scenario`, `artifacts store` or `artifacts move` uploads to an object-store tier is written at `<prefix>sha256/<digest>.zst`. The object is one zstd frame of the bound bytes (level 19, no dictionary, the content size in the frame header, a content checksum), and the digest in the name and in every record is still the sha256 of the bytes before compression. Without canon, download the object and run `zstd -d <digest>.zst` (`zstd -t` checks it). The object carries the metadata `canon-sha256`, `canon-size` (plain bytes) and the new `canon-stored-size` (the object's bytes).
+- Measured on this repository's 174 blobs (62,647,897 bytes): 8,294,999 bytes at level 19 (7.6x), 10,171,978 at level 3 (6.2x). Level 19's CPU time (Apple M-series, one thread, `zstd -19`): 0.24 s for the largest real blob (789,143 bytes, 106,540 bytes after; 0.01 s at level 3) and 4.1 s for 25 MiB of random bytes (the size limit; 26,215,014 bytes after, 614 more than it had; 0.01 s at level 3). The frame does not record its level, so a lower level later changes no reader.
+- `canon artifacts verify --full` decompresses a `.zst` object while hashing it, in chunks, so memory does not grow with the object, and stops at the `canon-size` the object recorded: a frame that decompresses past it is `Altered`, as is a changed, cut or non-zstd object. A HEAD compares the object's size with `canon-stored-size` (a `.zst`) or `canon-size` (a plain object).
+- `canon artifacts prune` counts a digest held as `.zst` and as a plain object once (its bytes are both objects') and deletes both names; the state a plan reads names the form of each object, so a form that appears after the preview is `PLAN_STALE`.
+- The local `.canon/artifacts/sha256/` is not compressed, by any command: git's delta compression works on plain blobs (the same blobs at zstd level 3 grew the packed repository 1.9 times). A `<digest>.zst` file in that directory is not a blob.
 
 ### Changed
 
@@ -19,6 +21,15 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
   - Nothing changes for a user with no such variable or setting: the digest, the code tree and the staleness verdict are the 0.39 values. A context pack made on a dirty tree that a variable or a setting had changed has a different id once, on the same tree: make it again.
   - A shell that fails now: a CI that gave `safe.directory` through `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS` gets `COMMIT_REQUIRED` on a checkout owned by another user, with git's "dubious ownership" in the message. Put the same value in a gitconfig file (the one `GIT_CONFIG_GLOBAL` names works). A `GIT_EXEC_PATH` that chose another git build is ignored: canon uses the helpers of the `git` on `PATH`.
   - No new option, error code or environment variable.
+- **Upgrade every canon that reads the tier before the first `.zst` is written.** A canon 0.39 or older does not look for `.zst`: its `gate check` and `artifacts verify` read such a blob as missing (a violation, never a pass) and its `prune` does not list the object, so it deletes nothing of it. There is no setting that keeps writing plain objects.
+- A plain object an older canon wrote at `<prefix>sha256/<digest>` stays valid: reads take `.zst` first and the plain name second, a digest that has either is not uploaded again, and `canon` writes no plain object any more. No command recompresses an existing plain object.
+- The key `canon artifacts` prints for an object of the tier is the `.zst` key; `ObjectBlobStore::key` returns it (`raw_key` is the plain name, `dir_key` the directory), and `list_objects` lists each digest with the size of each form.
+
+### Fixed
+
+- **A scenario whose last feature file was deleted is not judged `stale-evidence`** (`canon-0-40-retire-followups`, scenarios `gate.tombstone-corpus.01-02`). `canon inventory sync` writes a tombstone for a scenario no feature file declares, and the gate now reads the tombstone itself: in a repository whose last `.feature` file was deleted, the old evidence of the deleted scenarios is neither `stale-evidence` nor counted in `staleness_unresolvable`, where 0.39 could not tell the empty list from "no corpus read". A repository whose scenarios are not read (the kind routed off the git tier, no index) is judged as before.
+- **`canon migrate` names the retired key it cannot delete** (`tier.retired-keys.01-02`): the `CONFIG_INVALID` refusal says `routing.session` (and the line, for an anchor, an alias or a tag) instead of only the two kind names; keys it could delete are not listed. Exit code, code and the unchanged file are as before.
+- **The durability trace is debug-only** (`tier.durability-release.01-02`): the `canon_store::atomic::trace` module and its `Event` type exist in debug builds only, and a release build of `write_atomic` and the artifact store no longer copies a path for each trace call, as the 0.39 write-durability brief said.
 
 ## 0.39.0 — 2026-11-08
 

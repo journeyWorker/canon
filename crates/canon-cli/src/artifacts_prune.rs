@@ -226,6 +226,8 @@ struct Blob {
     digest: String,
     local: Option<(PathBuf, u64)>,
     object: Option<u64>,
+    /// The forms its tier objects take (`zst=<bytes>`, `raw=<bytes>`), in the plan's read state.
+    forms: String,
     reasons: BTreeSet<Reason>,
 }
 
@@ -370,12 +372,15 @@ fn store_blobs(repo: &Path, store: &ArtifactStore) -> Result<BTreeMap<String, Bl
             let message = format!("cannot read {}: {e}", blob.path.display());
             crate::artifacts::store_refusal(&ArtifactStoreError::Io(e), message).hint("check that .canon/artifacts/sha256 is a readable directory, then run the command again")
         })?;
-        blobs.insert(blob.digest.clone(), Blob { digest: blob.digest, local: Some((blob.path, bytes)), object: None, reasons: BTreeSet::new() });
+        blobs.insert(blob.digest.clone(), Blob { digest: blob.digest, local: Some((blob.path, bytes)), object: None, forms: String::new(), reasons: BTreeSet::new() });
     }
     if let ArtifactStore::Object(object) = store {
-        let listed = object.list_sized().map_err(|e| crate::artifacts::store_error(&e).hint(OBJECT_STORE_HINT))?;
-        for (digest, bytes) in listed {
-            blobs.entry(digest.clone()).or_insert_with(|| Blob { digest, local: None, object: None, reasons: BTreeSet::new() }).object = Some(bytes);
+        let listed = object.list_objects().map_err(|e| crate::artifacts::store_error(&e).hint(OBJECT_STORE_HINT))?;
+        for entry in listed {
+            let forms = [("zst", entry.zst), ("raw", entry.raw)].iter().filter_map(|(name, bytes)| bytes.map(|bytes| format!("{name}={bytes}"))).collect::<Vec<_>>().join(",");
+            let blob = blobs.entry(entry.digest.clone()).or_insert_with(|| Blob { digest: entry.digest.clone(), local: None, object: None, forms: String::new(), reasons: BTreeSet::new() });
+            blob.object = Some(entry.bytes());
+            blob.forms = forms;
         }
     }
     Ok(blobs)
@@ -443,14 +448,14 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
     }
     if delete.tier_objects > 0 {
         let bytes: u64 = doomed.iter().filter_map(|blob| blob.object).sum();
-        effects.push(Effect::record("delete", store.display("")).detail(format!("{} object(s), {bytes} bytes; data.blobs lists them; cannot be undone", delete.tier_objects)));
+        effects.push(Effect::record("delete", store.display_dir()).detail(format!("{} object(s), {bytes} bytes; data.blobs lists them; cannot be undone", delete.tier_objects)));
     }
     if !temps.is_empty() {
         effects.push(Effect::path("delete", format!("{}/.tmp-*", canon_model::paths::ARTIFACTS_SHA256_DIR)).detail(format!("{} stale temp file(s), {temp_bytes} bytes; data.staleTemps lists them", temps.len())));
     }
     let reads = Reads::new()
         .path(&repo, "canon.yaml")
-        .set("delete", doomed.iter().map(|blob| format!("{} local={} object={}", blob.digest, blob.local.as_ref().map_or(0, |(_, bytes)| *bytes), blob.object.map_or_else(|| "-".to_string(), |bytes| bytes.to_string()))))
+        .set("delete", doomed.iter().map(|blob| format!("{} local={} object={}", blob.digest, blob.local.as_ref().map_or(0, |(_, bytes)| *bytes), if blob.forms.is_empty() { "-" } else { blob.forms.as_str() })))
         .set("keep", kept.iter().map(|blob| format!("{} {}", blob.digest, blob.reasons.iter().map(|reason| reason.as_str()).collect::<Vec<_>>().join(","))))
         .set("stale-temps", temps.iter().map(|temp| format!("{} {}", temp.name, temp.bytes)))
         .set("records", bindings.state.iter());

@@ -75,9 +75,18 @@ impl Repo {
         self.canon(&["artifacts", "move", "--tier", tier, "--commit", "--plan-digest", &digest, "--json"])
     }
 
-    /// The object a bucket holds for `bytes`.
+    /// The object a bucket holds for `bytes`: the `.zst` canon writes, or (when only that exists) the uncompressed name of an older canon.
     fn object(&self, bytes: &[u8]) -> PathBuf {
-        self.store.path().join("artifacts/sha256").join(sha(bytes))
+        let plain = self.store.path().join("artifacts/sha256").join(sha(bytes));
+        let zst = plain.with_extension("zst");
+        if zst.exists() || !plain.exists() { zst } else { plain }
+    }
+
+    /// The bytes behind the object of `bytes`: a `.zst` is decompressed, an uncompressed object is read as it is.
+    fn read_object(&self, bytes: &[u8]) -> Vec<u8> {
+        let path = self.object(bytes);
+        let stored = std::fs::read(&path).unwrap();
+        if path.extension().is_some_and(|e| e == "zst") { zstd::decode_all(stored.as_slice()).unwrap() } else { stored }
     }
 
     /// The blob the local store holds for `bytes`.
@@ -152,7 +161,7 @@ fn evidence_add_with_an_object_backend_uploads_by_digest_keeps_no_local_blob_and
     let added = repo.attest(&["--artifact", "reports/smoke.json"]);
     assert!(added.status.success(), "{}", text(&added));
     assert!(text(&added).contains("1 newly uploaded") && text(&added).contains("nothing to commit"), "{}", text(&added));
-    assert_eq!(std::fs::read(repo.object(V1)).unwrap(), V1, "the bytes sit in the store under artifacts/sha256/<digest>");
+    assert_eq!(repo.read_object(V1), V1, "the bytes sit in the store under artifacts/sha256/<digest>");
     assert!(!repo.path().join(".canon/artifacts").exists(), "no local copy is kept");
 
     // The working tree changes: only the store can prove the record now.
@@ -197,7 +206,7 @@ fn a_missing_remote_object_fails_the_gate_with_a_hint_and_vault_uploads_it_again
 
     let vault = repo.ok(&["artifacts", "store"]);
     assert!(text(&vault).contains("stored 1, already stored 0") && !text(&vault).contains("commit .canon/artifacts"), "{}", text(&vault));
-    assert_eq!(std::fs::read(repo.object(V1)).unwrap(), V1);
+    assert_eq!(repo.read_object(V1), V1);
     assert!(repo.canon(&["gate", "check"]).status.success());
 }
 
@@ -213,7 +222,7 @@ fn verify_full_downloads_and_rehashes_what_a_head_cannot_judge() {
     assert!(repo.canon(&["artifacts", "verify"]).status.success(), "presence alone is what a HEAD proves here");
     let full = repo.canon(&["artifacts", "verify", "--full"]);
     assert_eq!(full.status.code(), Some(1), "{}", text(&full));
-    assert!(text(&full).contains("does not match its name") && text(&full).contains(&sha(b"someone else's bytes")), "{}", text(&full));
+    assert!(text(&full).contains("does not match its name") && text(&full).contains("does not decompress"), "a `.zst` that is no zstd frame: {}", text(&full));
 }
 
 /// An unattachable or unreachable store never passes: the write refuses with
@@ -320,8 +329,8 @@ fn migrate_moves_verifies_removes_local_copies_and_is_idempotent_and_resumable()
     assert_eq!(body["data"]["removedLocal"], 3);
     assert_eq!(body["data"]["configWritten"], true);
     assert!(body["meta"]["next"].is_array(), "a write names what comes next: {body}");
-    assert_eq!(std::fs::read(repo.object(V1)).unwrap(), V1);
-    assert_eq!(std::fs::read(repo.object(v2)).unwrap(), v2);
+    assert_eq!(repo.read_object(V1), V1);
+    assert_eq!(repo.read_object(v2), v2);
     assert!(!repo.path().join(".canon/artifacts").exists(), "the local store is gone");
     assert!(repo.canon_yaml().ends_with(ARTIFACTS_COLD), "{}", repo.canon_yaml());
     let ignore = std::fs::read_to_string(repo.path().join(".gitignore")).unwrap();
