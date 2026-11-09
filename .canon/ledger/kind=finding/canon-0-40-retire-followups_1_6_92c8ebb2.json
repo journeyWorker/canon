@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T12:45:33.661298Z",
+  "change_id": "canon-0-40-retire-followups",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/retention.rs:415",
+  "introduced_by": "df5bc3a9fd3f41a7bad6441c08fd48fb8e7db5ed",
+  "kind": "finding",
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-followups",
+  "round": 1,
+  "scenario_ids": [
+    "tier.purge-preview.01"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (brief premise wrong, planner-owned; implementation followed it): F2 says the value to set 'is already in the error text of handle(rung) (tier.rs:375-378)' and the scenario's Then wants a first meta.next step 'that says what to set'. The text for the cold s3 tier is 'cold tier (s3) is not attached (no live bucket)' (Backend::default_unattached_reason), which names no variable; the step then says 'set the variables the message names for the tier', and the message names none (the real probe output: reason '... cold tier (s3) is not attached (no live bucket)); set the variables the message names for the tier (or add its `tiers:` entry to canon.yaml) ...'). The test asserts only the generic phrases 'no live bucket' and 'set the variables'. canon.yaml's `bucket_env` (CANON_R2_BUCKET in the example) is known to the registry and could be named. The commit refusal has the same generic hint, so preview and commit match, but the F2 outcome 'names the tier and the value to resolve' is only half met (the tier, not the value). Blast radius: same text on every blocked purge preview; no data effect.",
+  "worktree_dirty": false
+}
