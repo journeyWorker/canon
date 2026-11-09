@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.39.1 — 2026-11-09
+
+Patch release: the npm launcher execs canon instead of staying resident beside it.
+
 ### Fixed
 
 - **The npm launcher no longer stays resident beside canon.** On macOS and Linux with Node 26.1 or later (or Bun 1.4, which reports Node 26.3), `@journeykit/canon` replaces its own process with the native binary (`process.execve`): a long-running command such as `canon dashboard` keeps no node process (~39 MB) beside it, its pid is the one the caller started, and signals reach canon directly; a signal death is now the caller's own, which a shell still reads as 128+n. Earlier versions are left out because a failed exec aborts them instead of throwing (nodejs/node#62878). On Windows and older Node the launcher runs the binary as a child and passes its exit status on, as before. Binary resolution, the workspace build's priority and `CANON_SKILLS_SOURCE` are unchanged.
