@@ -78,7 +78,7 @@ use std::path::Path;
 use canon_model::path_glob::{Anchor, Glob};
 use canon_model::{EvidenceRecord, EvidenceVerdict, Sha};
 use canon_store::fold_latest_by_key;
-use canon_store::git::{GitCall, GitError};
+use canon_store::git::{GitCall, GitError, NAMES_SHAPE};
 use chrono::{DateTime, Utc};
 
 use crate::context::{GateCheck, GateContext};
@@ -391,12 +391,15 @@ impl GitMemo {
         }
     }
 
-    /// The precise tier: `git diff --name-only -z --no-renames <sha>..HEAD`
+    /// The precise tier: `git diff --name-only -z --no-renames --ignore-submodules=none <sha>..HEAD`
     /// (staleness.md §3.1/§6, `_changed_files_since` +
     /// `_git_diff_touches`). `-z` names a file as it is, whatever its characters.
     fn git_diff_names(&mut self, repo: &Path, sha: &str) -> Option<Vec<String>> {
         let range = format!("{sha}..HEAD");
-        let out = self.run_git(repo, &["diff", "--name-only", "-z", "--no-renames", &range])?;
+        let mut args = vec!["diff", "--name-only", "-z", "--no-renames"];
+        args.extend(NAMES_SHAPE);
+        args.push(&range);
+        let out = self.run_git(repo, &args)?;
         let mut names: Vec<String> = out.split('\0').filter(|name| !name.is_empty()).map(str::to_string).collect();
         names.sort_unstable();
         names.dedup();

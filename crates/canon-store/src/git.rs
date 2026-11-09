@@ -4,12 +4,12 @@
 //! else in `crates/*/src`. What the path fixes, so that the answer of a call depends on the repository it names and
 //! on nothing the shell holds:
 //!
-//! - **Environment.** The variables that point git at a repository, an index or an object store
-//!   ([`CLEARED_ENV`]) are removed from the child; `HOME`, `PATH`, `SSH_AUTH_SOCK` and the XDG variables stay.
-//!   A call sets `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY` and `GIT_ALTERNATE_OBJECT_DIRECTORIES` only when it
+//! - **Environment.** An allow list (0.40, `canon-0-40-git-env-allowlist`): of the `GIT_*` variables of the process
+//!   only the eleven names of [`ALLOWED_ENV`] reach the child, every other one is removed ([`env_to_remove`]);
+//!   `HOME`, `PATH`, `SSH_AUTH_SOCK` and the XDG variables, which are not `GIT_*`, stay. A call sets `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY` and `GIT_ALTERNATE_OBJECT_DIRECTORIES` only when it
 //!   hands over a [`ScratchIndex`], the three together.
 //! - **Configuration.** `LC_ALL=C`, `GIT_OPTIONAL_LOCKS=0`, `GIT_TERMINAL_PROMPT=0`, `core.quotepath=false`,
-//!   `core.fsmonitor=false`, no pager and a closed stdin (or the bytes the call feeds).
+//!   `core.fsmonitor=false`, `color.ui=false`, `core.abbrev=auto`, `diff.suppressBlankEmpty=false` (a diff has no option for it), no pager and a closed stdin (or the bytes the call feeds).
 //! - **Time and size.** A call ends within [`DEADLINE`] and reads at most [`OUTPUT_LIMIT`] bytes of stdout and of
 //!   stderr each ([`TREE_OUTPUT_LIMIT`] for a call that lists a whole tree, [`GitCall::tree_listing`]). Past
 //!   either, the git child is killed (only the child: a grandchild that holds a pipe is not waited for) and the
@@ -40,23 +40,65 @@ const MIB: usize = 1024 * 1024;
 /// How often a running call looks at the clock and at the child.
 const POLL: Duration = Duration::from_millis(2);
 
-/// The environment variables that point git at a repository, an index or an object store, and the four that
-/// change how a pathspec is read. Removed from every child.
-pub const CLEARED_ENV: [&str; 13] = [
-    "GIT_DIR",
-    "GIT_WORK_TREE",
-    "GIT_INDEX_FILE",
-    "GIT_OBJECT_DIRECTORY",
-    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-    "GIT_COMMON_DIR",
-    "GIT_NAMESPACE",
-    "GIT_CEILING_DIRECTORIES",
-    "GIT_PREFIX",
-    "GIT_GLOB_PATHSPECS",
-    "GIT_NOGLOB_PATHSPECS",
-    "GIT_LITERAL_PATHSPECS",
-    "GIT_ICASE_PATHSPECS",
+/// The `GIT_*` names that reach a git child, one by one. Every other `GIT_*` of the process environment is removed
+/// ([`env_to_remove`]); a name git adds later is closed by default. What passes cannot change the bytes of a local
+/// answer:
+///
+/// - the three that choose the host's gitconfig files (what those files hold is pinned by [`DIFF_SHAPE`],
+///   [`STATUS_SHAPE`] and the `-c` options of [`GitCall::command`]);
+/// - the eight that only matter when a partial clone fetches a missing object from its remote.
+pub const ALLOWED_ENV: [&str; 11] = [
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "GIT_CONFIG_NOSYSTEM",
+    "GIT_SSH",
+    "GIT_SSH_COMMAND",
+    "GIT_SSH_VARIANT",
+    "GIT_ASKPASS",
+    "GIT_PROXY_COMMAND",
+    "GIT_SSL_CAINFO",
+    "GIT_SSL_CAPATH",
+    "GIT_SSL_NO_VERIFY",
 ];
+
+/// What the working-tree diff that canon reads and hashes (`diff --no-ext-diff --binary <SHAPE> HEAD`) is given, so
+/// that no gitconfig changes its shape. Each value is git's default: a user with no configuration gets the bytes
+/// of 0.39.
+pub const DIFF_SHAPE: [&str; 9] = [
+    "--no-color",
+    "-U3",
+    "--inter-hunk-context=0",
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+    "--find-renames",
+    "--diff-algorithm=myers",
+    "--no-relative",
+    "--ignore-submodules=none",
+];
+
+/// What `status --porcelain=v1 -z <SHAPE>` is given, for the same reason as [`DIFF_SHAPE`].
+pub const STATUS_SHAPE: [&str; 4] = ["--untracked-files=normal", "--find-renames", "--no-branch", "--ignore-submodules=none"];
+
+/// What `diff --name-only -z --no-renames <SHAPE> <range>` is given: a submodule update is a change whatever
+/// `diff.ignoreSubmodules` says.
+pub const NAMES_SHAPE: [&str; 1] = ["--ignore-submodules=none"];
+
+/// The names of `names` that start with `GIT_` and are not in [`ALLOWED_ENV`]: what a git child must not inherit.
+/// A pure function of the names, so a test needs no `set_var`.
+pub fn env_to_remove<I>(names: I) -> Vec<OsString>
+where
+    I: IntoIterator,
+    I::Item: AsRef<OsStr>,
+{
+    names
+        .into_iter()
+        .filter(|name| {
+            let text = name.as_ref().to_string_lossy();
+            text.starts_with("GIT_") && !ALLOWED_ENV.contains(&&*text)
+        })
+        .map(|name| name.as_ref().to_os_string())
+        .collect()
+}
 
 /// Why a git call did not give an answer.
 #[derive(Debug, thiserror::Error)]
@@ -226,8 +268,8 @@ impl<'a> GitCall<'a> {
     /// (`cat-file --batch`) starts from it too.
     pub fn command(&self) -> Command {
         let mut command = Command::new("git");
-        command.current_dir(self.repo).args(["--no-pager", "-c", "core.quotepath=false", "-c", "core.fsmonitor=false"]).args(&self.args);
-        for name in CLEARED_ENV {
+        command.current_dir(self.repo).args(["--no-pager", "-c", "core.quotepath=false", "-c", "core.fsmonitor=false", "-c", "color.ui=false", "-c", "core.abbrev=auto", "-c", "diff.suppressBlankEmpty=false"]).args(&self.args);
+        for name in env_to_remove(std::env::vars_os().map(|(name, _)| name)) {
             command.env_remove(name);
         }
         command.env("LC_ALL", "C").env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
@@ -407,14 +449,30 @@ mod tests {
         std::env::current_dir().expect("the test has a working directory")
     }
 
+    /// The thirteen names 0.39 removed.
+    const REMOVED_BY_0_39: [&str; 13] = [
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+        "GIT_NAMESPACE",
+        "GIT_CEILING_DIRECTORIES",
+        "GIT_PREFIX",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+    ];
+
+    /// gate.git-boundary.01 (0.39, kept in 0.40): the thirteen names 0.39 removed are still removed, and the command fixes the rest.
     #[test]
     fn gate_git_boundary_01_the_command_clears_the_repository_variables_and_fixes_the_rest() {
         let repo = here();
         let command = GitCall::new(&repo).args(["status"]).command();
         let envs = envs(&command);
-        for name in CLEARED_ENV {
-            assert_eq!(envs.get(name), Some(&None), "{name} is removed from the child");
-        }
+        assert_eq!(env_to_remove(REMOVED_BY_0_39).len(), 13, "the allow list lets none of the 0.39 names through");
         assert_eq!(envs["LC_ALL"].as_deref(), Some("C"));
         assert_eq!(envs["GIT_OPTIONAL_LOCKS"].as_deref(), Some("0"));
         assert_eq!(envs["GIT_TERMINAL_PROMPT"].as_deref(), Some("0"));
@@ -423,7 +481,60 @@ mod tests {
             assert!(!envs.contains_key(kept), "{kept} is not touched");
         }
         let args: Vec<String> = command.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
-        assert_eq!(args, ["--no-pager", "-c", "core.quotepath=false", "-c", "core.fsmonitor=false", "status"]);
+        assert_eq!(args, ["--no-pager", "-c", "core.quotepath=false", "-c", "core.fsmonitor=false", "-c", "color.ui=false", "-c", "core.abbrev=auto", "-c", "diff.suppressBlankEmpty=false", "status"]);
+    }
+
+    /// gate.git-env.02 (F1): the name test keeps what the list names, drops every other `GIT_*` (one git does not know too) and leaves a name
+    /// that is not `GIT_*` alone; the variables canon sets itself are set on the command whatever the process held.
+    #[test]
+    fn gate_git_env_02_the_allow_list_keeps_its_names_and_the_command_sets_canons_own_variables() {
+        let held = ["GIT_SSH_COMMAND", "GIT_CONFIG_GLOBAL", "GIT_CANON_TEST_UNKNOWN", "GIT_DIFF_OPTS", "PATH", "HOME", "SSH_AUTH_SOCK", "LC_ALL"];
+        let removed = env_to_remove(held);
+        assert_eq!(removed, [OsString::from("GIT_CANON_TEST_UNKNOWN"), OsString::from("GIT_DIFF_OPTS")]);
+        for name in ALLOWED_ENV {
+            assert!(env_to_remove([name]).is_empty(), "{name} passes");
+        }
+        assert_eq!(ALLOWED_ENV.len(), 11);
+        // The names that matter are exact: a prefix of an allowed name is not allowed, and `GIT_CONFIG_COUNT` is not `GIT_CONFIG_GLOBAL`.
+        assert_eq!(env_to_remove(["GIT_SSH_COMMAND_EXTRA", "GIT_CONFIG", "GIT_CONFIG_COUNT", "git_dir"]).len(), 3, "lower case is a different name");
+        // What canon sets is set on the command, so it wins over a removal of the same name.
+        let repo = here();
+        let scratch = ScratchIndex::new(PathBuf::from("/s/index"), PathBuf::from("/s/objects"), OsString::from("/r/objects"));
+        let set = envs(&GitCall::new(&repo).scratch(&scratch).no_lazy_fetch().command());
+        assert_eq!(set["GIT_OPTIONAL_LOCKS"].as_deref(), Some("0"));
+        assert_eq!(set["GIT_TERMINAL_PROMPT"].as_deref(), Some("0"));
+        assert_eq!(set["GIT_NO_LAZY_FETCH"].as_deref(), Some("1"));
+        assert_eq!(set["GIT_INDEX_FILE"].as_deref(), Some("/s/index"));
+        assert_eq!(set["GIT_OBJECT_DIRECTORY"].as_deref(), Some("/s/objects"));
+        assert_eq!(set["GIT_ALTERNATE_OBJECT_DIRECTORIES"].as_deref(), Some("/r/objects"));
+    }
+
+    /// gate.git-env.03 (F1, failure path): a name off the list is removed whatever its value, and the thirteen names 0.39 removed
+    /// (`GIT_DIR`, `GIT_INDEX_FILE`) are still removed. A child started under a polluted environment really sees none of them.
+    #[test]
+    fn gate_git_env_03_a_name_off_the_list_is_removed_whatever_its_value_and_the_child_does_not_see_it() {
+        let polluted = ["GIT_DIFF_OPTS", "GIT_EXTERNAL_DIFF", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_PARAMETERS", "GIT_EXEC_PATH", "GIT_TRACE", "GIT_TRACE2", "GIT_PAGER", "GIT_EDITOR", "GIT_AUTHOR_NAME", "GIT_COMMITTER_EMAIL", "GIT_ATTR_SOURCE", "GIT_NO_REPLACE_OBJECTS", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_QUARANTINE_PATH", "GIT_CANON_TEST_UNKNOWN"];
+        assert_eq!(env_to_remove(polluted).len(), polluted.len());
+        assert_eq!(env_to_remove(REMOVED_BY_0_39).len(), 13);
+        assert_eq!(env_to_remove(["GIT_DIR", "GIT_INDEX_FILE"]).len(), 2);
+
+        // The same through a real child: `env` run with the command's removals applied on top of a polluted environment.
+        let mut probe = Command::new("env");
+        probe.env_clear().env("PATH", std::env::var_os("PATH").unwrap_or_default());
+        for name in polluted.iter().chain(REMOVED_BY_0_39.iter()).chain(ALLOWED_ENV.iter()) {
+            probe.env(name, "polluted");
+        }
+        for name in env_to_remove(probe.get_envs().map(|(name, _)| name)) {
+            probe.env_remove(name);
+        }
+        let out = probe.output().expect("env runs");
+        let text = String::from_utf8_lossy(&out.stdout);
+        let seen: Vec<&str> = text.lines().filter_map(|line| line.split('=').next()).filter(|name| name.starts_with("GIT_")).collect();
+        let mut allowed: Vec<&str> = ALLOWED_ENV.to_vec();
+        let mut seen_sorted = seen.clone();
+        seen_sorted.sort_unstable();
+        allowed.sort_unstable();
+        assert_eq!(seen_sorted, allowed, "only the allowed names reach the child");
     }
 
     #[test]
@@ -436,7 +547,7 @@ mod tests {
         assert_eq!(with["GIT_ALTERNATE_OBJECT_DIRECTORIES"].as_deref(), Some("/r/objects"));
         let without = envs(&GitCall::new(&repo).command());
         for name in ["GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"] {
-            assert_eq!(without[name], None, "{name} is removed when no scratch index is handed over");
+            assert_ne!(without.get(name).map(Option::is_some), Some(true), "{name} is not set when no scratch index is handed over (it is removed when the process holds it: gate.git-env.03)");
         }
     }
 

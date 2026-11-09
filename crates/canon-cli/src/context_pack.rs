@@ -11,7 +11,7 @@ use std::path::{Component, Path, PathBuf};
 
 use canon_model::records::StrategyRef;
 use canon_model::secret_scan;
-use canon_store::git::GitCall;
+use canon_store::git::{DIFF_SHAPE, GitCall, STATUS_SHAPE};
 use canon_store::write_atomic;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -546,10 +546,25 @@ fn filter_registry_status(status: &[u8]) -> Vec<u8> {
         .collect()
 }
 
+/// The diff whose bytes are hashed into the state digest: the same line whatever gitconfig the host holds ([`DIFF_SHAPE`]).
+fn state_diff_args() -> Vec<&'static str> {
+    let mut args = vec!["diff", "--no-ext-diff", "--binary"];
+    args.extend(DIFF_SHAPE);
+    args.push("HEAD");
+    args
+}
+
+/// The status whose entries are hashed into the state digest ([`STATUS_SHAPE`]).
+fn state_status_args() -> Vec<&'static str> {
+    let mut args = vec!["status", "--porcelain=v1", "-z"];
+    args.extend(STATUS_SHAPE);
+    args
+}
+
 fn repo_identity(repo: &Path) -> Result<RepoIdentity, ContextPackError> {
     let commit = git_output(repo, &["rev-parse", "HEAD"], false)?;
-    let diff = git_bytes(repo, &["diff", "--no-ext-diff", "--binary", "HEAD"])?;
-    let status = filter_registry_status(&git_bytes(repo, &["status", "--porcelain=v1", "-z"])?);
+    let diff = git_bytes(repo, &state_diff_args())?;
+    let status = filter_registry_status(&git_bytes(repo, &state_status_args())?);
     let dirty = !diff.is_empty() || !status.is_empty();
     let state_digest = if dirty {
         let mut state = Vec::with_capacity(diff.len() + status.len() + 1);
@@ -875,7 +890,7 @@ mod tests {
         fs::write(dir.path().join(".canon/policy.yaml"), b"rules: [a]\n").unwrap();
         let tracked = create(dir.path(), &ContextPackSpec::default()).unwrap();
         assert!(tracked.repo.dirty);
-        let mut state = git(dir.path(), &["diff", "--no-ext-diff", "--binary", "HEAD"]);
+        let mut state = git(dir.path(), &state_diff_args());
         assert!(!state.is_empty());
         state.push(0);
         state.extend_from_slice(b" M .canon/policy.yaml\0");
