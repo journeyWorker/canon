@@ -78,6 +78,12 @@ pub fn active_require_ci_run(ctx: &GateContext) -> Option<(&RequireCiRun, &[Stri
     }
 }
 
+/// The reason name (`no_ci_run`, `other_code_tree`, …) a violation `detail` of [`scenario_violation`] starts with,
+/// `None` for any other violation.
+pub fn reason_of(detail: &str) -> Option<&str> {
+    detail.strip_prefix("spec_coverage.require_ci_run: ")?.split(' ').next()
+}
+
 /// What is wrong with `record`, a scenario's newest declared evidence, under `require`, as of
 /// `code_tree` (the code tree now; `None` when git did not give it).
 pub fn gap_of(record: &EvidenceRecord, require: &RequireCiRun, code_tree: Option<&str>) -> Option<Gap> {
@@ -232,5 +238,11 @@ mod tests {
     fn a_dirty_record_is_dirty_worktree_and_only_after_its_tree_matches() {
         assert_eq!(gap_of(&record(Some(run(1, 0, 0)), Some("t"), Some(true)), &require(None), Some("t")), Some(Gap::DirtyWorktree));
         assert_eq!(gap_of(&record(Some(run(1, 0, 0)), Some("old"), Some(true)), &require(None), Some("t")), Some(Gap::OtherCodeTree { recorded: Some("old".into()), now: "t".into() }));
+    }
+
+    #[test]
+    fn the_reason_of_a_detail_is_the_name_scenario_violation_leads_with() {
+        assert_eq!(reason_of("spec_coverage.require_ci_run: short_run — the newest CI record"), Some("short_run"));
+        assert_eq!(reason_of("verifying → shipped: something else"), None);
     }
 }

@@ -763,11 +763,15 @@ pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, Bind
         let attachment = EvidenceAttachment { path: relative, sha256: file.sha256.clone(), format: None, case: None, outcome: None };
         scoped.push((id.as_str(), attachment, file));
     }
-    let reports = request
-        .reports
-        .iter()
-        .map(|(format, path)| read_report(&repo, *format, path, request.max_bytes))
-        .collect::<Result<Vec<_>, _>>()?;
+    // The same report file named twice is one report: its cases and counts are those of the file, so a run
+    // given twice never reads as twice the cases (`min_cases` is the guard against a partial run).
+    let mut reports: Vec<ParsedReport> = Vec::new();
+    for (format, path) in request.reports {
+        let report = read_report(&repo, *format, path, request.max_bytes)?;
+        if !reports.iter().any(|seen| seen.resolved == report.resolved) {
+            reports.push(report);
+        }
+    }
 
     let mut unindexed: BTreeMap<String, String> = BTreeMap::new();
     for report in &reports {

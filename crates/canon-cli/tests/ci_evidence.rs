@@ -262,6 +262,24 @@ fn evidence_ci_run_02_a_report_without_a_scenario_case_is_still_counted() {
     }
 }
 
+/// evidence.ci-run.02 (F1): the same report file given twice is one report, so its cases are not counted twice.
+#[test]
+fn evidence_ci_run_02_the_same_report_given_twice_is_one_report() {
+    let dir = shop_repo();
+    let repo = dir.path();
+    write(repo, REPORT, SUITE);
+    let report = format!("junit:{REPORT}");
+    let out = canon_env(repo, &batch_args(&[&report, &report], &["--from-ci", "--json"]), &ci_env("1"));
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out));
+    let body = json_of(&out);
+    assert_eq!(body["data"]["reports"].as_array().unwrap().len(), 1, "{body}");
+    for record in records(repo, None) {
+        let reports = record["ci"]["reports"].as_array().unwrap();
+        assert_eq!(reports.len(), 1, "{record}");
+        assert_eq!((reports[0]["passed"].as_u64(), reports[0]["failed"].as_u64()), (Some(3), Some(1)), "{record}");
+    }
+}
+
 /// evidence.ci-run.03 (F1): the same batch of the same attempt is `unchanged`; another attempt writes new records.
 #[test]
 fn evidence_ci_run_03_the_same_attempt_is_unchanged_and_another_attempt_is_new() {
@@ -331,7 +349,7 @@ fn evidence_ci_run_05_from_ci_needs_all_scenarios_and_an_explicit_ref() {
 
 /// evidence.ci-run.06 (F2, failure path): outside GitHub Actions the batch is refused, naming what is missing.
 #[test]
-fn evidence_ci_run_06_from_ci_outside_github_actions_is_ci_env_missing() {
+fn evidence_ci_run_06_from_ci_outside_github_actions_is_ci_env_required() {
     let dir = shop_repo();
     let repo = dir.path();
     write(repo, REPORT, SUITE);
@@ -367,7 +385,7 @@ fn evidence_ci_run_06_from_ci_outside_github_actions_is_ci_env_missing() {
 
 /// evidence.ci-run.07 (F2, failure path): a work tree that differs from HEAD is refused, and the gitignored report is the way out.
 #[test]
-fn evidence_ci_run_07_from_ci_on_a_dirty_work_tree_is_ci_worktree_dirty() {
+fn evidence_ci_run_07_from_ci_on_a_dirty_work_tree_is_ci_worktree_conflict() {
     let dir = shop_repo();
     let repo = dir.path();
     write(repo, "junit.xml", SUITE);
@@ -438,6 +456,7 @@ fn evidence_ci_run_10_a_batch_says_how_many_cases_each_report_held() {
         ])
     );
     assert!(!text(&out).contains(" passed, "), "in --json mode the counts are data, not lines: {}", text(&out));
+    assert_eq!(json_of(&out)["meta"]["schemaVersion"], "1.2", "the answer of a batch that carries `reports`");
 
     // The human form prints one line per report as well.
     let again = canon(repo, &batch_args(&["junit:reports/a.xml", "junit:reports/b.xml"], &[]));
@@ -581,7 +600,7 @@ fn assert_three_readers(policy: &str, reason: &str, class: &str, spoil: impl FnO
     assert!(line.starts_with(class) && line.contains(&format!("spec_coverage.require_ci_run: {reason}")), "gate check: {line}");
     assert_eq!(canon(repo, &["gate", "check"]).status.code(), Some(1));
     let red = red_of(repo);
-    assert!(red.iter().any(|r| r.contains(class) && r.contains("game.run.01")), "status is red with the same class: {red:?}");
+    assert!(red.iter().any(|r| r.contains(class) && r.contains(&format!(": {reason} ")) && r.contains("game.run.01")), "status is red with the same class and reason: {red:?}");
 
     reopen(repo);
     let refused = ship(repo, &[]);
@@ -678,7 +697,23 @@ fn gate_ci_run_06_an_unknown_code_tree_is_code_tree_unknown() {
     assert!(line.starts_with("uncovered-cell") && line.contains("spec_coverage.require_ci_run: code_tree_unknown"), "{line}");
     assert_eq!(canon(repo, &["gate", "check"]).status.code(), Some(1));
     let red = red_of(repo);
-    assert!(red.iter().any(|r| r.contains("uncovered-cell") && r.contains("game.run.01")), "{red:?}");
+    assert!(red.iter().any(|r| r.contains("uncovered-cell: code_tree_unknown") && r.contains("game.run.01")), "{red:?}");
+}
+
+/// gate.ci-run.04 (F4): the policy's scope is what `status` reads too: a verifying subject in `scope: [verifying, shipped]` is red with the reason, no reopen command.
+#[test]
+fn gate_ci_run_04_status_covers_the_configured_scope_and_names_the_reason() {
+    let dir = gate_repo("spec_coverage:\n  require_ci_run:\n    scope: [verifying, shipped]\n");
+    let repo = dir.path();
+    ci_record(repo, "1");
+    assert!(red_of(repo).is_empty(), "a complete CI record: {:?}", red_of(repo));
+    person_records(repo, "game.run.01");
+    let red = red_of(repo);
+    assert!(red.iter().any(|r| r.starts_with("1 uncovered-cell: no_ci_run") && r.contains("game.run.01")), "{red:?}");
+    let human = text(&canon(repo, &["status"]));
+    assert!(human.contains("gate: red — 1 uncovered-cell: no_ci_run") && !human.contains("reopen with"), "{human}");
+    let gate = gate_line(repo, "game.run.01").expect("gate check says the same");
+    assert!(gate.contains("spec_coverage.require_ci_run: no_ci_run"), "{gate}");
 }
 
 /// gate.ci-run.07 (F4, failure path): a malformed `require_ci_run` does not switch itself off: it makes `spec_coverage` unusable.

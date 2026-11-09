@@ -94,8 +94,8 @@ Source: canon 이슈 #119, canon-0-28의 코드 트리 기록(`codeTree`)과 `ev
 
 ### F2 거절
 
-- `GITHUB_ACTIONS`가 `true`가 아니거나 위 변수 가운데 하나가 비었으면 `CI_ENV_MISSING`(종료 2)이 빠진 변수를 말한다. 아무것도 쓰이지 않는다.
-- ==**`--from-ci` 기록은 작업 트리가 HEAD와 같을 때만 쓴다.**== 작업 트리의 코드 트리가 HEAD의 것과 다르면(`worktree_dirty`) `CI_WORKTREE_DIRTY`(종료 2)가 거절한다. 흔한 원인은 gitignore되지 않은 곳의 보고서 파일이고, 안내는 보고서를 gitignore된 디렉터리나 `.canon/` 아래에 쓰거나 `code.exclude`에 넣으라고 한다.
+- `GITHUB_ACTIONS`가 `true`가 아니거나 위 변수 가운데 하나가 비었으면 `CI_ENV_REQUIRED`(종료 2)이 빠진 변수를 말한다. 아무것도 쓰이지 않는다. 코드 이름은 atip/1 7.2.1의 열다섯 조건(`REQUIRED`, `CONFLICT` 등)에서 고른다. `MISSING`과 `DIRTY`는 그 조건이 아니다.
+- ==**`--from-ci` 기록은 작업 트리가 HEAD와 같을 때만 쓴다.**== 작업 트리의 코드 트리가 HEAD의 것과 다르면(`worktree_dirty`) `CI_WORKTREE_CONFLICT`(종료 2)가 거절한다. 흔한 원인은 gitignore되지 않은 곳의 보고서 파일이고, 안내는 보고서를 gitignore된 디렉터리나 `.canon/` 아래에 쓰거나 `code.exclude`에 넣으라고 한다.
 - `--from-ci`는 `--rev`와 `--verdict`와 같이 못 쓴다. 기록의 코드는 테스트가 돈 작업 트리여야 하고 판정은 보고서의 케이스에서만 나와야 한다. 둘 다 `EVIDENCE_ARGUMENT_CONFLICT`다.
 - `--from-ci` 없이는 위 어떤 것도 달라지지 않는다. 특히 더티한 작업 트리는 지금처럼 기록되고 거절되지 않는다.
 
@@ -148,8 +148,8 @@ Source: canon 이슈 #119, canon-0-28의 코드 트리 기록(`codeTree`)과 `ev
   - 같은 스위트를 CI가 다시 기록해도 기존 리뷰는 유효하다.
   - 실패 경로: `--from-ci`를 `--all-scenarios` 없이, 또는 `--ref` 없이 주면 종료 2이고 아무것도 쓰이지 않는다.
 - F2:
-  - `GITHUB_ACTIONS`가 없거나 `GITHUB_RUN_ID`가 빈 환경은 `CI_ENV_MISSING`이고 빠진 변수를 말한다.
-  - 추적되지 않은 `junit.xml`이 있는 작업 트리는 `CI_WORKTREE_DIRTY`이고 gitignore된 경로의 보고서는 통과한다.
+  - `GITHUB_ACTIONS`가 없거나 `GITHUB_RUN_ID`가 빈 환경은 `CI_ENV_REQUIRED`이고 빠진 변수를 말한다.
+  - 추적되지 않은 `junit.xml`이 있는 작업 트리는 `CI_WORKTREE_CONFLICT`이고 gitignore된 경로의 보고서는 통과한다.
   - 실패 경로: `--from-ci --rev <커밋>`, `--from-ci --verdict faithful`은 `EVIDENCE_ARGUMENT_CONFLICT`이고 아무것도 쓰이지 않는다. `--from-ci` 없는 같은 배치는 더티한 작업 트리에서도 0.39처럼 기록된다.
 - F3:
   - 보고서 둘의 배치가 보고서마다 한 줄을 출력하고 `data.reports[]`가 같은 수를 낸다. `--from-ci`가 없어도 낸다.
@@ -168,7 +168,7 @@ Source: canon 이슈 #119, canon-0-28의 코드 트리 기록(`codeTree`)과 `ev
 - F7:
   - 스킬 조리법과 CHANGELOG 항목이 있다.
   - 실패 경로: 항목이나 생성 문서가 어긋나면 릴리스 확인과 생성 문서 drift 시험이 실패한다.
-- 새 오류 코드 `CI_ENV_MISSING`과 `CI_WORKTREE_DIRTY`는 레지스트리에 등록되고 시험 모음이 내보낸다(T9 witness). `cargo test --workspace`, `just atip-deep`, `canon gate check`가 통과한다.
+- 새 오류 코드 `CI_ENV_REQUIRED`와 `CI_WORKTREE_CONFLICT`는 레지스트리에 등록되고 시험 모음이 내보낸다(T9 witness). `cargo test --workspace`, `just atip-deep`, `canon gate check`가 통과한다.
 
 ## Questions and assumptions
 
