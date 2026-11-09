@@ -279,9 +279,10 @@ mod tests {
 
     #[cfg(unix)]
     fn run_script(path_dir: Option<&std::path::Path>, advisory: Option<&str>) -> std::process::ExitStatus {
-        let script_dir = std::env::temp_dir().join(format!("canon-gate-pre-commit-test-{}", std::process::id()));
-        fs::create_dir_all(&script_dir).unwrap();
-        let script_path = script_dir.join("canon-gate-pre-commit.sh");
+        // One directory per call: the tests run as threads of one process under `cargo test`, and a shared
+        // path let one test truncate the script while another's `sh` was reading it (an empty script exits 0).
+        let script_dir = tempfile::tempdir().unwrap();
+        let script_path = script_dir.path().join("canon-gate-pre-commit.sh");
         fs::write(&script_path, PRE_COMMIT_SCRIPT).unwrap();
         #[cfg(unix)]
         {
