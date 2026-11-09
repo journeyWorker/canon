@@ -6,7 +6,7 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## 0.40.0 — 2026-11-10
 
-canon 0.40 stores object-store blobs as zstd frames (`<prefix>sha256/<digest>.zst`), lets `canon evidence add --all-scenarios --from-ci` record a batch as a GitHub Actions run and `spec_coverage.require_ci_run` accept only a complete CI record of the code as it stands now, passes only an allow list of `GIT_*` variables to git and fixes the diff and status shape against any gitconfig, and retires four follow-ups (the tombstone corpus, the names `canon migrate` cannot delete, the release-only durability trace, the `canon purge` preview). It is not BREAKING for callers: `--from-ci` is additive and `require_ci_run` is opt-in; the git environment allow list changes a digest only for users with a `GIT_*` variable set or one of the pinned gitconfig keys; the one thing to plan is that a canon 0.39 or older reads a `.zst` blob on the same object-store tier as missing, so upgrade every canon that reads the tier before the first `.zst` is written.
+canon 0.40 stores object-store blobs as zstd frames (`<prefix>sha256/<digest>.zst`), lets `canon evidence add --all-scenarios --from-ci` record a batch as a GitHub Actions run and `spec_coverage.require_ci_run` accept only a complete CI record of the code as it stands now, passes only an allow list of `GIT_*` variables to git and fixes the diff and status shape against any gitconfig, and retires four follow-ups (the tombstone corpus, the names `canon migrate` cannot delete, the release-only durability trace, the `canon purge` preview). It is not BREAKING for callers: `--from-ci` is additive and `require_ci_run` is opt-in; the git environment allow list changes a digest only for users with a `GIT_*` variable set or one of the pinned gitconfig keys; the one thing to plan is that a canon 0.39 or older reads a `.zst` blob on the same object-store tier as missing, so upgrade every canon that reads the tier before the first `.zst` is written. 0.40.0 also includes the 0.39.1 launcher fix (the npm launcher execs canon instead of staying resident).
 
 ### Added
 
@@ -41,6 +41,14 @@ canon 0.40 stores object-store blobs as zstd frames (`<prefix>sha256/<digest>.zs
 - **A scenario whose last feature file was deleted is not judged `stale-evidence`** (`canon-0-40-retire-followups`, scenarios `gate.tombstone-corpus.01-02`). `canon inventory sync` writes a tombstone for a scenario no feature file declares, and the gate now reads the tombstone itself: in a repository whose last `.feature` file was deleted, the old evidence of the deleted scenarios is neither `stale-evidence` nor counted in `staleness_unresolvable`, where 0.39 could not tell the empty list from "no corpus read". The same holds before the sync, where `gate check` refreshes the index in memory. The tombstone lives in the gitignored scenario index, so a fresh clone has none and is judged as in 0.39. A repository whose scenarios are not read (the kind routed off the git tier, no index) is judged as before.
 - **`canon migrate` names the retired key it cannot delete** (`tier.retired-keys.01-02`): the `CONFIG_INVALID` refusal says `routing.session` (and the line, for an anchor, an alias or a tag) instead of only the two kind names; keys it could delete are not listed. Exit code, code and the unchanged file are as before.
 - **The durability trace is debug-only** (`tier.durability-release.01-02`): the `canon_store::atomic::trace` module and its `Event` type exist in debug builds only, and a release build of `write_atomic` and the artifact store no longer copies a path for each trace call, as the 0.39 write-durability brief said.
+
+## 0.39.1 — 2026-11-09
+
+Patch release: the npm launcher execs canon instead of staying resident beside it.
+
+### Fixed
+
+- **The npm launcher no longer stays resident beside canon.** On macOS and Linux with Node 26.1 or later (or Bun 1.4, which reports Node 26.3), `@journeykit/canon` replaces its own process with the native binary (`process.execve`): a long-running command such as `canon dashboard` keeps no node process (~39 MB) beside it, its pid is the one the caller started, and signals reach canon directly; a signal death is now the caller's own, which a shell still reads as 128+n. Earlier versions are left out because a failed exec aborts them instead of throwing (nodejs/node#62878). On Windows and older Node the launcher runs the binary as a child and passes its exit status on, as before. Binary resolution, the workspace build's priority and `CANON_SKILLS_SOURCE` are unchanged.
 
 ## 0.39.0 — 2026-11-08
 

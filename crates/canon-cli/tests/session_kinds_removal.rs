@@ -642,7 +642,7 @@ fn repo_text(relative: &str) -> String {
 #[test]
 fn tier_retired_18_the_changelog_lists_the_retired_kinds_and_what_replaces_them() {
     let changelog = repo_text("CHANGELOG.md");
-    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.39")).unwrap_or_default();
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.39.0")).unwrap_or_default();
     for needed in ["`RETIRED_KIND_KEYS`", "`routing.session`", "`routing.event`", "`aging.event`", "`canon migrate`", "`canon purge --kind session|event`", "`--kind session|event`", "`mart_session_costs`", "`## Session costs`"] {
         assert!(unreleased.contains(needed), "the 0.39 section of CHANGELOG.md does not mention {needed}");
     }
