@@ -90,20 +90,21 @@ fn write(repo: &Path, path: &str, text: &str) {
     std::fs::write(path, text).unwrap();
 }
 
+/// The files under `root` whose path below `root` contains `needle` (the temp directory's own name never counts).
 fn files_under(root: &Path, needle: &str) -> Vec<PathBuf> {
-    fn walk(dir: &Path, needle: &str, out: &mut Vec<PathBuf>) {
+    fn walk(root: &Path, dir: &Path, needle: &str, out: &mut Vec<PathBuf>) {
         let Ok(entries) = std::fs::read_dir(dir) else { return };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                walk(&path, needle, out);
-            } else if path.to_string_lossy().contains(needle) {
+                walk(root, &path, needle, out);
+            } else if path.strip_prefix(root).unwrap_or(&path).to_string_lossy().contains(needle) {
                 out.push(path);
             }
         }
     }
     let mut out = Vec::new();
-    walk(root, needle, &mut out);
+    walk(root, root, needle, &mut out);
     out.sort();
     out
 }
@@ -340,21 +341,21 @@ fn evidence_ci_run_06_from_ci_outside_github_actions_is_ci_env_missing() {
     let mut args = batch_args(&[&report], &["--from-ci", "--json"]);
     let none = canon_env(repo, &args, &[]);
     assert_eq!(none.status.code(), Some(2), "{}", text(&none));
-    assert_eq!(error_code(&none), "CI_ENV_MISSING");
+    assert_eq!(error_code(&none), "CI_ENV_REQUIRED");
     assert!(json_of(&none)["error"]["message"].as_str().unwrap().contains("GITHUB_ACTIONS"), "{}", text(&none));
 
     let mut empty_run = ci_env("1");
     empty_run.iter_mut().find(|(name, _)| *name == "GITHUB_RUN_ID").unwrap().1.clear();
     let empty = canon_env(repo, &args, &empty_run);
     assert_eq!(empty.status.code(), Some(2), "{}", text(&empty));
-    assert_eq!(error_code(&empty), "CI_ENV_MISSING");
+    assert_eq!(error_code(&empty), "CI_ENV_REQUIRED");
     let message = json_of(&empty)["error"]["message"].as_str().unwrap().to_string();
     assert!(message.contains("GITHUB_RUN_ID") && !message.contains("GITHUB_ACTIONS"), "only the variable that is missing: {message}");
 
     let mut not_ci = ci_env("1");
     not_ci.iter_mut().find(|(name, _)| *name == "GITHUB_ACTIONS").unwrap().1 = "false".into();
     let other = canon_env(repo, &args, &not_ci);
-    assert_eq!(error_code(&other), "CI_ENV_MISSING", "GITHUB_ACTIONS must be `true`");
+    assert_eq!(error_code(&other), "CI_ENV_REQUIRED", "GITHUB_ACTIONS must be `true`");
 
     // Without --from-ci the same environment is no business of canon's: the record names no run.
     args.retain(|a| *a != "--from-ci" && *a != "--json");
@@ -374,7 +375,7 @@ fn evidence_ci_run_07_from_ci_on_a_dirty_work_tree_is_ci_worktree_dirty() {
 
     let out = ci_batch(repo, "junit.xml", "1", &["--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
-    assert_eq!(error_code(&out), "CI_WORKTREE_DIRTY");
+    assert_eq!(error_code(&out), "CI_WORKTREE_CONFLICT");
     let hint = json_of(&out)["error"]["hint"].as_str().unwrap().to_string();
     assert!(hint.contains("gitignored") && hint.contains(".canon/") && hint.contains("code.exclude"), "{hint}");
     assert_eq!(evidence_files(repo), before, "nothing is written");

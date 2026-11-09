@@ -2155,7 +2155,7 @@
         },
         {
           "code": "EVIDENCE_ARGUMENT_REQUIRED",
-          "help": "--from-ci records a whole run: it needs --all-scenarios (a single scenario is not the suite) and an explicit --ref (the command line that ran the suite; the default, the report path, names no suite).",
+          "help": "--from-ci records the whole suite: it needs --all-scenarios and an explicit --ref, the command line that ran it.",
           "if": {
             "name": "from-ci"
           },
@@ -2167,7 +2167,7 @@
         },
         {
           "code": "EVIDENCE_ARGUMENT_CONFLICT",
-          "help": "--from-ci records the work tree the tests ran in, and each verdict comes from the report's own cases; --rev and --verdict would say otherwise.",
+          "help": "--from-ci records the work tree the tests ran in and the verdicts of the report's own cases.",
           "if": {
             "name": "from-ci"
           },
@@ -2263,6 +2263,8 @@
         "BRIEF_APPROVAL_REQUIRED",
         "BRIEF_APPROVAL_STALE",
         "BRIEF_MIGRATION_REQUIRED",
+        "CI_ENV_REQUIRED",
+        "CI_WORKTREE_CONFLICT",
         "COMMIT_REQUIRED",
         "CONFIG_DENIED",
         "CONFIG_INVALID",
@@ -2467,7 +2469,7 @@
           "valueType": "switch"
         },
         {
-          "help": "With --all-scenarios: record the batch as a CI run. Reads the GitHub Actions environment (`GITHUB_ACTIONS`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_SHA`; `GITHUB_WORKFLOW` and `GITHUB_JOB` when set) and writes it, with each report's case counts, as the `ci` block of every record. Needs an explicit --ref (the suite's command line); refused outside CI (CI_ENV_MISSING) and on a work tree that differs from HEAD (CI_WORKTREE_DIRTY)",
+          "help": "With --all-scenarios: record the batch as a CI run (the `ci` block of every record, from the GitHub Actions environment; needs --ref). Refused outside CI (CI_ENV_REQUIRED) and on a work tree that differs from HEAD (CI_WORKTREE_CONFLICT)",
           "name": "from-ci",
           "valueType": "switch"
         },
@@ -7938,17 +7940,17 @@
       "retryable": false
     },
     {
-      "code": "CI_ENV_MISSING",
+      "code": "CI_ENV_REQUIRED",
       "exit": 2,
       "fix": "Run the command in a GitHub Actions job that sets the variable the message names; outside CI, drop `--from-ci` (the record then names no CI run).",
-      "meaning": "`evidence add --from-ci` found no GitHub Actions environment: `GITHUB_ACTIONS` is not `true`, or one of `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_SHA` is empty (`field` and the message name the variable)",
+      "meaning": "`evidence add --from-ci` found no GitHub Actions environment: `GITHUB_ACTIONS` is not `true`, or `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT` (a whole number), `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY` or `GITHUB_SHA` is empty (`field` and the message name the variable)",
       "retryable": false
     },
     {
-      "code": "CI_WORKTREE_DIRTY",
+      "code": "CI_WORKTREE_CONFLICT",
       "exit": 2,
       "fix": "Write the report to a gitignored directory or under `.canon/`, or list it in `code.exclude`, and run the command again on a clean checkout.",
-      "meaning": "`evidence add --from-ci` found the work tree's code differs from `HEAD`'s, so the record's code tree would not be a commit's (the usual cause is a report file `.gitignore` does not hide)",
+      "meaning": "`evidence add --from-ci` found that the work tree's code differs from `HEAD`'s, so the record's code tree would be no commit's (the usual cause is a report file `.gitignore` does not hide)",
       "retryable": false
     },
     {
@@ -19505,7 +19507,7 @@
               "type": "string"
             },
             "fromCi": {
-              "description": "With --all-scenarios: record the batch as a CI run. Reads the GitHub Actions environment (`GITHUB_ACTIONS`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_SHA`; `GITHUB_WORKFLOW` and `GITHUB_JOB` when set) and writes it, with each report's case counts, as the `ci` block of every record. Needs an explicit --ref (the suite's command line); refused outside CI (CI_ENV_MISSING) and on a work tree that differs from HEAD (CI_WORKTREE_DIRTY)",
+              "description": "With --all-scenarios: record the batch as a CI run (the `ci` block of every record, from the GitHub Actions environment; needs --ref). Refused outside CI (CI_ENV_REQUIRED) and on a work tree that differs from HEAD (CI_WORKTREE_CONFLICT)",
               "type": "boolean"
             },
             "maxArtifactMib": {

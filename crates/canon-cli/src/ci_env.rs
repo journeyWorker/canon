@@ -35,7 +35,7 @@ pub struct CiEnv {
 }
 
 /// Read the CI environment through `get` (the process environment, or a table in a test). Refuses with
-/// `CI_ENV_MISSING`, naming every variable that is not there: `GITHUB_ACTIONS` that is not `true`, an empty
+/// `CI_ENV_REQUIRED`, naming every variable that is not there: `GITHUB_ACTIONS` that is not `true`, an empty
 /// variable, an attempt that is not a whole number of 1 or more.
 pub fn read(get: impl Fn(&str) -> Option<String>) -> Result<CiEnv, CliError> {
     let value = |name: &str| get(name).map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
@@ -67,7 +67,7 @@ pub fn read(get: impl Fn(&str) -> Option<String>) -> Result<CiEnv, CliError> {
 
 fn missing(problems: &[String]) -> CliError {
     let first = problems.first().and_then(|p| p.split([' ', '`']).next()).unwrap_or("GITHUB_ACTIONS").to_string();
-    CliError::refused("CI_ENV_MISSING", format!("--from-ci reads the GitHub Actions environment, and it is not there: {}; no record is written", problems.join("; ")))
+    CliError::refused("CI_ENV_REQUIRED", format!("--from-ci reads the GitHub Actions environment, and it is not there: {}; no record is written", problems.join("; ")))
         .field(first)
         .hint("run this command in a GitHub Actions job (it sets these variables); outside CI, record the batch without --from-ci")
 }
@@ -124,7 +124,7 @@ mod tests {
         for (name, _) in FULL {
             let rest: Vec<(&str, &str)> = FULL.iter().filter(|(k, _)| *k != name).copied().collect();
             let error = read(env(&rest)).unwrap_err();
-            assert_eq!(error.code, "CI_ENV_MISSING");
+            assert_eq!(error.code, "CI_ENV_REQUIRED");
             assert!(error.message.contains(name), "{name}: {}", error.message);
         }
         let empty = [("GITHUB_ACTIONS", "true"), ("GITHUB_RUN_ID", ""), ("GITHUB_RUN_ATTEMPT", "1"), ("GITHUB_SERVER_URL", "x"), ("GITHUB_REPOSITORY", " "), ("GITHUB_SHA", "a")];

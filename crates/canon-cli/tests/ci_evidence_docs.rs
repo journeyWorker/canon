@@ -1,6 +1,7 @@
 //! `canon-0-40-ci-evidence` F7: the people who read the skills and the CHANGELOG find the recipe, the new field and the new policy key,
 //! and a generated block that no longer matches the command spec fails the drift check (`tests/docs_generated.rs`).
 
+#[expect(dead_code, reason = "this test uses only the splice half of the generator")]
 mod doc_gen;
 
 use std::fs;
@@ -39,8 +40,8 @@ fn gate_ci_run_13_the_skills_and_the_changelog_carry_the_recipe_the_field_and_th
         "GITHUB_TOKEN",
         ".canon/ledger",
         ".canon/artifacts",
-        "CI_ENV_MISSING",
-        "CI_WORKTREE_DIRTY",
+        "CI_ENV_REQUIRED",
+        "CI_WORKTREE_CONFLICT",
     ] {
         assert!(recipe.contains(needle), "the recipe lacks `{needle}`");
     }
@@ -58,12 +59,10 @@ fn gate_ci_run_13_the_skills_and_the_changelog_carry_the_recipe_the_field_and_th
     assert!(schema.contains("\"ci\"") && schema.contains("\"CiRun\"") && schema.contains("\"attempt\""), "the evidence schema has the `ci` block");
 
     let added = unreleased();
-    for needle in ["--from-ci", "`ci` block", "data.reports[]", "spec_coverage.require_ci_run", "CI_ENV_MISSING", "CI_WORKTREE_DIRTY", "a claim the environment makes"] {
+    for needle in ["--from-ci", "`ci` block", "data.reports[]", "spec_coverage.require_ci_run", "CI_ENV_REQUIRED", "CI_WORKTREE_CONFLICT", "a claim the environment makes"] {
         assert!(added.contains(needle), "the CHANGELOG's Unreleased section lacks `{needle}`");
     }
-    for generated in ["canon/skills/reference/role-implementer.md", "packages/website/src/content/docs/cli.mdx"] {
-        assert!(read(generated).contains("--from-ci"), "{generated}: the generated command block lists --from-ci");
-    }
+    assert!(read("canon/skills/reference/role-implementer.md").contains("--from-ci"), "the generated command block of the implementer's guide lists --from-ci");
 }
 
 /// gate.ci-run.14 (F7, failure path): a generated block edited by hand, or left behind by a spec change, is not what the spec renders, and

@@ -34,10 +34,10 @@ pub(crate) static TABLES: Tables = Tables {
                 Rule::requires("all-scenarios", &["report"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("--all-scenarios splits a --report by the scenario each case belongs to.").says("--all-scenarios splits a --report by the scenario each case belongs to, and no --report was given: none was given"),
                 Rule::requires("from-ci", &["all-scenarios", "ref"])
                     .code("EVIDENCE_ARGUMENT_REQUIRED")
-                    .help("--from-ci records a whole run: it needs --all-scenarios (a single scenario is not the suite) and an explicit --ref (the command line that ran the suite; the default, the report path, names no suite)."),
+                    .help("--from-ci records the whole suite: it needs --all-scenarios and an explicit --ref, the command line that ran it."),
                 Rule::forbids("from-ci", &["rev", "verdict"])
                     .code("EVIDENCE_ARGUMENT_CONFLICT")
-                    .help("--from-ci records the work tree the tests ran in, and each verdict comes from the report's own cases; --rev and --verdict would say otherwise."),
+                    .help("--from-ci records the work tree the tests ran in and the verdicts of the report's own cases."),
                 Rule::requires("report-case", &["report"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("--report-case names a case of a --report."),
                 Rule::requires("command-result", &["summary"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("The captured output backs a --summary."),
                 Rule::requires("approver", &["approval-role", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_REQUIRED").help(APPROVAL_TOGETHER),

@@ -630,8 +630,8 @@ never implied: without `--from-ci` a record names no run, in CI or not. It
 needs `--all-scenarios` and an explicit `--ref` (the command line that ran the
 suite: the default, the report path, names no suite) and refuses `--rev` and
 `--verdict` (`EVIDENCE_ARGUMENT_CONFLICT`). Outside GitHub Actions it is
-`CI_ENV_MISSING`, naming the variable (exit 2). On a work tree whose code
-differs from `HEAD`'s it is `CI_WORKTREE_DIRTY` (exit 2): an untracked report
+`CI_ENV_REQUIRED`, naming the variable (exit 2). On a work tree whose code
+differs from `HEAD`'s it is `CI_WORKTREE_CONFLICT` (exit 2): an untracked report
 changes the code tree, so write the report to a gitignored directory or under
 `.canon/`, or list it in `code.exclude`. Nothing is written in either case. The
 same batch of the same attempt is `unchanged`; a re-run of the workflow

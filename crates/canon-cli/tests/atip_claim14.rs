@@ -881,6 +881,8 @@ const GROWN_SINCE_0_36: &[(&str, usize)] = &[
     ("schema finding close", 10),
     // canon-0-38-finding-closer: each listed finding gained `closedBy` and `closedRole`.
     ("schema finding list", 10),
+    // canon-0-40-ci-evidence: `evidence add --from-ci`, its two rules and the codes CI_ENV_REQUIRED and CI_WORKTREE_CONFLICT.
+    ("schema evidence add", 7),
 ];
 
 fn changelog_problems(text: &str, live: &BTreeMap<String, Vec<usize>>) -> Vec<String> {

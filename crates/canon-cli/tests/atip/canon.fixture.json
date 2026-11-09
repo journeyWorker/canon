@@ -937,12 +937,12 @@
       "retryable": false
     },
     {
-      "code": "CI_ENV_MISSING",
+      "code": "CI_ENV_REQUIRED",
       "exit": 2,
       "retryable": false
     },
     {
-      "code": "CI_WORKTREE_DIRTY",
+      "code": "CI_WORKTREE_CONFLICT",
       "exit": 2,
       "retryable": false
     },

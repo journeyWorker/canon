@@ -118,7 +118,7 @@ pub struct EvidenceAddArgs {
     /// One record per indexed scenario of --project that owns a case in the --report(s), all or nothing (see below)
     #[arg(long)]
     pub all_scenarios: bool,
-    /// With --all-scenarios: record the batch as a CI run. Reads the GitHub Actions environment (`GITHUB_ACTIONS`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_SHA`; `GITHUB_WORKFLOW` and `GITHUB_JOB` when set) and writes it, with each report's case counts, as the `ci` block of every record. Needs an explicit --ref (the suite's command line); refused outside CI (CI_ENV_MISSING) and on a work tree that differs from HEAD (CI_WORKTREE_DIRTY)
+    /// With --all-scenarios: record the batch as a CI run (the `ci` block of every record, from the GitHub Actions environment; needs --ref). Refused outside CI (CI_ENV_REQUIRED) and on a work tree that differs from HEAD (CI_WORKTREE_CONFLICT)
     #[arg(long)]
     pub from_ci: bool,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused

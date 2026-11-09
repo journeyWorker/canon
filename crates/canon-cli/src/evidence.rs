@@ -1513,7 +1513,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
             Err(error) => return error.emit("canon evidence add", args.json),
         };
         if args.commit.worktree_dirty {
-            return CliError::refused("CI_WORKTREE_DIRTY", "--from-ci records the work tree the tests ran in, and its code differs from HEAD's: a CI record of code no commit holds can never be told current; no record is written")
+            return CliError::refused("CI_WORKTREE_CONFLICT", "--from-ci records the work tree the tests ran in, and its code differs from HEAD's: a CI record of code no commit holds can never be told current; no record is written")
                 .hint("the usual cause is a report file git does not ignore (an untracked junit.xml changes the code tree): write the report to a gitignored directory or under .canon/, or list it in `code.exclude` of canon.yaml, and record again on a clean checkout")
                 .emit("canon evidence add", args.json);
         }
