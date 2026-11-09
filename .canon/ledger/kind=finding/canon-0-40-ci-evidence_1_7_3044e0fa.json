@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T16:02:13.482172Z",
+  "change_id": "canon-0-40-ci-evidence",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=evidence/ci-run.feature",
+  "introduced_by": "4b814830d6c7ecf3d9a3d41bf57478cae5370297",
+  "kind": "finding",
+  "resolution_code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "resolution_sha": "168ac536e287218d17fb504f56c9dcccf902a825",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-ci",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.ci-run.06",
+    "evidence.ci-run.07"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "Spec fidelity/standards: all 25 scenarios (evidence.ci-run.01-11, gate.ci-run.01-14) are a one-line title over the placeholder step `Given a step`, with no When/Then (the same convention as the other 0.39-0.40 planner scenarios), so the Then is the title and I read each test against the title and the brief's acceptance. The bound case names of evidence.ci-run.06 and .07 (`..._is_ci_env_missing`, `..._is_ci_worktree_dirty`) still carry the pre-rename code names; a review pins case names, so renaming them after a signature stales that signature: rename before the reviews or keep them. Blast radius: none in behavior.",
+  "worktree_dirty": false
+}

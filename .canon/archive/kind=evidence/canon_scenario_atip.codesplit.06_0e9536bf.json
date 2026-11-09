@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T12:10:53.440569Z",
+  "attachments": [
+    {
+      "case": "learn::tests::atip_codesplit_06_each_condition_of_a_refused_rollback_has_its_own_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    },
+    {
+      "case": "atip_codesplit_06_a_rollback_the_signature_check_turns_away_says_which_condition_failed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    }
+  ],
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.40/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 178,
+  "scenario_id": "atip.codesplit.06",
+  "schema": 1,
+  "staging_id": "47b6d28e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

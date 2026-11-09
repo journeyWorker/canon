@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T16:02:14.060244Z",
+  "change_id": "canon-0-40-ci-evidence",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "deferred",
+  "file_ref": "canon/skills/reference/canon-gate.md:605",
+  "introduced_by": "622d2529c8a9cc0329231d6bc397539ff32d863d",
+  "kind": "finding",
+  "reason": "note: install step, nextest profile and push trigger are in the recipe now; the website trust-spine page and executing the recipe in a real workflow are left to a later change",
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-ci",
+  "round": 1,
+  "scenario_ids": [
+    "gate.ci-run.13"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "Standards: the canon-gate recipe's record step runs as written (probed: `canon inventory sync` then `canon evidence add --project root --all-scenarios --from-ci --ref ... --report junit:target/nextest/ci/junit.xml --role implementer --promote`, no --actor, exit 0, 3 records with the same ci). But (a) it never says how canon reaches the runner nor which nextest profile writes the JUnit file (`[profile.ci.junit] path = \"junit.xml\"` gives target/nextest/ci/junit.xml); (b) Way 2's `git push` assumes a branch checkout: a `pull_request` run checks out a detached merge ref and the push has no destination, and the recipe names no trigger; (c) gate.ci-run.13 checks the recipe by needles in order, nothing runs it. The website concept page trust-spine (en and ko) lists the spec_coverage sub-keys (require_audit) and not require_ci_run; the brief's F7 does not ask for it. Blast radius: documentation only.",
+  "worktree_dirty": false
+}

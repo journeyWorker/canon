@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-zstd",
+    "role": "reviewer",
+    "session_id": "s-0-40-zstd-rev"
+  },
+  "at": "2026-11-09T12:35:16.117853Z",
+  "change_id": "canon-0-40-object-store-zstd",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/artifacts_prune.rs:delete_blob",
+  "introduced_by": "1955ad21da3043be28d0c52d830ae18a8e511433",
+  "kind": "finding",
+  "reviewed_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "reviewer": "rev-0-40-zstd",
+  "round": 1,
+  "scenario_ids": [
+    "artifacts.object-zstd.10"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] When the tier refuses the second name of a digest, the prune refusal contradicts itself. Probed (chflags uchg on the plain object, debug local-fs substitute): ARTIFACTS_STORE_FAILED 'could not delete cold:<digest>: ... deleted artifacts/sha256/<digest>.zst, but could not delete artifacts/sha256/<digest>: ... Operation not permitted; nothing was deleted', hint about CANON_S3_* reachability. The brief (F5 failure, scenario 10) asks to say what was deleted; the tail 'nothing was deleted' is false because delete_blob counts a digest only when both names went (done.blobs/tier_objects stay 0 for the half-deleted one) and the code is STORE_FAILED, not ARTIFACTS_PRUNE_INCOMPLETE. The repeat does work (preview lists the digest by the plain name, --commit removes it; verified). The CLI test of scenario 10 runs only the interrupted-then-repeat half; the refusal text is covered by the canon-store unit test alone, so the contradiction is untested. Blast radius: only the prune failure message and exit path; no data is lost.",
+  "worktree_dirty": false
+}

@@ -73,6 +73,7 @@ flate2 = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
+zstd = { version = "0.13", default-features = false }
 uuid = { version = "1.23.4", features = ["v4"] }
 
 [lints]

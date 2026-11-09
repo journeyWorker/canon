@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-gitenv",
+    "role": "reviewer",
+    "session_id": "s-0-40-gitenv-rev"
+  },
+  "at": "2026-11-09T16:08:48.863185Z",
+  "change_id": "canon-0-40-git-env-allowlist",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-store/src/git.rs:ALLOWED_ENV",
+  "introduced_by": "d51e42e5b22d845051a6b74c45710c7874fc2cd8",
+  "kind": "finding",
+  "reason": "ALLOWED_ENV has the 10 git-remote-http names (21), GIT_CURL_VERBOSE deliberately left out (stderr noise like GIT_TRACE), brief amended and re-approved, test asserts GIT_CURL_VERBOSE, GIT_ALLOW_PROTOCOL and GIT_NO_LAZY_FETCH are removed; wrapper-git probe at d7ce4913f not repeated, the test is by name",
+  "resolution_code_tree": "2e04e779db00edc2de4decba555741054bef36c6",
+  "resolution_sha": "c642f1950d606354a0ef39b0cd95aa5e7c0a3789",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-gitenv",
+  "round": 1,
+  "scenario_ids": [
+    "gate.git-env.02"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[spec fidelity] The allow list gives as its reason that its 8 remote names are the ones a partial clone's fetch of a missing object needs, but git-remote-http (git 2.56.0, strings of the binary) also reads GIT_SSL_CERT, GIT_SSL_KEY, GIT_SSL_CERT_PASSWORD_PROTECTED, GIT_SSL_CERT_TYPE, GIT_SSL_KEY_TYPE, GIT_SSL_VERSION, GIT_SSL_CIPHER_LIST, GIT_HTTP_PROXY_AUTHMETHOD, GIT_HTTP_LOW_SPEED_* and GIT_CURL_VERBOSE. [INFERENCE, no network test run] a client-certificate HTTPS partial clone configured by those variables cannot lazy-fetch under 0.40; GIT_ALLOW_PROTOCOL and a user's GIT_NO_LAZY_FETCH are removed too (the wrapper-git probe shows every GIT_* off the list is gone). The human approved the 8 names (default of the question), so this is a note: list the others, or say in the CHANGELOG that the fetch variables are exactly those 8. Not exercised by any check.",
+  "worktree_dirty": false
+}

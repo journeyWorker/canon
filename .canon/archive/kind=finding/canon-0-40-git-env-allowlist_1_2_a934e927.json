@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-gitenv",
+    "role": "reviewer",
+    "session_id": "s-0-40-gitenv-rev"
+  },
+  "at": "2026-11-09T12:44:10.539551Z",
+  "change_id": "canon-0-40-git-env-allowlist",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/git_env_allowlist.rs:dirty_project",
+  "introduced_by": "d51e42e5b22d845051a6b74c45710c7874fc2cd8",
+  "kind": "finding",
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-gitenv",
+  "round": 1,
+  "scenario_ids": [
+    "gate.git-env.04",
+    "gate.git-env.05",
+    "gate.git-env.06"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[standards] --ignore-submodules=none in DIFF_SHAPE and STATUS_SHAPE (the two calls that feed the context pack state) is proven by no test: the fixture of 04/05 (dirty_project) has no submodule, so the matrix row diff.ignoreSubmodules=all is vacuous for the pack, and 06 reaches only NAMES_SHAPE (staleness names). Mutation run in a copy of d4f00082a: dropping the option from both constants (and, in the same build, emptying the env removal and NAMES_SHAPE) leaves 04 and 05 green while 01 and 06 go red, so only the other two mutations are killed. The code is right (probe: a moved submodule under diff.ignoreSubmodules=all gives the plain digest on 0.40 and a different one on 0.39.1), the check does not prove it. Other pinned options no matrix row kills (measured on plain git with the 04 fixture): --inter-hunk-context=0, --diff-algorithm=myers, --no-relative (git runs at the repo root, so diff.relative=true cannot show), --no-branch, and --no-color (redundant after -c color.ui=false); the brief lists them, but each is unexercised. Fix: put a submodule with an uncommitted pointer move into dirty_project (or a second fixture) and add rows for diff.interHunkContext, diff.algorithm, status.branch. Blast radius: a regression that drops the option would make a dirty pack's id depend on diff.ignoreSubmodules again with every check green.",
+  "worktree_dirty": false
+}

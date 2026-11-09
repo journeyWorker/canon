@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T12:47:18.251135Z",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "kind": "review",
+  "pin": "7fd0e5f0f8ecbb7e709a4c2d50ba691886156e06",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atomic::tests::tier_durability_release_02_every_trace_call_in_the_writers_stands_under_cfg_debug_assertions"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f8cb213c53c11a2982660259c5ac6f95f1e657ff402cf50b1e4275644594d240",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-retire-followups/brief.md"
+  },
+  "review_id": "01M705JH7BM0Z3SYY46RZ2JT15",
+  "reviewer": "rev-0-40-followups",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "tier.durability-release.02",
+  "schema": 2,
+  "worktree_dirty": false
+}

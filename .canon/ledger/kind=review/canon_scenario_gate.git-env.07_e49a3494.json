@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-gitenv",
+    "role": "reviewer",
+    "session_id": "s-0-40-gitenv-rev"
+  },
+  "at": "2026-11-09T16:09:12.798724Z",
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "kind": "review",
+  "pin": "168ac536e287218d17fb504f56c9dcccf902a825",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_git_env_07_core_autocrlf_is_not_pinned_and_a_crlf_file_is_no_change_where_it_is_set"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "1d1281c75ed7a0708843bcf7b8986aa8b2d3b360070f4d1dc9c1fb4949d5b47d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-git-env-allowlist/brief.md"
+  },
+  "review_id": "01M70H47TYK2RGJHCBGNFKBT9V",
+  "reviewer": "rev-0-40-gitenv",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "gate.git-env.07",
+  "schema": 2,
+  "worktree_dirty": false
+}

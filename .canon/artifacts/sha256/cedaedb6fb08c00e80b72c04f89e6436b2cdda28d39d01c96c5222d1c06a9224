@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="8" skipped="0" failures="0" errors="0" uuid="80d79751-1db2-4a7c-9270-3b15c9c21621" timestamp="2026-11-09T22:03:57.341+09:00" time="8.835">
+    <testsuite name="canon-store" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="artifact_blobs::tests::artifacts_object_zstd_09_list_counts_a_digest_once_and_delete_removes_both_forms" classname="canon-store" timestamp="2026-11-09T22:03:57.350+09:00" time="0.038"/>
+        <testcase name="artifact_blobs::tests::artifacts_object_zstd_10_a_refused_second_delete_names_what_went_and_a_repeat_removes_the_rest" classname="canon-store" timestamp="2026-11-09T22:03:57.350+09:00" time="0.054"/>
+        <testcase name="artifact_blobs::tests::artifacts_object_zstd_03_put_replaces_an_altered_zst_even_when_a_plain_object_exists" classname="canon-store" timestamp="2026-11-09T22:03:57.350+09:00" time="0.068"/>
+        <testcase name="artifact_blobs::tests::artifacts_object_zstd_03_a_zst_object_and_a_plain_object_answer_the_same" classname="canon-store" timestamp="2026-11-09T22:03:57.350+09:00" time="0.093"/>
+    </testsuite>
+    <testsuite name="canon-cli::artifacts_zstd" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="artifacts_object_zstd_10_a_repeat_prune_deletes_the_name_that_remains_and_keeps_the_bound_blob" classname="canon-cli::artifacts_zstd" timestamp="2026-11-09T22:03:57.350+09:00" time="7.000"/>
+        <testcase name="artifacts_object_zstd_10_a_half_deleted_digest_is_prune_incomplete_not_nothing_deleted" classname="canon-cli::artifacts_zstd" timestamp="2026-11-09T22:03:57.350+09:00" time="7.339"/>
+        <testcase name="artifacts_object_zstd_09_prune_lists_both_forms_of_a_digest_once_and_deletes_both" classname="canon-cli::artifacts_zstd" timestamp="2026-11-09T22:03:57.350+09:00" time="7.565"/>
+        <testcase name="artifacts_object_zstd_03_gate_check_and_verify_answer_the_same_for_zst_and_plain_objects" classname="canon-cli::artifacts_zstd" timestamp="2026-11-09T22:03:57.350+09:00" time="8.825"/>
+    </testsuite>
+</testsuites>

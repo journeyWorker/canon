@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T15:49:55.039499Z",
+  "attachments": [
+    {
+      "case": "retention::tests::tier_durability_10_an_unopenable_audit_file_is_an_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b609178efae635dbc57bbb6d57eab8c594c5c4ab8fd6bdcfb7b8f1123eadefb4"
+    },
+    {
+      "case": "retention::tests::tier_durability_10_the_audit_file_is_created_restrictively",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b609178efae635dbc57bbb6d57eab8c594c5c4ab8fd6bdcfb7b8f1123eadefb4"
+    }
+  ],
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.40/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d7ce4913f8fd717f549c30fb97c38f90d24d8ac5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 58,
+  "scenario_id": "tier.durability.10",
+  "schema": 1,
+  "staging_id": "0a43bc64",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

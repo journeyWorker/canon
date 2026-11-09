@@ -83,7 +83,8 @@
 //! `canon.yaml`'s `artifact_store: { backend: local | <tier>, prefix: artifacts/ }`
 //! moves the bytes off git: [`ArtifactStore`] is the local directory above
 //! (the default, no credentials) or the object-store tier named by
-//! `backend`, keyed `<prefix>sha256/<digest>`. Records keep only digests.
+//! `backend`, keyed `<prefix>sha256/<digest>.zst` (one zstd frame; an older canon's plain
+//! `<prefix>sha256/<digest>` object is still read). Records keep only digests.
 //! The rules above hold unchanged, asked of the store instead of the
 //! directory, with two differences: the store is asked once per distinct
 //! digest (a HEAD and its size/digest metadata; `canon artifacts verify
@@ -468,6 +469,7 @@ impl StoreLock {
                 self.unpublish(&renamed);
                 return Err((index, e.into()));
             }
+            #[cfg(debug_assertions)]
             canon_store::atomic::trace::record(canon_store::atomic::trace::Event::Rename { from: temp, to: target.clone() });
             renamed.push(target);
             last_placed = index;
@@ -531,7 +533,7 @@ fn copy_hashed(reader: &mut impl Read, file: &mut File) -> std::io::Result<Strin
 /// `artifact_store: { backend: <tier>, prefix: artifacts/ }`.
 ///
 /// With an object store, a write uploads by digest key
-/// (`<prefix>sha256/<digest>`), reads it back, and keeps no local copy;
+/// (`<prefix>sha256/<digest>.zst`, zstd-compressed), reads it back, and keeps no local copy;
 /// the gate asks the store (one HEAD plus size/digest metadata per
 /// distinct digest; [`ArtifactStore::observe`] with `full` downloads and
 /// re-hashes). A store that cannot be reached is
@@ -595,11 +597,19 @@ impl ArtifactStore {
         }
     }
 
+    /// The directory-like key blobs live under, as printed to operators (`<tier>:<prefix>sha256/`).
+    pub fn display_dir(&self) -> String {
+        match self {
+            ArtifactStore::Local => format!("{}/", paths::ARTIFACTS_SHA256_DIR),
+            ArtifactStore::Object(object) => format!("{}:{}", object.tier, object.blobs.dir_key()),
+        }
+    }
+
     /// Where the store keeps blobs, for a sentence ("under …").
     pub fn location(&self) -> String {
         match self {
             ArtifactStore::Local => format!("{}/", paths::ARTIFACTS_SHA256_DIR),
-            ArtifactStore::Object(object) => format!("the `{}` object store ({})", object.tier, object.blobs.key("")),
+            ArtifactStore::Object(object) => format!("the `{}` object store ({})", object.tier, object.blobs.dir_key()),
         }
     }
 
@@ -644,15 +654,20 @@ impl ObjectArtifacts {
         self.blobs.list().map_err(|e| self.error(e))
     }
 
-    /// Every digest the store holds with the size of its object, sorted by digest.
-    pub fn list_sized(&self) -> Result<Vec<(String, u64)>, ArtifactStoreError> {
-        self.blobs.list_sized().map_err(|e| self.error(e))
+    /// Every digest the store holds, with the size of each object form (`.zst`, uncompressed), sorted by digest.
+    pub fn list_objects(&self) -> Result<Vec<canon_store::artifact_blobs::ObjectEntry>, ArtifactStoreError> {
+        self.blobs.list_objects().map_err(|e| self.error(e))
     }
 
     /// Delete the object for `digest` (`canon artifacts prune`); one the store already lacks is no error. Irreversible: the store keeps
     /// no other copy.
-    pub fn delete(&self, digest: &str) -> Result<(), ArtifactStoreError> {
-        self.blobs.delete(digest).map_err(|e| self.error(e))
+    ///
+    /// `Err((error, true))` when the first object of the digest was deleted and the second was refused.
+    pub fn delete(&self, digest: &str) -> Result<(), (ArtifactStoreError, bool)> {
+        self.blobs.delete(digest).map_err(|e| {
+            let partly = matches!(e, BlobError::PartlyDeleted(_));
+            (self.error(e), partly)
+        })
     }
 
     fn error(&self, e: BlobError) -> ArtifactStoreError {
@@ -978,6 +993,7 @@ mod tests {
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
+            tombstoned_scenarios: Default::default(),
             code_tree: None,
             derived: Default::default(),
             now: Utc::now(),
@@ -1009,6 +1025,18 @@ mod tests {
     #[cfg(all(unix, debug_assertions))]
     #[test]
     fn tier_durability_03_publishing_two_blobs_syncs_the_store_directory_once_after_both_renames_and_an_existing_blob_syncs_nothing() {
+        assert_publish_order();
+    }
+
+    /// tier.durability-release.01 (F4), the publish half: a debug build, where the trace exists, still sees two renames then one directory sync.
+    #[cfg(all(unix, debug_assertions))]
+    #[test]
+    fn tier_durability_release_01_a_debug_build_traces_two_renames_then_one_directory_sync() {
+        assert_publish_order();
+    }
+
+    #[cfg(all(unix, debug_assertions))]
+    fn assert_publish_order() {
         use canon_store::atomic::trace::{self, Event};
         let dir = TempDir::new().unwrap();
         let lock = StoreLock::acquire(dir.path()).unwrap();

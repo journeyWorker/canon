@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T16:07:14.788773Z",
+  "change_id": "canon-0-40-retire-followups",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/session_ingest_removed.rs:397-409",
+  "introduced_by": "d9683d4071cc1bf6978d9f0f3e85a741d3859842",
+  "kind": "finding",
+  "resolution_code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "resolution_sha": "eab59158a1ca4adf653515848edb3632b2b8ed6d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-followups",
+  "round": 1,
+  "scenario_ids": [
+    "gate.tombstone-corpus.02"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "Standards: the CLI test gate_tombstone_corpus_02_a_corpus_that_is_not_read_still_judges_the_evidence does not build its Given ('no scenario is read and no tombstone with it'). After `scenario: local` -> `scenario: hot` and deleting the feature file without a sync, .canon/ledger/kind=scenario/ still holds the live gone.leaf.01 record (probed), so the gate sees a declared scenario and judges it; the test would pass with the old 0.39 guard removed or inverted. The real empty-corpus-and-empty-tombstone-set guard is proven only by the unit test staleness::tests::gate_tombstone_corpus_02_..., which does fail if the `!ctx.scenarios.is_empty()` clause is dropped, so the scenario as a whole is covered; the real-binary equivalent (a clone with no index and no feature file) I probed and it is judged stale-evidence as in 0.39. Blast radius: none in code; the CLI half of this scenario's evidence is a weaker proxy than its name says.",
+  "worktree_dirty": false
+}

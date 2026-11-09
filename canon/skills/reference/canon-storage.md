@@ -164,9 +164,18 @@ artifact_store: { backend: local }                  # default
 
 `local` is `.canon/artifacts/sha256/`, git-tracked and credential-free. An
 object-store tier gets `evidence add`, `review scenario` and `artifacts store`
-uploads under `<prefix>sha256/<digest>` and keeps nothing locally. The gate
-and `canon artifacts verify [--full]` ask the store and refuse, never pass,
-when it cannot be reached. `canon artifacts move --tier <tier>` (a preview; `--commit --plan-digest <digest>` acts)
+uploads under `<prefix>sha256/<digest>.zst` and keeps nothing locally. The
+`.zst` object is one zstd frame (level 19) of the bound bytes; the digest is
+the sha256 of the bytes before compression, so a record's digest means what
+it always did. To read a blob without canon, download it and run
+`zstd -d <digest>.zst` (`zstd -t` checks it). An object an older canon wrote
+at `<prefix>sha256/<digest>` (plain bytes) stays valid: the gate, `verify`,
+`move` and `prune` read both names; canon writes only `.zst`. A canon 0.39 or
+older reads a `.zst` blob as missing, so upgrade every canon that reads the
+tier before the first `.zst` is written. The local `.canon/artifacts/sha256/`
+is never compressed (git's own delta compression works on plain blobs). The
+gate and `canon artifacts verify [--full]` ask the store and refuse, never
+pass, when it cannot be reached. `canon artifacts move --tier <tier>` (a preview; `--commit --plan-digest <digest>` acts)
 uploads, reads back and verifies every local blob, then writes the
 `artifact_store:` block, removes the local copies and ignores
 `.canon/artifacts/`; commit the removals, `.gitignore` and `canon.yaml`. It is
@@ -257,7 +266,12 @@ preflights all attached destinations before the first delete, but storage
 backends are not one transaction: a failure after a prior delete returns
 an explicit `partial` result with matched/deleted counts and a nonzero
 status. Purge never rewrites Git history or deletes source transcript
-files.
+files. A tier that `canon.yaml` declares but that cannot attach (its bucket
+variable or DSN is unset) stops a commit, `RETENTION_TIERS_REQUIRED`, before
+anything is deleted; the preview of such a repository says so: it lists the
+removal set and the tier under `unavailable`, and its first `meta.next` step names
+the tier and what to set instead of a `--commit` command. Set the value and run
+the preview again to get the commit command.
 
 **Done when:** after `canon purge --kind <kind> --before <time> --commit
 --plan-digest <digest from the preview>`, a bare `canon purge` with the same

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-gitenv",
+    "role": "reviewer",
+    "session_id": "s-0-40-gitenv-rev"
+  },
+  "at": "2026-11-09T12:45:30.795913Z",
+  "change_id": "canon-0-40-git-env-allowlist",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": ".canon/changes/canon-0-40-git-env-allowlist/brief.md",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-gitenv",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[spec fidelity, on the brief] 'canon brief show' still reports 15 open lines under 'questions' (next step 'clarify'): the three 'question:' lines (safe.directory via GIT_CONFIG_COUNT, the 8 fetch names, core.excludesFile) carry their default but no recorded answer, although the human approved the brief with the recommended defaults (approval line, 2026-11-09T10:05:36Z). The implementation follows the defaults and the CHANGELOG states the first two; the third (global core.excludesFile is not pinned, so a work-tree code tree can differ per host) is in neither the CHANGELOG nor any test. Judged, not a defect of the code: extra '-c diff.suppressBlankEmpty=false' is accepted (the matrix row diff.suppressBlankEmpty has no command-line option, so a -c is the only way; measured: without it diff.suppressBlankEmpty=true changes the diff bytes, with it plain; default false, and the CHANGELOG names it). The fixed digest being derived from plain git is accepted too: the 0.39.1 binary on a rebuilt copy of the fixture gives exactly sha256:597bc552...2280, the constant of 04.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T16:07:26.273623Z",
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "kind": "review",
+  "pin": "2baff789908b455870da1958568228ac9cf28d6f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:tier_purge_preview_01_a_configured_tier_that_does_not_answer_is_a_retry_not_a_variable",
+          "junit:tier_purge_preview_01_a_preview_with_a_tier_that_cannot_attach_names_it_and_offers_no_commit_command"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "62f534f636fb596a64a089432af955403fe7841ec18f2fd175943ae12d963167",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-retire-followups/brief.md"
+  },
+  "review_id": "01M70H0ZT1Q0QV9YE44V7VY5EV",
+  "reviewer": "rev-0-40-followups",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "tier.purge-preview.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

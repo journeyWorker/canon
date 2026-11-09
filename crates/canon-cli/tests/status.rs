@@ -1222,6 +1222,7 @@ fn context_status_80_status_names_the_policy_level_from_its_line_else_its_sectio
         (light.to_string(), "light"),
         (format!("{light}  scope: [building]\n"), "custom"),
         (format!("{FULL_POLICY}  require_audit: {{rate: 0.5}}\n"), "custom"),
+        (format!("{FULL_POLICY}  require_ci_run: {{}}\n"), "custom"),
         (format!("{standard}  require_review: {{distinct_actor: false}}\n"), "custom"),
         ("spec_coverage:\n  require_evidence: false\n".to_string(), "custom"),
         (format!("{light}# canon policy level: strict\n"), "light"),

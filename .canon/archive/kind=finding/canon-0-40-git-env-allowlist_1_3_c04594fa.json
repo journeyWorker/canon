@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-gitenv",
+    "role": "reviewer",
+    "session_id": "s-0-40-gitenv-rev"
+  },
+  "at": "2026-11-09T12:44:28.861526Z",
+  "change_id": "canon-0-40-git-env-allowlist",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/src/git.rs:gate_git_env_02",
+  "introduced_by": "d51e42e5b22d845051a6b74c45710c7874fc2cd8",
+  "kind": "finding",
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-gitenv",
+  "round": 1,
+  "scenario_ids": [
+    "gate.git-env.01",
+    "gate.git-env.02",
+    "gate.git-env.03"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] The name tests use the code under test as their oracle in places: gate_git_env_02 loops over ALLOWED_ENV and asks env_to_remove, so the membership of 9 of the 11 allowed names is pinned only by ALLOWED_ENV.len()==11 (GIT_CONFIG_GLOBAL and GIT_SSH_COMMAND are named, the other nine could be swapped for others unseen; the CHANGELOG test names 5 of the 11); the GIT_TRACE=1 and GIT_CONFIG_COUNT/PARAMETERS rows of 01 cannot fail even with no removal (-U3 and -c beat them, as the brief measured), so only GIT_DIFF_OPTS proves that command() applies env_to_remove to the real environment (mutation: env removal emptied -> 01 fails on GIT_DIFF_OPTS); 'canon's own variables keep their values' is shown by get_envs() of a process that holds none of them, not by a shell that holds GIT_OPTIONAL_LOCKS=1 (probe with a wrapper git: the child sees GIT_OPTIONAL_LOCKS=0, GIT_TERMINAL_PROMPT=0, and only the 11 names + canon's own); gate.git-boundary.01 (canon-store) no longer asserts that command() removes anything (the loop over CLEARED_ENV became env_to_remove(REMOVED_BY_0_39).len()==13), the binary test keeps that. Blast radius: every git child of the process: ls-files, cat-file --batch, add -A on the scratch index, write-tree, migrate's rm/mv/add -f, log/show of the policy history; all are run by the real-binary probe, none has a test of its own for the allowed names.",
+  "worktree_dirty": false
+}

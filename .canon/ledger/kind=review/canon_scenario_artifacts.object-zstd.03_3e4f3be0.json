@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-zstd",
+    "role": "reviewer",
+    "session_id": "s-0-40-zstd-rev"
+  },
+  "at": "2026-11-09T16:12:56.496089Z",
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "kind": "review",
+  "pin": "168ac536e287218d17fb504f56c9dcccf902a825",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:artifact_blobs::tests::artifacts_object_zstd_03_a_zst_object_and_a_plain_object_answer_the_same",
+          "junit:artifact_blobs::tests::artifacts_object_zstd_03_put_replaces_an_altered_zst_even_when_a_plain_object_exists",
+          "junit:artifacts_object_zstd_03_gate_check_and_verify_answer_the_same_for_zst_and_plain_objects"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "34235fd2fded6fb4dc086703d571eb1feaf9bdd9f7cad8134b72180a619ed16a",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-object-store-zstd/brief.md"
+  },
+  "review_id": "01M70HB29G318D3WPKHSJ51VDC",
+  "reviewer": "rev-0-40-zstd",
+  "reviewer_harness": "omp",
+  "scenario_id": "artifacts.object-zstd.03",
+  "schema": 2,
+  "worktree_dirty": false
+}

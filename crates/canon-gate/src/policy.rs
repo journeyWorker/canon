@@ -509,6 +509,9 @@ pub enum SpecCoverage {
         /// `require_audit:` (0.15 D3). `None` = the sub-section is
         /// absent, and no scenario is sampled for audit.
         require_audit: Option<RequireAudit>,
+        /// `require_ci_run:` (0.40). `None` = the sub-section is absent, and nothing is asked of
+        /// where the latest evidence came from.
+        require_ci_run: Option<RequireCiRun>,
     },
     /// Present but unusable — see [`PolicyDiagnostic::InvalidSection`].
     /// `crate::spec_coverage` emits a violation carrying `detail`
@@ -611,6 +614,28 @@ impl RequireAudit {
     }
 }
 
+/// `spec_coverage.require_ci_run`, resolved (0.40): the latest declared evidence of a scenario in
+/// `scope` must be a CI record ([`canon_model::CiRun`]) of the code as it stands now, from a run
+/// that ran at least `min_cases` cases. A scenario's own gaps are named by [`crate::ci_run`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequireCiRun {
+    /// Subject statuses whose scenarios need a CI record. EMPTY means every scenario; omitted
+    /// means [`RequireCiRun::DEFAULT_SCOPE`].
+    pub scope: Vec<SubjectStatus>,
+    /// The fewest cases (`passed + failed` over the record's reports) a run may have run, when set.
+    pub min_cases: Option<u64>,
+}
+
+impl RequireCiRun {
+    /// `scope`'s default when the key is omitted: a shipped subject keeps asking for a CI record.
+    pub const DEFAULT_SCOPE: [SubjectStatus; 1] = [SubjectStatus::Shipped];
+
+    /// Whether a subject at `status` is in this requirement's scope.
+    pub fn covers(&self, status: SubjectStatus) -> bool {
+        self.scope.is_empty() || self.scope.contains(&status)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 struct RawRequireAudit {
@@ -619,6 +644,16 @@ struct RawRequireAudit {
     seed: String,
     #[serde(default)]
     scope: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+struct RawRequireCiRun {
+    #[serde(default)]
+    scope: Option<Vec<String>>,
+    /// Untyped so a `null`, a `0`, a negative number and a non-integer are each refused by name.
+    #[serde(default, deserialize_with = "present_yaml")]
+    min_cases: Option<serde_yaml::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -658,6 +693,9 @@ struct RawSpecCoverage {
     /// Untyped for the same reason as `require_review`.
     #[serde(default, deserialize_with = "present_yaml")]
     require_audit: Option<serde_yaml::Value>,
+    /// Untyped for the same reason as `require_review`.
+    #[serde(default, deserialize_with = "present_yaml")]
+    require_ci_run: Option<serde_yaml::Value>,
 }
 
 /// A key that is present deserializes to `Some`, whatever its value —
@@ -722,6 +760,14 @@ fn resolve_spec_coverage(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<P
         }
     };
 
+    let require_ci_run = match parsed.require_ci_run.map(resolve_require_ci_run).transpose() {
+        Ok(require_ci_run) => require_ci_run,
+        Err(detail) => {
+            diagnostics.push(PolicyDiagnostic::InvalidSection { section: SECTION, detail: detail.clone() });
+            return Some(SpecCoverage::Invalid { detail });
+        }
+    };
+
     Some(SpecCoverage::Active {
         require_evidence: parsed.require_evidence,
         scope,
@@ -729,6 +775,7 @@ fn resolve_spec_coverage(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<P
         require_cases: parsed.require_cases,
         require_review,
         require_audit,
+        require_ci_run,
     })
 }
 
@@ -773,6 +820,27 @@ fn resolve_require_audit(raw: serde_yaml::Value) -> Result<RequireAudit, String>
         Some(names) => parse_statuses("require_audit.scope", names)?,
     };
     Ok(RequireAudit { rate, seed: parsed.seed, scope })
+}
+
+/// Parse `spec_coverage.require_ci_run`. A present `null` or a non-mapping is malformed;
+/// `require_ci_run: {}` is every default. `min_cases` is an integer of 1 or more.
+fn resolve_require_ci_run(raw: serde_yaml::Value) -> Result<RequireCiRun, String> {
+    if !raw.is_mapping() {
+        return Err("`require_ci_run` must be a mapping (use `require_ci_run: {}` for every default)".to_string());
+    }
+    let parsed: RawRequireCiRun = serde_yaml::from_value(raw).map_err(|e| format!("`require_ci_run`: {e}"))?;
+    let scope = match &parsed.scope {
+        None => RequireCiRun::DEFAULT_SCOPE.to_vec(),
+        Some(names) => parse_statuses("require_ci_run.scope", names)?,
+    };
+    let min_cases = match parsed.min_cases {
+        None => None,
+        Some(value) => match value.as_u64() {
+            Some(count) if count >= 1 => Some(count),
+            _ => return Err(format!("`require_ci_run.min_cases` must be an integer of 1 or more, got {}", serde_yaml::to_string(&value).map_or_else(|_| "?".to_string(), |text| text.trim().to_string()))),
+        },
+    };
+    Ok(RequireCiRun { scope, min_cases })
 }
 
 /// How `experimental.evidence_binding` treats a scenario whose latest
@@ -1535,7 +1603,8 @@ trust_required:
                 exclude_lanes: Vec::new(),
                 require_cases: Vec::new(),
                 require_review: None,
-                require_audit: None
+                require_audit: None,
+                require_ci_run: None
             })
         );
     }
@@ -1553,7 +1622,8 @@ trust_required:
                 exclude_lanes: Vec::new(),
                 require_cases: Vec::new(),
                 require_review: None,
-                require_audit: None
+                require_audit: None,
+                require_ci_run: None
             })
         );
     }
@@ -1593,7 +1663,8 @@ trust_required:
                 exclude_lanes: Vec::new(),
                 require_cases: vec!["failure".to_string(), "edge".to_string()],
                 require_review: None,
-                require_audit: None
+                require_audit: None,
+                require_ci_run: None
             })
         );
 
@@ -1602,6 +1673,44 @@ trust_required:
             panic!("expected a poisoned section, got {:?}", resolution.spec_coverage);
         };
         assert!(detail.contains("Failure") && detail.contains("require_cases"), "must name the offender and field: {detail}");
+    }
+
+    fn require_ci_run_of(contents: &str) -> Option<SpecCoverage> {
+        resolve_with(&format!("spec_coverage:\n  require_evidence: true\n{contents}")).0.spec_coverage
+    }
+
+    /// 0.40: an absent `require_ci_run` is `None`; `{}` is every default (`scope: [shipped]`, no minimum).
+    #[test]
+    fn require_ci_run_defaults_and_resolves() {
+        let Some(SpecCoverage::Active { require_ci_run, .. }) = require_ci_run_of("") else { panic!("expected an active section") };
+        assert_eq!(require_ci_run, None);
+        let Some(SpecCoverage::Active { require_ci_run, .. }) = require_ci_run_of("  require_ci_run: {}\n") else { panic!("expected an active section") };
+        assert_eq!(require_ci_run, Some(RequireCiRun { scope: vec![SubjectStatus::Shipped], min_cases: None }));
+        let Some(SpecCoverage::Active { require_ci_run, .. }) = require_ci_run_of("  require_ci_run:\n    scope: []\n    min_cases: 120\n") else { panic!("expected an active section") };
+        assert_eq!(require_ci_run, Some(RequireCiRun { scope: Vec::new(), min_cases: Some(120) }));
+        let rule = RequireCiRun { scope: vec![SubjectStatus::Shipped], min_cases: None };
+        assert!(rule.covers(SubjectStatus::Shipped) && !rule.covers(SubjectStatus::Verifying));
+        assert!(RequireCiRun { scope: Vec::new(), min_cases: None }.covers(SubjectStatus::Building), "an empty scope is every status");
+    }
+
+    /// 0.40: a malformed `require_ci_run` poisons the whole section, naming the key; it never switches itself off.
+    #[test]
+    fn a_malformed_require_ci_run_poisons_spec_coverage() {
+        for (yaml, detail) in [
+            ("  require_ci_run:\n", "`require_ci_run` must be a mapping"),
+            ("  require_ci_run: yes\n", "`require_ci_run` must be a mapping"),
+            ("  require_ci_run:\n    min_cases: 0\n", "`require_ci_run.min_cases` must be an integer of 1 or more, got 0"),
+            ("  require_ci_run:\n    min_cases: -1\n", "`require_ci_run.min_cases` must be an integer of 1 or more, got -1"),
+            ("  require_ci_run:\n    min_cases: 2.5\n", "`require_ci_run.min_cases` must be an integer of 1 or more, got 2.5"),
+            ("  require_ci_run:\n    min_cases: \"10\"\n", "`require_ci_run.min_cases` must be an integer of 1 or more"),
+            ("  require_ci_run:\n    min_cases:\n", "`require_ci_run.min_cases` must be an integer of 1 or more"),
+            ("  require_ci_run:\n    scope: [done]\n", "`done` is not a valid value for `require_ci_run.scope`"),
+            ("  require_ci_run:\n    other: 1\n", "unknown field `other`"),
+        ] {
+            let resolved = require_ci_run_of(yaml);
+            let Some(SpecCoverage::Invalid { detail: got }) = &resolved else { panic!("{yaml}: expected a poisoned section, got {resolved:?}") };
+            assert!(got.contains(detail), "{yaml}: {got}");
+        }
     }
 
     fn require_review_of(contents: &str) -> Option<SpecCoverage> {

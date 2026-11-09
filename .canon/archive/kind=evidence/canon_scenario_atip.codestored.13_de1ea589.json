@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T12:10:53.440569Z",
+  "attachments": [
+    {
+      "case": "retention::tests::atip_codestored_13_the_tiers_code_is_told_by_what_is_wrong",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    },
+    {
+      "case": "atip_codestored_13_an_unattached_tier_is_required_and_a_stored_object_that_does_not_decode_is_corrupt",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    }
+  ],
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.40/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 266,
+  "scenario_id": "atip.codestored.13",
+  "schema": 1,
+  "staging_id": "642f42d6",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

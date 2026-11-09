@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T12:42:54.815957Z",
+  "change_id": "canon-0-40-ci-evidence",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md:19",
+  "introduced_by": "622d2529c8a9cc0329231d6bc397539ff32d863d",
+  "kind": "finding",
+  "reviewed_sha": "7fd0e5f0f8ecbb7e709a4c2d50ba691886156e06",
+  "reviewer": "rev-0-40-ci",
+  "round": 1,
+  "scenario_ids": [
+    "gate.ci-run.13",
+    "evidence.ci-run.10"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "Standards/spec fidelity: the CHANGELOG (Unreleased, the data.reports[] bullet) says `meta.schemaVersion` of `evidence add` and `evidence audit` is `1.1` (was `1.0`). The built binary answers `1.2` on every `evidence add --json` write; the 0.39.0 binary answered `1.1` (A/B run, and docs/cli/canon.cli.json moved 1.1 -> 1.2): EvidenceAddReport::SCHEMA_VERSION is 1.1 and json_out::schema_version_of adds one minor for the state members a write carries. A caller that pins the version off the CHANGELOG reads the wrong number. No bound test pins either number (gate.ci-run.13 greps needles; conformance evidence-add-refused-unknown-spec-root carries 1.2). The bump itself (a minor for the additive `reports` member) follows the Report trait rule and the artifacts prune/verify precedent: I agree with it. Fix: write `1.2` (was `1.1`) and pin it in a bound test. Blast radius: the bump reaches every evidence add and evidence audit answer, single-scenario ones too, which the brief never mentions.",
+  "worktree_dirty": false
+}

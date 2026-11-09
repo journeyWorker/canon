@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T15:49:55.039499Z",
+  "attachments": [
+    {
+      "case": "atip_crate12_13_a_text_that_is_no_minor_is_refused_and_no_source_of_canon_reads_the_crates_contract_version",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b609178efae635dbc57bbb6d57eab8c594c5c4ab8fd6bdcfb7b8f1123eadefb4"
+    }
+  ],
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.40/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d7ce4913f8fd717f549c30fb97c38f90d24d8ac5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 133,
+  "scenario_id": "atip.crate12.13",
+  "schema": 1,
+  "staging_id": "f1cb8e9d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

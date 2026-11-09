@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T12:46:05.979799Z",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "kind": "review",
+  "pin": "7fd0e5f0f8ecbb7e709a4c2d50ba691886156e06",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_ci_run_08_an_override_reason_does_not_waive_the_ci_check"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "750901737f9c7543ae77ae1f3b6dfdaea7193a191667c928f381895972e383ef",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-ci-evidence/brief.md"
+  },
+  "review_id": "01M705GAMV9EF96FZHP4WHN0F6",
+  "reviewer": "rev-0-40-ci",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "gate.ci-run.08",
+  "schema": 2,
+  "worktree_dirty": false
+}

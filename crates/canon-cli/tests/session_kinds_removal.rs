@@ -97,6 +97,15 @@ impl Repo {
         hermetic::canon().args(args).current_dir(self.path()).env("HOME", self.home.path()).env("CANON_ACTOR", "kinds-tests").output().expect("spawn canon binary")
     }
 
+    /// `canon <args> --json` with extra environment variables.
+    fn json_env(&self, args: &[&str], envs: &[(&str, &str)]) -> (Value, Output) {
+        let mut all = args.to_vec();
+        all.push("--json");
+        let out = hermetic::canon().args(&all).current_dir(self.path()).env("HOME", self.home.path()).env("CANON_ACTOR", "kinds-tests").envs(envs.iter().copied()).output().expect("spawn canon binary");
+        let doc = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("`canon {all:?}` printed no JSON document ({e}):\nstdout: {}\nstderr: {}", text(&out.stdout), text(&out.stderr)));
+        (doc, out)
+    }
+
     /// `canon <args> --json`: the document and the process output.
     fn json(&self, args: &[&str]) -> (Value, Output) {
         let mut all = args.to_vec();
@@ -704,4 +713,156 @@ fn tier_retired_20_unreadable_bodies_in_the_retired_directories_change_nothing_a
     assert_eq!(out.status.code(), Some(1), "{doc}");
     let named: Vec<String> = doc["data"]["violations"].as_array().unwrap().iter().map(|v| v["subject"].as_str().unwrap_or_default().to_string()).collect();
     assert!(named.iter().any(|subject| subject.contains("kind=evidence")) && !named.iter().any(|subject| subject.contains("kind=session") || subject.contains("kind=event")), "{named:?}");
+}
+
+// ---------------------------------------------------------------------------
+// canon-0-40-retire-followups.
+
+/// The `cold` s3 tier, declared in the commented place `canon init` leaves for it. Its bucket variable is unset in a test run, so the tier cannot attach.
+fn declare_cold_tier(repo: &Repo) {
+    let marker = "  # cold:\n  #   backend: s3\n  #   bucket_env: CANON_R2_BUCKET\n  #   prefix: \"canon/\"\n";
+    let yaml = repo.read("canon.yaml");
+    assert!(yaml.contains(marker), "the skeleton's commented cold tier moved:\n{yaml}");
+    repo.write("canon.yaml", &yaml.replacen(marker, "  cold:\n    backend: s3\n    bucket_env: CANON_R2_BUCKET\n    prefix: \"canon/\"\n", 1));
+    repo.commit_all("a cold tier that cannot attach");
+}
+
+fn commit_steps(doc: &Value) -> Vec<String> {
+    doc["meta"]["next"].as_array().into_iter().flatten().filter_map(|step| step["command"].as_str()).filter(|command| command.contains("--commit")).map(str::to_string).collect()
+}
+
+/// tier.purge-preview.01 (F2): a preview that a commit would refuse offers no commit command, and says which tier to attach.
+#[test]
+fn tier_purge_preview_01_a_preview_with_a_tier_that_cannot_attach_names_it_and_offers_no_commit_command() {
+    let repo = Repo::old();
+    plant_rows(&repo);
+    declare_cold_tier(&repo);
+    let before = repo.snapshot();
+    let (preview, out) = repo.json(&["purge", "--kind", "session", "--before", "2026-06-01"]);
+    assert_eq!(out.status.code(), Some(0), "{preview}");
+    assert_eq!(preview["data"]["committed"], false, "{preview}");
+    assert_eq!(matched(&preview), 2, "the removal set of the tiers that attach is still listed: {preview}");
+    assert!(preview["data"]["planDigest"].as_str().is_some(), "{preview}");
+    let unavailable = preview["data"]["unavailable"].as_array().unwrap();
+    assert!(unavailable.len() == 1 && unavailable[0].as_str().unwrap().contains("cold"), "{preview}");
+    let first = &preview["meta"]["next"][0];
+    let why = first["reason"].as_str().unwrap();
+    assert!(why.contains("cold") && why.contains("no live bucket") && why.contains("`CANON_R2_BUCKET` is unset") && why.contains("set the variables"), "the first step names the variable to set: {first}");
+    assert!(!why.contains("reachable"), "an unset variable is not a retry: {first}");
+    assert_eq!(commit_steps(&preview), Vec::<String>::new(), "a commit that would be refused is not offered: {preview}");
+    assert_eq!(repo.snapshot(), before, "the preview wrote something");
+
+    let human = repo.run(&["purge", "--kind", "session", "--before", "2026-06-01"]);
+    let human = text(&human.stdout);
+    assert!(!human.contains("--commit") && human.lines().last().unwrap().contains("cold"), "{human}");
+}
+
+/// tier.purge-preview.02 (F2, failure path): the commit of that preview's digest is refused as before and deletes nothing.
+#[test]
+fn tier_purge_preview_02_committing_the_digest_of_that_preview_is_refused_and_deletes_nothing() {
+    let repo = Repo::old();
+    plant_rows(&repo);
+    declare_cold_tier(&repo);
+    let digest = repo.preview_digest(&["purge", "--kind", "session", "--before", "2026-06-01"]);
+    let before = repo.snapshot();
+    let (refused, out) = repo.json(&["purge", "--kind", "session", "--before", "2026-06-01", "--commit", "--plan-digest", &digest]);
+    assert_eq!(out.status.code(), Some(2), "{refused}");
+    assert_eq!(error_code(&refused), "RETENTION_TIERS_REQUIRED", "{refused}");
+    assert!(refused["error"]["message"].as_str().unwrap().contains("cold"), "{refused}");
+    assert_eq!(repo.snapshot(), before, "a refused purge changed the tree");
+    assert_eq!(hot_ids(&repo, "session"), ["new-hot-session", "old-hot-session"]);
+}
+
+/// tier.purge-preview.03 (F2): with the cold tier's bucket set to one it can attach (the debug seam `CANON_R2_LOCAL_ROOT`), the preview that was blocked offers the commit command and that commit deletes.
+#[test]
+fn tier_purge_preview_03_a_preview_whose_tiers_all_attach_offers_the_commit_command_and_it_deletes() {
+    let repo = Repo::old();
+    plant_rows(&repo);
+    declare_cold_tier(&repo);
+    let args = ["purge", "--kind", "session", "--before", "2026-06-01"];
+    let (blocked, _) = repo.json(&args);
+    assert_eq!(blocked["data"]["unavailable"].as_array().unwrap().len(), 1, "the Given: the unset bucket blocks the preview: {blocked}");
+    let cold = tempfile::tempdir().unwrap();
+    let envs = [("CANON_R2_BUCKET", "attachable"), ("CANON_R2_LOCAL_ROOT", cold.path().to_str().unwrap())];
+    let (preview, out) = repo.json_env(&args, &envs);
+    assert_eq!(out.status.code(), Some(0), "{preview}");
+    assert_eq!(preview["data"]["unavailable"], serde_json::json!([]), "{preview}");
+    let steps = commit_steps(&preview);
+    assert_eq!(steps.len(), 1, "{preview}");
+    assert_eq!(preview["meta"]["next"][0]["command"], steps[0].as_str(), "{preview}");
+    let digest = preview["data"]["planDigest"].as_str().unwrap();
+    assert!(steps[0].contains(digest), "{}", steps[0]);
+    let (done, out) = repo.json_env(&["purge", "--kind", "session", "--before", "2026-06-01", "--commit", "--plan-digest", digest], &envs);
+    assert!(out.status.success() && deleted(&done) == 2, "{done}");
+    assert_eq!(hot_ids(&repo, "session"), ["new-hot-session"]);
+}
+
+/// tier.purge-preview.01 (F2), the other cause: a tier that is configured and did not answer is a retry, not a variable to set; its commit is `RETENTION_TIERS_UNAVAILABLE`.
+#[test]
+fn tier_purge_preview_01_a_configured_tier_that_does_not_answer_is_a_retry_not_a_variable() {
+    let repo = Repo::init();
+    let yaml = repo.read("canon.yaml");
+    let sqlite = format!("  hot:\n    backend: sqlite\n    path: {}\n", ".canon/hot.db");
+    assert!(yaml.contains(&sqlite), "the skeleton's hot tier moved:\n{yaml}");
+    repo.write("canon.yaml", &yaml.replacen(&sqlite, "  hot:\n    backend: postgres\n    dsn_env: CANON_PG_DSN\n    schema: canon_v1\n", 1));
+    repo.commit_all("a hot tier that does not answer");
+    let envs = [("CANON_PG_DSN", "postgres://u:p@127.0.0.1:1/x?connect_timeout=1")];
+    let args = ["purge", "--kind", "run", "--before", "2030-01-01"];
+    let (preview, out) = repo.json_env(&args, &envs);
+    assert_eq!(out.status.code(), Some(0), "{preview}");
+    assert_eq!(preview["data"]["unavailable"].as_array().unwrap().len(), 1, "{preview}");
+    let why = preview["meta"]["next"][0]["reason"].as_str().unwrap();
+    assert!(why.contains("reachable") && !why.contains("set the variables"), "a reachability fix, not a variable to set: {why}");
+    assert_eq!(commit_steps(&preview), Vec::<String>::new(), "{preview}");
+    let digest = preview["data"]["planDigest"].as_str().unwrap();
+    let (refused, out) = repo.json_env(&["purge", "--kind", "run", "--before", "2030-01-01", "--commit", "--plan-digest", digest], &envs);
+    assert_eq!(out.status.code(), Some(2), "{refused}");
+    assert_eq!(error_code(&refused), "RETENTION_TIERS_UNAVAILABLE", "{refused}");
+}
+
+/// tier.retired-keys.01 (F3): the refusal names the key that could not be deleted, and its line when it is known.
+#[test]
+fn tier_retired_keys_01_the_refusal_names_the_key_and_its_line() {
+    let head = "tiers:\n  local: { backend: git, root: .canon/ledger }\n";
+    for (config, line) in [
+        ("routing: { change: local, session: hot }\n", None),
+        ("routing:\n  change: local\n  session: &shared hot\n  task: *shared\n", Some(5)),
+        ("routing:\n  change: local\n  session: !!str hot\n", Some(5)),
+    ] {
+        let config = format!("{head}{config}");
+        let repo = Repo::bare();
+        repo.write("canon.yaml", &config);
+        repo.commit_all("config");
+        let before = repo.snapshot();
+        for args in [&["migrate"][..], &["migrate", "--commit", "--plan-digest", "sha256:0000000000000000000000000000000000000000000000000000000000000000"]] {
+            let (doc, out) = repo.json(args);
+            assert_eq!(out.status.code(), Some(2), "{config}: {doc}");
+            assert_eq!(error_code(&doc), "CONFIG_INVALID", "{config}: {doc}");
+            let message = doc["error"]["message"].as_str().unwrap();
+            assert!(message.contains("`routing.session`"), "{config}: {message}");
+            match line {
+                Some(line) => assert!(message.contains(&format!("(line {line})")), "{config}: {message}"),
+                None => assert!(!message.contains("(line "), "a key in a flow mapping has no line: {message}"),
+            }
+        }
+        assert_eq!(repo.snapshot(), before, "a refused migrate changed the tree for {config}");
+    }
+}
+
+/// tier.retired-keys.02 (F3, failure path): a key that can be deleted is not named, and a file with no retired key is not refused.
+#[test]
+fn tier_retired_keys_02_only_the_keys_that_cannot_be_deleted_are_named() {
+    let repo = Repo::bare();
+    repo.write("canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  event: hot\n  session: &shared hot\n  task: *shared\n");
+    repo.commit_all("config");
+    let (doc, out) = repo.json(&["migrate"]);
+    assert_eq!(out.status.code(), Some(2), "{doc}");
+    let message = doc["error"]["message"].as_str().unwrap();
+    assert!(message.contains("`routing.session`") && !message.contains("routing.event"), "{message}");
+
+    let clean = Repo::bare();
+    clean.write("canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n");
+    clean.commit_all("config");
+    let (doc, out) = clean.json(&["migrate"]);
+    assert!(out.status.success() && doc["ok"] == true, "a canon.yaml with no retired key is not refused: {doc}");
 }

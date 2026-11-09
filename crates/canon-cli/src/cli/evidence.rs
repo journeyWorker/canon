@@ -118,6 +118,9 @@ pub struct EvidenceAddArgs {
     /// One record per indexed scenario of --project that owns a case in the --report(s), all or nothing (see below)
     #[arg(long)]
     pub all_scenarios: bool,
+    /// With --all-scenarios: record the batch as a CI run (the `ci` block of every record, from the GitHub Actions environment; needs --ref). Refused outside CI (CI_ENV_REQUIRED) and on a work tree that differs from HEAD (CI_WORKTREE_CONFLICT)
+    #[arg(long)]
+    pub from_ci: bool,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
     #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = crate::cli::safe_min1)]
     pub max_artifact_mib: u64,

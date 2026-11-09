@@ -11,6 +11,7 @@ pub mod brief;
 pub mod brief_approve;
 pub mod brief_check;
 pub mod brief_template;
+pub mod ci_env;
 pub mod cli_error;
 pub mod completion;
 pub mod change;

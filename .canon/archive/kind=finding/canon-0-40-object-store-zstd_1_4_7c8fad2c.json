@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-zstd",
+    "role": "reviewer",
+    "session_id": "s-0-40-zstd-rev"
+  },
+  "at": "2026-11-09T12:35:29.931539Z",
+  "change_id": "canon-0-40-object-store-zstd",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/tests/r2_tier_live.rs",
+  "introduced_by": "1955ad21da3043be28d0c52d830ae18a8e511433",
+  "kind": "finding",
+  "reviewed_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "reviewer": "rev-0-40-zstd",
+  "round": 1,
+  "scenario_ids": [
+    "artifacts.object-zstd.04",
+    "artifacts.object-zstd.06"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[standards, blast radius] What only a real S3 API shows is in no bound test: the CLI tests use the debug local-filesystem substitute, which keeps no metadata, so canon-size (the bomb limit), canon-stored-size (the HEAD size check) and the GET-time metadata read of verify_full_zst run only against InMemory. r2_tier_live.rs (skipped without MinIO, not extended for .zst) does put/probe/verify_full/list of a small blob only. I ran the real binary against a live MinIO container: metadata canon-sha256/canon-size/canon-stored-size round-trip; a 100 MB zeros bomb recorded as 405264 bytes stops at the limit (Altered, 0.07 s, RSS 42 MB); a flipped byte, a cut tail with a consistent and with a stale stored-size, and plain-only / zst-only / both-forms / neither digests give the answers the scenarios say (gate check and verify exit 0 for each single form, 1 for none; --full catches a corrupt plain object beside a good .zst that the HEAD cannot). No code defect; the live test should assert the bomb and stored-size paths so a release run keeps proving them.",
+  "worktree_dirty": false
+}

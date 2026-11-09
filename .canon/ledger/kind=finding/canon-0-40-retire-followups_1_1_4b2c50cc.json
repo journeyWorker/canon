@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T16:07:13.000379Z",
+  "change_id": "canon-0-40-retire-followups",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "introduced_by": "d9683d4071cc1bf6978d9f0f3e85a741d3859842",
+  "kind": "finding",
+  "resolution_code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "resolution_sha": "eab59158a1ca4adf653515848edb3632b2b8ed6d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-followups",
+  "round": 1,
+  "scenario_ids": [
+    "tier.durability-release.01"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "Standards/evidence: tier.durability-release.01 has no evidence record at all. The ledger holds evidence for tier.durability-release.02 (and the 0.39 tier.durability.01-16) at d4f00082a, but `grep '\"tier.durability-release.01\"' .canon/ledger/kind=evidence` finds nothing, and the CHANGELOG still cites `tier.durability-release.01-02`. The tests that prove its Then (tier_durability_01 in atomic.rs and tier_durability_03 in artifact_store.rs, both #[cfg(all(unix, debug_assertions))] since 0.39) are bound only to tier.durability.01/03. I re-ran them in debug at 7fd0e5f0f and they pass (canon-store+canon-gate 501/501), so the behavior holds, but there is nothing for a review to pin, so I did not sign it. Fix: `canon evidence add --scenario tier.durability-release.01` with --case naming those two tests (a junit report from a debug nextest run). Blast radius: none in code; only this scenario's coverage and the change's ship guard.",
+  "worktree_dirty": false
+}

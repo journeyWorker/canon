@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T16:07:15.416626Z",
+  "change_id": "canon-0-40-retire-followups",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/retention.rs:415",
+  "introduced_by": "d9683d4071cc1bf6978d9f0f3e85a741d3859842",
+  "kind": "finding",
+  "resolution_code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "resolution_sha": "eab59158a1ca4adf653515848edb3632b2b8ed6d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-followups",
+  "round": 1,
+  "scenario_ids": [
+    "tier.purge-preview.01",
+    "tier.purge-preview.02"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "Spec fidelity + standards: the blocked preview always appends `tiers_hint(\"RETENTION_TIERS_REQUIRED\")` ('set the variables the message names for the tier (or add its `tiers:` entry to canon.yaml)'), but `unavailable` also holds a tier that is configured and did not answer, whose commit is refused as RETENTION_TIERS_UNAVAILABLE (retryable, hint 'check that the tier backends are reachable (wait a moment...)'). Probed with the real binary: hot=postgres, CANON_PG_DSN=postgres://u:p@127.0.0.1:1/x, `purge --kind run --before 2030-01-01 --json` -> exit 0, unavailable ['hot tier (postgres) did not answer (pool timed out...)'], meta.next[0].reason '... set the variables the message names for the tier ...'; the commit of that digest -> RETENTION_TIERS_UNAVAILABLE, retryable true, hint 'check that the tier backends are reachable'. The brief says the preview's guidance matches the commit's hint; for a down tier it points at the wrong remedy (the DSN is already set). Fix: choose the hint from the same `tiers_code` the commit uses (or say the tier is down). Blast radius: every purge preview (any kind) in a repo with a declared-but-down Postgres/S3 tier; data and exit code are right, only the step text misleads. The tests use only the unset-bucket case.",
+  "worktree_dirty": false
+}

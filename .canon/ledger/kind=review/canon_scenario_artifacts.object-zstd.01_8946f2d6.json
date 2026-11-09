@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-zstd",
+    "role": "reviewer",
+    "session_id": "s-0-40-zstd-rev"
+  },
+  "at": "2026-11-09T12:43:45.939381Z",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "kind": "review",
+  "pin": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:artifact_blobs::tests::artifacts_object_zstd_01_put_writes_one_zst_object_that_decompresses_to_the_bytes",
+          "junit:artifacts_object_zstd_01_evidence_add_uploads_a_zst_object_and_keeps_no_local_copy"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "bc6aa6f589b335881a8bbb35afc3b9b3c99bf72da327e6a8dd055af463d38e26",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-object-store-zstd/brief.md"
+  },
+  "review_id": "01M705C1WKTZHHGDHSHXVEFCMV",
+  "reviewer": "rev-0-40-zstd",
+  "reviewer_harness": "omp",
+  "scenario_id": "artifacts.object-zstd.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

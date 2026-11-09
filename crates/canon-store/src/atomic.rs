@@ -59,8 +59,10 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
         let mut file = std::fs::File::create(&tmp_path)?;
         file.write_all(bytes)?;
         file.sync_all()?;
+        #[cfg(debug_assertions)]
         trace::record(trace::Event::FileSync(tmp_path.clone()));
         std::fs::rename(&tmp_path, path)?;
+        #[cfg(debug_assertions)]
         trace::record(trace::Event::Rename { from: tmp_path.clone(), to: path.to_path_buf() });
         Ok(())
     })();
@@ -82,14 +84,16 @@ pub fn sync_dir(dir: &Path) -> io::Result<()> {
         std::fs::File::open(dir)
             .and_then(|handle| handle.sync_all())
             .map_err(|e| io::Error::new(e.kind(), format!("could not sync directory {}: {e}", dir.display())))?;
+        #[cfg(debug_assertions)]
         trace::record(trace::Event::DirSync(dir.to_path_buf()));
     }
     Ok(())
 }
 
-/// The tests' durability trace: debug builds only, a per-thread log of the sync and rename steps
-/// [`write_atomic`] and the artifact store take, in order, so a test can assert "file sync, then rename,
-/// then directory sync". A release build records nothing.
+/// The tests' durability trace: debug builds only (the module and [`trace::Event`] do not exist in a release build, and neither do the
+/// calls that build the events), a per-thread log of the sync and rename steps [`write_atomic`] and the artifact store take, in order,
+/// so a test can assert "file sync, then rename, then directory sync".
+#[cfg(debug_assertions)]
 pub mod trace {
     use std::path::PathBuf;
 
@@ -104,29 +108,18 @@ pub mod trace {
         DirSync(PathBuf),
     }
 
-    #[cfg(debug_assertions)]
     thread_local! {
         static LOG: std::cell::RefCell<Vec<Event>> = const { std::cell::RefCell::new(Vec::new()) };
     }
 
-    /// Append `event` to this thread's log (a no-op in a release build).
+    /// Append `event` to this thread's log.
     pub fn record(event: Event) {
-        #[cfg(debug_assertions)]
         LOG.with(|log| log.borrow_mut().push(event));
-        #[cfg(not(debug_assertions))]
-        let _ = event;
     }
 
-    /// Take and clear this thread's log (always empty in a release build).
+    /// Take and clear this thread's log.
     pub fn take() -> Vec<Event> {
-        #[cfg(debug_assertions)]
-        {
-            LOG.with(|log| std::mem::take(&mut *log.borrow_mut()))
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            Vec::new()
-        }
+        LOG.with(|log| std::mem::take(&mut *log.borrow_mut()))
     }
 }
 
@@ -175,6 +168,18 @@ mod tests {
     #[cfg(all(unix, debug_assertions))]
     #[test]
     fn tier_durability_01_one_write_syncs_the_file_then_renames_then_syncs_the_parent_directory() {
+        assert_write_order();
+    }
+
+    /// tier.durability-release.01 (F4), the single-write half: a debug build, where the trace exists, still sees file sync, rename, directory sync in that order.
+    #[cfg(all(unix, debug_assertions))]
+    #[test]
+    fn tier_durability_release_01_a_debug_build_traces_file_sync_then_rename_then_directory_sync() {
+        assert_write_order();
+    }
+
+    #[cfg(all(unix, debug_assertions))]
+    fn assert_write_order() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("record.json");
         trace::take();
@@ -219,5 +224,29 @@ mod tests {
         assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
         assert!(err.to_string().contains(&parent.display().to_string()), "the error names the directory: {err}");
         assert_eq!(std::fs::read(&path).unwrap(), b"new", "the rename had already placed the bytes: the error means not known to be on disk");
+    }
+
+    /// tier.durability-release.02 (F4, failure path): in the source of the two writers, the trace module and every call that builds one of its events stand under
+    /// `#[cfg(debug_assertions)]`, so a release build neither has them nor copies a path for them. The release build itself is held by `cargo build --release`
+    /// and `cargo test --release --no-run` over this crate and `canon-gate`.
+    #[test]
+    fn tier_durability_release_02_every_trace_call_in_the_writers_stands_under_cfg_debug_assertions() {
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        for file in ["src/atomic.rs", "../canon-gate/src/artifact_store.rs"] {
+            let text = std::fs::read_to_string(manifest.join(file)).unwrap();
+            let code = text.split("#[cfg(test)]").next().unwrap();
+            let lines: Vec<&str> = code.lines().collect();
+            let mut seen = 0;
+            for (at, line) in lines.iter().enumerate() {
+                let trimmed = line.trim_start();
+                if trimmed.starts_with("//") || !(trimmed.contains("trace::record(") || trimmed.starts_with("pub mod trace")) {
+                    continue;
+                }
+                seen += 1;
+                let attribute = lines[..at].iter().rev().find(|previous| !previous.trim().is_empty() && !previous.trim_start().starts_with("///")).map(|previous| previous.trim());
+                assert_eq!(attribute, Some("#[cfg(debug_assertions)]"), "{file}:{}: `{trimmed}` is not under #[cfg(debug_assertions)]", at + 1);
+            }
+            assert!(seen > 0, "{file} holds no trace call: the inspection looks at nothing");
+        }
     }
 }

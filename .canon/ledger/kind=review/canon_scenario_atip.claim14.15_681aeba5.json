@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T12:46:05.979799Z",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "kind": "review",
+  "pin": "7fd0e5f0f8ecbb7e709a4c2d50ba691886156e06",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claim14_15_the_changelog_entry_states_the_measured_sizes_and_the_note_for_callers"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "bd21917890e5848762edf86bb145a2cad6d5a73e813adff495d587fff4af50f7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-ci-evidence/brief.md"
+  },
+  "review_id": "01M705GAMV9EF96FZHP4WHN0F6",
+  "reviewer": "rev-0-40-ci",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "atip.claim14.15",
+  "schema": 2,
+  "worktree_dirty": false
+}

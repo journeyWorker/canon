@@ -275,7 +275,14 @@ on an adopted change (`open-blocker`) — prints the violations, exits 2,
 leaves the record unchanged, and names `--override-reason`. `shipped`
 also refuses a `false-success` (a scenario whose latest audit is
 `refuted`) and, when `require_audit.scope` covers `shipped`, an owed
-sampled audit; see `canon-gate`.
+sampled audit; see `canon-gate`. With `spec_coverage.require_ci_run` covering
+`shipped` (the default scope) it also refuses a scenario whose newest evidence
+is not a CI record (`canon evidence add --all-scenarios --from-ci`) of the
+code as it stands now from a run of at least `min_cases` cases: one
+`uncovered-cell` or `stale-evidence` per scenario with its reason
+(`no_ci_run`, `other_code_tree`, `dirty_worktree`, `short_run`,
+`code_tree_unknown`). `--override-reason` does not waive it; see
+`canon-policy`. `canon status` flags a shipped subject red for the same reason.
 
 ```bash
 canon subject move demo-subject --to verifying \

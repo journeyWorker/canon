@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T16:02:36.524838Z",
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "kind": "review",
+  "pin": "168ac536e287218d17fb504f56c9dcccf902a825",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:evidence_ci_run_02_a_report_without_a_scenario_case_is_still_counted",
+          "junit:evidence_ci_run_02_the_same_report_given_twice_is_one_report"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f93c2d81242e39364bec117b5952c4823532b0e2d5ef2354e6e9966e1ebcfda7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-ci-evidence/brief.md"
+  },
+  "review_id": "01M70GR4VCTFEAV4RJK37C3QR2",
+  "reviewer": "rev-0-40-ci",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "evidence.ci-run.02",
+  "schema": 2,
+  "worktree_dirty": false
+}

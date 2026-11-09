@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-zstd",
+    "role": "reviewer",
+    "session_id": "s-0-40-zstd-rev"
+  },
+  "at": "2026-11-09T12:35:38.774104Z",
+  "change_id": "canon-0-40-object-store-zstd",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-gate/src/artifact_store.rs:ObjectArtifacts::list_sized",
+  "introduced_by": "1955ad21da3043be28d0c52d830ae18a8e511433",
+  "kind": "finding",
+  "reviewed_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "reviewer": "rev-0-40-zstd",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] Cutover leftovers: ObjectArtifacts::list_sized (canon-gate) has no caller after prune moved to list_objects, and ObjectBlobStore::list_sized is reached only by a unit test. The brief is a clean cutover; both could go. Also a deviation from brief F7 (canon-gate/others do not depend on zstd; Cargo.lock grows one canon-store line): canon-cli got a zstd dev-dependency, so Cargo.lock grew two lines. Dev-only, no new crate, the tests use it to decode frames independently of canon-store; harmless, noted because the brief spelled the lock diff.",
+  "worktree_dirty": false
+}

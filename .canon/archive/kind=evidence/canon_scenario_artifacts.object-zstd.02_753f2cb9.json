@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T12:10:53.440569Z",
+  "attachments": [
+    {
+      "case": "artifacts_object_zstd_02_a_file_that_changed_since_it_was_bound_leaves_the_tier_empty",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    },
+    {
+      "case": "artifact_blobs::tests::artifacts_object_zstd_02_put_refuses_bytes_that_do_not_hash_to_the_digest_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    }
+  ],
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.40/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "artifacts.object-zstd.02",
+  "schema": 1,
+  "staging_id": "0a191ef6",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

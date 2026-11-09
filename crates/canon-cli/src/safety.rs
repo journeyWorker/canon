@@ -341,6 +341,26 @@ impl Plan {
     }
 }
 
+impl Plan {
+    /// [`Plan::finish_preview`] for a plan a commit would refuse (a tier it needs is not attached): the same report, but the step after it
+    /// is the preview again with what to set (`blocked`), never the `--commit` command; the human closing line says the same.
+    pub fn finish_blocked_preview<R: Report>(&self, command: &str, blocked: &str, json: bool, report: &R) {
+        if json {
+            let call = self.preview_call(blocked);
+            crate::json_out::data_with_next(command, report, &After::fixed(vec![NextStep { command: call.command, why: blocked.to_string(), actor: StepActor::Agent, role: Some(Role::Orchestrator) }]));
+        } else {
+            let effects = &self.plan.effects;
+            for effect in effects.iter().take(PREVIEW_LINES) {
+                println!("{}", effect_line(effect));
+            }
+            if effects.len() > PREVIEW_LINES {
+                println!("  ... and {} more (`--json` lists every effect)", effects.len() - PREVIEW_LINES);
+            }
+            println!("nothing written. Not committable yet: {blocked}");
+        }
+    }
+}
+
 /// One effect as a human line.
 pub fn effect_line(effect: &Effect) -> String {
     let target = effect.path.as_deref().or(effect.record.as_deref()).unwrap_or("");

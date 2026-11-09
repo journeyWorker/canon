@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T12:44:32.615446Z",
+  "change_id": "canon-0-40-retire-followups",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/inventory.rs:1022-1027",
+  "introduced_by": "d9683d4071cc1bf6978d9f0f3e85a741d3859842",
+  "kind": "finding",
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-followups",
+  "round": 1,
+  "scenario_ids": [
+    "gate.tombstone-corpus.01"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "Standards: `overlay_stale_index` (called by gate check, status, review, evidence add, divergence, subject, migrate preview) rewrites `ctx.scenarios` (retain + extend of non-removed records) but not the new `ctx.tombstoned_scenarios`, though the field's own doc says a caller that rewrites scenarios must rewrite the set and the brief's failure-mode names it. Real-binary probe (throwaway repo: one scenario, evidence, 3 commits past max_commits_behind): delete the last .feature file WITHOUT `canon inventory sync` -> `canon gate check` still reports stale-evidence for the deleted scenario (the in-memory refresh computes the tombstone and drops the scenario, leaving an empty corpus and an empty tombstone set); after `canon inventory sync` the same tree is clean. gate.rs:173 promises a stale index is 'graded as the refresh would leave it'; with one of two scenarios deleted the unsynced tree is already clean, so the verdict now depends on whether the deleted scenario was the last one. The bound tests always sync first. Blast radius: every reader that overlays the index (status, review scenario, evidence add, divergence add, subject, migrate preview) sees the pre-fix verdict for an unsynced last-file deletion; the synced path the scenario states is correct.",
+  "worktree_dirty": false
+}

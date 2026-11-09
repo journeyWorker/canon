@@ -1,3 +1,4 @@
+canon evidence add: reports/events.jsonl: 4 passed, 1 failed, 1 skipped
 canon evidence add: artifact store holds 1 bound file(s) under .canon/artifacts/sha256/ (1 newly stored) — commit them with the ledger
 canon evidence add: staged kind=evidence/root_scenario_shop.cart.01_<digest8>.json for shop.cart.01 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
 canon evidence add: staged kind=evidence/root_scenario_shop.cart.02_<digest8>.json for shop.cart.02 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`

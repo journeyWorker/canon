@@ -1,0 +1,66 @@
+{
+  "actor": {
+    "agent_id": "impl-0-40",
+    "role": "implementer",
+    "session_id": "s-0-40-impl"
+  },
+  "at": "2026-11-09T12:10:53.440569Z",
+  "attachments": [
+    {
+      "case": "atip_l0_13_a_warning_is_a_coded_object_with_a_registered_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    },
+    {
+      "case": "atip_l0_13_every_warning_site_names_a_registered_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    },
+    {
+      "case": "atip_l0_13_no_warning_macro_call_lacks_a_code_literal",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    },
+    {
+      "case": "atip_l0_13_status_json_carries_coded_warnings_in_meta_and_plain_lines_in_data",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    },
+    {
+      "case": "atip_l0_13_a_warning_code_has_the_registry_shape_of_a_warning_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    },
+    {
+      "case": "atip_l0_13_every_warning_the_status_report_produces_has_a_registered_code",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "0ffa51f8158cf2feedb33fcf6c195750e398adbaa27a0696964cd35a593930fa"
+    }
+  ],
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.40/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1024,
+  "scenario_id": "atip.l0.13",
+  "schema": 1,
+  "staging_id": "f4a80856",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

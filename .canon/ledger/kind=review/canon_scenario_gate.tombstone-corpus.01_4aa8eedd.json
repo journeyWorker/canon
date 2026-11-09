@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T16:07:26.273623Z",
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "kind": "review",
+  "pin": "2baff789908b455870da1958568228ac9cf28d6f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_tombstone_corpus_01_a_last_feature_file_deleted_before_the_sync_is_not_stale_evidence",
+          "junit:gate_tombstone_corpus_01_the_old_evidence_of_the_last_deleted_scenario_is_not_stale_evidence_and_not_unresolvable",
+          "junit:staleness::tests::gate_tombstone_corpus_01_a_tombstone_in_an_empty_corpus_makes_the_scenario_undeclared"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e523942cee9a901d4852b1563b159d731542907b650ec81108a00774b2139673",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-retire-followups/brief.md"
+  },
+  "review_id": "01M70H0ZT1Q0QV9YE44V7VY5EV",
+  "reviewer": "rev-0-40-followups",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "gate.tombstone-corpus.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

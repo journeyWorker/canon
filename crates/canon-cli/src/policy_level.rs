@@ -130,7 +130,7 @@ fn level_from_comment(text: &str) -> Option<PolicyLevel> {
 
 /// The level `spec_coverage` matches exactly, if any.
 fn level_from_sections(policy: &PolicyResolution) -> Option<PolicyLevel> {
-    let Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes, require_cases, require_review, require_audit: None }) = &policy.spec_coverage
+    let Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes, require_cases, require_review, require_audit: None, require_ci_run: None }) = &policy.spec_coverage
     else {
         return None;
     };
@@ -212,6 +212,7 @@ mod tests {
             "spec_coverage:\n  require_evidence: true\n  scope: [building]\n",
             "spec_coverage:\n  require_evidence: true\n  require_cases: [failure]\n  require_review: {distinct_actor: false}\n",
             "spec_coverage:\n  require_evidence: true\n  require_audit: {rate: 0.5}\n",
+            "spec_coverage:\n  require_evidence: true\n  require_ci_run: {}\n",
             "spec_coverage:\n  require_evidence: false\n",
             "staleness:\n  max_commits_behind: 3\n",
         ] {

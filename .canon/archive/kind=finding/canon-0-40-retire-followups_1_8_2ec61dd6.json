@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T12:46:03.515035Z",
+  "change_id": "canon-0-40-retire-followups",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/src/atomic.rs:221-240",
+  "introduced_by": "d9683d4071cc1bf6978d9f0f3e85a741d3859842",
+  "kind": "finding",
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-followups",
+  "round": 1,
+  "scenario_ids": [
+    "tier.durability-release.02"
+  ],
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "Evidence gap: the scenario's Then also says the release build and the compiled tests of canon-store and canon-gate succeed, and the brief names `cargo build --release -p canon-store -p canon-gate` and `cargo test --release ... --no-run` for it; the recorded evidence binds only the source-inspection test (a nextest junit), so neither command is evidence. I ran both in my own target dir at 7fd0e5f0f: both exit 0, no warnings in the output, and `cargo nextest run --release -p canon-store -p canon-gate -E 'test(/tier_durability/)'` passes (the trace-reading tests are compiled out, the source check runs and passes), so the scenario holds. The source check inspects the attribute above each `trace::record(`/`pub mod trace` line in two files only; a trace call added in another file would not be seen. Blast radius: a future `Event`/`trace` use outside atomic.rs and artifact_store.rs is unchecked.",
+  "worktree_dirty": false
+}

@@ -644,15 +644,38 @@ fn remove_retired_keys(text: &str) -> Result<String, String> {
     if !has("routing") && !has("aging") {
         return Ok(text.to_string());
     }
-    let hand = |why: &str| format!("canon.yaml names a retired record kind (`session`, `event`) in {why}; delete the `session` and `event` keys under `routing:` and `aging:` by hand, then run `canon migrate` again");
+    // The keys of `before` that name a retired kind, as `routing.session`, sorted; the line is told when the line scan found it.
     let found = retired_key_lines(text);
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let mut present: Vec<String> = ["routing", "aging"]
+        .into_iter()
+        .filter_map(|section| before.get(section).and_then(serde_yaml::Value::as_mapping).map(|map| (section, map)))
+        .flat_map(|(section, map)| canon_store::policy::RETIRED_KIND_NAMES.iter().filter(|retired| map.contains_key(**retired)).map(move |retired| format!("{section}.{retired}")))
+        .collect();
+    present.sort();
+    let line_of = |name: &str| found.iter().find(|key| key.key == name).map(|key| key.first);
+    let name_of = |name: &str| match line_of(name) {
+        Some(line) => format!("`{name}` (line {line})"),
+        None => format!("`{name}`"),
+    };
+    let hand = |why: &str, names: &[String]| {
+        let named: Vec<String> = names.iter().map(|name| name_of(name)).collect();
+        format!(
+            "canon.yaml names a retired record kind (`session`, `event`) in {why}: {}; delete the `session` and `event` keys under `routing:` and `aging:` by hand, then run `canon migrate` again",
+            named.join(", ")
+        )
+    };
+    let mut unsafe_forms: Vec<String> = Vec::new();
     for key in &found {
         let first = lines[key.first - 1];
         let value = first.split_once(':').map_or("", |(_, rest)| rest).trim_start();
         if value.starts_with(['&', '*', '!']) {
-            return Err(hand("a form canon cannot delete safely (an anchor, an alias or a tag)"));
+            unsafe_forms.push(key.key.clone());
         }
+    }
+    if !unsafe_forms.is_empty() {
+        unsafe_forms.sort();
+        return Err(hand("a form canon cannot delete safely (an anchor, an alias or a tag)", &unsafe_forms));
     }
     let mut out = String::with_capacity(text.len());
     let mut header: Option<usize> = None;
@@ -694,7 +717,9 @@ fn remove_retired_keys(text: &str) -> Result<String, String> {
         }
     }
     if after != expected {
-        return Err(hand("a form canon cannot delete line by line (a flow mapping, a key that continues on later lines, or a shared anchor)"));
+        // The keys the line scan did not find (a flow mapping) are the ones that cannot be deleted by line; when it found them all, the form is another one and every key is named.
+        let unlocated: Vec<String> = present.iter().filter(|name| line_of(name).is_none()).cloned().collect();
+        return Err(hand("a form canon cannot delete line by line (a flow mapping, a key that continues on later lines, or a shared anchor)", if unlocated.is_empty() { &present } else { &unlocated }));
     }
     Ok(out)
 }

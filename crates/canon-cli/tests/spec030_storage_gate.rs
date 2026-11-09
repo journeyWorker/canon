@@ -107,7 +107,7 @@ impl Repo {
     }
 
     fn object(&self, bytes: &[u8]) -> PathBuf {
-        self.store.path().join("artifacts/sha256").join(sha(bytes))
+        self.store.path().join("artifacts/sha256").join(format!("{}.zst", sha(bytes)))
     }
 
     /// Attest `game.run.01` with `reports/smoke.json` bound as its artifact.
@@ -194,7 +194,7 @@ fn evidence_add_118_artifacts_move_previews_its_plan_then_moves_the_blobs_when_t
     assert_eq!(commit.status.code(), Some(0), "{}", text(&commit));
     let body = stdout_json(&commit);
     assert_eq!((body["data"]["committed"].as_bool(), body["data"]["uploaded"].as_u64(), body["data"]["removedLocal"].as_u64()), (Some(true), Some(1), Some(1)), "{body}");
-    assert_eq!(std::fs::read(repo.object(V1)).unwrap(), V1, "the store holds the blob under its digest");
+    assert_eq!(zstd::decode_all(std::fs::read(repo.object(V1)).unwrap().as_slice()).unwrap(), V1, "the store holds the blob, compressed, under its digest");
     assert!(!repo.local_blob(V1).exists(), "the local copy is removed");
     assert!(repo.canon_yaml().contains("artifact_store:") && repo.canon_yaml().contains("backend: cold"), "canon.yaml names the tier:\n{}", repo.canon_yaml());
 

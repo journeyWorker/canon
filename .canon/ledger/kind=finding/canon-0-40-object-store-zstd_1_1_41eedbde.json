@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-zstd",
+    "role": "reviewer",
+    "session_id": "s-0-40-zstd-rev"
+  },
+  "at": "2026-11-09T16:12:52.460376Z",
+  "change_id": "canon-0-40-object-store-zstd",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-store/src/artifact_blobs.rs:put",
+  "introduced_by": "1955ad21da3043be28d0c52d830ae18a8e511433",
+  "kind": "finding",
+  "resolution_code_tree": "3883ddab76952397116cfaf906679951ebec1b35",
+  "resolution_sha": "91db25de76048937f7319cc342a95b83504e3e59",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "reviewer": "rev-0-40-zstd",
+  "round": 1,
+  "scenario_ids": [
+    "artifacts.object-zstd.04"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity + standards] put() cannot heal a .zst the HEAD already calls Altered when a valid plain object of the same digest exists. Probed on live MinIO: .zst cut to 200000 bytes (canon-stored-size 305766) beside a valid plain object: gate check exits 1 (stored blob ... .zst: object holds 200000 bytes, recorded 305766), then `canon artifacts store` says 'stored 0, already stored 1' and writes nothing, gate stays 1; the verify hint tells the operator to run exactly that command. put skips on probe_raw == Present even when probe_zst is Altered (brief F1 'already there' rule counts a plain object of the same size, and its failure-mode paragraph admits only the HEAD-misses case, not this HEAD-detects case). Needs a 0.39 canon re-uploading a plain object beside a damaged .zst, so rare. Fix: skip on the plain object only when no .zst exists or the .zst probe is not Altered. Blast radius: the same short-circuit serves move (AlreadyStored, then observe(full) gives ARTIFACTS_BLOB_CORRUPT naming the .zst, so move is not silently stuck) and the evidence/review upload path.",
+  "worktree_dirty": false
+}

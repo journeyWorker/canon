@@ -226,6 +226,8 @@ struct Blob {
     digest: String,
     local: Option<(PathBuf, u64)>,
     object: Option<u64>,
+    /// The forms its tier objects take (`zst=<bytes>`, `raw=<bytes>`), in the plan's read state.
+    forms: String,
     reasons: BTreeSet<Reason>,
 }
 
@@ -370,12 +372,15 @@ fn store_blobs(repo: &Path, store: &ArtifactStore) -> Result<BTreeMap<String, Bl
             let message = format!("cannot read {}: {e}", blob.path.display());
             crate::artifacts::store_refusal(&ArtifactStoreError::Io(e), message).hint("check that .canon/artifacts/sha256 is a readable directory, then run the command again")
         })?;
-        blobs.insert(blob.digest.clone(), Blob { digest: blob.digest, local: Some((blob.path, bytes)), object: None, reasons: BTreeSet::new() });
+        blobs.insert(blob.digest.clone(), Blob { digest: blob.digest, local: Some((blob.path, bytes)), object: None, forms: String::new(), reasons: BTreeSet::new() });
     }
     if let ArtifactStore::Object(object) = store {
-        let listed = object.list_sized().map_err(|e| crate::artifacts::store_error(&e).hint(OBJECT_STORE_HINT))?;
-        for (digest, bytes) in listed {
-            blobs.entry(digest.clone()).or_insert_with(|| Blob { digest, local: None, object: None, reasons: BTreeSet::new() }).object = Some(bytes);
+        let listed = object.list_objects().map_err(|e| crate::artifacts::store_error(&e).hint(OBJECT_STORE_HINT))?;
+        for entry in listed {
+            let forms = [("zst", entry.zst), ("raw", entry.raw)].iter().filter_map(|(name, bytes)| bytes.map(|bytes| format!("{name}={bytes}"))).collect::<Vec<_>>().join(",");
+            let blob = blobs.entry(entry.digest.clone()).or_insert_with(|| Blob { digest: entry.digest.clone(), local: None, object: None, forms: String::new(), reasons: BTreeSet::new() });
+            blob.object = Some(entry.bytes());
+            blob.forms = forms;
         }
     }
     Ok(blobs)
@@ -443,14 +448,14 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
     }
     if delete.tier_objects > 0 {
         let bytes: u64 = doomed.iter().filter_map(|blob| blob.object).sum();
-        effects.push(Effect::record("delete", store.display("")).detail(format!("{} object(s), {bytes} bytes; data.blobs lists them; cannot be undone", delete.tier_objects)));
+        effects.push(Effect::record("delete", store.display_dir()).detail(format!("{} object(s), {bytes} bytes; data.blobs lists them; cannot be undone", delete.tier_objects)));
     }
     if !temps.is_empty() {
         effects.push(Effect::path("delete", format!("{}/.tmp-*", canon_model::paths::ARTIFACTS_SHA256_DIR)).detail(format!("{} stale temp file(s), {temp_bytes} bytes; data.staleTemps lists them", temps.len())));
     }
     let reads = Reads::new()
         .path(&repo, "canon.yaml")
-        .set("delete", doomed.iter().map(|blob| format!("{} local={} object={}", blob.digest, blob.local.as_ref().map_or(0, |(_, bytes)| *bytes), blob.object.map_or_else(|| "-".to_string(), |bytes| bytes.to_string()))))
+        .set("delete", doomed.iter().map(|blob| format!("{} local={} object={}", blob.digest, blob.local.as_ref().map_or(0, |(_, bytes)| *bytes), if blob.forms.is_empty() { "-" } else { blob.forms.as_str() })))
         .set("keep", kept.iter().map(|blob| format!("{} {}", blob.digest, blob.reasons.iter().map(|reason| reason.as_str()).collect::<Vec<_>>().join(","))))
         .set("stale-temps", temps.iter().map(|temp| format!("{} {}", temp.name, temp.bytes)))
         .set("records", bindings.state.iter());
@@ -527,12 +532,12 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
         #[cfg(debug_assertions)]
         if done.blobs == 1 {
             if let Some(e) = crate::incomplete::injected_stop("artifacts-prune-after-delete") {
-                stopped = Some(Stop { object: false, message: format!("failed to delete the next blob: {e}"), hint: "fix what the message names, then preview and commit again".to_string() });
+                stopped = Some(Stop { partial: false, object: false, message: format!("failed to delete the next blob: {e}"), hint: "fix what the message names, then preview and commit again".to_string() });
                 break;
             }
             // The same stop as an object store that gives out after its first delete.
             if let Some(e) = crate::incomplete::injected_stop("artifacts-prune-object-after-delete") {
-                stopped = Some(Stop { object: true, message: format!("could not delete the next object: {e}"), hint: format!("{OBJECT_STORE_HINT}; then preview and commit again") });
+                stopped = Some(Stop { partial: false, object: true, message: format!("could not delete the next object: {e}"), hint: format!("{OBJECT_STORE_HINT}; then preview and commit again") });
                 break;
             }
         }
@@ -550,14 +555,14 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
                 }
                 Ok(None) => {}
                 Err(e) => {
-                    stopped = Some(Stop { object: false, message: format!("failed to remove {}: {e}", temp.path.display()), hint: "fix the permissions of the blob directory, then preview and commit again".to_string() });
+                    stopped = Some(Stop { partial: false, object: false, message: format!("failed to remove {}: {e}", temp.path.display()), hint: "fix the permissions of the blob directory, then preview and commit again".to_string() });
                     break;
                 }
             }
             #[cfg(debug_assertions)]
             if done_temps.files == 1 {
                 if let Some(e) = crate::incomplete::injected_stop("artifacts-prune-temp-after-delete") {
-                    stopped = Some(Stop { object: false, message: format!("failed to delete the next stale temp file: {e}"), hint: "fix what the message names, then preview and commit again".to_string() });
+                    stopped = Some(Stop { partial: false, object: false, message: format!("failed to delete the next stale temp file: {e}"), hint: "fix what the message names, then preview and commit again".to_string() });
                     break;
                 }
             }
@@ -568,7 +573,7 @@ pub fn run_prune(repo: &crate::cli::RepoArgs, keep_days: Option<u64>, page: &Pag
     report.plan = plan.committed();
 
     if let Some(stop) = stopped {
-        if done.blobs == 0 && done_temps.files == 0 {
+        if done.blobs == 0 && done_temps.files == 0 && !stop.partial {
             // Nothing was deleted: the same call can run again.
             return CliError::failed(stop.code(), format!("{}; nothing was deleted", stop.message)).hint(stop.hint).emit("canon artifacts prune", json);
         }
@@ -621,6 +626,8 @@ fn store_bytes(blobs: &[&Blob], of: impl Fn(&Blob) -> Option<u64>) -> u64 {
 
 /// Why a delete stopped the run: an object of the tier (`ARTIFACTS_STORE_FAILED`) or a local file (`WRITE_FAILED`) could not be deleted.
 struct Stop {
+    /// The first object of one digest was deleted before the second was refused: something is gone although no whole blob is counted.
+    partial: bool,
     object: bool,
     message: String,
     hint: String,
@@ -649,7 +656,7 @@ fn delete_blob(blob: &Blob, object: Option<&ObjectArtifacts>, done: &mut PruneCo
                     done.bytes += bytes;
                     removed = true;
                 }
-                Err(e) => return Err(Stop { object: true, message: format!("could not delete {}:{}: {e}", object.tier, blob.digest), hint: format!("{OBJECT_STORE_HINT}; then preview and commit again") }),
+                Err((e, partial)) => return Err(Stop { partial, object: true, message: format!("could not delete {}:{}: {e}", object.tier, blob.digest), hint: format!("{OBJECT_STORE_HINT}; then preview and commit again") }),
             }
         }
         if let Some((path, bytes)) = &blob.local {
@@ -660,7 +667,7 @@ fn delete_blob(blob: &Blob, object: Option<&ObjectArtifacts>, done: &mut PruneCo
                     removed = true;
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => return Err(Stop { object: false, message: format!("failed to remove {}: {e}", path.display()), hint: "fix the permissions of the blob directory, then preview and commit again".to_string() }),
+                Err(e) => return Err(Stop { partial: false, object: false, message: format!("failed to remove {}: {e}", path.display()), hint: "fix the permissions of the blob directory, then preview and commit again".to_string() }),
             }
         }
         Ok(())

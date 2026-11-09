@@ -337,3 +337,98 @@ fn ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evid
     let advisory = advisory.expect("a shallow clone has no base commit for the declared scenario");
     assert!(advisory.starts_with("1 (subject, role) cell(s)") && advisory.contains("kept.leaf.01") && !advisory.contains("gone.leaf.01"), "{advisory}");
 }
+
+/// One scenario `gone.leaf.01` with green evidence, past `max_commits_behind = 2` (three commits after the evidence), its feature file the only one.
+fn one_scenario_past_the_ceiling(repo: &Path) {
+    git_in(repo, &["init", "-q", "-b", "main"]);
+    assert!(canon_in(repo, &["init", "--repo", ".", "--no-policy", "--json"]).status.success());
+    fs::write(repo.join(".canon/policy.yaml"), "staleness:\n  max_commits_behind: 2\n").unwrap();
+    assert_eq!(canon_in(repo, &["scenario", "new", "gone.leaf.01", "--title", "gone", "--case", "failure", "--json"]).status.code(), Some(0));
+    assert_eq!(canon_in(repo, &["inventory", "sync", "--json"]).status.code(), Some(0));
+    fs::write(repo.join("code.rs"), "1").unwrap();
+    commit_all(repo, "project");
+    let out = canon_in(repo, &["evidence", "add", "--scenario", "gone.leaf.01", "--project", "root", "--class", "test-run", "--ref", "run", "--role", "implementer", "--json"]);
+    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stdout));
+    commit_all(repo, "evidence");
+    for n in 2..=4 {
+        fs::write(repo.join("code.rs"), n.to_string()).unwrap();
+        commit_all(repo, &format!("code {n}"));
+    }
+}
+
+/// gate.tombstone-corpus.01 (F1): deleting the last feature file leaves an empty scenario list, and the tombstone, not the empty list, says the scenario is gone.
+#[test]
+fn gate_tombstone_corpus_01_the_old_evidence_of_the_last_deleted_scenario_is_not_stale_evidence_and_not_unresolvable() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    one_scenario_past_the_ceiling(repo);
+    assert_eq!(stale_subjects(repo).0, ["gone.leaf.01"], "declared and past the ceiling");
+
+    let feature = repo.join(".canon/specs/kind=feature/area=gone/leaf.feature");
+    let text = fs::read_to_string(&feature).unwrap();
+    fs::remove_file(&feature).unwrap();
+    assert_eq!(canon_in(repo, &["inventory", "sync", "--json"]).status.code(), Some(0));
+    commit_all(repo, "the last feature file is deleted");
+    let scenarios = json_of(&canon_in(repo, &["query", "--kind", "scenario", "--all", "--json"]));
+    assert!(scenarios["data"]["records"].as_array().unwrap().iter().all(|r| r["removed"] == true), "only tombstones are left: {scenarios}");
+    assert_eq!(stale_subjects(repo).0, Vec::<String>::new(), "a tombstone is read as a fact, not guessed from an empty list");
+
+    let status = json_of(&canon_in(repo, &["status", "--json"]));
+    assert!(!status.to_string().contains("staleness_unresolvable"), "{status}");
+
+    fs::create_dir_all(feature.parent().unwrap()).unwrap();
+    fs::write(&feature, text).unwrap();
+    assert_eq!(canon_in(repo, &["inventory", "sync", "--json"]).status.code(), Some(0));
+    commit_all(repo, "the feature file is back");
+    assert_eq!(stale_subjects(repo).0, ["gone.leaf.01"], "a re-declared scenario is judged again");
+}
+
+/// gate.tombstone-corpus.01 (F1): the same deletion read before any `canon inventory sync` (the refresh `gate check` does in memory) is just as clear of `stale-evidence`.
+#[test]
+fn gate_tombstone_corpus_01_a_last_feature_file_deleted_before_the_sync_is_not_stale_evidence() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    one_scenario_past_the_ceiling(repo);
+    assert_eq!(stale_subjects(repo).0, ["gone.leaf.01"], "declared and past the ceiling");
+    fs::remove_file(repo.join(".canon/specs/kind=feature/area=gone/leaf.feature")).unwrap();
+    assert_eq!(stale_subjects(repo).0, Vec::<String>::new(), "the in-memory refresh tombstones the scenario, and the tombstone is read");
+}
+
+/// gate.tombstone-corpus.02 (F1, failure path): a repository whose scenarios cannot be read keeps judging the evidence.
+#[test]
+fn gate_tombstone_corpus_02_a_corpus_that_is_not_read_still_judges_the_evidence() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    one_scenario_past_the_ceiling(repo);
+    let yaml = fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    assert!(yaml.contains("  scenario:") || yaml.contains("routing:"), "{yaml}");
+    // The scenario kind goes to another tier than the git one the gate reads.
+    let routed = if yaml.contains("  scenario:") { yaml.replacen("  scenario: local", "  scenario: hot", 1) } else { yaml.replacen("routing:\n", "routing:\n  scenario: hot\n", 1) };
+    fs::write(repo.join("canon.yaml"), routed).unwrap();
+    fs::remove_file(repo.join(".canon/specs/kind=feature/area=gone/leaf.feature")).unwrap();
+    // The Given: no scenario record is read (the index a sync wrote is not there, as in a fresh clone), so no tombstone is either.
+    fs::remove_dir_all(scenario_index_dir(repo)).unwrap();
+    commit_all(repo, "the scenario kind is routed off the git tier and the feature file is gone");
+    let scenarios = json_of(&canon_in(repo, &["query", "--kind", "scenario", "--all", "--json"]));
+    assert!(scenarios["data"]["records"].as_array().is_none_or(Vec::is_empty), "the Given: no scenario record is read: {scenarios}");
+    assert_eq!(stale_subjects(repo).0, ["gone.leaf.01"], "no corpus was read, so nothing is known to be absent");
+}
+
+/// The directory of the scenario index (`kind=scenario`) under `repo`'s `.canon`.
+fn scenario_index_dir(repo: &Path) -> PathBuf {
+    fn find(dir: &Path) -> Option<PathBuf> {
+        for entry in fs::read_dir(dir).ok()?.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if path.file_name().is_some_and(|name| name == "kind=scenario") {
+                    return Some(path);
+                }
+                if let Some(found) = find(&path) {
+                    return Some(found);
+                }
+            }
+        }
+        None
+    }
+    find(&repo.join(".canon")).expect("a synced repo has a scenario index")
+}
