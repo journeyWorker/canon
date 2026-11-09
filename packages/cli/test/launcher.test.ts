@@ -13,11 +13,13 @@ import { join } from "node:path";
 const launcherSource = join(import.meta.dir, "..", "src", "index.ts");
 
 // The launcher replaces itself with the binary (`process.execve`) where the
-// runtime has it: a long-running canon keeps no node process beside it.
-// Without execve (Windows, Node < 23.11) it runs the binary as a child.
+// runtime can do it safely (Node 26.1 or later): a long-running canon keeps
+// no node process beside it. Elsewhere (Windows, an older Node) it runs the
+// binary as a child. The launcher runs under `node`, as `bin.js` does for
+// every npm user (CI installs Node 26).
 function runStub(
   script: string,
-  opts: { stdin?: Buffer; withoutExecve?: boolean } = {},
+  opts: { stdin?: Buffer; withoutExecve?: boolean; executable?: boolean } = {},
 ): { exitCode: number | null; signalCode: string | null; stdout: string; stderr: string } {
   const root = mkdtempSync(join(tmpdir(), "canon-launcher-"));
   try {
@@ -25,13 +27,15 @@ function runStub(
     mkdirSync(join(cliDir, "src"), { recursive: true });
     mkdirSync(join(cliDir, "bin"), { recursive: true });
     copyFileSync(launcherSource, join(cliDir, "src", "index.ts"));
+    // An ES module package, as the published one is: node reads the launcher without a warning.
+    writeFileSync(join(cliDir, "package.json"), '{"type":"module"}\n');
     const stub = join(cliDir, "bin", "canon");
     writeFileSync(stub, `#!/bin/sh\n${script}\n`);
-    chmodSync(stub, 0o755);
+    chmodSync(stub, opts.executable === false ? 0o644 : 0o755);
     // A preload that takes process.execve away: the launcher's child path.
     const preload = join(root, "no-execve.cjs");
     writeFileSync(preload, "process.execve = undefined;\n");
-    const runtime = [process.execPath, ...(opts.withoutExecve ? ["--require", preload] : [])];
+    const runtime = ["node", ...(opts.withoutExecve ? ["--require", preload] : [])];
     const result = Bun.spawnSync([...runtime, join(cliDir, "src", "index.ts"), "gate", "check"], {
       stdin: opts.stdin ?? "ignore",
       stdout: "pipe",
@@ -112,7 +116,14 @@ describe.skipIf(process.platform === "win32")("launcher process", () => {
     expect(r.stdout.trim()).toMatch(/^skills:.*skills$/);
   });
 
-  describe("without process.execve (Windows, Node < 23.11): the child path", () => {
+  test("a binary the system cannot execute is the launcher's error (exit 1), never an abort", () => {
+    const r = runStub("exit 0", { executable: false });
+    expect(r.signalCode).toBeNull();
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("canon: failed to run");
+  });
+
+  describe("without process.execve (Windows, Node < 26.1): the child path", () => {
     test("runs the binary as a child of the launcher", () => {
       const r = runStub('echo "ppid:$PPID"', { withoutExecve: true });
       expect(r.exitCode).toBe(0);
