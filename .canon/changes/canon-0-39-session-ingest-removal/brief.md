@@ -113,7 +113,7 @@ canon은 의도에서 증거와 게이트까지 이어지는 워크플로를 다
   - 실패 경로: 고정 벡터 시험이 `content_digest`의 12자 값 하나라도 바뀌면 실패한다.
 - F3:
   - `canon dispatch begin`과 `end`의 Run 기록이 0.38과 같은 모양으로 라우팅된 계층에 저장되고 같은 Run을 다시 쓰면 오류가 아니다.
-  - 실패 경로: 저장소가 이미 갖고 있는 Run을 다른 내용으로 쓰면 지금처럼 거절된다.
+  - 실패 경로: 저장소가 이미 갖고 있는 Run을 다른 내용으로 쓰면 0.38처럼 덮어쓰지 않고 새 버전으로 저장되며, 읽을 때는 새 버전 하나만 보인다. 같은 내용을 다시 쓰면 아무것도 더 저장되지 않는다.
 - F4:
   - `ingest:` 절이 든 canon.yaml로 `status`와 `gate check`가 0.38과 같은 답을 낸다.
   - 실패 경로: 깨진 YAML인 canon.yaml은 지금처럼 그 명령의 설정 오류다. 옛 절이 결과를 바꾸지 않는다.
@@ -147,4 +147,4 @@ canon은 의도에서 증거와 게이트까지 이어지는 워크플로를 다
 - 대화 기록을 읽는 새 기능이나 외부 도구로의 안내.
 - `docs/research/**`와 `docs/design/cli-commands-0.28.md`의 옛 서술(역사 문서).
 
-Approved: Journey Hwang 2026-11-08T06:11:30Z — "승인 (canon 0.39 브리프 7개와 정책)" (relayed by planner planner-oco via ask) (code tree 7c28ab134d4701f16f343da5e87c7582b9521417) (brief sha256:295e70b9cf10dcc86f7a32a2a080429386ad0e0963e3736497e26271af4d0e14)
+Approved: Journey Hwang 2026-11-09T03:52:03Z — "승인: F3 실패 경로를 코드 동작(새 버전 저장)에 맞춰 고친 브리프" (relayed by planner planner-oco via chat) (code tree 95efa39f9e6567eca108728d0627f3b4410a1aec) (brief sha256:2058030074f5c5725aba95df47eca0a9cf8e12c18887b7ab46e9ef095fb8be1f)
