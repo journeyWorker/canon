@@ -937,6 +937,16 @@
       "retryable": false
     },
     {
+      "code": "CI_ENV_REQUIRED",
+      "exit": 2,
+      "retryable": false
+    },
+    {
+      "code": "CI_WORKTREE_CONFLICT",
+      "exit": 2,
+      "retryable": false
+    },
+    {
       "code": "COMMAND_REQUIRED",
       "exit": 2,
       "retryable": false

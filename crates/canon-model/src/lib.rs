@@ -41,7 +41,7 @@ pub use ids::{
     SpecDigest, SubjectId, TaskId, TotalOrder, regime_key,
 };
 pub use records::{
-    ApprovalRelay, AuditResult, BriefOverride, Change, ChangeStatus, CheckPin, Divergence, DivergenceFields, DivergenceStatus, EvidenceApproval, EvidenceAttachment, EvidenceAudit, EvidenceRecord,
+    ApprovalRelay, AuditResult, BriefOverride, Change, ChangeStatus, CheckPin, CiReport, CiRun, Divergence, DivergenceFields, DivergenceStatus, EvidenceApproval, EvidenceAttachment, EvidenceAudit, EvidenceRecord,
     EvidenceVerdict, Finding, FindingDisposition, ReportFormat, ReportOutcome,
     FindingSeverity, ProvenanceRef, Review, ReviewArtifact, ReviewOutcome, ReviewPins, PinnedSpec, EvidencePin, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario, ScenarioStep, StepOrigin,
     Reopen, StatusOverride, StatusReason, StrategyItem, StrategyRef, Subject, WaivedViolation,

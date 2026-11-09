@@ -45,6 +45,7 @@ fields	FIELDS	comma list of top-level report fields
 file-ref	TEXT	place in the tree a finding points at
 flow	FLOW_ID	flow of the original spec
 for-role	ROLE	role the retrieved guidance is for
+from-ci	-	mode: record the batch as a CI run, from the CI environment
 full	-	mode: re-hash every blob
 harness	NAME	a harness the canon skill is installed for (repeatable, one per name: init and skills)
 hash	HASH	regime hash segment

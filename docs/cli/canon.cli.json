@@ -2155,6 +2155,30 @@
         },
         {
           "code": "EVIDENCE_ARGUMENT_REQUIRED",
+          "help": "--from-ci records the whole suite: it needs --all-scenarios and an explicit --ref, the command line that ran it.",
+          "if": {
+            "name": "from-ci"
+          },
+          "rule": "requires",
+          "then": [
+            "all-scenarios",
+            "ref"
+          ]
+        },
+        {
+          "code": "EVIDENCE_ARGUMENT_CONFLICT",
+          "help": "--from-ci records the work tree the tests ran in and the verdicts of the report's own cases.",
+          "if": {
+            "name": "from-ci"
+          },
+          "rule": "forbids",
+          "then": [
+            "rev",
+            "verdict"
+          ]
+        },
+        {
+          "code": "EVIDENCE_ARGUMENT_REQUIRED",
           "help": "--report-case names a case of a --report.",
           "if": {
             "name": "report-case"
@@ -2239,6 +2263,8 @@
         "BRIEF_APPROVAL_REQUIRED",
         "BRIEF_APPROVAL_STALE",
         "BRIEF_MIGRATION_REQUIRED",
+        "CI_ENV_REQUIRED",
+        "CI_WORKTREE_CONFLICT",
         "COMMIT_REQUIRED",
         "CONFIG_DENIED",
         "CONFIG_INVALID",
@@ -2442,6 +2468,11 @@
           "name": "all-scenarios",
           "valueType": "switch"
         },
+        {
+          "help": "With --all-scenarios: record the batch as a CI run (the `ci` block of every record, from the GitHub Actions environment; needs --ref). Refused outside CI (CI_ENV_REQUIRED) and on a work tree that differs from HEAD (CI_WORKTREE_CONFLICT)",
+          "name": "from-ci",
+          "valueType": "switch"
+        },
         "max-artifact-mib",
         "override-reason",
         "promote",
@@ -2452,7 +2483,7 @@
       "outputs": [
         {
           "schemaRef": "#/schemas/EvidenceAddReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         },
         {
           "batch": true,
@@ -2856,7 +2887,7 @@
       "outputs": [
         {
           "schemaRef": "#/schemas/EvidenceAuditReport",
-          "schemaVersion": "1.1"
+          "schemaVersion": "1.2"
         },
         {
           "batch": true,
@@ -5197,6 +5228,7 @@
               "chain_id",
               "change_id",
               "change_ids",
+              "ci",
               "claimed_at",
               "claimed_by",
               "code_tree",
@@ -7905,6 +7937,20 @@
       "exit": 2,
       "fix": "Pass the id of the change you mean as the operand.",
       "meaning": "several live changes have a brief; pass the change id as the operand",
+      "retryable": false
+    },
+    {
+      "code": "CI_ENV_REQUIRED",
+      "exit": 2,
+      "fix": "Run the command in a GitHub Actions job that sets the variable the message names; outside CI, drop `--from-ci` (the record then names no CI run).",
+      "meaning": "`evidence add --from-ci` found no GitHub Actions environment: `GITHUB_ACTIONS` is not `true`, or `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT` (a whole number), `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY` or `GITHUB_SHA` is empty (`field` and the message name the variable)",
+      "retryable": false
+    },
+    {
+      "code": "CI_WORKTREE_CONFLICT",
+      "exit": 2,
+      "fix": "Write the report to a gitignored directory or under `.canon/`, or list it in `code.exclude`, and run the command again on a clean checkout.",
+      "meaning": "`evidence add --from-ci` found that the work tree's code differs from `HEAD`'s, so the record's code tree would be no commit's (the usual cause is a report file `.gitignore` does not hide)",
       "retryable": false
     },
     {
@@ -14078,6 +14124,29 @@
           ],
           "type": "object"
         },
+        "RequireCiRunSurface": {
+          "description": "`spec_coverage.require_ci_run` in the `policy` section, keyed like\n`policy.yaml` (0.40). `scope` is the resolved status list (the default\n`[shipped]` when the key is omitted); empty means every scenario.\n`min_cases` is omitted when the policy sets none.",
+          "properties": {
+            "min_cases": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "scope": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "scope"
+          ],
+          "type": "object"
+        },
         "RequireReviewSurface": {
           "description": "`spec_coverage.require_review` in the `policy` section, keyed like\n`policy.yaml`. `scope` is the resolved status list (the default\n`[verifying, shipped]` when the key is omitted); empty means every\nscenario.",
           "properties": {
@@ -14254,6 +14323,17 @@
                     "type": "string"
                   },
                   "type": "array"
+                },
+                "require_ci_run": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/schemas/RequireCiRunSurface"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Omitted when the sub-section is absent."
                 },
                 "require_evidence": {
                   "type": "boolean"
@@ -19138,6 +19218,16 @@
               },
               "type": "array"
             },
+            "reports": {
+              "description": "`--all-scenarios` only: what each `--report` held, case by case (`passed`, `failed`, `skipped`), counting the cases no scenario owns.",
+              "items": {
+                "$ref": "#/schemas/CiReport"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "skipped": {
               "description": "`--all-scenarios` only: cases skipped because their scenario is not indexed.",
               "items": {
@@ -19200,6 +19290,47 @@
           "required": [
             "index",
             "status"
+          ],
+          "type": "object"
+        },
+        "CiReport": {
+          "description": "One report file of a [`CiRun`] and the cases it held.",
+          "properties": {
+            "failed": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "format": {
+              "$ref": "#/schemas/ReportFormat"
+            },
+            "passed": {
+              "description": "Cases of the report that passed (every case counts, with or without a scenario id).",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "description": "Repository-relative path, `/`-separated.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "64 lowercase hex characters: sha256 over the report's bytes.",
+              "type": "string"
+            },
+            "skipped": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "path",
+            "sha256",
+            "format",
+            "passed",
+            "failed",
+            "skipped"
           ],
           "type": "object"
         },
@@ -19375,6 +19506,10 @@
               "description": "The real captured output backing --summary (requires --summary; scanned for fabrication markers)",
               "type": "string"
             },
+            "fromCi": {
+              "description": "With --all-scenarios: record the batch as a CI run (the `ci` block of every record, from the GitHub Actions environment; needs --ref). Refused outside CI (CI_ENV_REQUIRED) and on a work tree that differs from HEAD (CI_WORKTREE_CONFLICT)",
+              "type": "boolean"
+            },
             "maxArtifactMib": {
               "description": "Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused",
               "pattern": "^-?(0|[1-9][0-9]*)$",
@@ -19498,6 +19633,16 @@
               },
               "type": "array"
             },
+            "reports": {
+              "description": "`--all-scenarios` only: what each `--report` held, case by case (`passed`, `failed`, `skipped`), counting the cases no scenario owns.",
+              "items": {
+                "$ref": "#/schemas/CiReport"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "skipped": {
               "description": "`--all-scenarios` only: cases skipped because their scenario is not indexed.",
               "items": {
@@ -19612,6 +19757,9 @@
             },
             "commandResult": {
               "type": "string"
+            },
+            "fromCi": {
+              "type": "boolean"
             },
             "maxArtifactMib": {
               "anyOf": [
@@ -19733,6 +19881,26 @@
             "reason"
           ],
           "type": "object"
+        },
+        "ReportFormat": {
+          "description": "The machine-readable test-report formats `canon evidence add\n--report` parses (experimental evidence binding). Canon never runs a\ntest; it reads the report the team's own runner already wrote.",
+          "oneOf": [
+            {
+              "const": "junit",
+              "description": "JUnit XML — emitted or convertible from nearly every ecosystem.",
+              "type": "string"
+            },
+            {
+              "const": "cucumber",
+              "description": "Cucumber JSON — Gherkin runners; scenario tags travel in it.",
+              "type": "string"
+            },
+            {
+              "const": "swift-testing",
+              "description": "Swift Testing's JSON-lines event stream (`swift test\n--experimental-event-stream-output <path>`): the scenario id is\nread from a test's display name, else its function name.",
+              "type": "string"
+            }
+          ]
         },
         "SkippedCase": {
           "description": "A case of `--all-scenarios` that was not recorded: its scenario is not indexed.",
@@ -19911,6 +20079,47 @@
           ],
           "type": "object"
         },
+        "CiReport": {
+          "description": "One report file of a [`CiRun`] and the cases it held.",
+          "properties": {
+            "failed": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "format": {
+              "$ref": "#/schemas/ReportFormat"
+            },
+            "passed": {
+              "description": "Cases of the report that passed (every case counts, with or without a scenario id).",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "description": "Repository-relative path, `/`-separated.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "64 lowercase hex characters: sha256 over the report's bytes.",
+              "type": "string"
+            },
+            "skipped": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "path",
+            "sha256",
+            "format",
+            "passed",
+            "failed",
+            "skipped"
+          ],
+          "type": "object"
+        },
         "ErrorBody": {
           "description": "The `error` member of a failure envelope. Field order is the document\norder: `code` first. An optional member with no value is left out of the\ndocument, so the body validates against the contract's error schema.",
           "properties": {
@@ -20067,6 +20276,16 @@
                 "$ref": "#/schemas/EvidenceRecordEntry"
               },
               "type": "array"
+            },
+            "reports": {
+              "description": "`--all-scenarios` only: what each `--report` held, case by case (`passed`, `failed`, `skipped`), counting the cases no scenario owns.",
+              "items": {
+                "$ref": "#/schemas/CiReport"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "skipped": {
               "description": "`--all-scenarios` only: cases skipped because their scenario is not indexed.",
@@ -20242,6 +20461,16 @@
                 "$ref": "#/schemas/EvidenceRecordEntry"
               },
               "type": "array"
+            },
+            "reports": {
+              "description": "`--all-scenarios` only: what each `--report` held, case by case (`passed`, `failed`, `skipped`), counting the cases no scenario owns.",
+              "items": {
+                "$ref": "#/schemas/CiReport"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
             },
             "skipped": {
               "description": "`--all-scenarios` only: cases skipped because their scenario is not indexed.",
@@ -20466,6 +20695,26 @@
             "reason"
           ],
           "type": "object"
+        },
+        "ReportFormat": {
+          "description": "The machine-readable test-report formats `canon evidence add\n--report` parses (experimental evidence binding). Canon never runs a\ntest; it reads the report the team's own runner already wrote.",
+          "oneOf": [
+            {
+              "const": "junit",
+              "description": "JUnit XML — emitted or convertible from nearly every ecosystem.",
+              "type": "string"
+            },
+            {
+              "const": "cucumber",
+              "description": "Cucumber JSON — Gherkin runners; scenario tags travel in it.",
+              "type": "string"
+            },
+            {
+              "const": "swift-testing",
+              "description": "Swift Testing's JSON-lines event stream (`swift test\n--experimental-event-stream-output <path>`): the scenario id is\nread from a test's display name, else its function name.",
+              "type": "string"
+            }
+          ]
         },
         "SkippedCase": {
           "description": "A case of `--all-scenarios` that was not recorded: its scenario is not indexed.",
@@ -28145,6 +28394,9 @@
             "change_ids": {
               "description": "a member of the records of: subject"
             },
+            "ci": {
+              "description": "a member of the records of: evidence"
+            },
             "claimed_at": {
               "description": "a member of the records of: handoff"
             },
@@ -33135,6 +33387,29 @@
           ],
           "type": "object"
         },
+        "RequireCiRunSurface": {
+          "description": "`spec_coverage.require_ci_run` in the `policy` section, keyed like\n`policy.yaml` (0.40). `scope` is the resolved status list (the default\n`[shipped]` when the key is omitted); empty means every scenario.\n`min_cases` is omitted when the policy sets none.",
+          "properties": {
+            "min_cases": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "scope": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "scope"
+          ],
+          "type": "object"
+        },
         "RequireReviewSurface": {
           "description": "`spec_coverage.require_review` in the `policy` section, keyed like\n`policy.yaml`. `scope` is the resolved status list (the default\n`[verifying, shipped]` when the key is omitted); empty means every\nscenario.",
           "properties": {
@@ -33207,6 +33482,17 @@
                     "type": "string"
                   },
                   "type": "array"
+                },
+                "require_ci_run": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/schemas/RequireCiRunSurface"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Omitted when the sub-section is absent."
                 },
                 "require_evidence": {
                   "type": "boolean"

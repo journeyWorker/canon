@@ -50,6 +50,17 @@
         }
       ]
     },
+    "ci": {
+      "description": "The CI run that wrote this record (`--from-ci`, 0.40); absent on every\nrecord written another way and on a record written before 0.40.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CiRun"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "code_tree": {
       "description": "The git tree id of the code the writing command saw (0.28 D7b):\nthe working tree for the default `HEAD`, the commit's own code for\nan explicit rev; `.canon/`, spec roots and `code.exclude` are not\npart of it. Absent on a record written before 0.28.",
       "type": [
@@ -253,6 +264,109 @@
         "reason",
         "waived",
         "actor"
+      ]
+    },
+    "CiReport": {
+      "description": "One report file of a [`CiRun`] and the cases it held.",
+      "type": "object",
+      "properties": {
+        "failed": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "format": {
+          "$ref": "#/$defs/ReportFormat"
+        },
+        "passed": {
+          "description": "Cases of the report that passed (every case counts, with or without a scenario id).",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "path": {
+          "description": "Repository-relative path, `/`-separated.",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "64 lowercase hex characters: sha256 over the report's bytes.",
+          "type": "string"
+        },
+        "skipped": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "format",
+        "passed",
+        "failed",
+        "skipped"
+      ]
+    },
+    "CiRun": {
+      "description": "The CI run that produced a batch of evidence (`canon evidence add\n--all-scenarios --from-ci`, 0.40): the identity the CI environment\nvariables claim, and what each bound report held. A CLAIM, not proof:\ncanon reads environment variables, and nothing signs them. `provider`\nis a string so a later version's provider is readable here (a closed\nenum would make a record of a newer provider unreadable). Every\nrecord of one batch carries the same value.",
+      "type": "object",
+      "properties": {
+        "attempt": {
+          "description": "The attempt of that run (`GITHUB_RUN_ATTEMPT`); a re-run raises it.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "job": {
+          "description": "`GITHUB_JOB`, when set.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "description": "The CI provider, today `github-actions`.",
+          "type": "string"
+        },
+        "reports": {
+          "description": "One entry per bound report file, including one no scenario matched a case of.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CiReport"
+          }
+        },
+        "repository": {
+          "description": "The repository the run belongs to (`GITHUB_REPOSITORY`).",
+          "type": "string"
+        },
+        "run": {
+          "description": "The provider's run number (`GITHUB_RUN_ID`).",
+          "type": "string"
+        },
+        "sha": {
+          "description": "The commit the CI says it ran on (`GITHUB_SHA`), as given. It may differ from\nthe record's `evidence_sha` (a pull request run that checks out the PR head).",
+          "type": "string"
+        },
+        "url": {
+          "description": "The run's address: `<server>/<repository>/actions/runs/<run>/attempts/<attempt>`.",
+          "type": "string"
+        },
+        "workflow": {
+          "description": "`GITHUB_WORKFLOW`, when set.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "provider",
+        "run",
+        "attempt",
+        "url",
+        "repository",
+        "sha",
+        "reports"
       ]
     },
     "EvidenceApproval": {

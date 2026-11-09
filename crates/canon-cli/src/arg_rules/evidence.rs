@@ -32,6 +32,12 @@ pub(crate) static TABLES: Tables = Tables {
                     .code("EVIDENCE_ARGUMENT_CONFLICT")
                     .help("--all-scenarios writes one record per scenario its report owns, so it names no single subject."),
                 Rule::requires("all-scenarios", &["report"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("--all-scenarios splits a --report by the scenario each case belongs to.").says("--all-scenarios splits a --report by the scenario each case belongs to, and no --report was given: none was given"),
+                Rule::requires("from-ci", &["all-scenarios", "ref"])
+                    .code("EVIDENCE_ARGUMENT_REQUIRED")
+                    .help("--from-ci records the whole suite: it needs --all-scenarios and an explicit --ref, the command line that ran it."),
+                Rule::forbids("from-ci", &["rev", "verdict"])
+                    .code("EVIDENCE_ARGUMENT_CONFLICT")
+                    .help("--from-ci records the work tree the tests ran in and the verdicts of the report's own cases."),
                 Rule::requires("report-case", &["report"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("--report-case names a case of a --report."),
                 Rule::requires("command-result", &["summary"]).code("EVIDENCE_ARGUMENT_REQUIRED").help("The captured output backs a --summary."),
                 Rule::requires("approver", &["approval-role", "signature-file", "approval-at"]).code("EVIDENCE_APPROVAL_REQUIRED").help(APPROVAL_TOGETHER),

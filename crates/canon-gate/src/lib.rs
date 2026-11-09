@@ -47,6 +47,7 @@ pub mod acceptance;
 pub mod approval;
 pub mod artifact_store;
 pub mod audit;
+pub mod ci_run;
 pub mod checkbox;
 pub mod context;
 pub mod coverage;
@@ -87,7 +88,7 @@ pub use markers::{evidence_note_of, scan_fake_markers, scan_note_text, EvidenceN
 pub use evidence_binding::{binding_summary, strength_of, BindingGap, BindingSummary, EvidenceBindingCheck};
 pub use policy::{
     allowed_signers_path, AllowedSignersError, AuditRate, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution,
-    PolicyResolveError, RequireAudit, RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy, KNOWN_TOP_LEVEL_KEYS,
+    PolicyResolveError, RequireAudit, RequireCiRun, RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy, KNOWN_TOP_LEVEL_KEYS,
 };
 pub use policy_keys::PolicyKeysCheck;
 pub use review_gate::{review_advisories, ReviewAdvisory};

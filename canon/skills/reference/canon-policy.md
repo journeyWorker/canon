@@ -55,7 +55,7 @@ unknown `--policy` value exits 2, and so does `--policy` with `--no-policy`.
 it) and in `--json` as `policy.level`. It reads the level line when the
 file's leading comment block has one naming a known level; otherwise it
 infers the level from the `spec_coverage` section, which must match a
-level exactly (no `scope`, `exclude_lanes`, `require_audit`, or
+level exactly (no `scope`, `exclude_lanes`, `require_audit`, `require_ci_run`, or
 non-default `require_review` settings); anything else is `custom`.
 `policy.level` is `null` when there is no policy.
 
@@ -261,6 +261,51 @@ latest audit is missing or `indeterminate` is `uncovered-cell`; with
 `shipped` in `scope`, `canon subject move <id> --to shipped` also refuses
 it. `canon context` and the `canon status` policy line show
 `require_audit=(rate=… seed=`…` scope=…)`.
+
+## CI evidence: `spec_coverage.require_ci_run` (0.40)
+
+Optional; absent means nothing is asked of where evidence came from.
+
+```yaml
+spec_coverage:
+  require_ci_run: {}           # every default
+  # require_ci_run:
+  #   scope: [shipped]         # subject statuses the gate and the ship guard watch; this is the default; [] = every scenario
+  #   min_cases: 120           # optional: the fewest cases (passed + failed over the record's reports) a run may have run
+```
+
+For every in-scope scenario (`spec_coverage.exclude_lanes` applies) that has
+declared evidence, its newest record (the latest `at`; an audit is not one)
+must be a CI record (`canon evidence add --all-scenarios --from-ci`, see
+`canon-gate`) of the code as it stands now, from a run that ran enough
+cases. The first thing that is wrong is the scenario's one violation, and
+its reason is in the detail:
+
+| reason | the newest record | class |
+|---|---|---|
+| `no_ci_run` | has no `ci` block (a person or an agent wrote it; a newer one than the CI's counts) | `uncovered-cell` |
+| `code_tree_unknown` | cannot be compared: git did not give the code tree now | `uncovered-cell` |
+| `other_code_tree` | is of another code tree than the one now (none recorded is another) | `stale-evidence` |
+| `dirty_worktree` | says its work tree differed from `HEAD` | `uncovered-cell` |
+| `short_run` | ran fewer than `min_cases` cases | `uncovered-cell` |
+
+A scenario with no evidence at all is the evidence requirement's
+(`require_evidence`), not this one's. The code tree compared is the one
+`canon gate check` already uses for stale evidence; commit shas are not
+compared (a record commit changes `.canon/` only). `canon gate check`, the
+`verifying → shipped` guard and `canon status`' red flag on a shipped subject
+are one decision. `--override-reason` does not waive it: a repo that wants out
+changes the policy, and a human approves that. The default scope `[shipped]`
+means a shipped subject goes red again when its code changes, until CI records
+the suite at the new code: it assumes CI records on every push to the main
+branch.
+
+`min_cases` is an integer of 1 or more. An unknown key, `null`, `0`, a
+negative or non-integer `min_cases`, a bad `scope` or a non-mapping poisons
+the whole `spec_coverage` section, like the other sub-sections. A policy with
+`require_ci_run` is level `custom`. `canon context` and the `canon status`
+policy line show `require_ci_run=(scope=… min_cases=…)`; there is no line
+without the key.
 
 ## Effect-aware risk tiers
 

@@ -533,6 +533,8 @@ pub struct EvidenceArgs {
     /// `--project` that owns a case in the `--report`s
     /// ([`run_add_all`]).
     pub all_scenarios: bool,
+    /// `--from-ci` (0.40): record the batch as a CI run, with the `ci` block the CI environment says ([`crate::ci_env`]).
+    pub from_ci: bool,
     /// The artifact store's per-file size limit, in MiB.
     pub max_artifact_mib: u64,
     /// `--kind audit` only (0.15 D3): the external evaluator's id,
@@ -833,9 +835,15 @@ pub struct EvidenceAddReport {
     pub stale_reviews: Vec<StaleReview>,
     /// The refusals `--override-reason` waived for these records (D12); empty when nothing was waived.
     pub overrides: Vec<crate::reports::Override>,
+    /// `--all-scenarios` only: what each `--report` held, case by case (`passed`, `failed`, `skipped`), counting the cases no scenario owns.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reports: Option<Vec<canon_model::CiReport>>,
 }
 
-impl crate::reports::Report for EvidenceAddReport {}
+impl crate::reports::Report for EvidenceAddReport {
+    /// 1.1: `reports` (a batch says how many cases each `--report` held). `evidence audit` shares the type and never writes it.
+    const SCHEMA_VERSION: &'static str = "1.1";
+}
 
 /// Emit only the exact signable bytes to stdout; never stage or sign.
 pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
@@ -1215,7 +1223,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         if args.json {
             let entry = EvidenceRecordEntry { landing: existing.landing(), subject: subject.clone(), outcome: outcome.clone(), next: Some(next.clone()), unchanged: None };
             crate::json_out::mark_unchanged();
-            crate::json_out::data(args.command(), &EvidenceAddReport { records: vec![entry], skipped: None, cases_without_scenario_id: None, stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals) });
+            crate::json_out::data(args.command(), &EvidenceAddReport { records: vec![entry], skipped: None, cases_without_scenario_id: None, reports: None, stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals) });
         }
         return 0;
     }
@@ -1262,7 +1270,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
                     None => crate::next::Scope::Scenarios(vec![subject.clone()]),
                 };
                 let staged = matches!(settled, crate::gate::StagedOutcome::Staged);
-                crate::next::finish(&repo, args.command(), &scope, staged, args.json, &EvidenceAddReport { records: vec![record], skipped: None, cases_without_scenario_id: None, stale_reviews: stale, overrides: overrides_of(args, &refusals) });
+                crate::next::finish(&repo, args.command(), &scope, staged, args.json, &EvidenceAddReport { records: vec![record], skipped: None, cases_without_scenario_id: None, reports: None, stale_reviews: stale, overrides: overrides_of(args, &refusals) });
             }
             settled.exit_code()
         }
@@ -1496,6 +1504,23 @@ fn check_artifact_scopes(artifacts: &[std::path::PathBuf], all_scenarios: bool, 
 /// review the batch makes stale.
 fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     let project_id = args.project_id.as_ref().expect("--all-scenarios requires --project, checked by check_all_scenarios_flags");
+    // `--from-ci` (0.40): the environment and the work tree are judged before anything is read or written. The
+    // record's code is the work tree the tests ran in, so it must be HEAD's (`--rev` and `--verdict` are refused
+    // with `--from-ci` by the command's rules).
+    let ci_env = if args.from_ci {
+        let env = match crate::ci_env::read(|name| std::env::var(name).ok()) {
+            Ok(env) => env,
+            Err(error) => return error.emit("canon evidence add", args.json),
+        };
+        if args.commit.worktree_dirty {
+            return CliError::refused("CI_WORKTREE_CONFLICT", "--from-ci records the work tree the tests ran in, and its code differs from HEAD's: a CI record of code no commit holds can never be told current; no record is written")
+                .hint("the usual cause is a report file git does not ignore (an untracked junit.xml changes the code tree): write the report to a gitignored directory or under .canon/, or list it in `code.exclude` of canon.yaml, and record again on a clean checkout")
+                .emit("canon evidence add", args.json);
+        }
+        Some(env)
+    } else {
+        None
+    };
     let mut gate_context = match load_gate_context_refreshed(repo) {
         Ok(ctx) => ctx,
         Err(e) => {
@@ -1525,6 +1550,10 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
             return CliError::refused("EVIDENCE_ARGUMENT_INVALID", e.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
         }
     };
+    let ci = ci_env.map(|env| env.into_run(batch.reports.clone()));
+    for report in &batch.reports {
+        crate::say!(args.json, "canon evidence add: {}: {} passed, {} failed, {} skipped", report.path, report.passed, report.failed, report.skipped);
+    }
 
     if let Some(summary) = &args.summary {
         let subject = scenario_ids.iter().map(ScenarioId::as_str).collect::<Vec<_>>().join(", ");
@@ -1568,6 +1597,9 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
                 .with_project_id(project_id.clone())
                 .with_evidence_sha(args.commit.sha.clone())
                 .with_code(&args.commit.code_tree, args.commit.worktree_dirty);
+            if let Some(ci) = &ci {
+                record = record.with_ci(ci.clone());
+            }
             if let Some(brief_override) = brief_override_of(args, refusals) {
                 record = record.with_brief_override(brief_override);
             }
@@ -1594,7 +1626,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     if records.is_empty() {
         if args.json {
             crate::json_out::mark_unchanged();
-            crate::json_out::data("evidence add", &EvidenceAddReport { records: unchanged, skipped: Some(Vec::new()), cases_without_scenario_id: Some(batch.without_id), stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals.concat()) });
+            crate::json_out::data("evidence add", &EvidenceAddReport { records: unchanged, skipped: Some(Vec::new()), cases_without_scenario_id: Some(batch.without_id), reports: Some(batch.reports), stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals.concat()) });
         }
         return 0;
     }
@@ -1646,7 +1678,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     }
     let stale = print_stale_reviews(&stale_reviews, promote, json);
     let scope = crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect());
-    crate::next::finish(repo, "evidence add", &scope, !promote, json, &EvidenceAddReport { records: written, skipped: Some(skipped), cases_without_scenario_id: Some(batch.without_id), stale_reviews: stale, overrides: overrides_of(args, &refusals.concat()) });
+    crate::next::finish(repo, "evidence add", &scope, !promote, json, &EvidenceAddReport { records: written, skipped: Some(skipped), cases_without_scenario_id: Some(batch.without_id), reports: Some(batch.reports), stale_reviews: stale, overrides: overrides_of(args, &refusals.concat()) });
     0
 }
 
@@ -2151,6 +2183,7 @@ mod tests {
             reports: Vec::new(),
             report_cases: Vec::new(),
             all_scenarios: false,
+            from_ci: false,
             max_artifact_mib: canon_gate::DEFAULT_MAX_ARTIFACT_MIB,
             evaluator_id: None,
             evaluator_version: None,

@@ -1401,6 +1401,67 @@ where
     Ok(s)
 }
 
+/// The CI run that produced a batch of evidence (`canon evidence add
+/// --all-scenarios --from-ci`, 0.40): the identity the CI environment
+/// variables claim, and what each bound report held. A CLAIM, not proof:
+/// canon reads environment variables, and nothing signs them. `provider`
+/// is a string so a later version's provider is readable here (a closed
+/// enum would make a record of a newer provider unreadable). Every
+/// record of one batch carries the same value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct CiRun {
+    /// The CI provider, today `github-actions`.
+    pub provider: String,
+    /// The provider's run number (`GITHUB_RUN_ID`).
+    pub run: String,
+    /// The attempt of that run (`GITHUB_RUN_ATTEMPT`); a re-run raises it.
+    pub attempt: u64,
+    /// The run's address: `<server>/<repository>/actions/runs/<run>/attempts/<attempt>`.
+    pub url: String,
+    /// The repository the run belongs to (`GITHUB_REPOSITORY`).
+    pub repository: String,
+    /// The commit the CI says it ran on (`GITHUB_SHA`), as given. It may differ from
+    /// the record's `evidence_sha` (a pull request run that checks out the PR head).
+    pub sha: String,
+    /// `GITHUB_WORKFLOW`, when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<String>,
+    /// `GITHUB_JOB`, when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub job: Option<String>,
+    /// One entry per bound report file, including one no scenario matched a case of.
+    pub reports: Vec<CiReport>,
+}
+
+impl CiRun {
+    /// How many cases ran: `passed + failed` over every report. A skipped case did not run.
+    pub fn cases_run(&self) -> u64 {
+        self.reports.iter().map(CiReport::ran).sum()
+    }
+}
+
+/// One report file of a [`CiRun`] and the cases it held.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct CiReport {
+    /// Repository-relative path, `/`-separated.
+    pub path: String,
+    /// 64 lowercase hex characters: sha256 over the report's bytes.
+    #[serde(deserialize_with = "deserialize_sha256_hex")]
+    pub sha256: String,
+    pub format: ReportFormat,
+    /// Cases of the report that passed (every case counts, with or without a scenario id).
+    pub passed: u64,
+    pub failed: u64,
+    pub skipped: u64,
+}
+
+impl CiReport {
+    /// `passed + failed`: the cases that ran.
+    pub fn ran(&self) -> u64 {
+        self.passed + self.failed
+    }
+}
+
 /// What an external evaluator concluded when it re-audited a scenario's
 /// declared success (0.15 D3). `Indeterminate` is a real outcome — the
 /// evaluator ran and could not decide — never an approval.
@@ -1525,6 +1586,10 @@ pub struct EvidenceRecord {
     /// written (0.28 D7b). Absent on a record written before 0.28.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worktree_dirty: Option<bool>,
+    /// The CI run that wrote this record (`--from-ci`, 0.40); absent on every
+    /// record written another way and on a record written before 0.40.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub ci: Option<CiRun>,
 }
 
 impl EvidenceRecord {
@@ -1554,6 +1619,7 @@ impl EvidenceRecord {
             brief_override: None,
             code_tree: None,
             worktree_dirty: None,
+            ci: None,
         }
     }
 
@@ -1561,6 +1627,12 @@ impl EvidenceRecord {
     pub fn with_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
         self.code_tree = Some(code_tree.into());
         self.worktree_dirty = Some(worktree_dirty);
+        self
+    }
+
+    /// Record the CI run this evidence came from (0.40).
+    pub fn with_ci(mut self, ci: CiRun) -> Self {
+        self.ci = Some(ci);
         self
     }
 

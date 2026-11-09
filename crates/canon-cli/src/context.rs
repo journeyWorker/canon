@@ -214,6 +214,17 @@ pub struct RequireAuditSurface {
     pub scope: Vec<String>,
 }
 
+/// `spec_coverage.require_ci_run` in the `policy` section, keyed like
+/// `policy.yaml` (0.40). `scope` is the resolved status list (the default
+/// `[shipped]` when the key is omitted); empty means every scenario.
+/// `min_cases` is omitted when the policy sets none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct RequireCiRunSurface {
+    pub scope: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_cases: Option<u64>,
+}
+
 /// The same requirement in the camelCase `review` section.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -240,6 +251,9 @@ pub enum SpecCoverageSurface {
         /// Omitted when the sub-section is absent.
         #[serde(skip_serializing_if = "Option::is_none")]
         require_audit: Option<RequireAuditSurface>,
+        /// Omitted when the sub-section is absent.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        require_ci_run: Option<RequireCiRunSurface>,
     },
     Invalid { invalid: String },
 }
@@ -601,11 +615,19 @@ pub fn require_audit_line(ra: &RequireAuditSurface) -> String {
     format!("rate={} seed=`{}` scope={}", ra.rate, ra.seed, scope_text(&ra.scope))
 }
 
+/// The one-line `require_ci_run` summary `canon context` and `canon status` print.
+pub fn require_ci_run_line(rc: &RequireCiRunSurface) -> String {
+    match rc.min_cases {
+        Some(min) => format!("scope={} min_cases={min}", scope_text(&rc.scope)),
+        None => format!("scope={}", scope_text(&rc.scope)),
+    }
+}
+
 impl SpecCoverageSurface {
     /// The outline's one-line summary.
     fn outline(&self) -> String {
         match self {
-            SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit } => {
+            SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit, require_ci_run } => {
                 let mut summary = format!("require_evidence={require_evidence} scope={}", scope_text(scope));
                 if !exclude_lanes.is_empty() {
                     summary.push_str(&format!(" exclude_lanes={}", exclude_lanes.join(", ")));
@@ -618,6 +640,9 @@ impl SpecCoverageSurface {
                 }
                 if let Some(ra) = require_audit {
                     summary.push_str(&format!(" require_audit=({})", require_audit_line(ra)));
+                }
+                if let Some(rc) = require_ci_run {
+                    summary.push_str(&format!(" require_ci_run=({})", require_ci_run_line(rc)));
                 }
                 summary
             }
@@ -796,7 +821,7 @@ fn summarize_policy(policy: &PolicyResolution) -> PolicySurface {
 /// `canon status` both print, keyed like `policy.yaml`.
 pub fn spec_coverage_surface(policy: &PolicyResolution) -> Option<SpecCoverageSurface> {
     policy.spec_coverage.as_ref().map(|sc| match sc {
-        SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit } => SpecCoverageSurface::Active {
+        SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit, require_ci_run } => SpecCoverageSurface::Active {
             require_evidence: *require_evidence,
             scope: status_slugs(scope),
             exclude_lanes: exclude_lanes.clone(),
@@ -811,6 +836,7 @@ pub fn spec_coverage_surface(policy: &PolicyResolution) -> Option<SpecCoverageSu
                 seed: ra.seed.clone(),
                 scope: status_slugs(&ra.scope),
             }),
+            require_ci_run: require_ci_run.as_ref().map(|rc| RequireCiRunSurface { scope: status_slugs(&rc.scope), min_cases: rc.min_cases }),
         },
         SpecCoverage::Invalid { detail } => SpecCoverageSurface::Invalid { invalid: detail.clone() },
     })

@@ -194,13 +194,28 @@ A present section, even `require_evidence: false` or a malformed one
 
   Keys, defaults and the exact sampling formula: `canon-policy`.
 
+- **CI evidence** (`require_ci_run`, 0.40) — in-scope scenarios (default
+  `[shipped]`; `exclude_lanes` applies) whose newest declared evidence is not
+  a CI record (`--from-ci`, below) of the code as it stands now, from a run of
+  at least `min_cases` cases, are `uncovered-cell` (`stale-evidence` for
+  `other_code_tree`), with the reason in the detail: `no_ci_run`,
+  `other_code_tree`, `dirty_worktree`, `short_run`, `code_tree_unknown`:
+
+  ```
+  uncovered-cell cart.add.01 — spec_coverage.require_ci_run: no_ci_run — the newest evidence (recorded by `impl-1` at …) was not recorded from CI; run the whole suite in CI and record it there: `canon evidence add … --from-ci …`
+  ```
+
+  A newer record by a person or an agent than the CI's is `no_ci_run`.
+  The ship guard and `canon status` read the same decision, and
+  `--override-reason` does not waive it. Keys: `canon-policy`.
+
 Two refusals rather than a silent pass, both surfacing as
 `uncovered-cell` on the subject `spec_coverage`:
 
 - A **malformed section** (unknown key, unknown `scope` status, or a
-  malformed `require_cases`/`require_review`/`require_audit` — unknown
+  malformed `require_cases`/`require_review`/`require_audit`/`require_ci_run` — unknown
   key, bad status, `null`, non-mapping, a missing or out-of-range
-  `rate`) refuses at check time (`uncovered-cell spec_coverage — ...
+  `rate`, a `min_cases` that is not an integer of 1 or more) refuses at check time (`uncovered-cell spec_coverage — ...
   unusable`). It is never treated as
   absent — a typo must not be silently equivalent to not opting in.
 - A **corpus kind routed off the gate's rung** (`scenario`,
@@ -586,6 +601,91 @@ Evidence for uncommitted code is recorded with its `codeTree` and
 **Done when:** `canon gate check` shows no violation for the scenarios you
 recorded evidence for; each record's own output line says whether it was
 written or `unchanged`.
+
+### Recording the suite from CI (`--from-ci`, 0.40)
+
+A batch says how many cases each report held: one line per `--report`
+(`canon evidence add: <path>: 118 passed, 0 failed, 3 skipped`) and
+`data.reports[]` (`path`, `sha256`, `format`, `passed`, `failed`, `skipped`),
+counting every case, one no scenario owns too. A re-run of one test file is a
+small number you can see. Nothing of this is recorded unless the batch is a
+CI run:
+
+```bash
+canon evidence add --project root --all-scenarios --from-ci \
+  --ref "cargo nextest run --workspace --profile ci" \
+  --report junit:target/nextest/ci/junit.xml --role implementer --promote
+```
+
+`--from-ci` reads the GitHub Actions environment (`GITHUB_ACTIONS` must be
+`true`; `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_SERVER_URL`,
+`GITHUB_REPOSITORY`, `GITHUB_SHA`; `GITHUB_WORKFLOW` and `GITHUB_JOB` when
+set) and gives every record of the batch the same `ci` block: `provider`
+(`github-actions`), `run`, `attempt`, `url`
+(`<server>/<repository>/actions/runs/<run>/attempts/<attempt>`),
+`repository`, `sha` (what the CI says it ran on; `evidence_sha` stays the commit
+canon bound), `workflow` and `job`, and `reports`: one entry per report file
+with its digest and counts, a report that matched no scenario included. It is
+never implied: without `--from-ci` a record names no run, in CI or not. It
+needs `--all-scenarios` and an explicit `--ref` (the command line that ran the
+suite: the default, the report path, names no suite) and refuses `--rev` and
+`--verdict` (`EVIDENCE_ARGUMENT_CONFLICT`). Outside GitHub Actions it is
+`CI_ENV_REQUIRED`, naming the variable (exit 2). On a work tree whose code
+differs from `HEAD`'s it is `CI_WORKTREE_CONFLICT` (exit 2): an untracked report
+changes the code tree, so write the report to a gitignored directory or under
+`.canon/`, or list it in `code.exclude`. Nothing is written in either case. The
+same batch of the same attempt is `unchanged`; a re-run of the workflow
+(attempt 2) writes new records. A review does not look at `ci`: recording the
+same suite from CI leaves a review current.
+
+`ci` is what the environment says. It stops a collected report standing in for
+the suite's run, and it proves nothing about who set the variables; the `url`
+is what a person checks. The policy that asks for it, and what a partial run
+is, is `spec_coverage.require_ci_run` (see `canon-policy`).
+
+A GitHub Actions job, in the order that matters:
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write              # only for way 2 below
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0           # staleness and the code tree read history
+      # 1. The tests write JUnit to a gitignored path (`target/` here), never beside the sources.
+      - run: cargo nextest run --workspace --profile ci
+      # 2. Record the run. `if: always()`: a failed run is recorded too, so the divergent verdicts are on the ledger.
+      - if: always()
+        run: |
+          canon inventory sync
+          canon evidence add --project root --all-scenarios --from-ci \
+            --ref "cargo nextest run --workspace --profile ci" \
+            --report junit:target/nextest/ci/junit.xml \
+            --role implementer --promote
+      # 3. Get the records out of the job, by one of two ways.
+      #    Way 1: upload them.
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canon-records
+          path: |
+            .canon/ledger
+            .canon/artifacts
+      #    Way 2: commit and push them (needs `permissions: contents: write`).
+      #    A push made with GITHUB_TOKEN does not start a new workflow run.
+      - if: always()
+        run: |
+          git add .canon/ledger .canon/artifacts
+          git -c user.name=canon-ci -c user.email=canon-ci@users.noreply.github.com commit -m "ci: record run $GITHUB_RUN_ID" || true
+          git push
+```
+
+A pull request from a fork has no write token: it can only upload. A squash
+merge can leave a merged tree that is not the pull request head's: the CI of
+the target branch records again.
 
 ### A write that makes a review stale says so (0.18)
 
