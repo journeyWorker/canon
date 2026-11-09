@@ -168,6 +168,18 @@ mod tests {
     #[cfg(all(unix, debug_assertions))]
     #[test]
     fn tier_durability_01_one_write_syncs_the_file_then_renames_then_syncs_the_parent_directory() {
+        assert_write_order();
+    }
+
+    /// tier.durability-release.01 (F4), the single-write half: a debug build, where the trace exists, still sees file sync, rename, directory sync in that order.
+    #[cfg(all(unix, debug_assertions))]
+    #[test]
+    fn tier_durability_release_01_a_debug_build_traces_file_sync_then_rename_then_directory_sync() {
+        assert_write_order();
+    }
+
+    #[cfg(all(unix, debug_assertions))]
+    fn assert_write_order() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("record.json");
         trace::take();

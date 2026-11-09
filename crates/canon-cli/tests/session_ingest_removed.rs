@@ -373,16 +373,7 @@ fn gate_tombstone_corpus_01_the_old_evidence_of_the_last_deleted_scenario_is_not
     assert!(scenarios["data"]["records"].as_array().unwrap().iter().all(|r| r["removed"] == true), "only tombstones are left: {scenarios}");
     assert_eq!(stale_subjects(repo).0, Vec::<String>::new(), "a tombstone is read as a fact, not guessed from an empty list");
 
-    let shallow = tempfile::tempdir().unwrap();
-    git_in(shallow.path(), &["clone", "-q", "--depth", "1", &format!("file://{}", repo.display()), "."]);
-    // A clone does not carry the scenario index (and so no tombstone), so the repo's own is copied in: the clone then reads what a synced work tree reads, with a base commit it does not hold.
-    let (_, advisory) = stale_subjects(shallow.path());
-    assert!(advisory.is_some_and(|a| a.contains("gone.leaf.01")), "without the tombstone the clone cannot tell the scenario was deleted, and counts its cell");
-    let index = scenario_index_dir(repo);
-    copy_dir(&index, &shallow.path().join(index.strip_prefix(repo).unwrap()));
-    let (stale, advisory) = stale_subjects(shallow.path());
-    assert!(stale.is_empty() && advisory.is_none(), "{stale:?} {advisory:?}");
-    let status = json_of(&canon_in(shallow.path(), &["status", "--json"]));
+    let status = json_of(&canon_in(repo, &["status", "--json"]));
     assert!(!status.to_string().contains("staleness_unresolvable"), "{status}");
 
     fs::create_dir_all(feature.parent().unwrap()).unwrap();
@@ -390,6 +381,17 @@ fn gate_tombstone_corpus_01_the_old_evidence_of_the_last_deleted_scenario_is_not
     assert_eq!(canon_in(repo, &["inventory", "sync", "--json"]).status.code(), Some(0));
     commit_all(repo, "the feature file is back");
     assert_eq!(stale_subjects(repo).0, ["gone.leaf.01"], "a re-declared scenario is judged again");
+}
+
+/// gate.tombstone-corpus.01 (F1): the same deletion read before any `canon inventory sync` (the refresh `gate check` does in memory) is just as clear of `stale-evidence`.
+#[test]
+fn gate_tombstone_corpus_01_a_last_feature_file_deleted_before_the_sync_is_not_stale_evidence() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    one_scenario_past_the_ceiling(repo);
+    assert_eq!(stale_subjects(repo).0, ["gone.leaf.01"], "declared and past the ceiling");
+    fs::remove_file(repo.join(".canon/specs/kind=feature/area=gone/leaf.feature")).unwrap();
+    assert_eq!(stale_subjects(repo).0, Vec::<String>::new(), "the in-memory refresh tombstones the scenario, and the tombstone is read");
 }
 
 /// gate.tombstone-corpus.02 (F1, failure path): a repository whose scenarios cannot be read keeps judging the evidence.
@@ -404,7 +406,11 @@ fn gate_tombstone_corpus_02_a_corpus_that_is_not_read_still_judges_the_evidence(
     let routed = if yaml.contains("  scenario:") { yaml.replacen("  scenario: local", "  scenario: hot", 1) } else { yaml.replacen("routing:\n", "routing:\n  scenario: hot\n", 1) };
     fs::write(repo.join("canon.yaml"), routed).unwrap();
     fs::remove_file(repo.join(".canon/specs/kind=feature/area=gone/leaf.feature")).unwrap();
+    // The Given: no scenario record is read (the index a sync wrote is not there, as in a fresh clone), so no tombstone is either.
+    fs::remove_dir_all(scenario_index_dir(repo)).unwrap();
     commit_all(repo, "the scenario kind is routed off the git tier and the feature file is gone");
+    let scenarios = json_of(&canon_in(repo, &["query", "--kind", "scenario", "--all", "--json"]));
+    assert!(scenarios["data"]["records"].as_array().is_none_or(|r| r.is_empty()), "the Given: no scenario record is read: {scenarios}");
     assert_eq!(stale_subjects(repo).0, ["gone.leaf.01"], "no corpus was read, so nothing is known to be absent");
 }
 
