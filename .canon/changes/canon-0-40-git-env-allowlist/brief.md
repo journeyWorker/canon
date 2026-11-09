@@ -150,4 +150,4 @@ Source: canon-0-39-git-boundary의 리뷰 발견 1_2(`.canon/ledger/kind=finding
 - 기한, 출력 한도, 이름 읽기(0.39에서 끝났다).
 - `crates/*/tests`의 통합 시험이 부르는 git.
 
-Approved: Journey Hwang 2026-11-09T10:05:36Z — "승인 (canon 0.40 브리프 4개와 정책, 권장 기본값)" (relayed by planner planner-oco via ask) (code tree 95efa39f9e6567eca108728d0627f3b4410a1aec) (brief sha256:9a7b00078131d1486c05444ecd93b0f36e8eb923861095ee508872850219fb52)
+Approved: Journey Hwang 2026-11-09T14:24:16Z — "재승인: 리뷰 지적에 따라 고친 브리프 3개" (relayed by planner planner-oco via ask) (code tree b9fe5e9bd8ef5436b3e8990ed06245172b3a003c) (brief sha256:14eb201bfed6f0188f5fa17458602dac2fc8d2be43e2bba9801fcb5698b6eca6)

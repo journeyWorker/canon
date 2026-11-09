@@ -1,8 +1,8 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-09T10:05:36Z",
-  "note": "승인 (canon 0.40 브리프 4개와 정책, 권장 기본값)",
+  "approved_at": "2026-11-09T14:24:16Z",
+  "note": "재승인: 리뷰 지적에 따라 고친 브리프 3개",
   "relay": {
     "role": "planner",
     "actor": "planner-oco",
