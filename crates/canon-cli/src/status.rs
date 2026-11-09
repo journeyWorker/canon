@@ -1520,7 +1520,7 @@ pub fn render(report: &StatusReport) -> String {
         (true, Some(SpecCoverageSurface::Invalid { invalid })) => {
             let _ = writeln!(out, "policy: .canon/policy.yaml (spec_coverage INVALID — {invalid})");
         }
-        (true, Some(SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit })) => {
+        (true, Some(SpecCoverageSurface::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit, require_ci_run })) => {
             let _ = writeln!(out, "policy: .canon/policy.yaml");
             let mut coverage = format!("require_evidence={require_evidence} scope={}", list_or(scope, "<every scenario>"));
             if !exclude_lanes.is_empty() {
@@ -1540,6 +1540,9 @@ pub fn render(report: &StatusReport) -> String {
             };
             if let Some(ra) = require_audit {
                 let _ = writeln!(out, "  require_audit: {}", crate::context::require_audit_line(ra));
+            }
+            if let Some(rc) = require_ci_run {
+                let _ = writeln!(out, "  require_ci_run: {}", crate::context::require_ci_run_line(rc));
             }
         }
     }

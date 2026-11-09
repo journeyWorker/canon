@@ -258,6 +258,7 @@ mod tests {
                     require_cases: Vec::new(),
                     require_review: None,
                     require_audit: Some(ra),
+                    require_ci_run: None,
                 }),
                 evidence_binding: None,
                 diagnostics: Vec::new(),

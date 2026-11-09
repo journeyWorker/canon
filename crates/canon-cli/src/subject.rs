@@ -1086,6 +1086,7 @@ pub fn run_move(
         blocking.extend(brief_check_violations(&repo, subject_id, &judged));
         if let Some(ctx) = &gate_context {
             blocking.extend(crate::reverify::chore_violations(&repo, ctx, &code_tree, &subject));
+            blocking.extend(ci_run_violations(&repo, ctx, &code_tree, subject_id, "verifying → shipped: "));
         }
     }
     if reopens {
@@ -1321,6 +1322,7 @@ fn review_checks(ctx: &GateContext, rr: &RequireReview, exclude_lanes: &[String]
 pub(crate) fn shipped_gate_gaps(repo: &Path, ctx: &GateContext, code_tree: &crate::reverify::CodeTreeMemo, subject: &Subject) -> Vec<Violation> {
     let mut gaps = ship_gate_violations(ctx, &subject.subject_id);
     gaps.extend(crate::reverify::chore_violations(repo, ctx, code_tree, subject));
+    gaps.extend(ci_run_violations(repo, ctx, code_tree, &subject.subject_id, ""));
     if let Some((rr, exclude_lanes)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) {
         let (unwaivable, waivable, _) = review_checks(ctx, rr, exclude_lanes, subject);
         let waiver = subject.status_override.as_ref().filter(|waiver| waiver.to == subject.status);
@@ -1328,6 +1330,19 @@ pub(crate) fn shipped_gate_gaps(repo: &Path, ctx: &GateContext, code_tree: &crat
         gaps.extend(waivable.into_iter().filter(|v| !waiver.is_some_and(|waiver| waiver.covers(v.class.as_str(), &v.subject))));
     }
     gaps
+}
+
+/// `spec_coverage.require_ci_run` when it covers `shipped` (0.40): the one rule `canon gate check` applies
+/// ([`canon_gate::ci_run::scenario_violation`]), as of the code tree `code_tree` holds. `--override-reason`
+/// does not waive it, so it is a blocking gap. `prefix` leads each detail (the guard's transition).
+fn ci_run_violations(repo: &Path, ctx: &GateContext, code_tree: &crate::reverify::CodeTreeMemo, subject_id: &SubjectId, prefix: &str) -> Vec<Violation> {
+    canon_gate::ci_run::subject_violations(ctx, subject_id, SubjectStatus::Shipped, || code_tree.get(repo).map(str::to_string))
+        .into_iter()
+        .map(|mut violation| {
+            violation.detail = format!("{prefix}{}", violation.detail);
+            violation
+        })
+        .collect()
 }
 
 /// The `verifying → shipped` evidence gate (contract, fail-closed). The

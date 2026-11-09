@@ -99,6 +99,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `check` is shared by `brief check` and `brief approve`.
     ("brief_check.rs", &["brief check", "brief approve", "brief show"]),
     ("change.rs", &["change new"]),
+    // `missing`: `CI_ENV_MISSING`, built here and emitted by `evidence add --from-ci`.
+    ("ci_env.rs", &["evidence add"]),
     // `unverifiable_error`: the failure of a check that examined nothing, emitted by each check.
     ("coverage.rs", &["gate check", "format", "status"]),
     ("context_pack.rs", &["context-pack", "prompt"]),

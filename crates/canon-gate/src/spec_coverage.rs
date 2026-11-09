@@ -83,8 +83,8 @@ use crate::policy::SpecCoverage;
 /// that asks for something. When it does not, the gate names no corpus-kind layout violation.
 pub fn judges_corpus(ctx: &GateContext) -> bool {
     match &ctx.policy.spec_coverage {
-        Some(SpecCoverage::Active { require_evidence, require_cases, require_review, require_audit, .. }) => {
-            *require_evidence || !require_cases.is_empty() || require_review.is_some() || require_audit.is_some()
+        Some(SpecCoverage::Active { require_evidence, require_cases, require_review, require_audit, require_ci_run, .. }) => {
+            *require_evidence || !require_cases.is_empty() || require_review.is_some() || require_audit.is_some() || require_ci_run.is_some()
         }
         _ => false,
     }
@@ -115,7 +115,7 @@ impl GateCheck for SpecCoverageCheck {
                     format!("policy.yaml's `spec_coverage` section is unusable ({detail}); refusing rather than treating it as absent"),
                 )];
             }
-            Some(SpecCoverage::Active { require_evidence: false, require_cases, require_review: None, require_audit: None, .. }) if require_cases.is_empty() => {
+            Some(SpecCoverage::Active { require_evidence: false, require_cases, require_review: None, require_audit: None, require_ci_run: None, .. }) if require_cases.is_empty() => {
                 return Vec::new()
             }
             Some(active @ SpecCoverage::Active { .. }) => active,
@@ -138,7 +138,7 @@ impl GateCheck for SpecCoverageCheck {
             )];
         }
 
-        let SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit } = policy else {
+        let SpecCoverage::Active { require_evidence, scope, exclude_lanes, require_cases, require_review, require_audit, require_ci_run } = policy else {
             unreachable!("the non-Active arms return above");
         };
 
@@ -225,6 +225,9 @@ impl GateCheck for SpecCoverageCheck {
         }
         if let Some(require_audit) = require_audit {
             violations.extend(crate::audit::evaluate(ctx, require_audit, exclude_lanes));
+        }
+        if let Some(require_ci_run) = require_ci_run {
+            violations.extend(crate::ci_run::evaluate(ctx, require_ci_run, exclude_lanes));
         }
         violations
     }
@@ -592,7 +595,7 @@ mod tests {
     }
 
     fn active(scope: Vec<SubjectStatus>) -> Option<SpecCoverage> {
-        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None, require_audit: None })
+        Some(SpecCoverage::Active { require_evidence: true, scope, exclude_lanes: Vec::new(), require_cases: Vec::new(), require_review: None, require_audit: None, require_ci_run: None })
     }
 
     fn requiring(cases: &[&str], exclude_lanes: &[&str]) -> Option<SpecCoverage> {
@@ -603,6 +606,7 @@ mod tests {
             require_cases: cases.iter().map(std::string::ToString::to_string).collect(),
             require_review: None,
             require_audit: None,
+            require_ci_run: None,
         })
     }
 
@@ -688,6 +692,7 @@ mod tests {
                 require_cases: Vec::new(),
                 require_review: None,
                 require_audit: None,
+                require_ci_run: None,
             })
         )
         .is_empty());
@@ -720,6 +725,7 @@ mod tests {
             require_cases: Vec::new(),
             require_review: None,
             require_audit: None,
+            require_ci_run: None,
         });
         assert!(run(corpus, policy).is_empty());
     }
@@ -737,6 +743,7 @@ mod tests {
             require_cases: Vec::new(),
             require_review: None,
             require_audit: None,
+            require_ci_run: None,
         });
         assert_eq!(run(corpus, policy).len(), 1);
     }
@@ -942,6 +949,7 @@ mod tests {
             require_cases: Vec::new(),
             require_review: Some(RequireReview { scope, distinct_actor, block_on_findings: true }),
             require_audit: None,
+            require_ci_run: None,
         })
     }
 

@@ -80,7 +80,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use canon_model::{EvidenceAttachment, EvidenceVerdict, ReportFormat, ReportOutcome};
+use canon_model::{CiReport, EvidenceAttachment, EvidenceVerdict, ReportFormat, ReportOutcome};
 use quick_xml::events::{BytesStart, Event};
 use sha2::{Digest, Sha256};
 
@@ -497,6 +497,12 @@ struct ParsedReport {
 }
 
 impl ParsedReport {
+    /// What the report held, case by case, whether or not a scenario owns the case (0.40).
+    fn count(&self) -> CiReport {
+        let of = |outcome: ReportOutcome| self.cases.iter().filter(|case| case.outcome == outcome).count() as u64;
+        CiReport { path: self.relative.clone(), sha256: self.sha256.clone(), format: self.format, passed: of(ReportOutcome::Passed), failed: of(ReportOutcome::Failed), skipped: of(ReportOutcome::Skipped) }
+    }
+
     fn attachment(&self, case: &ReportCase) -> EvidenceAttachment {
         EvidenceAttachment {
             path: self.relative.clone(),
@@ -720,6 +726,9 @@ pub struct BatchBound {
     pub unindexed: Vec<(String, String)>,
     /// How many cases carry no scenario id at all.
     pub without_id: usize,
+    /// One entry per `--report`, in the order given: its digest and how many cases passed, failed and were
+    /// skipped, counting every case (one no scenario owns too).
+    pub reports: Vec<CiReport>,
 }
 
 /// A record's verdict from its own cases when none was claimed: any
@@ -833,6 +842,7 @@ pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, Bind
     for report in &reports {
         add_unique_file(&mut batch.files, BoundFile::on_disk(report.resolved.clone(), report.sha256.clone()));
     }
+    batch.reports = reports.iter().map(ParsedReport::count).collect();
     Ok(batch)
 }
 
