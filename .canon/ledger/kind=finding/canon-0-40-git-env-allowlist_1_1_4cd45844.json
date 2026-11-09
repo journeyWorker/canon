@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-gitenv",
+    "role": "reviewer",
+    "session_id": "s-0-40-gitenv-rev"
+  },
+  "at": "2026-11-09T12:43:42.376312Z",
+  "change_id": "canon-0-40-git-env-allowlist",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/src/git.rs:DIFF_SHAPE",
+  "introduced_by": "d51e42e5b22d845051a6b74c45710c7874fc2cd8",
+  "kind": "finding",
+  "reviewed_sha": "7fd0e5f0f8ecbb7e709a4c2d50ba691886156e06",
+  "reviewer": "rev-0-40-gitenv",
+  "round": 1,
+  "scenario_ids": [
+    "gate.git-env.04",
+    "gate.git-env.05"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, behaviour] The pinned shape still leaves four gitconfig keys as inputs of the dirty-pack state digest. Measured on the real binary (context-pack add, home gitconfig via GIT_CONFIG_GLOBAL, dirty tree with 3 inexact renames, 2 changed files and a moved submodule), each gives a different stateDigest and pack id from the plain run, identical to what 0.39.1 gives: diff.orderFile (file order), diff.submodule=log|diff (submodule hunk text), diff.renameLimit=1 (rename detection skipped with several renames), diff.indentHeuristic=false (hunk placement; reproduced on a 12-line slider case). The 12-key matrix of the brief does not contain them, so 04 and 05 pass, but the brief's outcome ('the shape of the diff and status canon reads hangs on no gitconfig') and the CHANGELOG headline ('no longer take their shape from any gitconfig') are false for them, and scenario 04/05 read in general terms. In plain git on the same trees, adding --indent-heuristic --submodule=short -O/dev/null -l<git default> to DIFF_SHAPE (defaults, so a no-config user keeps the 0.39 bytes) makes all four equal to the plain digest; add the four keys to MATRIX with a fixture that shows them (submodule moved, two files in non-alphabetic order, 3 renames, an indent slider) or narrow the wording. Blast radius: the same keys reach no other call; staleness names (--name-only, sorted in code) are not affected. Not a regression: 0.39 had the same exposure.",
+  "worktree_dirty": false
+}

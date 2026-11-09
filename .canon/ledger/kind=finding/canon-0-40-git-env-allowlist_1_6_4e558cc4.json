@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-gitenv",
+    "role": "reviewer",
+    "session_id": "s-0-40-gitenv-rev"
+  },
+  "at": "2026-11-09T12:47:32.095925Z",
+  "change_id": "canon-0-40-git-env-allowlist",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "9b18f173a1833e10171ea23c00a28fd6d996c20c",
+  "reviewer": "rev-0-40-gitenv",
+  "round": 1,
+  "scenario_ids": [
+    "gate.git-env.08"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[spec fidelity] Correction to seq 5: the CHANGELOG entry does name core.excludesFile, among the settings 'not fixed' (they are how you use the repository and part of the code tree id); what neither the entry nor a test says is the consequence, that a work-tree code tree (dirty verdict, evidence code_tree) can differ per host when a global core.excludesFile differs, the question the brief left at 'not pinned'. One sentence in the entry would close it.",
+  "worktree_dirty": false
+}
