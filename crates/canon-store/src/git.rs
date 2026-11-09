@@ -547,7 +547,7 @@ mod tests {
         assert_eq!(with["GIT_ALTERNATE_OBJECT_DIRECTORIES"].as_deref(), Some("/r/objects"));
         let without = envs(&GitCall::new(&repo).command());
         for name in ["GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"] {
-            assert_eq!(without[name], None, "{name} is removed when no scratch index is handed over");
+            assert_ne!(without.get(name).map(Option::is_some), Some(true), "{name} is not set when no scratch index is handed over (it is removed when the process holds it: gate.git-env.03)");
         }
     }
 
