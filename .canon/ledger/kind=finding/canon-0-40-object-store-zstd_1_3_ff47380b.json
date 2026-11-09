@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-zstd",
+    "role": "reviewer",
+    "session_id": "s-0-40-zstd-rev"
+  },
+  "at": "2026-11-09T16:12:53.707503Z",
+  "change_id": "canon-0-40-object-store-zstd",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/artifacts_zstd.rs:artifacts_object_zstd_09",
+  "introduced_by": "1955ad21da3043be28d0c52d830ae18a8e511433",
+  "kind": "finding",
+  "resolution_code_tree": "3883ddab76952397116cfaf906679951ebec1b35",
+  "resolution_sha": "91db25de76048937f7319cc342a95b83504e3e59",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "d4f00082ac81fd9277817e48078fba478f03d5d3",
+  "reviewer": "rev-0-40-zstd",
+  "round": 1,
+  "scenario_ids": [
+    "artifacts.object-zstd.09"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[standards] The PLAN_STALE half of test 09 does not isolate what the brief asks (the plan state names the form of each object): the late plain object also changes the summed object bytes the plan already carried before this change, so the test stays green if the per-form `forms` string is dropped from the Reads set. A form swap with an equal byte total is the case the new state is for and no test covers it. Blast radius: the plan digest of artifacts prune on an object-store tier.",
+  "worktree_dirty": false
+}
