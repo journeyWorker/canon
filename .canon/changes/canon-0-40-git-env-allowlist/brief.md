@@ -76,7 +76,7 @@ Source: canon-0-39-git-boundary의 리뷰 발견 1_2(`.canon/ledger/kind=finding
 - `GitCall::command`(`git.rs:227`)는 `CLEARED_ENV` 열세 개를 지우는 대신, 프로세스 환경에서 `GIT_`로 시작하는 이름을 모두 모아 허용 목록에 없는 것을 지운다. 지운 뒤 canon이 정하는 `GIT_OPTIONAL_LOCKS=0`, `GIT_TERMINAL_PROMPT=0`, 호출이 청할 때의 `GIT_NO_LAZY_FETCH=1`, 임시 색인을 줄 때의 `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`를 세운다(`:233-239`). 긴 수명 `cat-file --batch` 자식(`migrate_legacy_pins.rs:231`)도 같은 명령줄이다.
 - ==**허용 목록은 이름 하나씩이고, 지나가는 이름은 로컬 답의 바이트를 바꾸지 못하는 것뿐이다.**== 이유가 하나인 두 묶음이다.
   - 호스트의 gitconfig 파일을 고르는 이름: `GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, `GIT_CONFIG_NOSYSTEM`. `HOME`과 XDG를 그대로 두는 것과 같은 이유다. 어느 파일을 읽든 아래 F2가 모양을 고정한다. 지우면 `safe.directory`를 전역 파일로 주는 환경과 hermetic한 시험 환경이 깨진다.
-  - 원격에서 객체를 가져올 때만 쓰는 이름: `GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_SSH_VARIANT`, `GIT_ASKPASS`, `GIT_PROXY_COMMAND`, `GIT_SSL_CAINFO`, `GIT_SSL_CAPATH`, `GIT_SSL_NO_VERIFY`. 부분 복제에서는 `diff HEAD`, `show`, `add -A`가 빠진 객체를 느슨하게 가져오고(`no_lazy_fetch`를 청한 호출만 안 가져온다), 그때 이 이름이 전송을 정한다. 로컬 답의 바이트를 바꾸지 못한다.
+  - 원격에서 객체를 가져올 때만 쓰는 이름: `GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_SSH_VARIANT`, `GIT_ASKPASS`, `GIT_PROXY_COMMAND`, `GIT_SSL_CAINFO`, `GIT_SSL_CAPATH`, `GIT_SSL_NO_VERIFY`, `GIT_SSL_CERT`, `GIT_SSL_KEY`, `GIT_SSL_CERT_PASSWORD_PROTECTED`, `GIT_SSL_CERT_TYPE`, `GIT_SSL_KEY_TYPE`, `GIT_SSL_VERSION`, `GIT_SSL_CIPHER_LIST`, `GIT_HTTP_PROXY_AUTHMETHOD`, `GIT_HTTP_LOW_SPEED_LIMIT`, `GIT_HTTP_LOW_SPEED_TIME`. 부분 복제에서는 `diff HEAD`, `show`, `add -A`가 빠진 객체를 느슨하게 가져오고(`no_lazy_fetch`를 청한 호출만 안 가져온다), 그때 이 이름이 전송을 정한다. 로컬 답의 바이트를 바꾸지 못한다.
 - 지우는 것: 0.39가 지우던 열세 개(`GIT_CEILING_DIRECTORIES` 포함. 지금처럼 `--repo` 위쪽 저장소를 찾는다)와 그 밖의 전부다. 눈에 띄는 것: `GIT_DIFF_OPTS`, `GIT_EXTERNAL_DIFF`, `GIT_CONFIG_COUNT`와 `GIT_CONFIG_KEY_<n>`, `GIT_CONFIG_VALUE_<n>`, `GIT_CONFIG_PARAMETERS`, `GIT_EXEC_PATH`, `GIT_TRACE`와 `GIT_TRACE2*`(stderr가 오류 메시지에 들어간다), `GIT_PAGER`, `GIT_EDITOR`, `GIT_AUTHOR_*`와 `GIT_COMMITTER_*`, `GIT_ATTR_SOURCE`, `GIT_NO_REPLACE_OBJECTS`, `GIT_DISCOVERY_ACROSS_FILESYSTEM`, 훅이 세우는 `GIT_QUARANTINE_PATH`. canon은 커밋을 만들지 않아 작성자 변수가 필요 없다(`migrate`는 `rm`, `mv`, `add -f`, `update-index`만 부른다: `migrate.rs:1350,1365`, `migrate_names.rs:787-788,1448,1452`).
 - `GIT_` 아닌 이름(`PATH`, `HOME`, XDG, `SSH_AUTH_SOCK`, `LC_*`)은 지금처럼 둔다. `LC_ALL=C`는 canon이 정한다.
 - 허용 목록은 `git.rs`의 상수 하나(`CLEARED_ENV`를 대신한다)이고, 이름 판정은 환경 이름 목록을 받는 순수 함수다. 시험이 프로세스 환경을 바꾸지(`set_var`) 않고도 "목록에 있는 것은 남고 없는 것은 지워진다"를 확인할 수 있게 한다.
@@ -87,18 +87,18 @@ Source: canon-0-39-git-boundary의 리뷰 발견 1_2(`.canon/ledger/kind=finding
 - 환경과 달리 설정은 파일에서도 온다. 전역과 시스템 gitconfig를 통째로 가리는 길(`GIT_CONFIG_GLOBAL=/dev/null`과 `GIT_CONFIG_NOSYSTEM=1`을 canon이 세우는 것)은 쓰지 않는다. `git add -A`는 `filter.lfs.*`와 `core.autocrlf`를 읽고, 이 값들이 전역이나 시스템 파일에만 있는 사용자가 많다. 가리면 커밋된 트리와 작업 트리가 달라 모든 트리가 더티가 된다. `safe.directory`도 전역 파일에만 둘 수 있어, 가리면 소유자가 다른 체크아웃이 `COMMIT_REQUIRED`가 된다.
 - 대신 모양이 바뀌는 호출의 모양만 고정한다. 값은 git의 기본값이라, 설정이 없는 사용자의 출력은 0.39와 바이트까지 같다(위 해시가 설정 없이도 옵션을 주어도 같다는 것을 재서 확인했다).
   - 모든 호출: `-c color.ui=false`와 `-c core.abbrev=auto`를 `core.quotepath`, `core.fsmonitor` 옆에 둔다(`git.rs:229`). 명령줄 `-c`는 파일 설정을 이긴다.
-  - `context_pack.rs:551`의 `diff --no-ext-diff --binary HEAD`: `--no-color`, `-U3`, `--inter-hunk-context=0`, `--src-prefix=a/`, `--dst-prefix=b/`, `--find-renames`, `--diff-algorithm=myers`, `--no-relative`, `--ignore-submodules=none`.
+  - `context_pack.rs:551`의 `diff --no-ext-diff --binary HEAD`: `--no-color`, `-U3`, `--inter-hunk-context=0`, `--src-prefix=a/`, `--dst-prefix=b/`, `--find-renames`, `--diff-algorithm=myers`, `--no-relative`, `--ignore-submodules=none`, `--submodule=short`, `-l1000`, `--indent-heuristic`, `-O/dev/null`.
   - `context_pack.rs:552`의 `status --porcelain=v1 -z`: `--untracked-files=normal`, `--find-renames`, `--no-branch`, `--ignore-submodules=none`.
   - `staleness.rs`의 `diff --name-only -z --no-renames <sha>..HEAD`(`git_diff_names`): `--ignore-submodules=none`. `diff-tree` 호출들(`risk.rs:193`, `git_rev.rs:339`)은 같은 설정에도 달라지지 않아 그대로 둔다.
 - 두 diff와 status의 고정 옵션은 `git.rs`에 이름 있는 상수로 둔다. 호출처가 크레이트 둘(`canon-cli`, `canon-gate`)이라 한 곳에서 읽는다. `context_pack.rs:878`의 시험이 같은 diff를 직접 부르는 곳도 이 상수를 쓴다.
-- 정확한 옵션 집합은 시험이 정한다. 시험은 아래 설정 행렬(`diff.context=0`, `diff.noprefix`, `diff.mnemonicPrefix`, `diff.srcPrefix`, `diff.renames=false`, `diff.relative`, `diff.suppressBlankEmpty`, `color.ui=always`, `core.abbrev=12`, `status.showUntrackedFiles=no`, `status.renames=false`, `diff.ignoreSubmodules=all`)을 홈과 저장소 gitconfig에 차례로 놓고 설정 없는 출력과 같음을 확인한다. 행렬에서 하나라도 어긋나면 옵션을 더한다.
+- 정확한 옵션 집합은 시험이 정한다. 시험은 아래 설정 행렬(`diff.context=0`, `diff.noprefix`, `diff.mnemonicPrefix`, `diff.srcPrefix`, `diff.renames=false`, `diff.relative`, `diff.suppressBlankEmpty`, `color.ui=always`, `core.abbrev=12`, `status.showUntrackedFiles=no`, `status.renames=false`, `diff.ignoreSubmodules=all`, `diff.orderFile`, `diff.submodule=log`, `diff.renameLimit=1`, `diff.indentHeuristic=false`)을 홈과 저장소 gitconfig에 차례로 놓고 설정 없는 출력과 같음을 확인한다. 행렬에서 하나라도 어긋나면 옵션을 더한다. 서브모듈, 부분 일치 이름 변경 셋, 슬라이더 파일이 든 더티 트리를 쓰고, 행마다 설정 아래에서 맨 git의 출력이 달라지는 것을 먼저 확인한다(헛된 행을 막는다).
 - 손대지 않는 것: 저장소가 읽는 대로 파일 내용과 집합을 정하는 설정과 속성이다. `core.autocrlf`, `filter.*`, `.gitattributes`, `core.excludesFile`, `core.attributesFile`, `core.symlinks`, `core.fileMode`, `core.ignoreCase`. 코드 트리 id의 일부이고 사용자가 저장소를 쓰는 방식이다.
 - 쓰는 곳: context pack, 낡음 검사, 위험 승인(변경 없음), 코드 트리(변경 없음).
 
 ### F3 변경 기록
 
 - CHANGELOG의 Changed가 무엇을 말하는지:
-  - 이제 지우는 것이 목록 밖의 모든 `GIT_*`라는 것과 지나가는 이름 열한 개와 그 이유(호스트 gitconfig를 고르는 셋, 원격 가져오기 여덟).
+  - 이제 지우는 것이 목록 밖의 모든 `GIT_*`라는 것과 지나가는 이름 스물한 개와 그 이유(호스트 gitconfig를 고르는 셋, 원격 가져오기 열여덟).
   - 설정이 없는 사용자에게는 달라지는 것이 없다는 것. 설정이나 변수가 출력을 바꾸던 더티 트리의 context pack은 같은 트리에서 id가 한 번 바뀐다.
   - 쓰던 변수가 실패하는 경우: `safe.directory`를 `GIT_CONFIG_COUNT`나 `GIT_CONFIG_PARAMETERS`로 주던 CI는 소유자가 다른 체크아웃에서 `COMMIT_REQUIRED`를 받고 메시지에 git의 "dubious ownership"이 담긴다. 같은 값을 gitconfig 파일(`GIT_CONFIG_GLOBAL`이 가리키는 것 포함)에 두면 된다.
   - 새 옵션, 새 오류 코드, 새 환경 변수는 없다.
@@ -128,15 +128,17 @@ Source: canon-0-39-git-boundary의 리뷰 발견 1_2(`.canon/ledger/kind=finding
 - 결정: `GIT_AUTHOR_*`, `GIT_COMMITTER_*`는 지운다. canon은 커밋을 만들지 않는다.
 - 결정: 호스트 gitconfig를 가리지 않는다. 가림은 LFS·autocrlf 같은 필터와 `safe.directory`를 깬다(F2). 대신 모양만 고정한다.
 - 결정: 고정 값은 git의 기본이다. `--full-index`나 고정 길이 abbrev는 설정 없는 사용자의 다이제스트도 바꾸므로 쓰지 않는다(`core.abbrev=auto`는 저장소 크기에 따라 길이가 변하는 지금의 성질을 그대로 둔다).
+- 결정(리뷰 발견 1_4): 원격 가져오기 이름에 `GIT_SSL_CERT`, `GIT_SSL_KEY`, `GIT_SSL_CERT_PASSWORD_PROTECTED`, `GIT_SSL_CERT_TYPE`, `GIT_SSL_KEY_TYPE`, `GIT_SSL_VERSION`, `GIT_SSL_CIPHER_LIST`, `GIT_HTTP_PROXY_AUTHMETHOD`, `GIT_HTTP_LOW_SPEED_LIMIT`, `GIT_HTTP_LOW_SPEED_TIME`을 더한다(git-remote-http가 읽고 전송만 정한다). `GIT_CURL_VERBOSE`는 `GIT_TRACE`처럼 stderr를 채워 오류 메시지에 들어가므로 더하지 않는다. 허용 이름은 모두 스물한 개다.
+- 결정: 고정 옵션에 `--submodule=short`, `-l1000`, `--indent-heuristic`, `-O/dev/null`을 더한다(리뷰 발견 1_1: `diff.submodule`, `diff.renameLimit`, `diff.indentHeuristic`, `diff.orderFile`이 상태 다이제스트를 바꿨다). 값은 git의 기본이다.
 - 결정: 환경 변수는 지워서 막고 설정은 `-c`와 옵션으로 막는다. `-U3`은 `GIT_DIFF_OPTS`를 이기지 못했고, `-c`와 옵션은 파일 설정과 `GIT_CONFIG_COUNT`를 이겼다(잰 값).
 - 결정: 새 오류 코드, 새 옵션, 새 환경 변수는 없다. 실패는 지금의 `COMMIT_REQUIRED`, `CONTEXT_GIT_REQUIRED`가 git의 stderr를 담아 말한다.
 - 결정: `log`, `show`, `rev-parse`, `ls-files`, `update-index`, `write-tree`, `read-tree`, `diff-tree`, `merge-base`, `rev-list`는 이 변경에서 모양을 고정하지 않는다. 읽는 값이 40자리 해시와 NUL 구분 이름이고, 위 행렬에서 달라지는 것이 없었다. `log.showSignature`는 서명된 커밋이 있는 저장소에서 재지 않았다.
 - 실패 방식: `safe.directory`를 `GIT_CONFIG_COUNT`/`GIT_CONFIG_PARAMETERS`로 주던 환경은 소유자가 다른 체크아웃에서 실패한다. git 문서가 보호된 설정(system, global, command 범위)으로 말하는 곳이라 지운 변수에서 왔다는 이유로 걸러낼 수 없다.
 - 실패 방식: `GIT_EXEC_PATH`로 다른 git 빌드를 고르던 사용자는 PATH의 `git`이 가리키는 설치의 도우미를 쓴다.
 - 실패 방식: 저장소의 `.gitattributes`가 고른 `diff.<driver>.xfuncname`은 hunk 머리 줄을 바꾼다. 저장소가 정하는 값이라 둔다. 전역 `core.attributesFile`로 오는 같은 속성은 호스트마다 다를 수 있고 이 변경이 막지 않는다.
-- 질문: `safe.directory`를 `GIT_CONFIG_COUNT`/`GIT_CONFIG_PARAMETERS`로 주던 CI가 깨지는 것을 받아들이는가. 기본은 받아들이고 CHANGELOG에 쓴다. 아니라면 canon이 환경에서 `safe.directory` 항목만 골라 `-c`로 넘기게 한다(허용 목록의 예외가 하나 더 생긴다).
-- 질문: 원격 가져오기 이름 여덟 개(`GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_SSH_VARIANT`, `GIT_ASKPASS`, `GIT_PROXY_COMMAND`, `GIT_SSL_CAINFO`, `GIT_SSL_CAPATH`, `GIT_SSL_NO_VERIFY`)를 통과시키는가. 기본은 통과다(부분 복제에서 canon의 diff와 add가 객체를 가져올 때 필요하고 답의 바이트를 바꾸지 못한다). 아니라면 부분 복제의 인증은 gitconfig와 `SSH_AUTH_SOCK`로만 된다.
-- 질문: 전역 `core.excludesFile`은 `git add -A`가 보는 추적 안 하는 파일 집합을 바꿔 호스트마다 다른 작업 트리 코드 트리 id를 낼 수 있다. 커밋된 트리는 영향이 없다. 이 변경에서 고정하는가. 기본은 고정하지 않는다(F2: 파일 집합을 정하는 설정은 저장소 사용 방식의 일부로 둔다).
+- 답(승인 2026-11-09, 기본값): 받아들이고 CHANGELOG에 쓴다. 질문은 이랬다: `safe.directory`를 `GIT_CONFIG_COUNT`/`GIT_CONFIG_PARAMETERS`로 주던 CI가 깨지는 것을 받아들이는가. 기본은 받아들이고 CHANGELOG에 쓴다. 아니라면 canon이 환경에서 `safe.directory` 항목만 골라 `-c`로 넘기게 한다(허용 목록의 예외가 하나 더 생긴다).
+- 답(승인 2026-11-09, 기본값): 통과시킨다. 질문은 이랬다: 원격 가져오기 이름(승인 당시 여덟 개)(`GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_SSH_VARIANT`, `GIT_ASKPASS`, `GIT_PROXY_COMMAND`, `GIT_SSL_CAINFO`, `GIT_SSL_CAPATH`, `GIT_SSL_NO_VERIFY`, `GIT_SSL_CERT`, `GIT_SSL_KEY`, `GIT_SSL_CERT_PASSWORD_PROTECTED`, `GIT_SSL_CERT_TYPE`, `GIT_SSL_KEY_TYPE`, `GIT_SSL_VERSION`, `GIT_SSL_CIPHER_LIST`, `GIT_HTTP_PROXY_AUTHMETHOD`, `GIT_HTTP_LOW_SPEED_LIMIT`, `GIT_HTTP_LOW_SPEED_TIME`)를 통과시키는가. 기본은 통과다(부분 복제에서 canon의 diff와 add가 객체를 가져올 때 필요하고 답의 바이트를 바꾸지 못한다). 아니라면 부분 복제의 인증은 gitconfig와 `SSH_AUTH_SOCK`로만 된다. 리뷰 발견 1_4로 git-remote-http가 읽는 변수 열 개를 같은 이유로 더했다(아래 결정).
+- 답(승인 2026-11-09, 기본값): 고정하지 않는다. CHANGELOG에 호스트마다 작업 트리 코드 트리가 다를 수 있다고 쓴다. 질문은 이랬다: 전역 `core.excludesFile`은 `git add -A`가 보는 추적 안 하는 파일 집합을 바꿔 호스트마다 다른 작업 트리 코드 트리 id를 낼 수 있다. 커밋된 트리는 영향이 없다. 이 변경에서 고정하는가. 기본은 고정하지 않는다(F2: 파일 집합을 정하는 설정은 저장소 사용 방식의 일부로 둔다).
 
 ## Out of scope
 
