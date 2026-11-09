@@ -68,7 +68,9 @@
 //! tombstoned it, so it is no longer among the declared scenarios every other check starts from) is absent for the
 //! gate: its old evidence is neither `stale-evidence` however many commits have passed, nor counted in [`Unresolvable`].
 //! A corpus with no scenario at all is not read (a kind routed off the git tier, an index not built), so no scenario is
-//! judged absent from it. A re-declared scenario is judged again.
+//! judged absent from it, with one exception (0.40): a scenario whose tombstone was read
+//! ([`GateContext::tombstoned_scenarios`]) is absent even when the corpus is empty, which is what deleting the last
+//! `.feature` file leaves. A re-declared scenario is judged again.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -128,10 +130,14 @@ impl Candidate<'_> {
     /// or it never was one). Every other check starts from the declared scenarios, so the gate treats it as absent and
     /// its old evidence is not judged: neither stale, nor counted among the cells whose base commit git could not read.
     /// A corpus with no scenario at all is not read (a scenario kind routed off the git tier, an index not built yet):
-    /// nothing is known to be absent then, and a record with no `project_id` names no scenario, so both are judged as before.
+    /// nothing is known to be absent then, unless a tombstone for this very scenario was read (the last `.feature`
+    /// file was deleted and synced: the tombstone is the fact, an empty list is not), and a record with no `project_id` names no scenario, so both are judged as before.
     fn of_an_undeclared_scenario(&self, ctx: &GateContext) -> bool {
         match (self.scenario, &self.record.project_id, &self.record.scenario_id) {
-            (true, Some(project), Some(scenario)) => !ctx.scenarios.is_empty() && latest_scenario(ctx, project, scenario).is_none(),
+            (true, Some(project), Some(scenario)) => {
+                latest_scenario(ctx, project, scenario).is_none()
+                    && (!ctx.scenarios.is_empty() || ctx.tombstoned_scenarios.contains(&(project.clone(), scenario.clone())))
+            }
             _ => false,
         }
     }
@@ -687,6 +693,7 @@ mod tests {
             violations: read.violations,
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
+            tombstoned_scenarios: Default::default(),
             code_tree: None,
             derived: Default::default(),
             now,
@@ -1164,5 +1171,49 @@ mod tests {
         assert!(message.contains("first: `a`, `b`, `c`, ..."), "{message}");
         assert!(message.contains("git fetch --unshallow"), "{message}");
         assert_eq!(unresolvable.items(), ["base_missing: 3 cell(s)", "base_not_ancestor: 1 cell(s)", "first subjects: a, b, c, ..."]);
+    }
+
+    /// A repo of one commit, one green scenario record `gone.leaf.01` of project `root`, and then `behind` commits: the context of it, with an empty corpus.
+    fn scenario_ctx(behind: usize) -> (TempDir, GateContext) {
+        let dir = TempDir::new().unwrap();
+        let repo = dir.path();
+        init_repo(repo);
+        let sha = write_and_commit(repo, "code.rs", "0", "initial");
+        let ledger_root = repo.join(".canon/ledger");
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let record = EvidenceRecord::new(envelope, None, Some(canon_model::ScenarioId::parse("gone.leaf.01").unwrap()), None, EvidenceVerdict::Faithful)
+            .with_project_id(canon_model::ProjectId::parse("root").unwrap())
+            .with_evidence_sha(Sha::parse(&sha).unwrap());
+        GitTier::new(&ledger_root).write(&record).expect("write evidence record");
+        for n in 0..behind {
+            write_and_commit(repo, "code.rs", &format!("{}", n + 1), "later");
+        }
+        let ctx = ctx_for(repo, &ledger_root, policy_with(2, false), fixed_now());
+        (dir, ctx)
+    }
+
+    /// gate.tombstone-corpus.02 (F1, failure path): an empty corpus with no tombstone is not read as a deleted scenario, so the evidence is judged as in 0.39.
+    #[test]
+    fn gate_tombstone_corpus_02_an_empty_corpus_with_an_empty_tombstone_set_does_not_make_a_scenario_undeclared() {
+        let (_dir, ctx) = scenario_ctx(3);
+        assert!(ctx.scenarios.is_empty() && ctx.tombstoned_scenarios.is_empty());
+        let violations = StalenessCheck.run(&ctx);
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert_eq!(violations[0].class, FailureClass::StaleEvidence);
+    }
+
+    /// gate.tombstone-corpus.01 (F1): the same context with the scenario's tombstone read is absent for the gate; a tombstone of another scenario is not this one's.
+    #[test]
+    fn gate_tombstone_corpus_01_a_tombstone_in_an_empty_corpus_makes_the_scenario_undeclared() {
+        let key = |id: &str| (canon_model::ProjectId::parse("root").unwrap(), canon_model::ScenarioId::parse(id).unwrap());
+        // The context caches what it derives from the corpus on first use, so each tombstone set gets a context of its own.
+        let (_other_dir, mut other) = scenario_ctx(3);
+        other.tombstoned_scenarios.insert(key("other.leaf.01"));
+        assert_eq!(StalenessCheck.run(&other).len(), 1, "the tombstone of another scenario does not free this one");
+        let (_dir, mut ctx) = scenario_ctx(3);
+        ctx.tombstoned_scenarios.insert(key("gone.leaf.01"));
+        let (violations, unresolvable) = (StalenessCheck.run(&ctx), unresolvable_cells(&ctx, || None));
+        assert!(violations.is_empty(), "{violations:?}");
+        assert!(unresolvable.is_empty(), "{unresolvable:?}");
     }
 }

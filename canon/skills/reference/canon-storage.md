@@ -257,7 +257,12 @@ preflights all attached destinations before the first delete, but storage
 backends are not one transaction: a failure after a prior delete returns
 an explicit `partial` result with matched/deleted counts and a nonzero
 status. Purge never rewrites Git history or deletes source transcript
-files.
+files. A tier that `canon.yaml` declares but that cannot attach (its bucket
+variable or DSN is unset) stops a commit, `RETENTION_TIERS_REQUIRED`, before
+anything is deleted; the preview of such a repository says so: it lists the
+removal set and the tier under `unavailable`, and its first `meta.next` step names
+the tier and what to set instead of a `--commit` command. Set the value and run
+the preview again to get the commit command.
 
 **Done when:** after `canon purge --kind <kind> --before <time> --commit
 --plan-digest <digest from the preview>`, a bare `canon purge` with the same

@@ -156,6 +156,13 @@ pub struct GateContext {
     /// file declares it any more) is absent, every generation of it
     /// ([`without_removed`]).
     pub scenarios: Vec<Scenario>,
+    /// The `(project_id, scenario_id)` of every scenario whose latest generation is a tombstone: the keys
+    /// [`without_removed`] dropped from [`GateContext::scenarios`], kept so a reader can tell "a scenario
+    /// a feature file used to declare" from "nothing is known about it", including when the corpus is empty
+    /// because the last `.feature` file was deleted. Filled once by [`GateContext::load`] from the same read
+    /// as `scenarios`; a caller that rewrites `scenarios` must rewrite this set with it. Not a derived value
+    /// (`invalidate_derived` leaves it alone).
+    pub tombstoned_scenarios: BTreeSet<(canon_model::ProjectId, canon_model::ScenarioId)>,
     /// Divergence lifecycle events, unfolded. `crate::spec_coverage`
     /// folds them through `canon_model::fold` rather than reading
     /// `status` off individual rows, so the gate and
@@ -252,7 +259,7 @@ impl GateContext {
         violations.extend(validation_violations);
 
         let mut corpus_violations = Vec::new();
-        let scenarios = without_removed(read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?);
+        let (scenarios, tombstoned_scenarios) = without_removed(read_corpus_kind(&tier, RecordKind::Scenario, &mut corpus_violations)?);
         let divergences = read_corpus_kind(&tier, RecordKind::Divergence, &mut corpus_violations)?;
         let subjects = read_corpus_kind(&tier, RecordKind::Subject, &mut corpus_violations)?;
         let changes = read_corpus_kind(&tier, RecordKind::Change, &mut corpus_violations)?;
@@ -273,6 +280,7 @@ impl GateContext {
             evidence,
             audits,
             scenarios,
+            tombstoned_scenarios,
             divergences,
             subjects,
             changes,
@@ -327,11 +335,12 @@ fn read_corpus_kind<T: serde::de::DeserializeOwned>(
 /// fold every reader runs ([`crate::spec_coverage::latest_by_key`])
 /// would otherwise hand back the generation before it and grade a
 /// deleted scenario as present. A re-added scenario's live generation
-/// supersedes its tombstone, so it is kept again.
-fn without_removed(scenarios: Vec<Scenario>) -> Vec<Scenario> {
+/// supersedes its tombstone, so it is kept again. The second value is the set of keys dropped.
+fn without_removed(scenarios: Vec<Scenario>) -> (Vec<Scenario>, BTreeSet<(canon_model::ProjectId, canon_model::ScenarioId)>) {
     let key = |s: &Scenario| (s.project_id.clone(), s.scenario_id.clone());
     let removed: BTreeSet<_> = crate::spec_coverage::latest_by_key(&scenarios, key).into_iter().filter(|s| s.removed).map(key).collect();
-    scenarios.into_iter().filter(|s| !removed.contains(&key(s))).collect()
+    let kept = scenarios.into_iter().filter(|s| !removed.contains(&key(s))).collect();
+    (kept, removed)
 }
 
 /// The kinds `spec_coverage`'s evidence, case, and mismatch rules read.

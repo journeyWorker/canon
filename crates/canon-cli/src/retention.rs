@@ -408,7 +408,13 @@ pub fn run_purge(repo: &Path, kind: PurgeKind, before: DateTime<Utc>, mode: &Mod
             }
             crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, json_output, &report);
         } else {
-            plan.finish_preview("purge", "the plan only lists what would be removed; deleting takes its planDigest", json_output, &report);
+            if report.unavailable.is_empty() {
+                plan.finish_preview("purge", "the plan only lists what would be removed; deleting takes its planDigest", json_output, &report);
+            } else {
+                // A commit reads every tier before its first delete and refuses when one does not attach (`RETENTION_TIERS_REQUIRED`): the plan is no step to take until it does.
+                let blocked = format!("a commit is refused until every tier the kind lives in is attached ({}); {}, then run `{base}` again", report.unavailable.join("; "), tiers_hint("RETENTION_TIERS_REQUIRED"));
+                plan.finish_blocked_preview("purge", &blocked, json_output, &report);
+            }
         }
         Ok(())
     })();
