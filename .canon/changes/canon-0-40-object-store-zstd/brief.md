@@ -189,3 +189,5 @@ Source: canon 이슈 #138의 압축 항목과 소유자 댓글, `docs/research/2
 - 범위 읽기. 지금 이를 쓰는 곳이 없다.
 - `canon tier age`가 쓰는 parquet의 압축.
 - 압축을 끄는 설정 키(질문 1의 기본안).
+
+Approved: Journey Hwang 2026-11-09T10:05:36Z — "승인 (canon 0.40 브리프 4개와 정책, 권장 기본값)" (relayed by planner planner-oco via ask) (code tree 95efa39f9e6567eca108728d0627f3b4410a1aec) (brief sha256:3db024b355c34165b1936d0397317e71bd4bd7bf95cb8fceea01b0f2e6bb47c0)

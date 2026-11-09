@@ -194,3 +194,5 @@ Source: canon 이슈 #119, canon-0-28의 코드 트리 기록(`codeTree`)과 `ev
 - `status`나 `gate check`가 CI 기록을 새로 쓰거나 CI를 시작하는 일(canon은 아무것도 돌리지 않는다).
 - canon 자신의 `test.yml`과 `.canon/policy.yaml`의 수정(질문 2가 답해진 뒤 따로).
 - 보고서 첨부가 있는 리뷰 핀이나 승인 페이로드에 `ci`를 넣는 일.
+
+Approved: Journey Hwang 2026-11-09T10:05:36Z — "승인 (canon 0.40 브리프 4개와 정책, 권장 기본값)" (relayed by planner planner-oco via ask) (code tree 95efa39f9e6567eca108728d0627f3b4410a1aec) (brief sha256:fd7d0625177db93552a3c982bfa5a022b4414427877dfeb6a00f6a168e4d7da3)

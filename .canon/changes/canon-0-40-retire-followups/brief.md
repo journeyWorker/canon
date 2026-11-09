@@ -157,3 +157,5 @@ Source: 0.39.0 변경 셋의 리뷰어 노트(`canon finding list --change canon
 - 새 오류 코드·경고 코드.
 - 증거를 다시 쓰거나 `stale-evidence` 판정의 다른 규칙을 바꾸는 일.
 - `write_atomic`의 보장(파일과 디렉터리 sync)과 비용 측정.
+
+Approved: Journey Hwang 2026-11-09T10:05:36Z — "승인 (canon 0.40 브리프 4개와 정책, 권장 기본값)" (relayed by planner planner-oco via ask) (code tree 95efa39f9e6567eca108728d0627f3b4410a1aec) (brief sha256:88431c3a5ccb87c3a12a904362ebab1d4b9bfae9a1544715038182137a054751)

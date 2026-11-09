@@ -1,11 +1,11 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-09T03:52:03Z",
-  "note": "승인: F3 실패 경로를 코드 동작(새 버전 저장)에 맞춰 고친 브리프",
+  "approved_at": "2026-11-09T10:05:36Z",
+  "note": "승인 (canon 0.40 브리프 4개와 정책, 권장 기본값)",
   "relay": {
     "role": "planner",
     "actor": "planner-oco",
-    "tool": "chat"
+    "tool": "ask"
   }
 }
