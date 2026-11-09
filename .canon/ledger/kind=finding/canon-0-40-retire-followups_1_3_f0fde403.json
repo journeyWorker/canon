@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T16:07:14.163007Z",
+  "change_id": "canon-0-40-retire-followups",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=gate/tombstone-corpus.feature",
+  "introduced_by": "1464b7a9d9a6273efc80f131892743bd99e3915a",
+  "kind": "finding",
+  "resolution_code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "resolution_sha": "eab59158a1ca4adf653515848edb3632b2b8ed6d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-followups",
+  "round": 1,
+  "scenario_ids": [
+    "gate.tombstone-corpus.01"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Spec fidelity (scenario/brief text, planner-owned; the code matches the approved design): gate.tombstone-corpus.01's When/Then say `gate check` and `status` run 'there, and in a shallow clone of it' and neither reports stale-evidence nor counts the cell. The tombstone lives only in the gitignored scenario index (.canon/ledger/kind=scenario/ is in .canon/.gitignore), so a real clone does not carry it. Probed with the real binary on the post-sync repo: `git clone` (full) -> gate check reports stale-evidence gone.leaf.01 (unchanged from 0.39); `git clone --depth 1` -> staleness_unresolvable advisory naming gone.leaf.01. The test only passes the shallow-clone Then after `copy_dir`-ing the repo's index into the clone (and asserts the uncopied clone still counts the cell), which is not what a clone is. So the fix holds only in a work tree that ran `inventory sync` (or kept its index), not in CI/fresh checkouts. Ask: amend the scenario/brief wording (the Then holds for a clone that carries the index) or choose a design that survives a clone. Blast radius: CI and any fresh checkout of a repo whose last feature file was deleted still go red exactly as in 0.39.",
+  "worktree_dirty": false
+}

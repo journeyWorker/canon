@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-followups",
+    "role": "reviewer",
+    "session_id": "s-0-40-followups-rev"
+  },
+  "at": "2026-11-09T16:07:26.273623Z",
+  "code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "kind": "review",
+  "pin": "2baff789908b455870da1958568228ac9cf28d6f",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:tier_retired_keys_01_the_refusal_names_the_key_and_its_line"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "ea25e2ade137f01043f1dea16729ab3ef7af09d6fc861cc88f2e6eae3dc0fe0d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-40-retire-followups/brief.md"
+  },
+  "review_id": "01M70H0ZT1Q0QV9YE44V7VY5EV",
+  "reviewer": "rev-0-40-followups",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "tier.retired-keys.01",
+  "schema": 2,
+  "worktree_dirty": false
+}
