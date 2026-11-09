@@ -390,7 +390,7 @@ fn artifacts_object_zstd_12_a_zst_file_in_the_local_directory_is_not_a_blob() {
     assert!(text(&gate).contains("stale-evidence game.run.01"), "{}", text(&gate));
 }
 
-/// What the release lacks of the announcement of the `.zst` format: the Unreleased CHANGELOG says, under Added, the key, and under Changed, the order
+/// What the release lacks of the announcement of the `.zst` format: the 0.40.0 CHANGELOG says, under Added, the key, and under Changed, the order
 /// of upgrade and the plain objects of older canons; both guides name the `.zst` key; the storage guide says how to decompress. The release check.
 fn release_problems(guides: &[(&str, String)], changelog: &str) -> Vec<String> {
     let mut problems = Vec::new();
@@ -405,10 +405,10 @@ fn release_problems(guides: &[(&str, String)], changelog: &str) -> Vec<String> {
             problems.push("the guide `canon-storage` never says how to decompress a blob (`zstd -d`)".to_string());
         }
     }
-    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("Unreleased"));
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.40.0"));
     let part = |name: &str| unreleased.and_then(|section| section.split("\n### ").find(|part| part.starts_with(name))).map(flat);
     match part("Added") {
-        None => problems.push("the CHANGELOG has no Added section under Unreleased".to_string()),
+        None => problems.push("the CHANGELOG has no Added section under 0.40.0".to_string()),
         Some(added) => {
             for needle in ["<digest>.zst", "zstd -d", "level 19"] {
                 if !added.contains(needle) {
@@ -418,7 +418,7 @@ fn release_problems(guides: &[(&str, String)], changelog: &str) -> Vec<String> {
         }
     }
     match part("Changed") {
-        None => problems.push("the CHANGELOG has no Changed section under Unreleased".to_string()),
+        None => problems.push("the CHANGELOG has no Changed section under 0.40.0".to_string()),
         Some(changed) => {
             for (what, needle) in [("that every canon reading the tier is upgraded first", "before the first `.zst` is written"), ("that a canon 0.39 or older reads a `.zst` blob as missing", "0.39 or older"), ("that a plain object stays valid", "plain object")] {
                 if !changed.contains(needle) {
@@ -457,9 +457,9 @@ fn artifacts_object_zstd_14_a_release_without_the_announcement_fails_the_release
     let mut silent = guides.clone();
     silent[0].1 = silent[0].1.replace("zstd -d", "removed");
     assert!(release_problems(&silent, &changelog).iter().any(|p| p.contains("`zstd -d`")), "{:?}", release_problems(&silent, &changelog));
-    let none = "## Unreleased\n\n### Fixed\n\n- Something else.\n\n## 0.39.0\n";
+    let none = "## 0.40.0 — 2026-11-10\n\n### Fixed\n\n- Something else.\n\n## 0.39.0\n";
     let problems = release_problems(&guides, none);
-    assert_eq!(problems, ["the CHANGELOG has no Added section under Unreleased", "the CHANGELOG has no Changed section under Unreleased"], "{problems:?}");
+    assert_eq!(problems, ["the CHANGELOG has no Added section under 0.40.0", "the CHANGELOG has no Changed section under 0.40.0"], "{problems:?}");
     let without_order = changelog.replace("before the first `.zst` is written", "later");
     assert!(release_problems(&guides, &without_order).iter().any(|p| p.contains("upgraded first")));
 }

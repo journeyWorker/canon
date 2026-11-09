@@ -10,11 +10,11 @@ fn read(relative: &str) -> String {
     fs::read_to_string(doc_gen::repo_root().join(relative)).unwrap_or_else(|e| panic!("{relative}: {e}"))
 }
 
-/// The CHANGELOG's `## Unreleased` section.
+/// The CHANGELOG's `## 0.40.0` section.
 fn unreleased() -> String {
     let changelog = read("CHANGELOG.md");
-    let start = changelog.find("## Unreleased").expect("an Unreleased section");
-    let rest = &changelog[start + "## Unreleased".len()..];
+    let start = changelog.find("## 0.40.0").expect("a 0.40.0 section");
+    let rest = &changelog[start + "## 0.40.0".len()..];
     rest[..rest.find("\n## ").unwrap_or(rest.len())].to_string()
 }
 
@@ -60,7 +60,7 @@ fn gate_ci_run_13_the_skills_and_the_changelog_carry_the_recipe_the_field_and_th
 
     let added = unreleased();
     for needle in ["--from-ci", "`ci` block", "data.reports[]", "spec_coverage.require_ci_run", "CI_ENV_REQUIRED", "CI_WORKTREE_CONFLICT", "a claim the environment makes"] {
-        assert!(added.contains(needle), "the CHANGELOG's Unreleased section lacks `{needle}`");
+        assert!(added.contains(needle), "the CHANGELOG's 0.40.0 section lacks `{needle}`");
     }
     assert!(read("canon/skills/reference/role-implementer.md").contains("--from-ci"), "the generated command block of the implementer's guide lists --from-ci");
 

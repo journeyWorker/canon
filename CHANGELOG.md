@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.40.0 — 2026-11-10
+
+canon 0.40 stores object-store blobs as zstd frames (`<prefix>sha256/<digest>.zst`), lets `canon evidence add --all-scenarios --from-ci` record a batch as a GitHub Actions run and `spec_coverage.require_ci_run` accept only a complete CI record of the code as it stands now, passes only an allow list of `GIT_*` variables to git and fixes the diff and status shape against any gitconfig, and retires four follow-ups (the tombstone corpus, the names `canon migrate` cannot delete, the release-only durability trace, the `canon purge` preview). It is not BREAKING for callers: `--from-ci` is additive and `require_ci_run` is opt-in; the git environment allow list changes a digest only for users with a `GIT_*` variable set or one of the pinned gitconfig keys; the one thing to plan is that a canon 0.39 or older reads a `.zst` blob on the same object-store tier as missing, so upgrade every canon that reads the tier before the first `.zst` is written.
+
 ### Added
 
 - **Object-store blobs are zstd frames** (`canon-0-40-object-store-zstd`, scenarios `artifacts.object-zstd.01-14`): a blob that `evidence add`, `review scenario`, `artifacts store` or `artifacts move` uploads to an object-store tier is written at `<prefix>sha256/<digest>.zst`. The object is one zstd frame of the bound bytes (level 19, no dictionary, the content size in the frame header, a content checksum), and the digest in the name and in every record is still the sha256 of the bytes before compression. Without canon, download the object and run `zstd -d <digest>.zst` (`zstd -t` checks it). The object carries the metadata `canon-sha256`, `canon-size` (plain bytes) and the new `canon-stored-size` (the object's bytes).

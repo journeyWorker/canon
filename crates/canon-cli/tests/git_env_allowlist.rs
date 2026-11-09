@@ -373,15 +373,15 @@ const ENTRY_NEEDLES: [&str; 31] = [
     "21",
 ];
 
-/// The release check of F3: what the `Unreleased` section's entry fails to say, and what the coding rules page says of the git path. Empty when both are complete.
+/// The release check of F3: what the `0.40.0` section's entry fails to say, and what the coding rules page says of the git path. Empty when both are complete.
 fn release_problems(changelog: &str, rules: &str) -> Vec<String> {
     let mut problems = Vec::new();
-    let unreleased = changelog.split("\n## ").find(|section| section.contains("## Unreleased") || section.starts_with("Unreleased")).unwrap_or("");
+    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.40.0")).unwrap_or("");
     let unreleased = unreleased.split("\n## ").next().unwrap_or("");
     let changed = unreleased.split("### Changed").nth(1).unwrap_or("");
     let lines: Vec<&str> = changed.lines().collect();
     match lines.iter().position(|line| line.contains("canon-0-40-git-env-allowlist")) {
-        None => problems.push("no entry in Unreleased names `canon-0-40-git-env-allowlist`".to_string()),
+        None => problems.push("no entry in 0.40.0 names `canon-0-40-git-env-allowlist`".to_string()),
         Some(start) => {
             let entry = lines[start..].iter().enumerate().take_while(|(i, line)| *i == 0 || line.starts_with("  ")).map(|(_, line)| *line).collect::<Vec<_>>().join("\n");
             problems.extend(ENTRY_NEEDLES.iter().filter(|needle| !entry.contains(**needle)).map(|needle| format!("the entry does not say `{needle}`")));
@@ -397,7 +397,7 @@ fn release_problems(changelog: &str, rules: &str) -> Vec<String> {
     problems
 }
 
-/// gate.git-env.08 (F3): the CHANGELOG's `Unreleased` section names the allowed names, the shells that now fail, the one-time id change and the unchanged
+/// gate.git-env.08 (F3): the CHANGELOG's `0.40.0` section names the allowed names, the shells that now fail, the one-time id change and the unchanged
 /// defaults, and the coding rules state the allow list.
 #[test]
 fn gate_git_env_08_the_changelog_and_the_coding_rules_say_what_reaches_git_and_what_now_fails() {
@@ -413,7 +413,7 @@ fn gate_git_env_09_a_missing_entry_item_or_an_old_coding_rule_fails_the_release_
     let changelog = std::fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
     let rules = std::fs::read_to_string(repo_root().join("docs/design/rust-coding-rules.md")).unwrap();
     assert_eq!(release_problems(&changelog, &rules), Vec::<String>::new(), "the real text passes");
-    assert_eq!(release_problems(&changelog.replace("canon-0-40-git-env-allowlist", "canon-0-40-other"), &rules), ["no entry in Unreleased names `canon-0-40-git-env-allowlist`"]);
+    assert_eq!(release_problems(&changelog.replace("canon-0-40-git-env-allowlist", "canon-0-40-other"), &rules), ["no entry in 0.40.0 names `canon-0-40-git-env-allowlist`"]);
     let start = changelog.find("`canon-0-40-git-env-allowlist`").expect("the entry");
     let end = start + changelog[start..].find("\n## ").expect("the next section");
     for needle in &ENTRY_NEEDLES[1..ENTRY_NEEDLES.len() - 1] {
