@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Fixed
+
+- **The npm launcher no longer stays resident beside canon.** On macOS and Linux with Node 23.11 or later (and Bun), `@journeykit/canon` replaces its own process with the native binary (`process.execve`): a long-running command such as `canon dashboard` keeps no node process (~39 MB) beside it, its pid is the one the caller started, and signals reach canon directly; a signal death is now the caller's own, which a shell still reads as 128+n. On Windows and older Node the launcher runs the binary as a child and passes its exit status on, as before. Binary resolution, the workspace build's priority and `CANON_SKILLS_SOURCE` are unchanged.
+
 ## 0.39.0 — 2026-11-08
 
 canon drops `canon ingest sessions` and the record kinds `session` and `event` (twelve record kinds remain), sends every git call through one path (the shell's git environment is ignored, a file name is read as it is, a deadline and an output limit apply), makes a directory or a glob declared as a surface go stale like a file, creates a new `.canon/hot.db` readable by its owner only, writes a record file to disk with its name before the command returns, judges a `context-pack add` text by six secret shapes, and makes `canon artifacts prune` delete the stale temp files of a killed blob write. It is BREAKING for callers: the `### Breaking` tables below name every command, key and column that moved.
