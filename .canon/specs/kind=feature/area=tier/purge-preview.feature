@@ -10,7 +10,7 @@ Feature: tier purge-preview
   Scenario: A purge preview in a repository with a tier that cannot attach lists the removal set and names the tier, and offers no commit command
     Given a canon.yaml that declares a cold s3 tier whose bucket variable is unset, and old rows of the retired session kind
     When canon purge --kind session --before T runs without --commit
-    Then it exits 0 with the removal set, data.unavailable naming the cold tier, and a first meta.next step that says what to set
+    Then it exits 0 with the removal set, data.unavailable naming the cold tier, and a first meta.next step that names the variable to set (CANON_R2_BUCKET), or, for a tier that is configured and did not answer, the reachability check to retry
     And no meta.next entry is a --commit command and nothing is written
 
   # canon: {"schema":1,"at":"2026-11-09T10:12:37Z","actor":{"agent_id":"impl-0-40-retire-followups","role":"planner"}}

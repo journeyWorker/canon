@@ -42,6 +42,8 @@ pub struct PurgeOutcome {
     pub dry_run: bool,
     pub rungs: Vec<RungPurgeReport>,
     pub unavailable: Vec<String>,
+    /// True when some entry of `unavailable` is a tier that is configured and did not answer (a repeat can pass), not only unset variables.
+    pub unreachable: bool,
 }
 
 /// Retention facade kept separate from ordinary query/age call sites so
@@ -158,7 +160,17 @@ impl TierRegistry {
                 return StoreError::tier_unreachable(rung, backend, reason.clone());
             }
             let reason = match backend {
-                Some(b) => b.default_unattached_reason().to_string(),
+                Some(b) => {
+                    let var = match self.policy.tiers.get(&rung) {
+                        Some(BackendConfig::S3(c)) => Some(&c.bucket_env),
+                        Some(BackendConfig::Postgres(c)) => Some(&c.dsn_env),
+                        _ => None,
+                    };
+                    match var {
+                        Some(var) => format!("{} (`{var}` is unset)", b.default_unattached_reason()),
+                        None => b.default_unattached_reason().to_string(),
+                    }
+                }
                 None => format!("no `tiers.{}` in canon.yaml", rung.as_str()),
             };
             StoreError::tier_unavailable(rung, backend, reason)
@@ -288,10 +300,14 @@ impl TierRegistry {
         rungs.dedup();
         let mut attached = Vec::new();
         let mut unavailable = Vec::new();
+        let mut unreachable = false;
         for rung in rungs {
             match self.handle(rung) {
                 Ok(tier) => attached.push((rung, tier)),
-                Err(err) if dry_run => unavailable.push(err.to_string()),
+                Err(err) if dry_run => {
+                    unreachable |= matches!(err, StoreError::TierUnavailable { configured: true, .. });
+                    unavailable.push(err.to_string());
+                }
                 Err(err) => return Err(err),
             }
         }
@@ -302,7 +318,7 @@ impl TierRegistry {
             preflight.push(RungPurgeReport { rung: *rung, backend: tier.backend(), matched: count.matched, deleted: 0 });
         }
         if dry_run {
-            return Ok(PurgeOutcome { kind, before, dry_run, rungs: preflight, unavailable });
+            return Ok(PurgeOutcome { kind, before, dry_run, rungs: preflight, unavailable, unreachable });
         }
 
         let matched_total = preflight.iter().map(|report| report.matched).sum();
@@ -322,7 +338,7 @@ impl TierRegistry {
                 }
             }
         }
-        Ok(PurgeOutcome { kind, before, dry_run, rungs: reports, unavailable })
+        Ok(PurgeOutcome { kind, before, dry_run, rungs: reports, unavailable, unreachable })
     }
 
     /// The identity of every record [`Self::purge`] would remove, sorted and

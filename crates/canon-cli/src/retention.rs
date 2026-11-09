@@ -412,7 +412,15 @@ pub fn run_purge(repo: &Path, kind: PurgeKind, before: DateTime<Utc>, mode: &Mod
                 plan.finish_preview("purge", "the plan only lists what would be removed; deleting takes its planDigest", json_output, &report);
             } else {
                 // A commit reads every tier before its first delete and refuses when one does not attach (`RETENTION_TIERS_REQUIRED`): the plan is no step to take until it does.
-                let blocked = format!("a commit is refused until every tier the kind lives in is attached ({}); {}, then run `{base}` again", report.unavailable.join("; "), tiers_hint("RETENTION_TIERS_REQUIRED"));
+                // A tier that is configured and did not answer is retryable (RETENTION_TIERS_UNAVAILABLE); an unset one needs its variables (RETENTION_TIERS_REQUIRED).
+                let fix = if outcome.unreachable && report.unavailable.len() == 1 {
+                    tiers_hint("RETENTION_TIERS_UNAVAILABLE").to_string()
+                } else if outcome.unreachable {
+                    format!("{}; for a tier whose message names a variable, {}", tiers_hint("RETENTION_TIERS_UNAVAILABLE"), tiers_hint("RETENTION_TIERS_REQUIRED"))
+                } else {
+                    tiers_hint("RETENTION_TIERS_REQUIRED").to_string()
+                };
+                let blocked = format!("a commit is refused until every tier the kind lives in is attached ({}); {fix}, then run `{base}` again", report.unavailable.join("; "));
                 plan.finish_blocked_preview("purge", &blocked, json_output, &report);
             }
         }
@@ -783,6 +791,7 @@ mod tests {
             dry_run: false,
             rungs: vec![],
             unavailable: vec![],
+            unreachable: false,
         };
         let value = serde_json::to_value(purge_report(&outcome, Some((3, 2)), Plan::new("purge", Vec::new(), Reads::new()).unwrap().preview())).unwrap();
         assert_eq!(value["learnStore"]["backend"], "parquet");

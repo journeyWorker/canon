@@ -97,6 +97,15 @@ impl Repo {
         hermetic::canon().args(args).current_dir(self.path()).env("HOME", self.home.path()).env("CANON_ACTOR", "kinds-tests").output().expect("spawn canon binary")
     }
 
+    /// `canon <args> --json` with extra environment variables.
+    fn json_env(&self, args: &[&str], envs: &[(&str, &str)]) -> (Value, Output) {
+        let mut all = args.to_vec();
+        all.push("--json");
+        let out = hermetic::canon().args(&all).current_dir(self.path()).env("HOME", self.home.path()).env("CANON_ACTOR", "kinds-tests").envs(envs.iter().copied()).output().expect("spawn canon binary");
+        let doc = serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("`canon {all:?}` printed no JSON document ({e}):\nstdout: {}\nstderr: {}", text(&out.stdout), text(&out.stderr)));
+        (doc, out)
+    }
+
     /// `canon <args> --json`: the document and the process output.
     fn json(&self, args: &[&str]) -> (Value, Output) {
         let mut all = args.to_vec();
@@ -738,7 +747,8 @@ fn tier_purge_preview_01_a_preview_with_a_tier_that_cannot_attach_names_it_and_o
     assert!(unavailable.len() == 1 && unavailable[0].as_str().unwrap().contains("cold"), "{preview}");
     let first = &preview["meta"]["next"][0];
     let why = first["reason"].as_str().unwrap();
-    assert!(why.contains("cold") && why.contains("no live bucket") && why.contains("set the variables"), "the first step says what to set: {first}");
+    assert!(why.contains("cold") && why.contains("no live bucket") && why.contains("`CANON_R2_BUCKET` is unset") && why.contains("set the variables"), "the first step names the variable to set: {first}");
+    assert!(!why.contains("reachable"), "an unset variable is not a retry: {first}");
     assert_eq!(commit_steps(&preview), Vec::<String>::new(), "a commit that would be refused is not offered: {preview}");
     assert_eq!(repo.snapshot(), before, "the preview wrote something");
 
@@ -763,12 +773,18 @@ fn tier_purge_preview_02_committing_the_digest_of_that_preview_is_refused_and_de
     assert_eq!(hot_ids(&repo, "session"), ["new-hot-session", "old-hot-session"]);
 }
 
-/// tier.purge-preview.03 (F2): with no tier left that cannot attach, the preview offers the commit command and that commit deletes.
+/// tier.purge-preview.03 (F2): with the cold tier's bucket set to one it can attach (the debug seam `CANON_R2_LOCAL_ROOT`), the preview that was blocked offers the commit command and that commit deletes.
 #[test]
 fn tier_purge_preview_03_a_preview_whose_tiers_all_attach_offers_the_commit_command_and_it_deletes() {
     let repo = Repo::old();
     plant_rows(&repo);
-    let (preview, out) = repo.json(&["purge", "--kind", "session", "--before", "2026-06-01"]);
+    declare_cold_tier(&repo);
+    let args = ["purge", "--kind", "session", "--before", "2026-06-01"];
+    let (blocked, _) = repo.json(&args);
+    assert_eq!(blocked["data"]["unavailable"].as_array().unwrap().len(), 1, "the Given: the unset bucket blocks the preview: {blocked}");
+    let cold = tempfile::tempdir().unwrap();
+    let envs = [("CANON_R2_BUCKET", "attachable"), ("CANON_R2_LOCAL_ROOT", cold.path().to_str().unwrap())];
+    let (preview, out) = repo.json_env(&args, &envs);
     assert_eq!(out.status.code(), Some(0), "{preview}");
     assert_eq!(preview["data"]["unavailable"], serde_json::json!([]), "{preview}");
     let steps = commit_steps(&preview);
@@ -776,8 +792,32 @@ fn tier_purge_preview_03_a_preview_whose_tiers_all_attach_offers_the_commit_comm
     assert_eq!(preview["meta"]["next"][0]["command"], steps[0].as_str(), "{preview}");
     let digest = preview["data"]["planDigest"].as_str().unwrap();
     assert!(steps[0].contains(digest), "{}", steps[0]);
-    let (done, out) = repo.json(&["purge", "--kind", "session", "--before", "2026-06-01", "--commit", "--plan-digest", digest]);
+    let (done, out) = repo.json_env(&["purge", "--kind", "session", "--before", "2026-06-01", "--commit", "--plan-digest", digest], &envs);
     assert!(out.status.success() && deleted(&done) == 2, "{done}");
+    assert_eq!(hot_ids(&repo, "session"), ["new-hot-session"]);
+}
+
+/// tier.purge-preview.01 (F2), the other cause: a tier that is configured and did not answer is a retry, not a variable to set; its commit is `RETENTION_TIERS_UNAVAILABLE`.
+#[test]
+fn tier_purge_preview_01_a_configured_tier_that_does_not_answer_is_a_retry_not_a_variable() {
+    let repo = Repo::init();
+    let yaml = repo.read("canon.yaml");
+    let sqlite = format!("  hot:\n    backend: sqlite\n    path: {}\n", ".canon/hot.db");
+    assert!(yaml.contains(&sqlite), "the skeleton's hot tier moved:\n{yaml}");
+    repo.write("canon.yaml", &yaml.replacen(&sqlite, "  hot:\n    backend: postgres\n    dsn_env: CANON_PG_DSN\n    schema: canon_v1\n", 1));
+    repo.commit_all("a hot tier that does not answer");
+    let envs = [("CANON_PG_DSN", "postgres://u:p@127.0.0.1:1/x?connect_timeout=1")];
+    let args = ["purge", "--kind", "run", "--before", "2030-01-01"];
+    let (preview, out) = repo.json_env(&args, &envs);
+    assert_eq!(out.status.code(), Some(0), "{preview}");
+    assert_eq!(preview["data"]["unavailable"].as_array().unwrap().len(), 1, "{preview}");
+    let why = preview["meta"]["next"][0]["reason"].as_str().unwrap();
+    assert!(why.contains("reachable") && !why.contains("set the variables"), "a reachability fix, not a variable to set: {why}");
+    assert_eq!(commit_steps(&preview), Vec::<String>::new(), "{preview}");
+    let digest = preview["data"]["planDigest"].as_str().unwrap();
+    let (refused, out) = repo.json_env(&["purge", "--kind", "run", "--before", "2030-01-01", "--commit", "--plan-digest", digest], &envs);
+    assert_eq!(out.status.code(), Some(2), "{refused}");
+    assert_eq!(error_code(&refused), "RETENTION_TIERS_UNAVAILABLE", "{refused}");
 }
 
 /// tier.retired-keys.01 (F3): the refusal names the key that could not be deleted, and its line when it is known.

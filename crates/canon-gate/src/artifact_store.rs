@@ -1025,6 +1025,18 @@ mod tests {
     #[cfg(all(unix, debug_assertions))]
     #[test]
     fn tier_durability_03_publishing_two_blobs_syncs_the_store_directory_once_after_both_renames_and_an_existing_blob_syncs_nothing() {
+        assert_publish_order();
+    }
+
+    /// tier.durability-release.01 (F4), the publish half: a debug build, where the trace exists, still sees two renames then one directory sync.
+    #[cfg(all(unix, debug_assertions))]
+    #[test]
+    fn tier_durability_release_01_a_debug_build_traces_two_renames_then_one_directory_sync() {
+        assert_publish_order();
+    }
+
+    #[cfg(all(unix, debug_assertions))]
+    fn assert_publish_order() {
         use canon_store::atomic::trace::{self, Event};
         let dir = TempDir::new().unwrap();
         let lock = StoreLock::acquire(dir.path()).unwrap();

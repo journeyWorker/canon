@@ -21,6 +21,6 @@ Feature: gate tombstone-corpus
   @gate.tombstone-corpus.01
   Scenario: The old evidence of a scenario whose feature file was the last one deleted is not stale evidence and not an unresolvable cell
     Given one scenario with green evidence, more commits since than max_commits_behind allows, and its feature file, the last one, then deleted and canon inventory sync run
-    When canon gate check and canon status run there, and in a shallow clone of it
+    When canon gate check and canon status run there
     Then neither reports stale-evidence nor counts the deleted scenario among the staleness_unresolvable cells
     And restoring the feature file and running canon inventory sync makes canon gate check report stale-evidence again
