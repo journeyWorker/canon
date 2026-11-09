@@ -410,7 +410,7 @@ fn gate_tombstone_corpus_02_a_corpus_that_is_not_read_still_judges_the_evidence(
     fs::remove_dir_all(scenario_index_dir(repo)).unwrap();
     commit_all(repo, "the scenario kind is routed off the git tier and the feature file is gone");
     let scenarios = json_of(&canon_in(repo, &["query", "--kind", "scenario", "--all", "--json"]));
-    assert!(scenarios["data"]["records"].as_array().is_none_or(|r| r.is_empty()), "the Given: no scenario record is read: {scenarios}");
+    assert!(scenarios["data"]["records"].as_array().is_none_or(Vec::is_empty), "the Given: no scenario record is read: {scenarios}");
     assert_eq!(stale_subjects(repo).0, ["gone.leaf.01"], "no corpus was read, so nothing is known to be absent");
 }
 
@@ -431,16 +431,4 @@ fn scenario_index_dir(repo: &Path) -> PathBuf {
         None
     }
     find(&repo.join(".canon")).expect("a synced repo has a scenario index")
-}
-
-fn copy_dir(from: &Path, to: &Path) {
-    fs::create_dir_all(to).unwrap();
-    for entry in fs::read_dir(from).unwrap().flatten() {
-        let target = to.join(entry.file_name());
-        if entry.path().is_dir() {
-            copy_dir(&entry.path(), &target);
-        } else {
-            fs::copy(entry.path(), target).unwrap();
-        }
-    }
 }
