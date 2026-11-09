@@ -468,6 +468,7 @@ impl StoreLock {
                 self.unpublish(&renamed);
                 return Err((index, e.into()));
             }
+            #[cfg(debug_assertions)]
             canon_store::atomic::trace::record(canon_store::atomic::trace::Event::Rename { from: temp, to: target.clone() });
             renamed.push(target);
             last_placed = index;
@@ -978,6 +979,7 @@ mod tests {
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
+            tombstoned_scenarios: Default::default(),
             code_tree: None,
             derived: Default::default(),
             now: Utc::now(),

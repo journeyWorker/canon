@@ -4,6 +4,16 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Fixed
+
+- **A scenario whose last feature file was deleted is not judged `stale-evidence`** (`canon-0-40-retire-followups`, scenarios `gate.tombstone-corpus.01-02`). `canon inventory sync` writes a tombstone for a scenario no feature file declares, and the gate now reads the tombstone itself: in a repository whose last `.feature` file was deleted, the old evidence of the deleted scenarios is neither `stale-evidence` nor counted in `staleness_unresolvable`, where 0.39 could not tell the empty list from "no corpus read". A repository whose scenarios are not read (the kind routed off the git tier, no index) is judged as before.
+- **`canon migrate` names the retired key it cannot delete** (`tier.retired-keys.01-02`): the `CONFIG_INVALID` refusal says `routing.session` (and the line, for an anchor, an alias or a tag) instead of only the two kind names; keys it could delete are not listed. Exit code, code and the unchanged file are as before.
+- **The durability trace is debug-only** (`tier.durability-release.01-02`): the `canon_store::atomic::trace` module and its `Event` type exist in debug builds only, and a release build of `write_atomic` and the artifact store no longer copies a path for each trace call, as the 0.39 write-durability brief said.
+
+### Changed
+
+- **`canon purge` does not offer a commit it would refuse** (`tier.purge-preview.01-03`): when `canon.yaml` declares a tier that cannot attach, the preview (exit 0, same `data`) leads `meta.next` with the tier and the value to set, and gives no `--commit` command; the commit is refused as before (`RETENTION_TIERS_REQUIRED`, exit 2, nothing deleted). Set the value (or drop the tier) and run the preview again.
+
 ## 0.39.0 — 2026-11-08
 
 canon drops `canon ingest sessions` and the record kinds `session` and `event` (twelve record kinds remain), sends every git call through one path (the shell's git environment is ignored, a file name is read as it is, a deadline and an output limit apply), makes a directory or a glob declared as a surface go stale like a file, creates a new `.canon/hot.db` readable by its owner only, writes a record file to disk with its name before the command returns, judges a `context-pack add` text by six secret shapes, and makes `canon artifacts prune` delete the stale temp files of a killed blob write. It is BREAKING for callers: the `### Breaking` tables below name every command, key and column that moved.
