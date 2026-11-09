@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T16:02:13.819914Z",
+  "change_id": "canon-0-40-ci-evidence",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "deferred",
+  "file_ref": "crates/canon-cli/tests/ci_evidence.rs",
+  "introduced_by": "2b3d7faa4bfe40ab08a6c5447da82ed3b5ffe2e8",
+  "kind": "finding",
+  "reason": "note: exclude_lanes, scope: [] and data.reports[] of a --from-ci batch verified live by the reviewer; extra bound tests left to a later change by the owner's choice",
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-ci",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.ci-run.10",
+    "gate.ci-run.05",
+    "gate.ci-run.01"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "Standards: behaviors the brief states that no bound test reaches through the binary: require_ci_run with `exclude_lanes` (an excluded lane is skipped; probed live: no violation with the lane excluded, no_ci_run without), `scope: []` (every scenario; only the policy unit test), `data.reports[]` of a --from-ci batch (evidence.ci-run.10 runs plain batches; probed live: present and equal to ci.reports), and the schemaVersion of the answer. The decision is right where I probed it; a regression in these would stay green. Blast radius: the places the require_ci_run decision meets exclude_lanes and scope.",
+  "worktree_dirty": false
+}

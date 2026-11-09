@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-40-ci",
+    "role": "reviewer",
+    "session_id": "s-0-40-ci-rev"
+  },
+  "at": "2026-11-09T16:02:12.546549Z",
+  "change_id": "canon-0-40-ci-evidence",
+  "code_tree": "e617e7a4cc544dc36881af95127c3ae6ef13906a",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/evidence_attach.rs:845",
+  "introduced_by": "622d2529c8a9cc0329231d6bc397539ff32d863d",
+  "kind": "finding",
+  "resolution_code_tree": "b9fe5e9bd8ef5436b3e8990ed06245172b3a003c",
+  "resolution_sha": "168ac536e287218d17fb504f56c9dcccf902a825",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "0f8df88e9e86de8e927e6551017d65ee84742ecb",
+  "reviewer": "rev-0-40-ci",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.ci-run.02",
+    "gate.ci-run.05"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "Standards/spec fidelity: `--report junit:a.xml --report junit:a.xml` (the same path twice) writes two identical entries in ci.reports and cases_run() adds both: a report of 3 passed + 1 failed counts 8 (probed live, exit 0, data.reports[] lists it twice). The brief says reports is one line per report file and min_cases is the only guard against a partial run, so one 60-case run given twice reads as 120 and clears `min_cases: 100`. The bound files are already deduplicated (add_unique_file in bind_all_scenarios) but `batch.reports = reports.iter().map(ParsedReport::count)` is not. No test passes a path twice (evidence.ci-run.02 uses two distinct files). A copy of the file under another name still counts twice; ci is a claim, so that part is the documented limit, but the accidental repeat is not. Fix: one entry per distinct resolved report file, or refuse a repeated --report, with a case in evidence.ci-run.02 and gate.ci-run.05. Blast radius: data.reports[] of every batch and the counts printed per report.",
+  "worktree_dirty": false
+}
