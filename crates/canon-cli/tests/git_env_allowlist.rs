@@ -44,6 +44,9 @@ fn git(dir: &Path, args: &[&str]) -> String {
         .current_dir(dir)
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .env("GIT_CONFIG_NOSYSTEM", "1")
+        // Fixed dates, so that the commits (a submodule's among them) and the digest of the fixture are the same in every run.
+        .env("GIT_AUTHOR_DATE", "2026-01-01T00:00:00Z")
+        .env("GIT_COMMITTER_DATE", "2026-01-01T00:00:00Z")
         .output()
         .expect("git must be on PATH");
     assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
@@ -77,8 +80,9 @@ fn project() -> TempDir {
 
 const MANIFEST: &str = r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":["doc.md"],"examples":[],"toolSchemas":[],"injectedGuidance":[]}"#;
 
-/// A dirty tree that every setting of the matrix can show in: two hunks 40 lines apart with a blank context line, a staged rename that is also edited,
-/// an untracked file, and a file whose blob is long enough to show an abbreviated hash.
+/// A dirty tree that every setting of the matrix can show in: two hunks 40 lines apart with a blank context line, three staged renames that are also edited
+/// (more than a rename limit of 1 reaches), a file whose indent heuristic moves the hunk, a submodule that moved, an untracked file, and a file whose blob is long
+/// enough to show an abbreviated hash.
 fn dirty_project() -> TempDir {
     let dir = project();
     let repo = dir.path();
@@ -88,14 +92,34 @@ fn dirty_project() -> TempDir {
     let body: String = (1..=60).map(|n| if n % 7 == 0 { "\n".to_string() } else { format!("line {n}\n") }).collect();
     write(repo, "src/long.rs", &body);
     write(repo, "src/old_name.rs", "pub fn renamed() {\n    let a = 1;\n    let b = 2;\n    a + b\n}\n");
+    write(repo, "src/slider.txt", SLIDER_OLD);
+    for n in 1..=2 {
+        write(repo, &format!("src/old_{n}.rs"), &format!("pub fn other_{n}() {{\n    let a = 1;\n    let b = 2;\n    a + b\n}}\n"));
+    }
+    let upstream = TempDir::new().unwrap();
+    git(upstream.path(), &["init", "-q", "-b", "main"]);
+    write(upstream.path(), "lib.txt", "one\n");
+    commit_all(upstream.path(), "one");
+    git(repo, &["submodule", "add", "-q", upstream.path().to_str().unwrap(), "vendor"]);
     commit_all(repo, "pack inputs");
     let edited = body.replace("line 3\n", "line three\n").replace("line 50\n", "line fifty\n");
     write(repo, "src/long.rs", &edited);
     git(repo, &["mv", "src/old_name.rs", "src/new_name.rs"]);
     write(repo, "src/new_name.rs", "pub fn renamed() {\n    let a = 1;\n    let b = 3;\n    a + b\n}\n");
+    for n in 1..=2 {
+        git(repo, &["mv", &format!("src/old_{n}.rs"), &format!("src/new_{n}.rs")]);
+        write(repo, &format!("src/new_{n}.rs"), &format!("pub fn other_{n}() {{\n    let a = 1;\n    let b = 3;\n    a + b\n}}\n"));
+    }
+    write(repo, "src/slider.txt", SLIDER_NEW);
+    write(&repo.join("vendor"), "lib.txt", "two\n");
+    commit_all(&repo.join("vendor"), "two");
     write(repo, "untracked.txt", "x\n");
     dir
 }
+
+/// A file whose added lines can slide, so that `diff.indentHeuristic=false` places the hunk differently (found by search: plain git prints the two differently).
+const SLIDER_OLD: &str = "\n}\n    b();\n}\n    }\n    }\n    }\n    if (x) {\n";
+const SLIDER_NEW: &str = "\n}\n    }\n}\n    b();\n}\n    }\n    }\n    }\n    if (x) {\n";
 
 /// `context-pack add` of the dirty project: the pack id and the state digest it holds.
 fn pack(repo: &Path, env: &[(&str, String)]) -> (String, String) {
@@ -122,7 +146,10 @@ fn state_digest_of_0_39(repo: &Path) -> String {
 }
 
 /// The settings of the brief's matrix: each changes the shape of what git prints, or the files it lists.
-const MATRIX: [(&str, &str); 12] = [
+/// The value `ORDER_FILE` stands for in a row: the path of a file that puts the submodule and the renames first.
+const ORDER_FILE: &str = "<order file>";
+
+const MATRIX: [(&str, &str); 16] = [
     ("diff.context", "0"),
     ("diff.noprefix", "true"),
     ("diff.mnemonicPrefix", "true"),
@@ -135,7 +162,33 @@ const MATRIX: [(&str, &str); 12] = [
     ("status.showUntrackedFiles", "no"),
     ("status.renames", "false"),
     ("diff.ignoreSubmodules", "all"),
+    ("diff.orderFile", ORDER_FILE),
+    ("diff.submodule", "log"),
+    ("diff.renameLimit", "1"),
+    ("diff.indentHeuristic", "false"),
 ];
+
+/// The row's value: `ORDER_FILE` becomes the path of a file in `dir` that moves the submodule and the renames before the rest.
+fn matrix_value(dir: &Path, value: &str) -> String {
+    if value != ORDER_FILE {
+        return value.to_string();
+    }
+    let file = dir.join("order.txt");
+    std::fs::write(&file, "vendor\nsrc/new_*\nsrc/slider.txt\n").unwrap();
+    file.display().to_string()
+}
+
+/// What plain git (no canon options) prints for the diff and status of the pack, under the gitconfig file `global`: the precondition that a row of the matrix is a
+/// setting that changes what git prints on this tree, so that a pinned option that did nothing would show.
+fn plain_git_prints(repo: &Path, global: &Path) -> Vec<u8> {
+    let mut printed = Vec::new();
+    for args in [&["diff", "--no-ext-diff", "--binary", "HEAD"][..], &["status", "--porcelain=v1", "-z"][..]] {
+        let out = Command::new("git").args(args).current_dir(repo).env("GIT_CONFIG_GLOBAL", global).env("GIT_CONFIG_NOSYSTEM", "1").output().expect("git must be on PATH");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        printed.extend(out.stdout);
+    }
+    printed
+}
 
 fn gitconfig_with(dir: &Path, name: &str, key: &str, value: &str) -> PathBuf {
     let file = dir.join(name);
@@ -168,7 +221,7 @@ fn gate_git_env_01_a_git_variable_off_the_list_does_not_change_the_id_or_digest_
 
 /// The state digest of `dirty_project()` as 0.39 made it with no gitconfig: the plain `git diff --no-ext-diff --binary HEAD` and `git status --porcelain=v1 -z`.
 /// Fixed here, so that a change to the pinned options that moves a user's digest fails.
-const DIRTY_PROJECT_DIGEST_0_39: &str = "sha256:597bc5522934fc2864f9600be1e84987bd9339efeceecfb718d0615af1212280";
+const DIRTY_PROJECT_DIGEST_0_39: &str = "sha256:6161226bf31349efe902741e022fd7770c7e09840bf9cc4db5e93bbef5f47631";
 
 /// gate.git-env.04 (F2): each setting of the matrix in the home gitconfig (`GIT_CONFIG_GLOBAL`) leaves the state digest and id of a dirty pack as they are with
 /// no setting, and that digest is the one 0.39 made.
@@ -181,8 +234,13 @@ fn gate_git_env_04_a_home_gitconfig_does_not_change_the_state_digest_of_a_dirty_
     assert_eq!(plain.1, state_digest_of_0_39(repo));
     let homes = TempDir::new().unwrap();
     for (key, value) in MATRIX {
-        let file = gitconfig_with(homes.path(), &format!("{key}.gitconfig"), key, value);
+        let value = matrix_value(homes.path(), value);
+        let file = gitconfig_with(homes.path(), &format!("{key}.gitconfig"), key, &value);
         let env = [("GIT_CONFIG_GLOBAL", file.display().to_string())];
+        // `diff.relative` only acts from a subdirectory; canon runs git at the root, so the row is a guard, not a visible change.
+        if key != "diff.relative" {
+            assert_ne!(plain_git_prints(repo, &file), plain_git_prints(repo, Path::new("/dev/null")), "{key}={value}: the precondition, plain git prints this tree differently under the setting");
+        }
         assert_eq!(pack(repo, &env), plain, "{key}={value} in the home gitconfig");
     }
 }
@@ -193,8 +251,10 @@ fn gate_git_env_05_the_repositorys_own_git_config_does_not_change_the_state_dige
     let dir = dirty_project();
     let repo = dir.path();
     let plain = pack(repo, &[]);
+    let order = TempDir::new().unwrap();
     for (key, value) in MATRIX {
-        git(repo, &["config", key, value]);
+        let value = matrix_value(order.path(), value);
+        git(repo, &["config", key, &value]);
         assert_eq!(pack(repo, &[]), plain, "{key}={value} in .git/config");
         git(repo, &["config", "--unset", key]);
     }
@@ -278,13 +338,30 @@ fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().nth(2).unwrap().to_path_buf()
 }
 
-const ENTRY_NEEDLES: [&str; 14] = [
+/// What the entry must say: its name, every allowed name written out (in backticks, so that `GIT_SSH` is not found inside `GIT_SSH_COMMAND`), and the rest.
+const ENTRY_NEEDLES: [&str; 31] = [
     "canon-0-40-git-env-allowlist",
-    "GIT_CONFIG_GLOBAL",
-    "GIT_CONFIG_SYSTEM",
-    "GIT_CONFIG_NOSYSTEM",
-    "GIT_SSH_COMMAND",
-    "GIT_SSL_NO_VERIFY",
+    "`GIT_CONFIG_GLOBAL`",
+    "`GIT_CONFIG_SYSTEM`",
+    "`GIT_CONFIG_NOSYSTEM`",
+    "`GIT_SSH`",
+    "`GIT_SSH_COMMAND`",
+    "`GIT_SSH_VARIANT`",
+    "`GIT_ASKPASS`",
+    "`GIT_PROXY_COMMAND`",
+    "`GIT_SSL_CAINFO`",
+    "`GIT_SSL_CAPATH`",
+    "`GIT_SSL_NO_VERIFY`",
+    "`GIT_SSL_CERT`",
+    "`GIT_SSL_KEY`",
+    "`GIT_SSL_CERT_PASSWORD_PROTECTED`",
+    "`GIT_SSL_CERT_TYPE`",
+    "`GIT_SSL_KEY_TYPE`",
+    "`GIT_SSL_VERSION`",
+    "`GIT_SSL_CIPHER_LIST`",
+    "`GIT_HTTP_PROXY_AUTHMETHOD`",
+    "`GIT_HTTP_LOW_SPEED_LIMIT`",
+    "`GIT_HTTP_LOW_SPEED_TIME`",
     "GIT_DIFF_OPTS",
     "GIT_CONFIG_PARAMETERS",
     "safe.directory",
@@ -292,7 +369,8 @@ const ENTRY_NEEDLES: [&str; 14] = [
     "dubious ownership",
     "different id once",
     "GIT_EXEC_PATH",
-    "11",
+    "differ per host",
+    "21",
 ];
 
 /// The release check of F3: what the `Unreleased` section's entry fails to say, and what the coding rules page says of the git path. Empty when both are complete.
@@ -338,7 +416,7 @@ fn gate_git_env_09_a_missing_entry_item_or_an_old_coding_rule_fails_the_release_
     assert_eq!(release_problems(&changelog.replace("canon-0-40-git-env-allowlist", "canon-0-40-other"), &rules), ["no entry in Unreleased names `canon-0-40-git-env-allowlist`"]);
     let start = changelog.find("`canon-0-40-git-env-allowlist`").expect("the entry");
     let end = start + changelog[start..].find("\n## ").expect("the next section");
-    for needle in &ENTRY_NEEDLES[1..13] {
+    for needle in &ENTRY_NEEDLES[1..ENTRY_NEEDLES.len() - 1] {
         let thin = format!("{}{}{}", &changelog[..start], changelog[start..end].replace(needle, "[removed]"), &changelog[end..]);
         assert_eq!(release_problems(&thin, &rules), [format!("the entry does not say `{needle}`")], "{needle}");
     }

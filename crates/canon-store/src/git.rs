@@ -5,7 +5,7 @@
 //! on nothing the shell holds:
 //!
 //! - **Environment.** An allow list (0.40, `canon-0-40-git-env-allowlist`): of the `GIT_*` variables of the process
-//!   only the eleven names of [`ALLOWED_ENV`] reach the child, every other one is removed ([`env_to_remove`]);
+//!   only the twenty-one names of [`ALLOWED_ENV`] reach the child, every other one is removed ([`env_to_remove`]);
 //!   `HOME`, `PATH`, `SSH_AUTH_SOCK` and the XDG variables, which are not `GIT_*`, stay. A call sets `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY` and `GIT_ALTERNATE_OBJECT_DIRECTORIES` only when it
 //!   hands over a [`ScratchIndex`], the three together.
 //! - **Configuration.** `LC_ALL=C`, `GIT_OPTIONAL_LOCKS=0`, `GIT_TERMINAL_PROMPT=0`, `core.quotepath=false`,
@@ -46,8 +46,9 @@ const POLL: Duration = Duration::from_millis(2);
 ///
 /// - the three that choose the host's gitconfig files (what those files hold is pinned by [`DIFF_SHAPE`],
 ///   [`STATUS_SHAPE`] and the `-c` options of [`GitCall::command`]);
-/// - the eight that only matter when a partial clone fetches a missing object from its remote.
-pub const ALLOWED_ENV: [&str; 11] = [
+/// - the eighteen that only matter when a partial clone fetches a missing object from its remote (git-remote-http's
+///   transport settings; `GIT_CURL_VERBOSE` is not among them, it fills stderr as `GIT_TRACE` does).
+pub const ALLOWED_ENV: [&str; 21] = [
     "GIT_CONFIG_GLOBAL",
     "GIT_CONFIG_SYSTEM",
     "GIT_CONFIG_NOSYSTEM",
@@ -59,12 +60,22 @@ pub const ALLOWED_ENV: [&str; 11] = [
     "GIT_SSL_CAINFO",
     "GIT_SSL_CAPATH",
     "GIT_SSL_NO_VERIFY",
+    "GIT_SSL_CERT",
+    "GIT_SSL_KEY",
+    "GIT_SSL_CERT_PASSWORD_PROTECTED",
+    "GIT_SSL_CERT_TYPE",
+    "GIT_SSL_KEY_TYPE",
+    "GIT_SSL_VERSION",
+    "GIT_SSL_CIPHER_LIST",
+    "GIT_HTTP_PROXY_AUTHMETHOD",
+    "GIT_HTTP_LOW_SPEED_LIMIT",
+    "GIT_HTTP_LOW_SPEED_TIME",
 ];
 
 /// What the working-tree diff that canon reads and hashes (`diff --no-ext-diff --binary <SHAPE> HEAD`) is given, so
 /// that no gitconfig changes its shape. Each value is git's default: a user with no configuration gets the bytes
 /// of 0.39.
-pub const DIFF_SHAPE: [&str; 9] = [
+pub const DIFF_SHAPE: [&str; 13] = [
     "--no-color",
     "-U3",
     "--inter-hunk-context=0",
@@ -74,6 +85,10 @@ pub const DIFF_SHAPE: [&str; 9] = [
     "--diff-algorithm=myers",
     "--no-relative",
     "--ignore-submodules=none",
+    "--submodule=short",
+    "-l1000",
+    "--indent-heuristic",
+    "-O/dev/null",
 ];
 
 /// What `status --porcelain=v1 -z <SHAPE>` is given, for the same reason as [`DIFF_SHAPE`].
@@ -491,10 +506,39 @@ mod tests {
         let held = ["GIT_SSH_COMMAND", "GIT_CONFIG_GLOBAL", "GIT_CANON_TEST_UNKNOWN", "GIT_DIFF_OPTS", "PATH", "HOME", "SSH_AUTH_SOCK", "LC_ALL"];
         let removed = env_to_remove(held);
         assert_eq!(removed, [OsString::from("GIT_CANON_TEST_UNKNOWN"), OsString::from("GIT_DIFF_OPTS")]);
-        for name in ALLOWED_ENV {
+        // The independent oracle: the names written out here, not read from the constant under test.
+        let named = [
+            "GIT_CONFIG_GLOBAL",
+            "GIT_CONFIG_SYSTEM",
+            "GIT_CONFIG_NOSYSTEM",
+            "GIT_SSH",
+            "GIT_SSH_COMMAND",
+            "GIT_SSH_VARIANT",
+            "GIT_ASKPASS",
+            "GIT_PROXY_COMMAND",
+            "GIT_SSL_CAINFO",
+            "GIT_SSL_CAPATH",
+            "GIT_SSL_NO_VERIFY",
+            "GIT_SSL_CERT",
+            "GIT_SSL_KEY",
+            "GIT_SSL_CERT_PASSWORD_PROTECTED",
+            "GIT_SSL_CERT_TYPE",
+            "GIT_SSL_KEY_TYPE",
+            "GIT_SSL_VERSION",
+            "GIT_SSL_CIPHER_LIST",
+            "GIT_HTTP_PROXY_AUTHMETHOD",
+            "GIT_HTTP_LOW_SPEED_LIMIT",
+            "GIT_HTTP_LOW_SPEED_TIME",
+        ];
+        for name in named {
             assert!(env_to_remove([name]).is_empty(), "{name} passes");
         }
-        assert_eq!(ALLOWED_ENV.len(), 11);
+        let mut written: Vec<&str> = named.to_vec();
+        let mut constant: Vec<&str> = ALLOWED_ENV.to_vec();
+        written.sort_unstable();
+        constant.sort_unstable();
+        assert_eq!(written, constant, "the list is exactly the written names");
+        assert_eq!(env_to_remove(["GIT_CURL_VERBOSE", "GIT_ALLOW_PROTOCOL", "GIT_NO_LAZY_FETCH"]).len(), 3);
         // The names that matter are exact: a prefix of an allowed name is not allowed, and `GIT_CONFIG_COUNT` is not `GIT_CONFIG_GLOBAL`.
         assert_eq!(env_to_remove(["GIT_SSH_COMMAND_EXTRA", "GIT_CONFIG", "GIT_CONFIG_COUNT", "git_dir"]).len(), 3, "lower case is a different name");
         // What canon sets is set on the command, so it wins over a removal of the same name.
