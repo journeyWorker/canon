@@ -1,0 +1,7 @@
+answers compared: 217 (tree entries 105/105); differing: 0; combined sha256 of A side 2f1d20ea0e2d6478
+errors exit 0 0
+warnings exit 0 0
+
+real	2m28.925s
+user	1m44.263s
+sys	0m16.729s
