@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:06:05.152606Z",
+  "attachments": [
+    {
+      "case": "read_cause::tests::atip_reasons_05_a_canon_yaml_that_cannot_be_used_is_config_invalid_with_its_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_reasons_05_a_wrong_specs_section_a_wrong_policy_and_a_wrong_canon_yaml_are_config_invalid_with_three_reasons",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.41-atip/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 229,
+  "scenario_id": "atip.reasons.05",
+  "schema": 1,
+  "staging_id": "16082415",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

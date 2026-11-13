@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:06:05.152606Z",
+  "attachments": [
+    {
+      "case": "atip_codestored_09_the_registry_has_the_new_codes_and_not_the_old_names",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.41-atip/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 290,
+  "scenario_id": "atip.codestored.09",
+  "schema": 1,
+  "staging_id": "b4456c27",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:06:05.152606Z",
+  "attachments": [
+    {
+      "case": "retired_kind_keys::tests::tier_retired_01_the_retired_keys_are_listed_in_one_sorted_message",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "tier_retired_01_old_retired_keys_load_and_warn_with_the_migrate_step_first",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "tier_retired_01_the_values_of_the_retired_keys_are_not_checked",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "policy::tests::tier_retired_01_retired_kind_keys_load_route_nothing_and_are_listed",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.41-atip/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 81,
+  "scenario_id": "tier.retired.01",
+  "schema": 1,
+  "staging_id": "10f78220",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

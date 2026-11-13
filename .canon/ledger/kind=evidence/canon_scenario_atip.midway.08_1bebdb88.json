@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:06:05.152606Z",
+  "attachments": [
+    {
+      "case": "input::tests::atip_midway_08_an_element_that_stopped_midway_keeps_its_code_and_reason_in_its_item_error",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_midway_08_a_batch_element_that_stops_part_way_is_failed_with_its_reason_and_the_batch_is_incomplete",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.41-atip/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 426,
+  "scenario_id": "atip.midway.08",
+  "schema": 1,
+  "staging_id": "861f7d97",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

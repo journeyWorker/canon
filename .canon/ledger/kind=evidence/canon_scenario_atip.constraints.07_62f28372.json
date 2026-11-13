@@ -1,0 +1,101 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:06:05.152606Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_07_every_validator_refuses_every_call_it_rejects",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_every_time_option_declares_the_calendar_validator_and_refuses_an_impossible_date",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_brief_approve_a_relayed_approval_without_its_digest_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_evidence_add_class_audit_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_evidence_add_an_artifact_scope_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_brief_approve_one_change_with_two_digests_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_evidence_audit_an_artifact_scope_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_export_an_empty_window_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_finding_add_a_defect_without_its_origin_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_policy_approve_a_blank_note_under_relay_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "atip_constraints_07_query_a_status_foreign_to_the_kind_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.41-atip/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 878,
+  "scenario_id": "atip.constraints.07",
+  "schema": 1,
+  "staging_id": "1d92bce2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

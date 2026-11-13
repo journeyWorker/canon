@@ -1,0 +1,45 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:06:05.152606Z",
+  "attachments": [
+    {
+      "case": "gate_git_boundary_07_a_name_that_is_not_utf8_gives_no_surface_and_never_a_stale_verdict",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "risk::tests::gate_git_boundary_07_a_commit_that_changed_a_name_that_is_not_utf8_closes_the_risk_check_as_an_unknown_analysis",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    },
+    {
+      "case": "staleness::tests::gate_git_boundary_07_a_name_that_is_not_utf8_leaves_the_surface_query_unanswered_and_the_evidence_not_stale",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "/Volumes/External/wt/canon/next-0.41-atip/target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 72,
+  "scenario_id": "gate.git-boundary.07",
+  "schema": 1,
+  "staging_id": "8bb40a8f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

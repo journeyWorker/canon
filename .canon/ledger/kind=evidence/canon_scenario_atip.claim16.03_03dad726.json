@@ -1,0 +1,39 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:08:24.192355Z",
+  "attachments": [
+    {
+      "path": "target/f2/atip-1-6-f2-compare-0.40.0.txt",
+      "sha256": "b391cacb44bd871822febebada82901026b2dbd22de3a32bacde0c3dcf7a61e1"
+    },
+    {
+      "case": "atip_claim16_03_no_document_has_comma_list_or_path_shape",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "b55ed149132d4f5935462066502a713c28792823904c4965b7d0b61d63ed311a"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "one-off F2: compare.py <0.40.0 binary> <this build> 1.5 1.6 over every canon schema answer (canon-0-41-atip-1-6 brief F2)"
+  },
+  "evidence_note": {
+    "command_result": "answers compared: 217 (tree entries 105/105); differing: 0; combined sha256 of A side 42454b6427c25dd2; errors exit 0 0; warnings exit 0 0",
+    "summary": "217 canon schema answers of the 0.40.0 binary and this build at 01ec9a138 are equal once contractVersion, schemaVersion and toolVersion that equal the declared minor or tool version are replaced; 0 differ"
+  },
+  "evidence_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "atip.claim16.03",
+  "schema": 1,
+  "staging_id": "cc5a6ba0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
