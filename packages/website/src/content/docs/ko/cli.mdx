@@ -409,7 +409,7 @@ canon schema --warnings --json    # 모든 경고 코드(meta.warnings)와 의�
 (안내 문구는 stderr), 성공과 실패 모두 같은 모양입니다: `{ok, data, meta}`.
 exit 1의 부분 보고서는 실패 봉투에 `data`도 함께 담습니다. 봉투는 atip/1을
 따릅니다. `meta`에는 `schemaVersion`, `tool`(`canon`), `toolVersion`,
-`contract`(`atip/1`), `contractVersion`(`1.5`, 모든 봉투에), 해석된 `command`가 들어 있고, 해당할 때 `output`(명령이
+`contract`(`atip/1`), `contractVersion`(`1.6`, 모든 봉투에), 해석된 `command`가 들어 있고, 해당할 때 `output`(명령이
 보고서를 여럿 선언하면 그 이름), `context`(`{repo}`), `next`, `warnings`,
 `coverage`, `page`, `x-canon`(canon 전용 추가 정보)이 더해집니다. 값이 없는
 멤버는 `null`도 `[]`도 아니라 아예 빠집니다. `--json`은 `--` 앞이면 어디에든 올 수
@@ -431,7 +431,7 @@ exit 1의 부분 보고서는 실패 봉투에 `data`도 함께 담습니다. �
     "tool": "canon",
     "toolVersion": "0.34.0",
     "contract": "atip/1",
-    "contractVersion": "1.5",
+    "contractVersion": "1.6",
     "command": "evidence add",
     "context": { "repo": "." },
     "next": [
