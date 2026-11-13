@@ -23,7 +23,7 @@ use atip::doc::{OptionDoc, ValueType};
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
-const MINOR: &str = "1.5";
+const MINOR: &str = "1.6";
 
 /// The 17 patterns canon 0.36.0 printed with white space listed by hand, and where (`<command> --<option>`, `<command> <operand>`, `tree --<option>`).
 const GOLDEN: &str = "crates/canon-cli/tests/atip/white_space_0_36.json";
@@ -439,7 +439,8 @@ fn atip_claim15_02_a_declaration_of_1_4_fails_the_check_and_the_crate_judges_a_d
     let problems = declaration_problems(&answer, true);
     assert_found("a 1.4 envelope", &problems, "meta.contractVersion");
     assert_found("a 1.4 schema answer", &problems, "meta.schemaVersion");
-    assert_eq!(declaration_problems(&json!({ "meta": { "contractVersion": "1.5" } }), false), Vec::<String>::new());
+    assert_found("a 1.5 envelope", &declaration_problems(&json!({ "meta": { "contractVersion": "1.5" } }), false), "meta.contractVersion");
+    assert_eq!(declaration_problems(&json!({ "meta": { "contractVersion": "1.6" } }), false), Vec::<String>::new());
     assert_found("a missing declaration", &declaration_problems(&json!({ "meta": {} }), false), "meta.contractVersion");
 
     // The crate's checks take the minor canon declares: a property pattern is a problem of a 1.4 document and none of a 1.5 one.
@@ -833,7 +834,7 @@ fn value_after<'a>(tokens: &'a [String], flag: &str) -> Option<&'a str> {
     tokens.iter().position(|token| token == flag).and_then(|index| tokens.get(index + 1)).map(String::as_str)
 }
 
-/// Every problem of the declared minors: each of the five must be `1.5` (they agree because they are the one value).
+/// Every problem of the declared minors: each of the five must be `1.6` (they agree because they are the one value).
 fn minor_problems(declared: &str, fixture: &str, ci: &[String], atip: &[String], deep: &[String]) -> Vec<String> {
     let mut found = Vec::new();
     let mut check = |what: &str, values: &[String]| {
@@ -875,11 +876,11 @@ fn atip_claim15_10_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fi
         assert_eq!(tokens.iter().any(|token| token == "--deep"), with_deep, "{what}: {tokens:?}");
         assert_eq!(value_after(&tokens, "--fixture"), Some(FIXTURE), "{what}: {tokens:?}");
     }
-    // The tree the fixture runs against says it, and the checker is the one of contract 1.5.
+    // The tree the fixture runs against says it, and the checker is the one of contract 1.6.
     assert_eq!(SURFACE.tree.value["meta"]["contractVersion"], MINOR);
-    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.2.0")), "the job installs the checker at atip-check-v0.2.0");
+    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.3.0")), "the job installs the checker at atip-check-v0.3.0");
     let install = recipe(&justfile, "atip-install");
-    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.2.0")), "`just atip-install` installs the checker at atip-check-v0.2.0");
+    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.3.0")), "`just atip-install` installs the checker at atip-check-v0.3.0");
     // The fixture the checker reads keeps what the L1.patterns row compares: values a domain takes (`ok`) and refuses (`domainRejects`).
     assert!(fixture["commands"].as_object().is_some_and(|commands| commands.values().any(|command| command.get("domainRejects").is_some())), "the fixture lists values the domains refuse");
 }
@@ -909,17 +910,17 @@ fn atip_claim15_11_lowering_the_declaration_the_fixture_the_job_or_a_recipe_fail
     }
     assert_found("a missing declaration", &minor_problems(declared, &fixture_minor, &[], &atip, &deep), "gives no minor");
     // The readers of the files find a lowered value too.
-    assert_eq!(contracts_in(&job_block(&workflow.replace("--contract 1.5", "--contract 1.4"), "atip")), vec!["1.4".to_string()]);
-    assert_eq!(contracts_in(&recipe(&justfile.replace("--contract 1.5", "--contract 1.4"), "atip-deep")), vec!["1.4".to_string()]);
-    // A fixture that claims 1.4 is the fixture the test of the generated fixture refuses (its source is the one that says 1.5).
+    assert_eq!(contracts_in(&job_block(&workflow.replace("--contract 1.6", "--contract 1.4"), "atip")), vec!["1.4".to_string()]);
+    assert_eq!(contracts_in(&recipe(&justfile.replace("--contract 1.6", "--contract 1.4"), "atip-deep")), vec!["1.4".to_string()]);
+    // A fixture that claims 1.4 is the fixture the test of the generated fixture refuses (its source is the one that says 1.6).
     let source = read("crates/canon-cli/tests/atip/canon.fixture.src.json");
-    assert!(source.contains("\"contractVersion\": \"1.5\""), "the source of the fixture says 1.5");
+    assert!(source.contains("\"contractVersion\": \"1.6\""), "the source of the fixture says 1.6");
 }
 
 // ===========================================================================
 // atip.claim15.12 - 13 (F6)
 
-/// The versions below 1.5 that `line` spells as the declaration: after `contractVersion`, `--contract`, `claims` and `declares`.
+/// The versions below 1.6 that `line` spells as the declaration: after `contractVersion`, `--contract`, `claims` and `declares`.
 fn old_declarations(line: &str) -> Vec<String> {
     let skip = |text: &str| text.trim_start_matches([' ', '`', '"', '\'', ':', '=', '\\']).to_string();
     let mut found = Vec::new();
@@ -930,7 +931,7 @@ fn old_declarations(line: &str) -> Vec<String> {
                 rest = skip(after);
             }
             let bytes = rest.as_bytes();
-            let is_old = bytes.len() >= 3 && &bytes[..2] == b"1." && (b'0'..=b'4').contains(&bytes[2]) && bytes.get(3).is_none_or(|next| !next.is_ascii_digit());
+            let is_old = bytes.len() >= 3 && &bytes[..2] == b"1." && (b'0'..=b'5').contains(&bytes[2]) && bytes.get(3).is_none_or(|next| !next.is_ascii_digit());
             if is_old {
                 found.push(format!("{needle} {}", &rest[..3]));
             }
@@ -939,7 +940,7 @@ fn old_declarations(line: &str) -> Vec<String> {
     found
 }
 
-/// Every stale sentence of one text file: a declaration below 1.5, and a list of white space shown by hand (the line and paragraph separators together).
+/// Every stale sentence of one text file: a declaration below 1.6, and a list of white space shown by hand (the line and paragraph separators together).
 fn consumer_problems(path: &str, text: &str) -> Vec<String> {
     let mut found = Vec::new();
     for (number, line) in text.lines().enumerate() {
@@ -1007,9 +1008,9 @@ fn atip_claim15_12_the_consumers_declare_1_5_and_show_no_list_of_white_space() {
     // The pages say the declaration where they name it.
     for page in ["packages/website/src/content/docs/cli.mdx", "packages/website/src/content/docs/ko/cli.mdx"] {
         let text = read(page);
-        assert!(text.contains("\"contractVersion\": \"1.5\"") && text.contains("`contractVersion`") && text.contains("`1.5`"), "`{page}` says 1.5");
+        assert!(text.contains("\"contractVersion\": \"1.6\"") && text.contains("`contractVersion`") && text.contains("`1.6`"), "`{page}` says 1.6");
     }
-    assert!(read("canon/skills/SKILL.src.md").contains("`contractVersion` (`1.5`)"), "the guide says 1.5");
+    assert!(read("canon/skills/SKILL.src.md").contains("`contractVersion` (`1.6`)"), "the guide says 1.6");
 }
 
 #[test]
@@ -1020,12 +1021,13 @@ fn atip_claim15_13_the_consumer_scan_finds_a_declaration_below_1_5_and_a_shown_l
         ("1.3", "{\"meta\":{\"contractVersion\":\"1.3\"}}"),
         ("1.4", "canon claims atip/1 1.4 at L2"),
         ("1.2", "The tree declares contractVersion=1.2."),
+        ("1.5", "canon claims atip/1 1.5 at L2"),
     ] {
         let found = consumer_problems("guide.md", line);
         assert_found(&format!("the declaration {version} in `{line}`"), &found, "declares");
         assert!(found.iter().any(|problem| problem.contains(version)), "the finding names {version}: {found:?}");
     }
-    for line in ["canon declares `\"contractVersion\": \"1.5\"` on every envelope", "runs `atip check --level L2 --contract 1.5 --deep`", "canon claims atip/1 1.5 at L2", "the schema `1.4` of a report is not the declaration", "contractVersion 1.50"] {
+    for line in ["canon declares `\"contractVersion\": \"1.6\"` on every envelope", "runs `atip check --level L2 --contract 1.6 --deep`", "canon claims atip/1 1.6 at L2", "the schema `1.4` of a report is not the declaration", "contractVersion 1.50"] {
         assert_eq!(consumer_problems("guide.md", line), Vec::<String>::new(), "`{line}` is no stale declaration");
     }
     // A list of white space shown by hand, as 0.36.0 printed it, is found; the class of 1.5 is not.

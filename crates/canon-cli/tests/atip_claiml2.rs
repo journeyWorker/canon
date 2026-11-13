@@ -1,6 +1,6 @@
-//! `canon-0-35-claim-l2`, moved to 1.4 by `canon-0-36-claim-1-4` and to 1.5 by `canon-0-37-claim-1-5`: canon declares atip/1 1.5 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-20`; `canon-0-36-atip-dep` moved the checker to the atip repository).
+//! `canon-0-35-claim-l2`, moved to 1.4 by `canon-0-36-claim-1-4` to 1.5 by `canon-0-37-claim-1-5` and to 1.6 by `canon-0-41-atip-1-6`: canon declares atip/1 1.6 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-20`; `canon-0-36-atip-dep` moved the checker to the atip repository).
 //!
-//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.5 --deep`
+//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.6 --deep`
 //! on the committed fixture, which `just atip-deep` and the job `atip` run (`just atip` runs it without `--deep`), and which no test of canon runs. The CHANGELOG holds the release entry and the list of tests that
 //! stand for the obligations of contract 17.2 that a green checker run does not prove; the last four tests read it.
 
@@ -39,31 +39,31 @@ fn canon_in(dir: &Path, args: &[&str]) -> Value {
 #[test]
 fn atip_claiml2_01_every_envelope_declares_1_5_and_the_schema_tree_says_l2() {
     let dir = tempfile::tempdir().expect("tempdir");
-    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.5");
+    assert_eq!(canon_cli::json_out::DECLARED_MINOR, "1.6");
     assert_eq!(canon_cli::spec::LEVEL, "L2");
     let init = hermetic::canon().args(["init", "--no-harness"]).current_dir(dir.path()).env_remove("CANON_ROLE").output().expect("init");
     assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
     for args in [&["status", "--json"][..], &["nosuch", "--json"], &["schema", "--json"], &["schema", "--errors", "--json"], &["schema", "--warnings", "--json"]] {
         let document = canon_in(dir.path(), args);
-        assert_eq!(document["meta"]["contractVersion"], "1.5", "{args:?}: {document}");
+        assert_eq!(document["meta"]["contractVersion"], "1.6", "{args:?}: {document}");
         assert_eq!(atip::envelope_problems(&document), Vec::<String>::new(), "{args:?}");
     }
     let schema = canon_in(dir.path(), &["schema", "--json"]);
-    assert_eq!((schema["data"]["kind"].as_str(), schema["data"]["level"].as_str(), schema["meta"]["schemaVersion"].as_str()), (Some("tree"), Some("L2"), Some("1.5")), "{schema}");
+    assert_eq!((schema["data"]["kind"].as_str(), schema["data"]["level"].as_str(), schema["meta"]["schemaVersion"].as_str()), (Some("tree"), Some("L2"), Some("1.6")), "{schema}");
 }
 
-/// Whether `text` says that canon's `contractVersion` is one of the minors it no longer declares (`1.1`, `1.2`, `1.3`, `1.4`), in any of the ways the repository writes it (JSON, escaped JSON, code spans, prose).
+/// Whether `text` says that canon's `contractVersion` is one of the minors it no longer declares (`1.1`, `1.2`, `1.3`, `1.4`, `1.5`), in any of the ways the repository writes it (JSON, escaped JSON, code spans, prose).
 fn spells_an_old_minor(text: &str) -> bool {
     text.match_indices("contractVersion").any(|(at, word)| {
         let after: String = text[at + word.len()..].chars().take(12).filter(|c| !matches!(c, '"' | '\\' | ':' | '`' | '(' | ' ' | '=' | '\'')).collect();
-        ["1.1", "1.2", "1.3", "1.4"].iter().any(|old| after.strip_prefix(old).is_some_and(|rest| !rest.starts_with(|c: char| c == '.' || c.is_ascii_digit())))
+        ["1.1", "1.2", "1.3", "1.4", "1.5"].iter().any(|old| after.strip_prefix(old).is_some_and(|rest| !rest.starts_with(|c: char| c == '.' || c.is_ascii_digit())))
     })
 }
 
 #[test]
 fn atip_claiml2_02_no_consumer_spells_canons_declaration_as_an_earlier_minor() {
-    assert!(spells_an_old_minor("\"contractVersion\": \"1.1\"") && spells_an_old_minor("`contractVersion` (`1.2`, on every envelope)") && spells_an_old_minor("{\\\"contractVersion\\\":\\\"1.3\\\"}") && spells_an_old_minor("`contractVersion` (`1.4`)"), "the detector sees the spellings");
-    assert!(!spells_an_old_minor("\"contractVersion\": \"1.5\"") && !spells_an_old_minor("`contractVersion` (`1.5`)") && !spells_an_old_minor("contractVersion 1.9") && !spells_an_old_minor("contractVersion 1.2.1"));
+    assert!(spells_an_old_minor("\"contractVersion\": \"1.1\"") && spells_an_old_minor("`contractVersion` (`1.2`, on every envelope)") && spells_an_old_minor("{\\\"contractVersion\\\":\\\"1.3\\\"}") && spells_an_old_minor("`contractVersion` (`1.4`)") && spells_an_old_minor("\"contractVersion\": \"1.5\""), "the detector sees the spellings");
+    assert!(!spells_an_old_minor("\"contractVersion\": \"1.6\"") && !spells_an_old_minor("`contractVersion` (`1.6`)") && !spells_an_old_minor("contractVersion 1.9") && !spells_an_old_minor("contractVersion 1.2.1"));
     let root = repo_root();
     let mut found = Vec::new();
     // What reads canon's declaration: the skills, the website, the eval scripts, the conformance corpus, the generated spec and canon's own sources.
@@ -121,7 +121,7 @@ fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_5() {
     let root = repo_root();
     let workflow = read(&root.join(".github/workflows/test.yml"));
     let justfile = read(&root.join("justfile"));
-    let canon_at_l2 = "atip check --bin target/debug/canon --level L2 --contract 1.5 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json".to_string();
+    let canon_at_l2 = "atip check --bin target/debug/canon --level L2 --contract 1.6 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json".to_string();
     let recipe = recipe_lines(&justfile, "atip-deep");
     assert!(recipe.contains(&canon_at_l2), "the recipe atip-deep runs `{canon_at_l2}`: {recipe:?}");
     assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "the recipe builds canon only: {recipe:?}");
@@ -150,8 +150,8 @@ fn destructive_commands() -> Vec<String> {
 /// What canon's fixture lacks of what the L2 rows need: the declaration, `prepare`, `notRun`, a preview for each destructive command, the batch cases and `allowedEffects`. One line per missing item, empty when the fixture has them all.
 fn fixture_problems(fixture: &Value, destructive: &[String]) -> Vec<String> {
     let mut problems = Vec::new();
-    if fixture["contractVersion"] != "1.5" {
-        problems.push("contractVersion is not 1.5".to_string());
+    if fixture["contractVersion"] != "1.6" {
+        problems.push("contractVersion is not 1.6".to_string());
     }
     if fixture["notRun"] != json!(["dashboard"]) {
         problems.push("notRun does not name dashboard".to_string());
