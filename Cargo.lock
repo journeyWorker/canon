@@ -358,12 +358,13 @@ dependencies = [
 
 [[package]]
 name = "atip"
-version = "0.2.0"
-source = "git+https://github.com/journeyWorker/atip?tag=atip-crate-v0.2.0#c6c1a1d9b478064260bae666064284b85af6ba96"
+version = "0.3.0"
+source = "git+https://github.com/journeyWorker/atip?tag=atip-crate-v0.3.0#9cbc74a4d6b46820543283b68b5bc4dddb53b260"
 dependencies = [
  "clap",
  "jsonschema",
  "regex",
+ "regex-syntax",
  "schemars",
  "serde",
  "serde_json",

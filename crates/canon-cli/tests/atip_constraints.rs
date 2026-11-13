@@ -124,6 +124,7 @@ fn atip_constraints_02_a_relation_stated_twice_is_found_and_a_broken_pair_names_
         default_note: None,
         env: None,
         flag_only: false,
+        comma_list: false,
         domain: None,
         help: "h".to_string(),
     };
@@ -205,6 +206,7 @@ fn atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults() {
         default_note: None,
         env: None,
         flag_only: false,
+        comma_list: false,
         domain: Some(domain),
         help: "h".to_string(),
     };

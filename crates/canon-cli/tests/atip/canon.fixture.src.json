@@ -344,7 +344,7 @@
       }
     }
   },
-  "contractVersion": "1.5",
+  "contractVersion": "1.6",
   "globalOptions": [
     [
       "--repo",

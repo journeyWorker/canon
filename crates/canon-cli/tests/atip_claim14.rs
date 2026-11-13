@@ -1,7 +1,7 @@
 //! `canon-0-36-claim-1-4` (scenarios `atip.claim14.01-16`): canon declared atip/1 1.4 and writes `canon schema` in the 1.4 form, against the built binary. `canon-0-37-claim-1-5` moved the declaration to 1.5 and
-//! the form is the same at 1.5 (contract 15.1): these tests hold the declaration to `MINOR`.
+//! the form is the same at 1.5 and 1.6 (contract 15.1): these tests hold the declaration to `MINOR`.
 //!
-//! The 1.4 form (contract 5.1, 9, 15.7): every envelope says `contractVersion` `MINOR` (1.5) and the tree `level` `L2`; the tree defines the shared options once
+//! The 1.4 form (contract 5.1, 9, 15.7): every envelope says `contractVersion` `MINOR` (1.6) and the tree `level` `L2`; the tree defines the shared options once
 //! and carries no `path`, no `kind: "command"` and no member at its default; a command document is the call surface only (no `schemas`, `path`,
 //! `input.schemaRef`, `input.option`, `rejects`, no implied option or code); `schema <COMMAND> --schemas` answers the schemas, the derived `Input` and the
 //! `rejects`; every JSON document is compact. The consumers (guides, website, evals, conformance, generated spec) and the CI configuration say the declared minor, and the
@@ -22,8 +22,8 @@ use std::sync::{LazyLock, Mutex};
 use serde_json::{json, Map, Value};
 use tempfile::TempDir;
 
-/// The minor canon declares: 1.4 in 0.36 (`canon-0-36-claim-1-4`), 1.5 since `canon-0-37-claim-1-5`. The form of the documents is the 1.4 form at both.
-const MINOR: &str = "1.5";
+/// The minor canon declares: 1.4 in 0.36 (`canon-0-36-claim-1-4`), 1.5 from `canon-0-37-claim-1-5`, 1.6 since `canon-0-41-atip-1-6`. The form of the documents is the 1.4 form at both.
+const MINOR: &str = "1.6";
 
 // ---------------------------------------------------------------------------
 // Running the binary.
@@ -639,7 +639,7 @@ fn compile_problems(name: &str, schemas: &Map<String, Value>) -> Vec<String> {
 // ---------------------------------------------------------------------------
 // The consumers (spec 15.7): what the guides, pages, scripts and expectations say about the declaration and the form.
 
-/// The version spelled right after `needle`'s end in `rest`, past quotes, colons, `=` and the contract's name, when it is `1.0`-`1.4`.
+/// The version spelled right after `needle`'s end in `rest`, past quotes, colons, `=` and the contract's name, when it is `1.0`-`1.5`.
 fn old_minor_after(rest: &str) -> Option<String> {
     let skip = |text: &str| text.trim_start_matches([' ', '`', '"', '\'', ':', '=', '\\']).to_string();
     let mut rest = skip(rest);
@@ -647,11 +647,11 @@ fn old_minor_after(rest: &str) -> Option<String> {
         rest = skip(after);
     }
     let bytes = rest.as_bytes();
-    let is_old = bytes.len() >= 3 && &bytes[..2] == b"1." && (b'0'..=b'4').contains(&bytes[2]) && bytes.get(3).is_none_or(|next| !next.is_ascii_digit());
+    let is_old = bytes.len() >= 3 && &bytes[..2] == b"1." && (b'0'..=b'5').contains(&bytes[2]) && bytes.get(3).is_none_or(|next| !next.is_ascii_digit());
     is_old.then(|| rest[..3].to_string())
 }
 
-/// The versions below 1.5 that `line` spells as the declaration: after `contractVersion`, `--contract`, `claims` and `declares`.
+/// The versions below 1.6 that `line` spells as the declaration: after `contractVersion`, `--contract`, `claims` and `declares`.
 fn old_declarations(line: &str) -> Vec<String> {
     let mut found = Vec::new();
     for needle in ["contractVersion", "--contract", "claims", "declares", "declaring"] {
@@ -697,7 +697,7 @@ fn old_form_member(line: &str) -> Option<&'static str> {
     None
 }
 
-/// Every stale sentence of one text file: a declaration below 1.5, and (in prose, not in data files) a member of the old form stated as current.
+/// Every stale sentence of one text file: a declaration below 1.6, and (in prose, not in data files) a member of the old form stated as current.
 fn consumer_problems(path: &str, text: &str) -> Vec<String> {
     let data_file = path.ends_with(".json") || path.ends_with(".out");
     let mut found = Vec::new();
@@ -1456,7 +1456,7 @@ fn atip_claim14_12_the_consumer_scan_finds_a_declaration_below_1_5_and_a_stated_
         assert_found(&format!("the declaration {version} in `{line}`"), &found, "declares");
         assert!(found.iter().any(|problem| problem.contains(version)), "the finding names {version}: {found:?}");
     }
-    for line in ["canon declares `\"contractVersion\": \"1.5\"` on every envelope", "runs `atip check --level L2 --contract 1.5 --deep`", "canon claims atip/1 1.5 at L2", "the schema `1.2` of a report is not the declaration", "{\"schemaVersion\":\"1.2\"}"] {
+    for line in ["canon declares `\"contractVersion\": \"1.6\"` on every envelope", "runs `atip check --level L2 --contract 1.6 --deep`", "canon claims atip/1 1.6 at L2", "the schema `1.2` of a report is not the declaration", "{\"schemaVersion\":\"1.2\"}"] {
         assert_eq!(consumer_problems("guide.md", line), Vec::<String>::new(), "`{line}` is no stale declaration");
     }
     let members = [
@@ -1526,8 +1526,8 @@ fn atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_
     }
     assert_found("a missing declaration", &minor_problems(declared, &fixture_minor, &[], &atip, &deep), "gives no minor");
     // The readers of the files find a lowered value too.
-    assert_eq!(contracts_in(&job_block(&workflow.replace("--contract 1.5", "--contract 1.4"), "atip")), vec!["1.4".to_string()]);
-    assert_eq!(contracts_in(&recipe(&justfile.replace("--contract 1.5", "--contract 1.4"), "atip-deep").1), vec!["1.4".to_string()]);
+    assert_eq!(contracts_in(&job_block(&workflow.replace("--contract 1.6", "--contract 1.4"), "atip")), vec!["1.4".to_string()]);
+    assert_eq!(contracts_in(&recipe(&justfile.replace("--contract 1.6", "--contract 1.4"), "atip-deep").1), vec!["1.4".to_string()]);
 }
 
 #[test]
@@ -1548,10 +1548,10 @@ fn atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fi
         assert!(tokens.join(" ").contains("--bin {{ target }}/debug/canon") || value_after(&tokens, "--bin").is_some_and(|bin| bin.ends_with("debug/canon")), "{what} runs the built canon: {tokens:?}");
     }
     // The checker's tag is the same in the job (install and cache key) and in the recipe that installs it.
-    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.2.0")), "the job installs the checker at atip-check-v0.2.0");
-    assert!(job.iter().any(|line| line.contains("key:") && line.contains("atip-check-v0.2.0")), "the cache key of the checker names its tag");
+    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.3.0")), "the job installs the checker at atip-check-v0.3.0");
+    assert!(job.iter().any(|line| line.contains("key:") && line.contains("atip-check-v0.3.0")), "the cache key of the checker names its tag");
     let (_, install) = recipe(&justfile, "atip-install");
-    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.2.0")), "`just atip-install` installs the checker at atip-check-v0.2.0");
+    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.3.0")), "`just atip-install` installs the checker at atip-check-v0.3.0");
     // `just ci` includes the deep run.
     let (ci_header, _) = recipe(&justfile, "ci");
     assert!(ci_header.split_whitespace().skip(1).any(|dependency| dependency == "atip-deep"), "`just ci` depends on atip-deep: {ci_header}");

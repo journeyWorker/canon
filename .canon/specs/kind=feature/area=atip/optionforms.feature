@@ -161,10 +161,10 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @case:edge
   @flow:canon-0-37-option-forms.F5
   @atip.optionforms.15
-  Scenario: The checker's fixture lists values the new domains refuse, and the recipes run at 1.5
+  Scenario: The checker's fixture lists values the new domains refuse, and the recipes run at 1.6
     Given the checker's fixture and the recipes of the justfile
     When the values it lists as refused are judged by the declared domains
-    Then each of the twelve places of the six options lists a value its domain refuses, and the recipes run the checker at 1.5
+    Then each of the twelve places of the six options lists a value its domain refuses, and the recipes run the checker at 1.6
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:42Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
