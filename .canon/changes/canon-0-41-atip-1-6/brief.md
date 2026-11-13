@@ -80,16 +80,24 @@ canon은 `meta.contractVersion` 1.5와 L2를 선언한다. 크레이트는 태�
 
 - 선언 상수가 `"1.6"`이고 모든 봉투, 거절, `schema` 답, 생성 명세의 `contractVersion`이 그 값을 말한다. `schema` 답과 레지스트리 답의 `schemaVersion`이 선언을 따른다. 수준은 L2이다.
 - 크레이트의 `CONTRACT_VERSION`은 "1.6"이 된다. canon의 선언은 canon 자신의 상수이고 크레이트의 값이 아니다.
-- 크레이트 0.3.0에서 `OptionDoc`에 공개 필드 `comma_list`가 생겨 구조체 리터럴이 깨진다. canon의 리터럴은 시험에만 있다(4곳, 하나는 `..option`으로 이어받아 영향이 없다). 구현자가 다시 센다. `TreeDoc`은 필드가 늘지 않고 `pathShape`은 `Described::path_shape`가 받으므로 트리 생성은 바뀌지 않는다.
+- 크레이트 0.3.0에서 `OptionDoc`에 공개 필드 `comma_list`가 생겨 구조체 리터럴이 깨진다. canon의 리터럴은 시험에만 있다: 완전한 리터럴 4곳과 `..option`으로 이어받는 1곳이다. 이어받는 곳은 영향이 없다. `TreeDoc`은 필드가 늘지 않고 `pathShape`은 `Described::path_shape`가 받으므로 트리 생성은 바뀌지 않는다.
+- 크레이트의 나머지 공개 API 추가(`Minor::V1_6`, `Minor::ALL`의 일곱째 값, `describe::Error`와 `project::Problem`의 새 변형)는 canon에 짝이 되는 코드가 없다. `Cargo.lock`이 태그와 함께 움직이고 CI가 `--locked`를 쓰므로 잠금 파일도 올린다.
 - 투영이 clap의 `value_delimiter`를 읽어 `commaList`로 옮긴다. canon에는 `value_delimiter`가 0곳이라 `Problem::Delimiter`도, 쉼표 목록을 1.6 미만에서 거절하는 `Described::new`의 오류도 일어나지 않는다. canon이 `value_delimiter(',')`를 더하면 `commaList`가 문서에 저절로 나온다. CHANGELOG에 한 줄 적는다.
-- 일하는 순서는 둘이다. 먼저 상수를 1.5로 둔 채 크레이트만 0.3.0으로 올린다. `canon schema --json`, `--errors`, `--warnings`, `--schemas`와 모든 명령 문서의 출력이 0.40.0과 같은 해시임을 남긴다. 그 뒤 상수를 1.6으로 바꾼다. 크레이트 탓의 변화와 선언 탓의 변화가 섞이지 않는다.
+- 일하는 순서는 둘이다.
+  - 먼저 상수를 1.5로 둔 채 크레이트만 0.3.0으로 올린다. 이 단계에서 바뀌는 시험은 `atip_crate12`의 두 곳뿐이다.
+  - 모르는 minor의 시료가 1.6에서 1.7이 되고 알려진 minor 목록이 1.6을 더해 일곱이 된다.
+  - 그 단계의 `canon schema --json`, `--errors`, `--warnings`, `--schemas`와 모든 명령 문서의 출력이 부모 커밋의 빌드와 같은 해시임을 남긴다.
+  - 그 뒤 상수를 1.6으로 바꾼다. 크레이트 탓의 변화와 선언 탓의 변화가 섞이지 않는다.
 
 ### F2 1.5 호출자
 
 - 계약 15.10: 1.5 이하 호출자는 두 멤버를 무시하고 쉼표 목록의 값을 occurrence마다 하나씩 준다. 모든 1.6 도구가 이를 받는다.
 - canon은 두 멤버를 쓰지 않는다. 호출자가 보는 문서는 선언 문자열만 다르다. 쉼표 목록 옵션이 없으므로 도메인을 검사하는 호출자도, 검사하지 않는 호출자도 값이 다르게 읽히지 않는다.
 - "1.5"를 문자열로 비교하는 호출자는 "1.6"을 읽는다. 0.37이 1.4에서 1.5로 옮길 때도 같은 노트를 달았다. CHANGELOG 항목은 Changed에 둔다.
-- 시험은 0.40.0과 새 빌드의 `schema` 답에서 `contractVersion`, `schemaVersion`, `toolVersion`을 같은 값으로 치환해 두 답이 같음을 본다.
+- 0.40.0 바이너리와 새 빌드의 비교는 일회성 evidence이다. 모든 트리, 그룹, 명령 답과 `--schemas`, `--errors`, `--warnings` 답에서 값이 선언 minor와 같은 `contractVersion`, `toolVersion`, `schemaVersion`만 치환해 두 답이 같음을 보인다. 다른 보고서의 `schemaVersion`은 치환하지 않는다.
+- 이 비교는 영구 시험이 될 수 없다. 시험은 0.40.0 바이너리를 돌릴 수 없고 생성 명세와 conformance 기대 출력도 이 변경에서 다시 만들어진다.
+- 영구 시험은 둘이다. 어느 문서에도 `commaList`와 `pathShape`이 없다. 다시 만든 생성 명세와 conformance 기대 출력의 차이가 선언 문자열에만 있음을 diff로 evidence에 남긴다.
+- 선언 문자열은 저장되는 digest나 서명에 들어가지 않는다. plan digest, 승인 페이로드, 브리프 digest, 컨텍스트 팩 id, 스킬 잠금 파일이 그렇다. 선언을 담는 파일은 커밋되는 생성 파일(생성 명세, conformance 기대 출력)뿐이다. 저장된 기록, digest, 서명이 바뀌지 않는다는 말이 CHANGELOG의 호출자 노트에 들어간다.
 
 ### F3 쉼표 목록
 
@@ -113,7 +121,7 @@ canon은 `meta.contractVersion` 1.5와 L2를 선언한다. 크레이트는 태�
 - 가장 긴 경로가 두 단어이고 1.6의 기본 권고는 세 단어이므로 `L1.depth`는 통과한다.
 - 결정: `pathShape`을 선언하지 않는다. 예시 `["product","noun","verb"]`은 canon에 맞지 않는다. 제품 단어가 없고 경로가 명사와 동사 둘이다.
 - `["noun","verb"]`로 선언하면 규칙 19가 세 단어 경로를 영영 거절해 설계를 미리 묶는다. 얻는 것은 호출자가 단어 자리를 안다는 것뿐인데 canon의 경로는 이미 `<명사> <동사>` 하나이다.
-- 세 단어 이상의 경로를 더하는 변경은 `pathShape`을 선언하거나 `L1.depth` 권고를 받는다. 이 변경은 이를 시험하지 않고 검사기의 행에 맡긴다.
+- 세 단어 이상의 경로를 더하는 변경은 `pathShape`을 선언하거나 `L1.depth` 권고를 받는다. canon의 시험은 `canon schema --json`에서 가장 긴 경로가 두 단어이고 트리에 `pathShape`이 없음을 확인한다. 검사기의 판정은 검사기의 시료 행에 맡기고 canon의 시험은 검사기를 돌리지 않는다. 이 한도를 올리는 변경이 시험과 `pathShape` 결정을 함께 고친다.
 
 ### F5 한 이름 한 뜻
 
@@ -123,6 +131,7 @@ canon은 `meta.contractVersion` 1.5와 L2를 선언한다. 크레이트는 태�
 - `L1.one-meaning-values`(SHOULD)는 enum 옵션 이름 `as`, `disposition`, `harness`, `kind`, `review-outcome`을 대조한다. 겹치는 값이 없는 쌍은 `kind`의 `gate promote`와 `purge` 하나이다. 같은 `KIND`라서 그룹이 달라도 비교된다.
 - 계약 S1 항목 4는 한 공유 집합의 서로소 부분집합을 허용한다. 두 옵션 모두 레코드 종류이다. 그래서 권고로 남는다.
 - 결정: `--kind`의 값 이름을 바꾸지 않는다(질문 2). 바꾸면 `canon schema purge`의 `valueName`과 `--help`의 사용 줄이 달라져 선언만 바뀌는 불변식(F1)이 깨진다.
+- 결정: canon은 1.6이 허용한 그룹별 자유를 쓰지 않는다. 시험은 한 이름이 도구 전체에서 값 이름 하나와 값 종류 하나만 갖는지 모든 명령 문서에서 확인한다. 이 조건은 그룹별 규칙보다 엄하므로 그룹별 규칙을 함께 보장한다.
 
 ### F6 CI와 검사기
 
@@ -132,6 +141,7 @@ canon은 `meta.contractVersion` 1.5와 L2를 선언한다. 크레이트는 태�
 - 검사기 0.3.0부터 `--contract`가 픽스처의 선언과 다른 미리보기는 실패하면 종료 값 1(`LEVEL_FAILED`), 통과하면 0이다. 통과한 미리보기도 수준을 주장하지 못한다. CI의 `--contract`와 픽스처의 선언이 어긋나면 초록인데 증명이 아니다. canon의 일치 시험(상수, 픽스처, CI, 두 레시피가 같은 minor)이 1.6으로 옮겨 이를 막는다.
 - 실행이 L0, L1, L2의 모든 MUST 행을 통과한다. 보고서 요약(`L2 met: N MUST passed, …, SHOULD advisories`)과 실행 시간을 evidence에 남긴다.
 - CI의 `atip` job 구조(빌드와 설치 순서)는 이 변경이 바꾸지 않는다. 태그, 캐시 키, `--contract` 값, 주석만 바꾼다.
+- `canon-0-41-ci-nextest`도 `test.yml`과 그 파일을 읽는 시험(`atip_check`, `atip_claim14`, `atip_claim15`, `atip_claiml2`)을 고친다. 두 변경은 의미가 겹치지 않는다. `ci-nextest`가 먼저 들어가고 이 변경이 그 위로 다시 맞춘다.
 
 ### F7 소비자와 변경 기록
 
@@ -140,7 +150,8 @@ canon은 `meta.contractVersion` 1.5와 L2를 선언한다. 크레이트는 태�
   - 생성 명세 `docs/cli/canon.cli.json`(`CANON_BLESS_CLI_SPEC=1`)과 conformance 기대 출력(830개 중 `contractVersion` 1.5가 96개, `schemaVersion` 1.5가 22개. `just conformance`).
   - 소스와 시험 머리의 주석.
 - 시험의 선언 literal이 1.6으로 옮겨 간다: `atip_claim15`, `atip_claim14`, `atip_claiml2`, `atip_crate12`, `atip_contract11`, `atip_l0`, `atip_check`, `atip_optionforms`, `atip_optionvalues`, `schema_doc`, `grammar_t5_errors`. 값 자체가 1.5인 곳(크레이트가 1.5 문서의 패턴을 읽는다는 단언, 옛 선언을 찾는 시험의 시료)은 그대로 둔다. 옛 선언을 찾는 소비자 검사는 기준을 1.6으로 올린다.
-- 시나리오 `atip.claim14`, `atip.claim15`, `atip.claiml2`, `atip.crate12`, `atip.contract11`, `atip.check`의 문장이 선언 1.5를 말하면 고친다. 고친 시나리오의 리뷰는 stale이고 다른 행위자가 다시 리뷰한다.
+- `atip_crate12`는 1.6을 모르는 minor로 적은 두 곳을 고친다. 시료는 1.7이 되고 알려진 minor 목록은 1.0부터 1.6까지 일곱이 된다. 이 값은 크레이트가 아는 minor에 대한 말이고 canon의 선언과 무관하다.
+- 시나리오 `atip.claim14`, `atip.claim15`, `atip.claiml2`, `atip.contract11`, `atip.check`의 문장이 선언 1.5를 말하면 고친다. `atip.crate12.13`과 `atip.crate12.18`은 1.6을 "아는 minor가 아님"으로 적고 알려진 minor를 여섯으로 적으므로 1.7과 일곱으로 고친다. 고친 시나리오의 리뷰는 stale이고 다른 행위자가 다시 리뷰한다.
 - CHANGELOG의 이번 릴리스 항목 "canon declares atip/1 1.6"을 Changed에 싣는다.
   - 전후 표의 행은 선언, 크레이트와 검사기 태그, `commaList` 옵션 수(0), `pathShape`(없음)이다.
   - 같은 표에 가장 긴 경로(두 단어), 한 이름 두 뜻(0개), SHOULD 권고(`--kind` 하나)를 싣는다.
@@ -151,20 +162,20 @@ canon은 `meta.contractVersion` 1.5와 L2를 선언한다. 크레이트는 태�
 ## Acceptance
 
 - F1:
-  - 아무 명령의 봉투와 모든 `schema` 답이 `"1.6"`이고 트리의 `level`이 `L2`이다. 크레이트만 0.3.0이고 상수가 1.5인 빌드의 `schema` 출력 해시가 0.40.0과 같다.
+  - 아무 명령의 봉투와 모든 `schema` 답이 `"1.6"`이고 트리의 `level`이 `L2`이다. 크레이트만 0.3.0이고 상수가 1.5인 빌드의 `schema` 출력 해시가 부모 커밋의 빌드와 같다. 0.40.0 바이너리와는 `toolVersion`을 치환한 뒤 같다.
   - 실패 경로: 선언 상수를 1.5로 두면 선언 시험이 실패한다. 1.6이 아닌 값이 봉투에 하나라도 있으면 시험이 그 명령을 알린다.
 - F2:
-  - 0.40.0과 새 빌드의 `schema` 답(트리, 모든 명령 문서, `--schemas`, `--errors`, `--warnings`)이 선언 문자열을 같게 치환하면 같다. 어느 문서에도 `commaList`와 `pathShape`이 없다.
-  - 실패 경로: 문서에 `commaList`나 `pathShape`이 있거나 옵션 이름이나 값 이름이 바뀌면 이 시험이 실패한다.
+  - 일회성 evidence: 0.40.0 바이너리와 새 빌드가 모든 트리, 그룹, 명령 답과 `--schemas`, `--errors`, `--warnings` 답에서 위 치환 뒤 같다. 시험: 어느 문서에도 `commaList`와 `pathShape`이 없고, 다시 만든 생성 명세와 conformance 기대 출력의 차이가 선언 문자열에만 있다.
+  - 실패 경로: `commaList`나 `pathShape`이 있는 문서, 선언 문자열 밖의 차이가 있는 기대 출력이 하나라도 있으면 실패한다.
 - F3:
   - `--harness claude,omp`와 `--kind change,task`가 `USAGE`이고 `received`가 쉼표 문자열이며 `expected`가 허용된 값 목록이다. `--input`의 `{"harness":["claude,omp"]}`가 `INPUT_INVALID`이고 `field`가 `/harness/0`이다. 값마다 옵션을 쓰는 호출은 통과한다.
   - 실패 경로: 쉼표 문자열이 받아들여지거나 `commaList`가 선언되었는데 파서가 쪼개지 않으면 시험이 실패한다.
 - F4:
-  - 가장 긴 경로가 두 단어이고 트리에 `pathShape`이 없다. 검사기의 `L1.depth`가 통과한다.
-  - 실패 경로: 세 단어를 넘는 경로를 가진 시료 트리는 `pathShape`이 없으면 `L1.depth`의 권고 대상이다. 시험이 시료로 그 판정을 확인한다.
+  - 가장 긴 경로가 두 단어이고 트리에 `pathShape`이 없음을 `canon schema --json`을 읽는 시험이 확인한다. 검사기의 `L1.depth`가 통과한다.
+  - 실패 경로: 세 단어 항목을 심은 트리를 시험에 주면 시험이 실패한다. 검사기 쪽 판정은 검사기의 시료 행에 맡긴다.
 - F5:
-  - `L1.one-meaning`이 통과이고 `L1.one-meaning-values`의 권고가 `--kind` 하나이다. 이름 하나가 둘 이상의 값 이름이나 종류를 가진 옵션이 0개이다.
-  - 실패 경로: 한 그룹 안에서 같은 이름이 다른 값 이름을 갖는 시료를 그룹별 대조 시험이 실패시킨다. 다른 그룹에서 같은 값 이름에 다른 종류를 갖는 시료도 실패시킨다.
+  - 모든 명령 문서에서 옵션 이름 하나가 값 이름 하나와 값 종류 하나만 갖는다고 시험이 확인한다. 검사기의 `L1.one-meaning`이 통과이고 `L1.one-meaning-values`의 권고가 `--kind` 하나이다.
+  - 실패 경로: 같은 이름에 다른 값 이름이나 다른 값 종류를 심은 문서 집합을 시험에 주면 시험이 실패한다. 그룹별 판정은 검사기의 시료 행에 맡긴다.
 - F6:
   - CI의 `atip check --level L2 --contract 1.6 --deep`이 검사기 0.3.0으로 통과한다. 보고서 요약과 실행 시간이 evidence에 있다. 설치 줄이 CI, `just atip-install`, 시험에서 같은 태그이다.
   - 실패 경로: CI의 `--contract`, 두 레시피, 픽스처의 `contractVersion`, 선언 상수 중 하나가 1.5이면 일치 시험이 실패한다. 설치 태그가 0.2.0인 줄이 남아도 실패한다.
@@ -175,7 +186,7 @@ canon은 `meta.contractVersion` 1.5와 L2를 선언한다. 크레이트는 태�
 
 ## Questions and assumptions
 
-- 결정: 이 변경은 feature이다. 모든 봉투와 `schema` 답의 선언 문자열이 호출자가 읽는 출력으로 바뀐다. 0.37은 크레이트 이동(chore)과 선언(feature)을 둘로 나눴다. 이번에는 한 변경으로 묶고 크레이트만 올린 단계의 출력 동일성은 F1의 순서와 해시로 보인다.
+- 결정: 이 변경은 feature이다. 모든 봉투와 `schema` 답의 선언 문자열이 호출자가 읽는 출력으로 바뀐다. 0.37은 크레이트 이동과 선언을 두 변경으로 나눴고 앞의 것만 chore였다. 이번에는 한 변경으로 묶고 크레이트만 올린 단계의 출력 동일성은 F1의 순서와 해시로 보인다.
 - 결정: 호출자에게 Breaking이 아니다. 계약 15.10이 1.5 호출자가 occurrence마다 하나씩 주는 값을 모든 1.6 도구가 받는다고 적고, canon은 두 멤버를 쓰지 않으며 옵션 이름도 그대로이다. CHANGELOG는 Changed에 둔다.
 - 결정: `commaList`를 쓰는 옵션이 없다(F3의 표). `pathShape`도 선언하지 않는다(F4).
 - 결정: 시험의 1.5 literal은 1.6으로 옮긴다. 선언 literal을 상수 하나로 모으는 정리는 넣지 않는다.
@@ -183,7 +194,7 @@ canon은 `meta.contractVersion` 1.5와 L2를 선언한다. 크레이트는 태�
 - 가정: 검사기 0.3.0이 선언 1.6의 canon을 L2로 통과시킨다. 미리보기는 `L0.contract-version` 하나만 MUST 실패였고 원인이 선언이라, 올린 빌드에서 MUST 74개 통과, 실패 0개일 것으로 본다. 다른 MUST 행이 실패하면 그 행의 이름을 사람에게 알린다.
 - 질문 1: `--harness`를 쉼표 목록으로도 받을지(`--harness claude,omp`)? 기본은 받지 않는다. 0.38이 쉼표 문자열 `--providers`를 반복 옵션으로 바꾸었고, 받으면 같은 뜻의 철자가 둘이 되며 `value_delimiter`, 지워진 철자의 힌트, 안내와 시험이 함께 바뀐다. 받기로 하면 별도 변경으로 한다.
 - 질문 2: `--kind`의 SHOULD 권고를 없앨지? 기본은 그대로 둔다. 없애려면 `purge --kind`나 `gate promote --kind`의 값 이름 하나를 바꾸고 `canon schema`의 `valueName`과 사용 줄이 달라진다. 두 옵션 모두 레코드 종류라는 같은 뜻이어서 권고가 오탐에 가깝다.
-- 정책 질문: 이 변경은 canon이 계약에 대해 하는 주장(1.6과 L2)을 바꾼다. 사람이 이 선언을 승인한다.
+- 결정, 소유자의 지시: canon이 계약에 대해 하는 주장(1.6과 L2)을 바꾸는 것은 소유자가 채팅에서 지시했다("atip 1.6 출시했어 따라가자", 2026-11-14). 이 브리프의 승인은 그와 별개로 받는다.
 
 ## Out of scope
 

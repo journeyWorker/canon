@@ -30,9 +30,9 @@ Source: PR #143의 CI 실행 42559156525(잡 `cargo test --workspace (offline)`)
 
 ## Intent
 
-오프라인 테스트 잡은 한 번에 26분 4초가 든다. `cargo test`는 4코어 러너에서 테스트 바이너리를 하나씩 차례로 돌리고, 병렬은 한 바이너리 안에서만 일어난다. 캐시는 릴리스마다 비고, 모든 PR이 같은 캐시를 다시 저장한다.
+오프라인 테스트 잡은 0.40.0의 main push 실행 42670247057에서 30분 1초가 들었다. 최근 test.yml 60회 중 가장 긴 오프라인 잡은 36.5분이다. `cargo test`는 4코어 러너에서 테스트 바이너리를 하나씩 차례로 돌리고, 병렬은 한 바이너리 안에서만 일어난다. 캐시는 릴리스마다 비고, 모든 PR이 같은 캐시를 다시 저장한다.
 
-- 시간: 설정 약 25초, 캐시 미스 상태의 컴파일 3분 29초, `cargo test --workspace` 약 19분, 세 호출자 단위 테스트 1분 45초, witness 32초, gate check 20초, 캐시 저장 34초다. 컴파일 가운데 의존성이 약 1분 20초이고 `canon-cli`와 그 테스트 유닛이 2분 8초다.
+- 시간: 0.39.0 PR 실행 42559156525의 단계는 설정 약 25초, 캐시 미스 상태의 컴파일 3분 29초, `cargo test --workspace` 약 19분, 세 호출자 단위 테스트 1분 45초, witness 32초, gate check 20초, 캐시 저장 34초다. 컴파일 가운데 의존성이 약 1분 20초이고 `canon-cli`와 그 테스트 유닛이 2분 8초다. 0.40.0 main push 실행 42670247057은 `cargo test` 단계 1,597초, 세 호출자 105초, witness 27초, gate check 17초, 캐시 저장 29초다.
 - 실행: 바이너리 267개의 시간 합이 1,237초다. 가장 느린 셋은 `atip_validate` 182초에 테스트 3개, `arg_rules` 95초에 9개, `schema_codes` 55초에 4개다. 0.40.0 소스의 `cargo nextest list --workspace`는 테스트 4,082개와 테스트 바이너리 221개를 센다. 무시된 시험 2개는 따로다. `canon-cli`가 테스트 2,532개와 통합 테스트 파일 173개다.
 - 속도 이득의 한계: 바이너리 끝에서 느린 시험 하나가 코어를 놀리는 시간이 nextest가 채울 수 있는 몫이다. 실행이 이미 CPU로 포화였다면 얻는 것이 작다. 이 기계의 로컬 실행은 CPU 시간 합이 71분(user 54분, sys 17분)이었다. 어느 쪽인지 PR 실행이 말한다.
 - 경합: 0.40에서 훅 테스트가 한 프로세스의 스레드로 돌며 같은 스크립트 파일을 서로 잘라 "unit tests under three callers" 단계가 간헐적으로 실패했다(커밋 10f5fbbbd). nextest는 테스트마다 프로세스를 쓴다.
@@ -48,37 +48,42 @@ ci
 
 ## Invariants
 
-- ==**canon의 바이너리, 출력, 레저는 바뀌지 않는다.**== CI 정의, nextest 설정, 그것을 따르는 contributor 레시피와 스크립트, 주석, CHANGELOG만 바뀐다.
+- ==**canon의 바이너리, 출력, 레저는 바뀌지 않는다.**== 바뀌는 것은 CI 정의, nextest 설정, contributor 레시피와 스크립트, 주석, CHANGELOG뿐이다. README는 한 줄만 바뀐다. 그 줄은 cargo-nextest 0.9.146을 contributor 선행 조건으로 적는다. `just test`, `just test-callers`, `just ci`가 nextest를 필요로 하기 때문이다.
 - 시험은 지우지도 건너뛰지도 않는다. 뒤에 CI가 도는 시험의 집합은 앞의 `cargo test --workspace`와 같다.
-- 오프라인 잡은 `cargo nextest run --workspace --profile ci`로 시험을 돈다.
+- 오프라인 잡은 `cargo nextest run --workspace --locked --offline --profile ci`로 시험을 돈다. 세 호출자 단계와 witness의 nextest 명령도 `--locked --offline`을 갖는다. 증거 `--ref` 문자열은 스킬 조리법의 `cargo nextest run --workspace --profile ci` 그대로다.
 - `ci` 프로필은 `fail-fast = false`와 `retries = 0`을 정한다. `slow-timeout`은 60초 주기로 느린 시험을 표시하고 열 번째 주기에 종료한다.
 - `ci` 프로필은 JUnit을 `target/nextest/ci/junit.xml`에 쓴다. 0.40 스킬 조리법의 경로다. 값마다 이유가 주석에 있다. 기본 프로필은 그대로다.
 - nextest는 고정 버전의 릴리스 타르볼로 설치하고 풀기 전에 체크섬을 확인한다. 외부 설치 액션은 새로 들이지 않는다.
 - JUnit 보고서는 시험이 실패해도 CI 아티팩트로 올라간다.
 - 세 호출자 단계와 witness는 다른 프로필(`ci-aux`)로 돈다. 주 보고서를 덮어쓰지 않는다.
-- 세 호출자 단계는 같은 세 환경에서 `--lib` 시험을 nextest로 돈다.
+- 세 호출자 단계는 같은 세 환경에서 `--lib` 시험을 nextest로 돈다. 단계 이름은 `unit tests under three callers` 그대로다.
 - witness는 같은 `--workspace` 선택에서 무시된 시험 하나만 돈다. 서드파티 크레이트를 다시 컴파일하지 않는다.
 - 문서 시험 단계(`cargo test --workspace --doc`)는 남는다.
 - 시험 뒤 작업 트리에 추적되지 않은 파일이나 바뀐 파일이 있으면 오프라인 잡이 실패하고 목록을 출력한다.
-- test.yml의 캐시 잡 여섯은 복원과 저장을 나눈다. 잡은 offline, clippy, atip, grammar-mutation, bench-shape, live-tier다. 복원은 모든 실행에서 하고 키 접두사의 `restore-keys`를 둔다.
-- 저장은 main으로의 push에서 정확한 키로 복원하지 못했을 때만 한다. 잡이 취소되지 않았으면 실패한 잡도 저장한다. 저장 직전에 워크스페이스 크레이트의 빌드 결과를 지워 의존성 빌드만 남긴다. 시험 바이너리가 그 결과에 든다.
-- 오프라인 잡은 복원한 키, 정확한 일치 여부, `target/`과 `~/.cargo`의 크기를 잡 요약에 쓴다.
-- test.yml, build-native.yml, pr-guard.yml은 같은 PR의 새 push가 앞의 PR 실행을 취소한다. main push는 서로 취소하지 않고 대기열에서 버려지지도 않는다. publish.yml에는 `concurrency`를 두지 않는다.
-- 네 워크플로의 모든 잡이 `timeout-minutes`를 갖는다. publish.yml도 든다. 값은 측정한 가장 긴 실행의 약 세 배를 5분 단위로 올린 것이다.
-  - test.yml: offline, atip, grammar-mutation, bench-shape, live-tier는 30. clippy는 20. launcher, platformer는 10.
+- test.yml의 캐시 잡 여섯은 복원과 저장을 나눈다. 잡은 offline, clippy, atip, grammar-mutation, bench-shape, live-tier다. 의존성만 든 캐시는 새 키 이름 공간에 둔다. 키는 `canon-test-<잡>-deps-<락 해시>`이고 `restore-keys`는 새 접두사 `canon-test-<잡>-deps-`와 옛 접두사 `canon-test-<잡>-cargo-` 순서다. 복원은 모든 실행에서 한다.
+- `<잡>`은 지금 키에 있는 그 잡의 구간이다. 옛 접두사는 잡마다 `canon-test-offline-cargo-`, `canon-test-clippy-cargo-`, `canon-test-atip-cargo-`, `canon-test-mutation-cargo-`(잡 grammar-mutation), `canon-test-bench-shape-cargo-`, `canon-test-live-tier-cargo-`다.
+- 저장은 main으로의 push에서 새 키로 복원하지 못했을 때만 한다. 잡의 빌드를 끝내는 단계가 성공했을 때만 저장한다.
+- 오프라인 잡은 `cargo nextest run --no-run`을 따로 둔다. 시험이 실패해도 저장한다. 빌드 전 실패(`cargo fetch`, nextest 내려받기와 체크섬)는 저장하지 않는다. 다른 잡은 각자 빌드를 끝내는 단계를 고른다.
+- 저장 직전에 워크스페이스 크레이트의 빌드 결과를 지워 의존성 빌드만 남긴다. 시험 바이너리가 그 결과에 든다.
+- atip 잡의 검사기 캐시(`~/.cargo/bin/atip`)는 그대로 `actions/cache` 한 단계다. 그 `key:` 줄은 `atip-check-v0.2.0`을 가진다.
+- 오프라인 잡은 복원한 키, 정확한 일치 여부, `target/`과 `~/.cargo`의 크기를 잡 요약에 쓴다. main 저장마다 저장 크기도 남는다.
+- test.yml, build-native.yml, pr-guard.yml은 같은 PR의 새 push가 앞의 PR 실행을 취소한다. 그룹은 `${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}`이고 `cancel-in-progress`는 `${{ github.event_name == 'pull_request' }}`다. 워크플로 이름이 그룹에 들어 세 워크플로가 서로 취소하지 않는다. main push는 서로 취소하지 않고 대기열에서 버려지지도 않는다. publish.yml에는 `concurrency`를 두지 않는다.
+- 네 워크플로의 모든 잡이 `timeout-minutes`를 갖는다. publish.yml도 든다. 값은 측정한 가장 긴 실행의 약 세 배를 5분 단위로 올린 것이다. 측정은 최근 test.yml 60회와 다른 워크플로의 최근 실행이다.
+  - test.yml: offline 110(최대 36.5분). atip, grammar-mutation, bench-shape, live-tier 30. clippy 20. launcher, platformer 10.
   - build-native.yml: safety 5, dashboard 10, man 15, build(세 행) 45.
   - pr-guard.yml: safety 5, man-check 15.
-  - publish.yml: read-version 5, dashboard 10, man 15, build(세 행) 45, publish 15.
+  - publish.yml: read-version 5, dashboard 10, man 15, build(세 행) 45, publish 30. 멱등한 발행 단계 한가운데서 시간 제한에 걸리면 npm 발행이 반쯤 남는다.
 - publish.yml의 캐시 단계는 그대로다. build-native.yml과 pr-guard.yml의 캐시는 PR에서 지금처럼 저장한다.
 - 릴리스 워크플로 안전 검사와 그 시험은 새 워크플로를 규칙 추가 없이, 예외 추가 없이 받아들인다.
-- test.yml과 justfile을 읽는 canon의 시험은 그대로 통과한다. 시험은 `atip_check`, `atip_claim14`, `atip_claim15`, `atip_claiml2`, `git_boundary`, `ci_evidence_docs`다. 잡 이름 `atip`와 `clippy`와 그 단계의 명령은 바뀌지 않는다.
+- test.yml과 justfile을 읽는 canon의 시험은 그대로 통과한다. 시험은 `atip_check`, `atip_claim14`, `atip_claim15`(`atip_claim15_12` 포함), `atip_claiml2`, `atip_codestable_07`, `atip_optionforms`, `atip_optionvalues`, `git_boundary`, `ci_evidence_docs`와 `hermetic_env.rs`다. 잡 이름 `atip`와 `clippy`와 그 단계의 명령, 단계 이름 `unit tests under three callers`는 바뀌지 않는다.
+- 병합 순서: 이 변경이 `canon-0-41-atip-1-6`보다 먼저 들어간다. 둘 다 test.yml의 atip 잡과 justfile의 레시피를 바꾸므로 뒤의 변경이 이 변경 위로 옮겨 놓는다.
 - `just test`, `just test-callers`, `scripts/check-witness.sh`는 CI와 같은 nextest 명령을 돈다. `.config/nextest.toml`의 머리 주석이 이를 말한다.
 
 ## Checks
 
 - ==**이 PR의 마지막 커밋에서 모든 CI 잡이 통과한다.**==
-- 오프라인 잡을 실행 42559156525와 나란히 놓은 표를 리뷰에 남긴다. 잡 전체, nextest 단계, 컴파일, 세 호출자, witness의 초와 캐시 상태가 든다.
-- 잡 전체가 26분 4초보다 짧다. 더 길면 이 변경의 전제(코어가 놀았다)가 틀린 것이므로 리뷰에 그 숫자를 쓰고 멈춘다.
+- 오프라인 잡을 0.40.0의 main push 실행 42670247057(30분 1초)과 나란히 놓은 표를 리뷰에 남긴다. 잡 전체, nextest 단계, 컴파일, 세 호출자, witness의 초와 캐시 상태가 든다. 시험 바이너리별 값은 0.39.0 실행 42559156525의 것과 견준다.
+- 잡 전체가 30분 1초보다 짧다. 더 길면 이 변경의 전제(코어가 놀았다)가 틀린 것이므로 리뷰에 그 숫자를 쓰고 멈춘다. 시간 제한 110분은 이 비교를 가리지 않는다.
 - 목표는 15분 이하다 [추정]. 가장 느린 시험 182초가 단계의 하한이고, 실행이 CPU로 포화였다면 지금과 비슷하다. 못 미치면 JUnit에서 가장 느린 시험 다섯을 리뷰에 적고, 40초를 넘는 시험에 `priority` 오버라이드를 더한다.
 - JUnit 아티팩트가 있고 안의 시험 수가 같은 커밋의 `cargo nextest list --workspace` 수와 같다. 실패한 실행의 아티팩트도 있다.
 - 버리는 브랜치에서 위반을 하나씩 넣어 해당 단계가 실패하는 것을 확인하고 결과를 리뷰에 남긴다.
@@ -87,8 +92,9 @@ ci
   - 체크섬 한 자리를 바꾼 nextest 설치: 풀기 전에 실패한다.
   - PR에 두 번째 push: 첫 실행이 `cancelled`다.
 - `timeout-minutes`가 없는 잡이 네 워크플로에 0개다. 검사는 한 번이다.
-- PR의 첫 push에서 복원 단계가 main의 캐시를 복원했다고 말한다. 같은 `Cargo.lock`이면 정확한 일치이고 다르면 접두사 일치다. 어떤 잡도 캐시를 저장하지 않는다.
-- 병합 뒤 main의 첫 push 실행이 정확한 키로 저장한다. 같은 `Cargo.lock`의 다음 실행은 정확한 일치이고 저장 단계가 건너뛰어진다. 저장된 오프라인 캐시는 이전 2,214MB보다 작다. 이 확인은 병합한 세션이 남긴다.
+- PR의 첫 push에서 복원 단계가 main의 캐시를 복원했다고 말한다. 새 키는 아직 main에 없으므로 옛 접두사 일치다. test.yml의 어떤 잡도 캐시를 저장하지 않는다. build-native.yml과 pr-guard.yml은 질문 2의 기본대로 PR에서 저장한다.
+- 병합 뒤 main의 첫 push 실행이 새 키로 저장한다. 같은 `Cargo.lock`의 다음 실행은 정확한 일치이고 저장 단계가 건너뛰어진다. 저장된 오프라인 캐시는 이전 2,214MB보다 작다. 이 확인은 병합한 세션이 남긴다.
+- README에 cargo-nextest 0.9.146을 contributor 선행 조건으로 적은 한 줄이 있다.
 - 릴리스 워크플로 안전 검사와 그 시험이 통과한다. 체크섬 줄을 지운 복사본에서는 검사가 "SHA-256 verification"으로 실패한다.
 - `just test`, `just test-callers`, `scripts/check-witness.sh`가 통과한다.
 - 이 변경은 워크플로와 스크립트를 바꾸므로 코드 변경으로 센다. 이 변경이 adopt된 출시된 subject는 다시 열어 새 evidence를 기록하고 출시한다. 변경 단위 리뷰는 다른 세션의 reviewer가 한다.
@@ -103,7 +109,9 @@ ci
 - 결정: 문서 시험 단계는 남긴다. 지금 0개에 4초라 비용이 없고, 나중에 문서 시험이 생겨도 조용히 빠지지 않는다. lute도 같다.
 - 결정: 세 호출자 단계는 세 번 모두 남긴다. 첫 번째는 주 실행의 `--lib` 부분과 겹치지만 주 실행은 `CANON_WITNESS_DIR`를 켠 환경이다. 이득은 불확실하다 [추정]. 한 번에 약 34초가 거의 모두 `canon-cli` 단위 시험 바이너리 하나이고 이미 4스레드로 돈다. 시험마다 프로세스를 띄우는 비용이 병렬 이득을 깎을 수 있다. 105초보다 느리면 리뷰에 적는다.
 - 결정: witness와 gate check가 `-p canon-cli`로 컴파일을 되풀이하지 않게 한다. 확인은 nextest 단계 뒤 어느 단계의 로그에도 서드파티 크레이트의 `Compiling` 줄이 없는 것이다. 방법은 구현자가 고른다. 이미 빌드된 디버그 `canon`을 gate check가 쓰는 것이 한 방법이다. 안 되면 비용을 옮기기만 한 것이므로 witness와 gate check의 합이 지금의 52초를 넘지 않음을 리뷰에 적는다.
+- 결정: 이 변경은 `Cargo.lock`을 건드리지 않아서 main에는 옛 키 `canon-test-<잡>-cargo-<락 해시>`의 전체 캐시(오프라인 2,214MB)가 이미 있다. 같은 키로 저장하면 병합 뒤 정확한 일치로 저장이 건너뛰어져 작은 캐시가 만들어지지 않는다. 그래서 의존성만 든 캐시는 새 키 이름 공간에 두고 `restore-keys`가 옛 접두사를 마지막 대안으로 갖는다. 옛 캐시는 쓰이지 않다가 저장소 한도에서 밀려난다.
 - 결정: 저장 전에 워크스페이스 크레이트의 빌드 결과를 지운다. 로컬 디버그 빌드에서 테스트 바이너리 226개가 `target/debug` 7.0GB의 4.2GB(60%)다. 접두사 복원을 쓰면 릴리스마다 옛 버전의 시험 바이너리가 캐시에 쌓이고 cargo는 치우지 않는다. 한편 `canon-cli`의 라이브러리를 건드리면 시험 유닛 175개가 모두 다시 컴파일되고 링크된다. 로컬에서 그 재빌드의 유닛 시간 628초 가운데 590초(94%)가 이 유닛들이다. 캐시에 시험 바이너리를 남겨 얻는 것이 작다. 컴파일 시간이 늘면 리뷰에 적고 이 결정을 다시 본다.
+- 결정: 의존성이 바뀔 때마다 접두사 복원이 옛 서드파티 산출물과 `.crate` 파일을 새 키로 옮겨 쌓는다. 이 증가는 받아들인다. 워크스페이스 크레이트만 지우므로 이를 막지 못한다. main 저장마다 크기가 요약에 남고, 오프라인 캐시가 3GB를 넘으면 쓰이지 않은 `target/*/deps` 항목을 지우는 정리를 후속 변경으로 더한다.
 - 결정: 락 파일 해시에서 워크스페이스 버전을 빼는 방식(oh-my-pi §3.6)은 쓰지 않는다. 릴리스 쌍 여섯 가운데 둘에서만 정확한 일치를 지키고 나머지는 접두사 복원이 같은 결과를 낸다.
 - 결정: 취소는 PR 실행에만 한다. main push의 그룹 이름에 커밋 해시를 넣어 실행마다 따로 둔다. 같은 그룹의 대기 실행은 최신 하나만 남으므로 이렇게 하지 않으면 연속 push에서 중간 실행이 버려진다.
 - 결정: JUnit 아티팩트 이름은 `junit-offline`이고 보관은 14일이다. 증거로 남기는 것은 레저의 기록이고 아티팩트가 아니다.
