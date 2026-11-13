@@ -20,6 +20,22 @@ retries = 0
 # A test that runs 60 s is marked slow at every 60 s and killed at the tenth mark (600 s), three times the slowest test measured (182 s, `atip_validate`).
 slow-timeout = { period = "60s", terminate-after = 10 }
 
+# The six slowest tests (measured 2026-11-14 on a machine at load average 70-100 on 10 cores, each alone without a limit: 280-365 s, about 6 CPU-minutes each; the
+# 0.39.0 CI run measured the slowest binary at 182 s). They start first, so they never wait behind the 4,000 short tests for a free slot at the end of the run, and
+# they are killed at the thirtieth mark (1800 s) instead of the tenth: a 4-core runner running four of them at once can pass 600 s. Every other test keeps 600 s.
+[[profile.ci.overrides]]
+filter = '''
+  (binary(=arg_rules) & test(=atip_constraints_03_every_declared_rule_is_refused_when_broken_and_not_when_met))
+  | (binary(=atip_check_order) & (
+      test(=atip_checkorder_05_a_broken_domain_is_answered_before_a_constraint_and_before_a_later_domain)
+    | test(=atip_checkorder_07_the_first_constraint_the_document_lists_answers)
+    | test(=atip_checkorder_08_a_constraint_is_answered_before_a_validator)
+    | test(=atip_checkorder_12_every_rule_is_answered_with_the_field_of_the_first_argument_at_fault)))
+  | (binary(=atip_validate) & test(=admits_answers_as_the_validator_does_for_every_domain_canon_declares))
+'''
+priority = 100
+slow-timeout = { period = "60s", terminate-after = 30 }
+
 [profile.ci.junit]
 # Relative to `target/nextest/ci/`.
 path = "junit.xml"
