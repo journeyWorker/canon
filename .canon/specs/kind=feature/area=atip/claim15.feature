@@ -7,10 +7,10 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @case:happy
   @flow:canon-0-37-claim-1-5.F1
   @atip.claim15.01
-  Scenario: Every envelope and schema answer says contractVersion 1.5, a schema answer says schemaVersion 1.5, and the tree says level L2
+  Scenario: Every envelope and schema answer says contractVersion 1.6, a schema answer says schemaVersion 1.6, and the tree says level L2
     Given canon status, an unknown command, a refusal, schema, schema finding close, schema finding close --schemas, schema --errors and schema --warnings run with --json, and the answer of schema for every command
     When each envelope is read and the tree of canon schema --json is read
-    Then each says contractVersion 1.5 and the schema answers say schemaVersion 1.5, the tree says level L2, the generated spec says contractVersion 1.5, and schema --json is the same bytes from another directory
+    Then each says contractVersion 1.6 and the schema answers say schemaVersion 1.6, the tree says level L2, the generated spec says contractVersion 1.6, and schema --json is the same bytes from another directory
 
   # canon: {"schema":1,"at":"2026-11-05T12:08:35Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-contract
@@ -21,7 +21,7 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   Scenario: A declaration of 1.4 fails the declaration check, and the crate judges a property pattern by the declared minor: a problem of a 1.4 document, none of a 1.5 one
     Given the declaration check seeded with an envelope that says 1.4, a schema answer that says 1.4 and one with no declaration, and the property pattern of Annex V2 judged by the atip crate at the minors 1.4 and 1.5
     When the checks read the seeded answers and the crate judges the pattern and a document that has it
-    Then the declaration check finds each seeded answer, the crate reads the pattern as no problem at the declared minor 1.5 and as a problem at 1.4, and a document that declares 1.5 has no problem while one that declares 1.4 has
+    Then the declaration check finds each seeded answer, the crate reads the pattern as no problem at the declared minor 1.6 and as a problem at 1.4, and a document that declares 1.6 has no problem while one that declares 1.4 has
 
   # canon: {"schema":1,"at":"2026-11-05T12:08:43Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -65,7 +65,7 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   Scenario: The rules of 1.4 hold at 1.5: compact documents, USAGE for --help --json, no member at its default, commit and plan-digest on the destructive commands
     Given every document of canon schema for the tree and each command, canon --help --json, canon finding close --help --json, canon --version --json and the five destructive command documents
     When each document is read for whitespace outside a string, for a member at its default and for a member of the 1.3 form, and each call is made
-    Then no document has whitespace outside a string or a member at its default, path or schemas, each call is refused with USAGE at exit 2 naming contractVersion 1.5, and each destructive document lists commit and plan-digest
+    Then no document has whitespace outside a string or a member at its default, path or schemas, each call is refused with USAGE at exit 2 naming contractVersion 1.6, and each destructive document lists commit and plan-digest
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:06Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -106,10 +106,10 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @case:happy
   @flow:canon-0-37-claim-1-5.F5
   @atip.claim15.10
-  Scenario: The job and the recipes run atip check --level L2 --contract 1.5 --deep with the fixture, and the fixture and the declaration say 1.5
+  Scenario: The job and the recipes run atip check --level L2 --contract 1.6 --deep with the fixture, and the fixture and the declaration say 1.6
     Given the job atip of the workflow, the recipes atip and atip-deep of the justfile, the fixture of the checker, its source and the declared minor
     When each command line is read
-    Then the job and atip-deep run atip check --level L2 --contract 1.5 --deep with the canon fixture, atip runs it without --deep, the fixture and the declared minor say 1.5, the checker is installed at atip-check-v0.2.0, and the fixture lists values a domain refuses for the L1.patterns row
+    Then the job and atip-deep run atip check --level L2 --contract 1.6 --deep with the canon fixture, atip runs it without --deep, the fixture and the declared minor say 1.6, the checker is installed at atip-check-v0.3.0, and the fixture lists values a domain refuses for the L1.patterns row
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:30Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-check
@@ -128,10 +128,10 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @case:happy
   @flow:canon-0-37-claim-1-5.F6
   @atip.claim15.12
-  Scenario: The guides, website pages, eval scripts, conformance expectations, generated spec, README, ARCHITECTURE, workflow and justfile declare 1.5 and show no list of white space
+  Scenario: The guides, website pages, eval scripts, conformance expectations, generated spec, README, ARCHITECTURE, workflow and justfile declare 1.6 and show no list of white space
     Given the tracked guides, website pages in both languages, eval scripts, conformance expectations, generated spec, README, ARCHITECTURE, workflow and justfile
-    When each file is scanned for a declaration below 1.5 and for a list of white space shown by hand, and each envelope an expectation prints is read
-    Then no file declares a minor below 1.5 or shows a list of white space, every envelope the expectations print says 1.5, and the two cli pages and the guide say 1.5 where they name the declaration
+    When each file is scanned for a declaration below 1.6 and for a list of white space shown by hand, and each envelope an expectation prints is read
+    Then no file declares a minor below 1.6 or shows a list of white space, every envelope the expectations print says 1.6, and the two cli pages and the guide say 1.6 where they name the declaration
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:42Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-contract
@@ -140,9 +140,9 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @flow:canon-0-37-claim-1-5.F6
   @atip.claim15.13
   Scenario: The consumer scan finds a declaration below 1.5 and a list of white space shown by hand
-    Given lines that declare 1.2, 1.3 and 1.4 in the spellings the repository uses, lines that declare 1.5, a pattern of 0.36.0 shown in a guide and the classes of 1.5
+    Given lines that declare 1.2, 1.3, 1.4 and 1.5 in the spellings the repository uses, lines that declare 1.6, a pattern of 0.36.0 shown in a guide and the classes of 1.5
     When the consumer scan reads each
-    Then the scan finds each declaration below 1.5 by its version and a shown list of white space, and finds nothing in a declaration of 1.5 or in the classes of 1.5
+    Then the scan finds each declaration below 1.6 by its version and a shown list of white space, and finds nothing in a declaration of 1.6 or in the classes of 1.5
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:47Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-contract

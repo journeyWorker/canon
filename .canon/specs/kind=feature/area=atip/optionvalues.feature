@@ -172,7 +172,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   @case:edge
   @flow:canon-0-37-option-values.F1
   @atip.optionvalues.16
-  Scenario: The checker fixture lists values the new domains refuse, and the recipes run the checker at 1.5
+  Scenario: The checker fixture lists values the new domains refuse, and the recipes run the checker at 1.6
     Given the checker fixture and the justfile
     When each listed value is judged by the declared domain and the recipes are read
-    Then every listed value is outside the domain of its command, the cells of the new rules are listed, the fixture claims 1.5 and the recipes pass --contract 1.5
+    Then every listed value is outside the domain of its command, the cells of the new rules are listed, the fixture claims 1.6 and the recipes pass --contract 1.6

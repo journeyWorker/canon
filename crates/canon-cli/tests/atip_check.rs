@@ -1,14 +1,14 @@
 //! The fixture `atip check` reads for canon (0.34, `canon-0-34-atip-check-1-1` F6; 0.33 `canon-0-33-atip-check`; 0.36 `canon-0-36-atip-dep`).
 //!
-//! `tests/atip/canon.fixture.json` is the fixture the checker reads for canon: it claims 1.5 (0.37: `canon-0-37-claim-1-5`; 1.4 in 0.36: `canon-0-36-claim-1-4`; 0.35: `canon-0-35-claim-l2`); `setup` is `init`, two
+//! `tests/atip/canon.fixture.json` is the fixture the checker reads for canon: it claims 1.6 (0.41: `canon-0-41-atip-1-6`; 1.5 in 0.37: `canon-0-37-claim-1-5`; 1.4 in 0.36: `canon-0-36-claim-1-4`; 0.35: `canon-0-35-claim-l2`); `setup` is `init`, two
 //! subjects (so a listing has a second page) and what the findings, scenarios and divergences of the entries need; `probe` is `status`; `globalOptions` is `--repo .`; `commands` holds a paging call
 //! that also emits a next step (`query`) and the refusal of a missing value (`finding close` without `--seq`); `registry`
 //! and `warnings` are generated from `canon schema --errors --json` and `--warnings --json`, never written by hand.
 //! `CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it; the test fails when the
 //! committed file differs from what the binary says.
 //!
-//! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.2.0`) and canon runs it once, in the
-//! CI job `atip` and in `just atip-deep`: `atip check --level L2 --contract 1.5 --deep` on the canon binary and this fixture (`just atip` runs it without `--deep`). No test of canon runs the checker.
+//! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.3.0`) and canon runs it once, in the
+//! CI job `atip` and in `just atip-deep`: `atip check --level L2 --contract 1.6 --deep` on the canon binary and this fixture (`just atip` runs it without `--deep`). No test of canon runs the checker.
 
 #[path = "support/hermetic.rs"]
 mod hermetic;
@@ -18,9 +18,9 @@ use serde_json::{json, Value};
 
 
 /// The command the CI job and the just recipe run, with the binary's directory spelled `target/debug`.
-const COMMAND: &str = "atip check --bin target/debug/canon --level L2 --contract 1.5 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json";
+const COMMAND: &str = "atip check --bin target/debug/canon --level L2 --contract 1.6 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json";
 /// The command that installs the checker, at the tag canon is held to, in the CI job and in the just recipe.
-const INSTALL: &str = "cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.2.0 atip-check --locked";
+const INSTALL: &str = "cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.3.0 atip-check --locked";
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -96,7 +96,7 @@ fn atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generat
     let committed = std::fs::read_to_string(fixture_path()).expect("tests/atip/canon.fixture.json");
     assert_eq!(drift(&committed, &generated), None, "run CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check and commit the fixture");
     let fixture: Value = serde_json::from_str(&committed).expect("the fixture is JSON");
-    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.5"), json!("status"), json!([["--repo", "."]])));
+    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.6"), json!("status"), json!([["--repo", "."]])));
     let mut keys: Vec<&String> = fixture.as_object().expect("object").keys().collect();
     keys.sort();
     assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "notRun", "prepare", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L2 keys are `commands` members (`preview`, `batchFailsAt`, `batchFailsFirst`, `allowedEffects`), not top-level ones");

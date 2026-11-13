@@ -61,10 +61,11 @@ Contributors: run `just` to list the recipes for the build, the tests, the lint,
 canon's own gate and the other CI checks (`just ci` runs every check that needs
 no docker). The atip/1 contract crate and its checker are the
 [atip repository](https://github.com/journeyWorker/atip)'s, not this workspace's: `canon-cli` links the
-`atip` crate at the tag `atip-crate-v0.2.0` (a git dependency, pinned by `Cargo.lock`), and the
+`atip` crate at the tag `atip-crate-v0.3.0` (a git dependency, pinned by `Cargo.lock`), and the
 tests of the crate and the checker run there. Canon proves its own conformance by running the
-checker once, on the canon binary: `just atip-install` installs it at the tag `atip-check-v0.2.0`
-and `just atip-deep` runs `atip check --level L2 --contract 1.5 --deep` (the CI job `atip`); `just atip` runs the same check without `--deep`, in seconds.
+checker once, on the canon binary: `just atip-install` installs it at the tag `atip-check-v0.3.0`
+and `just atip-deep` runs `atip check --level L2 --contract 1.6 --deep` (the CI job `atip`); `just atip` runs the same check without `--deep`, in seconds.
+Contributor prerequisite: cargo-nextest 0.9.146 (`cargo install cargo-nextest --version 0.9.146 --locked`); `just test`, `just test-callers` and `just ci` run the tests with it.
 
 ## Safety boundaries
 

@@ -22,16 +22,18 @@ build:
 install:
     cargo install --path crates/canon-cli
 
-# The workspace tests (test.yml `offline`, without the network ban). The checker (`atip check`) is the atip repo's: its tests are not run here (`just atip` runs it on canon).
-test:
-    cargo test --workspace --locked
+# The workspace tests (test.yml `offline`: the same commands, without the network ban): cargo-nextest, profile `ci` (.config/nextest.toml), then the documentation tests nextest does not run. Needs cargo-nextest 0.9.146.
+# `ci` kills a test at 600 s, which a machine loaded far beyond CI's can reach on the heaviest ones: `just test default` runs the default profile, which has no limit. The checker (`atip check`) is the atip repo's: its tests are not run here (`just atip` runs it on canon).
+test profile="ci":
+    cargo nextest run --workspace --locked --profile {{ profile }}
+    cargo test --workspace --doc --locked
 
 # The unit tests of the workspace under three callers: none, an implementer with an actor, and an unknown role. A unit test that reads the declared role
 # or actor from the environment (`closing_role` once did) answers differently in two of them and fails here; `tests/hermetic_env.rs` covers the tests that start the binary.
 test-callers:
-    env -u CANON_ROLE -u CANON_ACTOR cargo test --workspace --lib --locked
-    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test --workspace --lib --locked
-    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test --workspace --lib --locked
+    env -u CANON_ROLE -u CANON_ACTOR cargo nextest run --workspace --lib --locked --profile ci-aux
+    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo nextest run --workspace --lib --locked --profile ci-aux
+    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo nextest run --workspace --lib --locked --profile ci-aux
 
 # The three clippy runs of test.yml `clippy`, and its git boundary scan (every git call goes through `canon_store::git`).
 lint:
@@ -96,17 +98,17 @@ live:
 
 # Install the checker canon is held to: the atip repo's `atip check`, at the tag the CI job `atip` installs.
 atip-install:
-    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.2.0 atip-check --locked
+    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.3.0 atip-check --locked
 
-# atip check on the canon binary, interface checks only (seconds): L2, contract 1.5. Needs the checker: `just atip-install`.
+# atip check on the canon binary, interface checks only (seconds): L2, contract 1.6. Needs the checker: `just atip-install`.
 atip:
     cargo build --locked -p canon-cli
-    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.5 --fixture crates/canon-cli/tests/atip/canon.fixture.json
+    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.6 --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # The same with `--deep` (declaration against behaviour, about two minutes): what CI's `atip` job runs; run it once before a release.
 atip-deep:
     cargo build --locked -p canon-cli
-    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.5 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
+    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.6 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # Every CI check that needs no docker.
 ci: release-check lint test test-callers gate launcher platformer atip-deep

@@ -52,6 +52,7 @@ jobs:
   read-version:
     name: Read workspace version
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.read.outputs.version }}
     steps:
@@ -98,6 +99,7 @@ jobs:
     name: Build dashboard app
     needs: read-version
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -127,6 +129,7 @@ jobs:
     name: Generate man pages
     needs: read-version
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -157,6 +160,7 @@ jobs:
     name: Build - ${{ matrix.settings.target }}
     needs: [read-version, dashboard]
     runs-on: ${{ matrix.settings.host }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -238,6 +242,8 @@ jobs:
     name: Publish npm packages
     needs: [read-version, build, man]
     runs-on: ubuntu-latest
+    # A limit that fires inside the idempotent publish steps leaves npm half published, so this one is generous.
+    timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
