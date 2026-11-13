@@ -7,8 +7,9 @@
 # recorded with the spec's `outputs`. What the suite cannot reach is listed, with a reason, in
 # that file's UNWITNESSED allowlist, which only shrinks.
 #
-# Usage: scripts/check-witness.sh [extra `cargo test --workspace` arguments]
+# Usage: scripts/check-witness.sh [extra `cargo nextest run` arguments for the whole-suite run]
 # CANON_WITNESS_DIR may be set to keep the recording; by default a temporary directory is used.
+# The commands are the ones of test.yml's `offline` job (profiles `ci` and `ci-aux` of .config/nextest.toml), without CI's `--offline`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -20,5 +21,5 @@ else
 fi
 export CANON_WITNESS_DIR
 
-cargo test --workspace --no-fail-fast "$@"
-cargo test -p canon-cli --test grammar_t9_witness -- --ignored
+cargo nextest run --workspace --locked --profile ci "$@"
+cargo nextest run --workspace --locked --profile ci-aux --run-ignored only -E 'binary(=grammar_t9_witness)'

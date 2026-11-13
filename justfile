@@ -22,16 +22,18 @@ build:
 install:
     cargo install --path crates/canon-cli
 
-# The workspace tests (test.yml `offline`, without the network ban). The checker (`atip check`) is the atip repo's: its tests are not run here (`just atip` runs it on canon).
-test:
-    cargo test --workspace --locked
+# The workspace tests (test.yml `offline`: the same commands, without the network ban): cargo-nextest, profile `ci` (.config/nextest.toml), then the documentation tests nextest does not run. Needs cargo-nextest 0.9.146.
+# `ci` kills a test at 600 s, which a machine loaded far beyond CI's can reach on the heaviest ones: `just test default` runs the default profile, which has no limit. The checker (`atip check`) is the atip repo's: its tests are not run here (`just atip` runs it on canon).
+test profile="ci":
+    cargo nextest run --workspace --locked --profile {{ profile }}
+    cargo test --workspace --doc --locked
 
 # The unit tests of the workspace under three callers: none, an implementer with an actor, and an unknown role. A unit test that reads the declared role
 # or actor from the environment (`closing_role` once did) answers differently in two of them and fails here; `tests/hermetic_env.rs` covers the tests that start the binary.
 test-callers:
-    env -u CANON_ROLE -u CANON_ACTOR cargo test --workspace --lib --locked
-    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test --workspace --lib --locked
-    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test --workspace --lib --locked
+    env -u CANON_ROLE -u CANON_ACTOR cargo nextest run --workspace --lib --locked --profile ci-aux
+    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo nextest run --workspace --lib --locked --profile ci-aux
+    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo nextest run --workspace --lib --locked --profile ci-aux
 
 # The three clippy runs of test.yml `clippy`, and its git boundary scan (every git call goes through `canon_store::git`).
 lint:

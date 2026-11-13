@@ -1,6 +1,32 @@
-# cargo-nextest profiles (`cargo nextest run`). CI itself runs `cargo test` (.github/workflows/test.yml).
+# cargo-nextest profiles (`cargo nextest run`, cargo-nextest 0.9.146).
+#
+# CI (.github/workflows/test.yml, job `offline`) runs the workspace tests with `cargo nextest run --workspace --locked --offline --profile ci`.
+# `just test`, `just test-callers` and `scripts/check-witness.sh` run the same commands (without CI's `--offline`, the network ban of the job), so a
+# test that fails there fails on your machine the same way. Documentation tests are not nextest's: `cargo test --workspace --doc` runs them.
+# A test the profile `ci` kills at 600 s may only be slow on a machine loaded far beyond a CI runner (the heaviest ones took 280-365 s each at a load average of 70-100
+# on 10 cores): `just test default` runs the default profile, which has no limit.
 #
 # The default profile runs every test of the workspace and writes the JUnit report that `canon evidence add --report junit:junit.xml` binds.
 
 [profile.default.junit]
 path = "junit.xml"
+
+# `ci`: the one run whose report is the record of the suite (`target/nextest/ci/junit.xml`, the path the canon-gate skill's GitHub Actions recipe binds).
+[profile.ci]
+# One run shows every failure, not the first.
+fail-fast = false
+# A flaky test is a bug to see, not one to hide behind a second try: 0.40's hook tests cut the same script file under each other and would have passed on a retry.
+retries = 0
+# A test that runs 60 s is marked slow at every 60 s and killed at the tenth mark (600 s), three times the slowest test measured (182 s, `atip_validate`).
+slow-timeout = { period = "60s", terminate-after = 10 }
+
+[profile.ci.junit]
+# Relative to `target/nextest/ci/`.
+path = "junit.xml"
+
+# `ci-aux`: the same policy for the runs that come after the main one in CI (the unit tests under three callers, the witness test), so they never write
+# `target/nextest/ci/`: the report of the main run stays the only one there.
+[profile.ci-aux]
+fail-fast = false
+retries = 0
+slow-timeout = { period = "60s", terminate-after = 10 }
