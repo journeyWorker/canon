@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:57:11.896648Z",
+  "change_id": "canon-0-41-atip-1-6",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "disposition": "rejected",
+  "file_ref": "Cargo.lock",
+  "introduced_by": "aa9d7f7923170c6ec8c6e6925d8dd2bb33491772",
+  "kind": "finding",
+  "reason": "a blast-radius fact, no defect: both edges build and pass; kept in the record for the next reader",
+  "reviewed_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "reviewer": "rev-0-41-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim16.11"
+  ],
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[standards] Blast radius the 39 scenarios do not exercise: Cargo.lock adds a regex-syntax edge to the atip crate (0.3.0 reads patterns itself) and the branch carries an unrelated test fix (pre_dispatch_hook.rs, EPIPE, 5d8c18fca) that no scenario of this change names. Both build and pass in my run; claim16.11 only reads the tag and the commit prefix in the lock file. No waiver (--override-reason) is in use: status lists none.",
+  "worktree_dirty": false
+}

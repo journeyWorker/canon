@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:56:56.122168Z",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "kind": "review",
+  "pin": "33e64c2300a996a22674d42e3a4e5ed4566b314e",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_on_1_5"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "576e9dcb38af5b76814eefcf74d3c4ff31925e204b25e1e17d1103c102ced42e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-41-atip-1-6/brief.md"
+  },
+  "review_id": "01M7BEKT5TBDRH8WDQA0HV17RQ",
+  "reviewer": "rev-0-41-atip",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "scenario_id": "atip.claiml2.20",
+  "schema": 2,
+  "worktree_dirty": false
+}

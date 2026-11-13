@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:57:11.584362Z",
+  "change_id": "canon-0-41-atip-1-6",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "disposition": "deferred",
+  "file_ref": "crates/canon-cli/tests/atip_claim16.rs:448",
+  "introduced_by": "874081f4354a744bb0179a3c887213395714427c",
+  "kind": "finding",
+  "reason": "the CHANGELOG cells were read by hand and match the brief; a cell-level check is a later hardening",
+  "reviewed_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "reviewer": "rev-0-41-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim16.13",
+    "atip.claim16.14"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] changelog_problems checks the before/after table by row label only (a lower-cased substring per row word) and the two paragraphs by keyword presence; it never reads a cell, so a table that said commaList 3 or longest path three words would pass, and the Then 'say what the brief decided' is not proven by the test. I read the real CHANGELOG entry by hand: every cell matches the brief (declaration 1.5/1.6, tags 0.2.0/0.3.0, commaList 0, pathShape none, longest path two words, 0 names with two meanings, advice --kind), the Callers and Not used paragraphs and the contributors line (9cbc74a) match the brief. A one-line mutation that fails nothing: change '| options that declare `commaList` | 0 | 0 |' to '| ... | 0 | 3 |' in CHANGELOG.md. Blast radius: the CHANGELOG text only.",
+  "worktree_dirty": false
+}

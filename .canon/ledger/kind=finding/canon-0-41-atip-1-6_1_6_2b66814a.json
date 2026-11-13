@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:57:11.743999Z",
+  "change_id": "canon-0-41-atip-1-6",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "disposition": "deferred",
+  "file_ref": ".canon/specs/kind=feature/area=atip/claim16.feature:21",
+  "introduced_by": "bdd6806b3f32cbb3c91fa5a67e3d6203906f62f9",
+  "kind": "finding",
+  "reason": "title wording only; the Given/Then are met and the constant is proven in claim16.01",
+  "reviewed_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "reviewer": "rev-0-41-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim16.02"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[spec-fidelity] The title of atip.claim16.02 says 'an envelope, a schema answer or a constant that says 1.5 is found and named' but Given/Then and the test seed an envelope, a schema answer, a command document and a missing declaration; the constant is checked in claim16.01 (assert_eq on DECLARED_MINOR) and never seeded here. The Given/Then are met. Blast radius: none; title wording only.",
+  "worktree_dirty": false
+}
