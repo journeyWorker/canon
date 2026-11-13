@@ -460,6 +460,7 @@ fn atip_claim15_02_a_declaration_of_1_4_fails_the_check_and_the_crate_judges_a_d
         default_note: None,
         env: None,
         flag_only: false,
+        comma_list: false,
         domain: Some(json!({ "pattern": pattern })),
         help: "h".to_string(),
     };
@@ -762,6 +763,7 @@ fn atip_claim15_09_a_document_that_declares_1_4_has_its_property_pattern_read_as
         default_note: None,
         env: None,
         flag_only: false,
+        comma_list: false,
         domain: Some(json!({ "pattern": pattern })),
         help: "h".to_string(),
     };

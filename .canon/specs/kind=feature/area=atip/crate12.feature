@@ -17,9 +17,9 @@ Feature: atip crate 1.2, seen from canon: the minor canon declares, the reserved
   @flow:canon-0-35-crate-1-2.F1
   @atip.crate12.13
   Scenario: A text that is no minor the crate knows is refused by Minor::parse and no source of canon reads the crate's CONTRACT_VERSION, so removing canon's own declaration fails its build
-    Given the texts 1.9, 1.6, 2.0, 1, the empty text, 1.1.0 and v1.1, the six minors 1.0 to 1.5, and the sources of canon-cli
+    Given the texts 1.9, 1.7, 2.0, 1, the empty text, 1.1.0 and v1.1, the seven minors 1.0 to 1.6, and the sources of canon-cli
     When Minor::parse reads each text and the sources are scanned for the crate's CONTRACT_VERSION
-    Then every text that is no minor is refused as itself and never as the nearest minor, the six minors are read back as written, and no source of canon reads the crate's constant
+    Then every text that is no minor is refused as itself and never as the nearest minor, the seven minors are read back as written, and no source of canon reads the crate's constant
 
   # canon: {"schema":1,"at":"2026-11-04T19:17:46Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
   @subject:atip-contract
@@ -67,6 +67,6 @@ Feature: atip crate 1.2, seen from canon: the minor canon declares, the reserved
   @flow:canon-0-35-crate-1-2.F5
   @atip.crate12.18
   Scenario: The rules a fields declaration is held to are those of the minor canon declares, and a minor the crate does not know is refused
-    Given the minors 1.0, 1.1 and 1.4, the texts 1.9, 1.6, 2.0, 1 and the empty text, and the declarations canon publishes
+    Given the minors 1.0, 1.1 and 1.4, the texts 1.9, 1.7, 2.0, 1 and the empty text, and the declarations canon publishes
     When Rules::for_minor builds the rules of each, a bracketed key is declared under each, every published declaration is checked under canon's, and the sources of canon-cli are scanned for a Rules built by its old field
     Then the declared minor has the rules of 1.1 (a bracketed key is allowed) and not those of 1.0 (it is refused), each text that is no minor is refused as itself, the eight published declarations have no problem, and no source builds Rules by the v11 field
