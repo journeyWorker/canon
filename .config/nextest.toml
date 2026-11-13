@@ -1,6 +1,48 @@
-# cargo-nextest profiles (`cargo nextest run`). CI itself runs `cargo test` (.github/workflows/test.yml).
+# cargo-nextest profiles (`cargo nextest run`, cargo-nextest 0.9.146).
+#
+# CI (.github/workflows/test.yml, job `offline`) runs the workspace tests with `cargo nextest run --workspace --locked --offline --profile ci`.
+# `just test`, `just test-callers` and `scripts/check-witness.sh` run the same commands (without CI's `--offline`, the network ban of the job), so a
+# test that fails there fails on your machine the same way. Documentation tests are not nextest's: `cargo test --workspace --doc` runs them.
+# A test the profile `ci` kills at 600 s may only be slow on a machine loaded far beyond a CI runner (the heaviest ones took 280-365 s each at a load average of 70-100
+# on 10 cores): `just test default` runs the default profile, which has no limit.
 #
 # The default profile runs every test of the workspace and writes the JUnit report that `canon evidence add --report junit:junit.xml` binds.
 
 [profile.default.junit]
 path = "junit.xml"
+
+# `ci`: the one run whose report is the record of the suite (`target/nextest/ci/junit.xml`, the path the canon-gate skill's GitHub Actions recipe binds).
+[profile.ci]
+# One run shows every failure, not the first.
+fail-fast = false
+# A flaky test is a bug to see, not one to hide behind a second try: 0.40's hook tests cut the same script file under each other and would have passed on a retry.
+retries = 0
+# A test that runs 60 s is marked slow at every 60 s and killed at the tenth mark (600 s), three times the slowest test measured (182 s, `atip_validate`).
+slow-timeout = { period = "60s", terminate-after = 10 }
+
+# The six slowest tests (measured 2026-11-14 on a machine at load average 70-100 on 10 cores, each alone without a limit: 280-365 s, about 6 CPU-minutes each; the
+# 0.39.0 CI run measured the slowest binary at 182 s). They start first, so they never wait behind the 4,000 short tests for a free slot at the end of the run, and
+# they are killed at the thirtieth mark (1800 s) instead of the tenth: a 4-core runner running four of them at once can pass 600 s. Every other test keeps 600 s.
+[[profile.ci.overrides]]
+filter = '''
+  (binary(=arg_rules) & test(=atip_constraints_03_every_declared_rule_is_refused_when_broken_and_not_when_met))
+  | (binary(=atip_check_order) & (
+      test(=atip_checkorder_05_a_broken_domain_is_answered_before_a_constraint_and_before_a_later_domain)
+    | test(=atip_checkorder_07_the_first_constraint_the_document_lists_answers)
+    | test(=atip_checkorder_08_a_constraint_is_answered_before_a_validator)
+    | test(=atip_checkorder_12_every_rule_is_answered_with_the_field_of_the_first_argument_at_fault)))
+  | (binary(=atip_validate) & test(=admits_answers_as_the_validator_does_for_every_domain_canon_declares))
+'''
+priority = 100
+slow-timeout = { period = "60s", terminate-after = 30 }
+
+[profile.ci.junit]
+# Relative to `target/nextest/ci/`.
+path = "junit.xml"
+
+# `ci-aux`: the same policy for the runs that come after the main one in CI (the unit tests under three callers, the witness test), so they never write
+# `target/nextest/ci/`: the report of the main run stays the only one there.
+[profile.ci-aux]
+fail-fast = false
+retries = 0
+slow-timeout = { period = "60s", terminate-after = 10 }

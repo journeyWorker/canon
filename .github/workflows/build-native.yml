@@ -32,10 +32,16 @@ env:
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run before it. Workflow name in the group: the three workflows of a pull request do not cancel each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   safety:
     name: Release workflow safety check
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Cross-workflow drift guard (the upstream release pipeline's lesson,
@@ -53,6 +59,7 @@ jobs:
     name: Build dashboard app
     needs: safety
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -82,6 +89,7 @@ jobs:
     name: Generate man pages
     needs: safety
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -111,6 +119,7 @@ jobs:
   build:
     name: Build - ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
+    timeout-minutes: 45
     needs: [safety, dashboard]
     strategy:
       fail-fast: false
