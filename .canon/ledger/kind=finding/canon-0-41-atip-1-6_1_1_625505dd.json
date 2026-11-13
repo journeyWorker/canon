@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:56:26.341534Z",
+  "change_id": "canon-0-41-atip-1-6",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip_claim14.rs:1498",
+  "introduced_by": "0d3e104664e8051c55d0c0a896fdce008d018a12",
+  "kind": "finding",
+  "resolution_code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "resolution_sha": "33e64c2300a996a22674d42e3a4e5ed4566b314e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "reviewer": "rev-0-41-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claiml2.20"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[standards] atip.claiml2.20 was not re-bound: its only evidence record is the 0.37 one (impl-atip-dep-037, a5f6b6ba0) naming the case atip_claim14_13_..._agree_on_1_4, which no longer exists in the code (it is atip_claim14_13_..._agree_on_1_5, and atip_claim15_11 reads the same agreement); the scenario text was re-worded to 1.6 in this change and its evidence names code that is gone, so a review would pin a verdict about nothing at this rev. The behaviour holds: both tests pass when I run them at HEAD (code identical to 01ec9a138 outside .canon). Fix: evidence add --scenario atip.claiml2.20 bound to the current case (atip_claim14_13_..._agree_on_1_5, optionally atip_claim15_11_...). Blast radius: the other 38 scenarios of this review have impl-0-41 evidence whose cases all exist and pass; only this one fell out of the batch.",
+  "worktree_dirty": false
+}

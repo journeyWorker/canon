@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:57:11.398092Z",
+  "change_id": "canon-0-41-atip-1-6",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "disposition": "deferred",
+  "file_ref": "crates/canon-cli/tests/atip_claiml2.rs:40",
+  "introduced_by": "874081f4354a744bb0179a3c887213395714427c",
+  "kind": "finding",
+  "reason": "a rename unbinds the evidence of eleven scenarios; the brief puts literal clean-up out of scope",
+  "reviewed_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "reviewer": "rev-0-41-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim14.01",
+    "atip.claim14.11",
+    "atip.claim14.13",
+    "atip.claim14.14",
+    "atip.claim15.01",
+    "atip.claim15.12",
+    "atip.claiml2.01",
+    "atip.claiml2.07",
+    "atip.claiml2.09",
+    "atip.optionforms.15",
+    "atip.optionvalues.16"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[standards] Eleven bound tests keep '_1_5' (or '_1_4') in their names while they now assert 1.6 (e.g. atip_claiml2_01_every_envelope_declares_1_5_..., atip_claim14_14_..._l2_1_5_...). The assertions are correct (I ran them and read the diff); the names mislead the next reader, and a rename would unbind the evidence, so I do not ask for it in this change. The brief leaves literal clean-up out of scope. Blast radius: evidence binds by case name, so any later rename must re-record these scenarios.",
+  "worktree_dirty": false
+}

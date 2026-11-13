@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T22:02:41.039191Z",
+  "change_id": "canon-0-41-atip-1-6",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "disposition": "fixed",
+  "file_ref": ".canon/ledger/kind=evidence/canon_scenario_atip.claim16.03_703f1370.json",
+  "introduced_by": "33e64c2300a996a22674d42e3a4e5ed4566b314e",
+  "kind": "finding",
+  "resolution_code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "resolution_sha": "be6f4979d9d89d35c9509f98851118d648048783",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "33e64c2300a996a22674d42e3a4e5ed4566b314e",
+  "reviewer": "rev-0-41-atip",
+  "round": 2,
+  "scenario_ids": [
+    "atip.claim16.01",
+    "atip.claim16.03",
+    "atip.claim16.11"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[standards] The round-2 evidence records for atip.claim16.01, .03 and .11 each REPLACE the scenario's latest record (the round-1 ones are now in .canon/archive) and hold only a text artifact (stage1-output.txt, atip-deep-output.txt): none carries the junit case any more (atip_claim16_01_..., atip_claim16_03_..., atip_claim16_11_...), and .03 also lost the one-off 0.40.0 comparison artifact (atip-1-6-f2-compare-0.40.0.txt) that the brief's F2 acceptance asks for. So the latest evidence of three scenarios is no longer a test run of what their Then steps say, and my round-1 reviews of them are stale (the checks differ). The artifacts themselves are real: I read both; stage1-output.txt is the crate-only comparison (217 answers, 0 differ) and atip-deep-output.txt is the checker report (L2 met, 74 MUST passed, 0 failed, 1 SHOULD advisory = --kind, real 5m46s as the CHANGELOG says); both match what I reproduced in round 1. Fix: add each scenario's evidence once with the junit case AND its artifacts in the one record: claim16.01 = case atip_claim16_01_... + stage1-output.txt; claim16.03 = case atip_claim16_03_... + atip-1-6-f2-compare-0.40.0.txt + atip-deep-output.txt; claim16.11 = case atip_claim16_11_... + atip-deep-output.txt (junit target/nextest/default/junit.xml holds all three passing at this code tree). Blast radius: only these three evidence records; no code changed since 01ec9a138.",
+  "worktree_dirty": false
+}

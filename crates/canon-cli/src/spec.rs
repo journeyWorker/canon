@@ -5,7 +5,7 @@
 //! The documents are the contract's (atip/1 spec 9). [`tree`], [`group`] and [`command`] build the typed model of
 //! them in the full form (every member, `path`, the JSON Schemas its refs name, the `rejects` of each validator): the
 //! one thing the tests, the generators and the human text read. [`described`] hands that model to the contract crate's
-//! serializer, which writes the form canon declares (the 1.4 form, unchanged in 1.5: the call surface only, defaults left out, shared options in
+//! serializer, which writes the form canon declares (the 1.4 form, unchanged in 1.5 and 1.6: the call surface only, defaults left out, shared options in
 //! the tree, the schemas in the `--schemas` answer). `canon schema` prints what [`described`] writes and the checked-in
 //! `docs/cli/canon.cli.json` holds it, from the same function, so what the file says of a command and what
 //! `canon schema <COMMAND>` answers are one value.
@@ -111,7 +111,7 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
 }
 
 
-/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.5 --deep`
+/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.6 --deep`
 /// passes on the build: the check runs in CI beside the tests that build these documents (`just atip-deep`, the `atip` job).
 pub const LEVEL: &str = "L2";
 

@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:50:36.188684Z",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "kind": "review",
+  "pin": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_optionforms_15_the_checker_fixture_lists_values_the_new_domains_refuse_and_the_recipes_run_at_1_5"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "b1f7d2073aa3e4b04cb93fe7af40e268c561df31bf94131ea753e3a85a4c9763",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-41-atip-1-6/brief.md"
+  },
+  "review_id": "01M7BE874W8CZW14K2N22BX30J",
+  "reviewer": "rev-0-41-atip",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "scenario_id": "atip.optionforms.15",
+  "schema": 2,
+  "worktree_dirty": false
+}

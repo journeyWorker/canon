@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:59:27.309782Z",
+  "attachments": [
+    {
+      "path": "target/atip-notes/atip-deep-output.txt",
+      "sha256": "46a9f36d9f60b6975936b08408031f998dd35ab8fb24d14e28fd5e20b95fafa9"
+    },
+    {
+      "case": "atip_claim16_11_the_install_lines_and_the_dependency_name_the_tags_of_0_3_0",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "4c7e17b3daa584a995ebf700f998e6dc65b50cf0b0f8547eb181ab00e703ab01"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d93458550da3be380c557f412f94db708c8d915e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "atip.claim16.11",
+  "schema": 1,
+  "staging_id": "375006d3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

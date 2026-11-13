@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:57:11.179661Z",
+  "change_id": "canon-0-41-atip-1-6",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "disposition": "deferred",
+  "file_ref": ".canon/specs/kind=feature/area=atip/claim15.feature",
+  "introduced_by": "bdd6806b3f32cbb3c91fa5a67e3d6203906f62f9",
+  "kind": "finding",
+  "reason": "wording only; the tests are right. Re-word when these scenarios are next touched (a re-word stales their reviews, not worth a round)",
+  "reviewed_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "reviewer": "rev-0-41-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim15.02",
+    "atip.claim15.13",
+    "atip.claim14.11",
+    "atip.claim15.06"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[spec-fidelity] The re-wording to 1.6 left stale words in four scenarios, so the text and the test disagree in places: claim15.02 Given/When say the crate judges the pattern 'at the minors 1.4 and 1.5' and its title says 'none of a 1.5 one', but Then and the test judge at the declared minor 1.6 and at 1.4 (1.5 is not judged there); claim15.13 title says 'below 1.5' while Then and the test say below 1.6 (1.5 is a seeded fault); claim14.11 Then says no file spells the declaration as '1.0 to 1.3' while the test (old_minor_after, 0..=5) refuses 1.0 to 1.5; claim15.06 title says the 1.4 rules 'hold at 1.5' while the test and Then are at 1.6. Behaviour is right in all four (tests pass); only the text lags. Blast radius: none beyond the text; fix by a re-wording that stales the review again.",
+  "worktree_dirty": false
+}

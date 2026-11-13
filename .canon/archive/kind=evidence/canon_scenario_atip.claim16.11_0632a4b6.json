@@ -1,0 +1,32 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:55:02.059649Z",
+  "attachments": [
+    {
+      "path": "target/atip-notes/atip-deep-output.txt",
+      "sha256": "46a9f36d9f60b6975936b08408031f998dd35ab8fb24d14e28fd5e20b95fafa9"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "just atip-deep"
+  },
+  "evidence_note": {
+    "command_result": "L2 met: 74 MUST passed, 0 MUST failed, 0 MUST unprovided, 8 not applicable, 1 SHOULD advisories",
+    "summary": "just atip-deep (checker atip 0.3.0, --contract 1.6 --deep) on the debug build: L2 met, 74 MUST passed, 0 failed; real 5m46s on a loaded machine"
+  },
+  "evidence_sha": "722b9c3f5e7857f8500b5e0f58b30c4048f6bf71",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "atip.claim16.11",
+  "schema": 1,
+  "staging_id": "58f51cda",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

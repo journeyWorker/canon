@@ -9,7 +9,7 @@ Feature: atip schema: the L1 self-description documents
   Scenario: The schema tree is a tree document at level L2 that lists every group and command once, a group before its commands, and --as filters while CANON_ROLE does not
     Given a built canon and no environment
     When canon schema --json runs twice, then with --as reviewer, and with CANON_ROLE=reviewer
-    Then data.kind is tree and level is L2; the 27 groups and 78 commands appear once each with a group before its commands and no entry has path or kind command; meta.schemaVersion and contractVersion are 1.5; the two plain answers are byte-equal; --as keeps only the reviewer commands and their groups and the tree names the role in x-canon.as; every tree, filtered or not, says the two forms of x-canon.roles once in x-canon.rolesForm and the unfiltered trees have no other x-canon member; each command entry carries x-canon.roles as all or an array of role names; CANON_ROLE changes nothing
+    Then data.kind is tree and level is L2; the 27 groups and 78 commands appear once each with a group before its commands and no entry has path or kind command; meta.schemaVersion and contractVersion are 1.6; the two plain answers are byte-equal; --as keeps only the reviewer commands and their groups and the tree names the role in x-canon.as; every tree, filtered or not, says the two forms of x-canon.roles once in x-canon.rolesForm and the unfiltered trees have no other x-canon member; each command entry carries x-canon.roles as all or an array of role names; CANON_ROLE changes nothing
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:12Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema
@@ -129,7 +129,7 @@ Feature: atip schema: the L1 self-description documents
   Scenario: The checked-in spec holds the tree and, for every command, the document canon schema answers, and no consumer reads a name the old spec had
     Given the checked-in spec file and the guides, the website pages, the evaluation scripts and the design notes
     When canon schema <command> --json runs for every command and the files are scanned for the names the old spec had
-    Then the file says contractVersion 1.5 and holds the 1.4-form tree and, for each of the 78 commands, the document the answer carries, byte for byte, and under schemas the --schemas answer of each command; the tree defines each shared option once and every 1.4 rule of the form holds; no guide, page, script or design note holds a member name the 0.33 spec had
+    Then the file says contractVersion 1.6 and holds the 1.4-form tree and, for each of the 78 commands, the document the answer carries, byte for byte, and under schemas the --schemas answer of each command; the tree defines each shared option once and every 1.4 rule of the form holds; no guide, page, script or design note holds a member name the 0.33 spec had
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:51Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema

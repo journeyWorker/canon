@@ -3,7 +3,7 @@
   "cli": {
     "about": "Specs, evidence gates, and agent memory for your repo",
     "name": "canon",
-    "version": "0.40.0"
+    "version": "0.41.0"
   },
   "commands": [
     {
@@ -6148,7 +6148,7 @@
       "outputs": [
         {
           "schemaRef": "#/schemas/SchemaReport",
-          "schemaVersion": "1.5"
+          "schemaVersion": "1.6"
         }
       ],
       "summary": "Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes",
@@ -7555,7 +7555,7 @@
     }
   ],
   "contract": "atip/1",
-  "contractVersion": "1.5",
+  "contractVersion": "1.6",
   "envVars": [
     {
       "about": "Default actor id (`--actor`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`",

@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:50:36.188684Z",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "kind": "review",
+  "pin": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claim16_01_every_envelope_and_schema_answer_says_1_6_and_the_tree_says_l2"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "7c7db8919909f28ca18cc926c32939542dc76bbea176ec3e3aab974a779c5b8d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-41-atip-1-6/brief.md"
+  },
+  "review_id": "01M7BE874W8CZW14K2N22BX30J",
+  "reviewer": "rev-0-41-atip",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-sonnet-5-5",
+  "scenario_id": "atip.claim16.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

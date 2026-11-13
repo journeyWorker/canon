@@ -1,0 +1,32 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:54:09.555416Z",
+  "attachments": [
+    {
+      "path": "target/atip-notes/stage1-output.txt",
+      "sha256": "07d458774f560b868ea06d1ea43548e805e27461d491fc9274c1eaa63b6403d0"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "compare.py parent build vs 320fcb199"
+  },
+  "evidence_note": {
+    "command_result": "answers compared: 217 (tree entries 105/105); differing: 0; combined sha256 of A side 2f1d20ea0e2d6478",
+    "summary": "crate-only stage 320fcb199 (crate 0.3.0, declaration 1.5) vs the parent build: 217 answers compared, tree entries 105/105, 0 differ, combined sha256 2f1d20ea0e2d6478"
+  },
+  "evidence_sha": "722b9c3f5e7857f8500b5e0f58b30c4048f6bf71",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 16,
+  "scenario_id": "atip.claim16.01",
+  "schema": 1,
+  "staging_id": "138d084d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

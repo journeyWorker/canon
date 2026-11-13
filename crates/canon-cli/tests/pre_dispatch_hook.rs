@@ -187,7 +187,12 @@ fn pre_dispatch_hook_is_silent_and_exits_zero_when_canon_is_missing_from_path() 
         .spawn()
         .and_then(|mut child| {
             use std::io::Write;
-            child.stdin.take().unwrap().write_all(b"{}")?;
+            // With no `canon` on PATH the hook may exit before it reads stdin; the write then meets a closed
+            // pipe, which is the hook doing its job, not a failure (seen on a CI runner as EPIPE).
+            match child.stdin.take().unwrap().write_all(b"{}") {
+                Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => {}
+                other => other?,
+            }
             child.wait_with_output()
         })
         .expect("spawn pre-dispatch.sh with an empty PATH");

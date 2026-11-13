@@ -1,11 +1,11 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "Journey Hwang",
-  "approved_at": "2026-11-09T14:24:16Z",
-  "note": "재승인: 리뷰 지적에 따라 고친 브리프 3개",
+  "approved_at": "2026-11-13T18:02:18Z",
+  "note": "Approved on the owner's behalf: the owner delegated approval to the orchestrator (canon-OCO) in chat on 2026-11-14 ('슬로우나 플랜 애이전트에게 리뷰받고 승인해서 진행해'), conditional on an independent plan review with no P0/P1. Reviews: ci-nextest round 2 approve, atip-1-6 round 1 approve (JSON on NAS 2026-11-14-0.41-plan-review). The owner did not read the brief text. The atip 1.6 claim itself was the owner's own instruction ('atip 1.6 출시했어 따라가자').",
   "relay": {
     "role": "planner",
     "actor": "planner-oco",
-    "tool": "ask"
+    "tool": "chat"
   }
 }

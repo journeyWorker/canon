@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-41-atip",
+    "role": "reviewer",
+    "session_id": "s-0-41-atip-rev"
+  },
+  "at": "2026-11-13T21:50:03.550090Z",
+  "change_id": "canon-0-41-atip-1-6",
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md:9",
+  "introduced_by": "0d3e104664e8051c55d0c0a896fdce008d018a12",
+  "kind": "finding",
+  "reviewed_sha": "01ec9a138ca47bd69880b47c5d0f6c9ec2352ad2",
+  "reviewer": "rev-0-41-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claim16.01",
+    "atip.claim16.03",
+    "atip.claim16.11"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The brief's F1 order and F6 ask the implementer to leave (a) the hash of the schema/errors/warnings/schemas/command outputs of the crate-only build (crate 0.3.0, constant 1.5, 320fcb199) against the parent build, and (b) the checker's report summary and run time, in evidence. Neither is in any evidence record: claim16.03 holds only the 0.40.0-vs-final comparison; the run summary is only in the commit message of 0d3e10466 (74 MUST passed, 4m09s), while the CHANGELOG says 5 min 46 s. The CHANGELOG nevertheless states as fact that the crate-only build prints the same bytes. I reproduced both: a build of 320fcb199 prints 190 answers (tree per role, 27 groups, 78 commands, --schemas, --errors, --warnings) byte-identical to the 0.40.0 binary with no substitution; atip check --level L2 --contract 1.6 --deep (checker 0.3.0) on the final binary gives 'L2 met: 74 MUST passed, 0 MUST failed, 0 MUST unprovided, 8 not applicable, 1 SHOULD advisories' (L1.one-meaning-values for --kind; L1.depth, L1.one-meaning, L0.contract-version pass; L1.comma-list not applicable), 8m14s on this loaded machine. Fix: attach the stage-1 comparison and the checker report to evidence (claim16.01/.03/.11), and make the CHANGELOG time and the commit message agree or drop the time. Blast radius: nothing else in the checks reads the crate-only stage.",
+  "worktree_dirty": false
+}

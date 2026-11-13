@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-0-41",
+    "role": "implementer",
+    "session_id": "s-0-41-impl"
+  },
+  "at": "2026-11-13T21:59:53.484983Z",
+  "attachments": [
+    {
+      "case": "atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_on_1_5",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/nextest/default/junit.xml",
+      "sha256": "4c7e17b3daa584a995ebf700f998e6dc65b50cf0b0f8547eb181ab00e703ab01"
+    }
+  ],
+  "code_tree": "b51d73bd211797e885d14b7ac177f917e41368d4",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/nextest/default/junit.xml"
+  },
+  "evidence_sha": "d93458550da3be380c557f412f94db708c8d915e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 462,
+  "scenario_id": "atip.claiml2.20",
+  "schema": 1,
+  "staging_id": "50666038",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

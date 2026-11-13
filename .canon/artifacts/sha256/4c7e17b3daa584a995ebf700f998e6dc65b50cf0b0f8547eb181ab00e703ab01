@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="193" skipped="0" failures="0" errors="0" uuid="7490e7fe-fb42-4e5f-a508-80d0bd58405d" timestamp="2026-11-14T06:28:19.631+09:00" time="306.345">
+    <testsuite name="canon-cli::atip_check" tests="3" skipped="0" errors="0" failures="0">
+        <testcase name="atip_check_43_the_ci_job_and_the_just_recipe_run_atip_check_against_the_canon_binary_with_the_same_command" classname="canon-cli::atip_check" timestamp="2026-11-14T06:28:19.633+09:00" time="0.027"/>
+        <testcase name="atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generated_from_canon_schema" classname="canon-cli::atip_check" timestamp="2026-11-14T06:28:19.634+09:00" time="97.854"/>
+        <testcase name="atip_check_40_a_stale_registry_in_the_canon_fixture_fails_the_generation_test" classname="canon-cli::atip_check" timestamp="2026-11-14T06:28:19.634+09:00" time="97.964"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_claim14" tests="16" skipped="0" errors="0" failures="0">
+        <testcase name="atip_claim14_10_the_whitespace_check_finds_formatted_documents_and_accepts_strings" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:29:57.599+09:00" time="0.033"/>
+        <testcase name="atip_claim14_08_schemas_is_refused_without_a_command_path_and_with_the_registries" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:28:19.664+09:00" time="98.375"/>
+        <testcase name="atip_claim14_12_the_consumer_scan_finds_a_declaration_below_1_5_and_a_stated_old_form_member" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:29:58.039+09:00" time="0.026"/>
+        <testcase name="atip_claim14_06_commit_without_plan_digest_is_refused_and_a_destructive_document_needs_commit" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:28:19.634+09:00" time="104.036"/>
+        <testcase name="atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fixture" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:30:03.671+09:00" time="0.031"/>
+        <testcase name="atip_claim14_01_every_envelope_says_1_5_and_the_tree_says_l2_with_shared_options" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:28:19.633+09:00" time="108.401"/>
+        <testcase name="atip_claim14_16_the_entry_check_fails_when_the_table_a_size_row_or_the_callers_paragraph_is_missing" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:30:08.035+09:00" time="0.028"/>
+        <testcase name="atip_claim14_11_the_consumers_declare_1_5_and_state_no_old_form_member_as_current" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:29:57.632+09:00" time="12.112"/>
+        <testcase name="atip_claim14_05_a_bare_destructive_command_is_a_preview_that_writes_nothing" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:28:19.633+09:00" time="112.845"/>
+        <testcase name="atip_claim14_15_the_changelog_entry_states_the_measured_sizes_and_the_note_for_callers" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:30:03.702+09:00" time="10.769"/>
+        <testcase name="atip_claim14_04_the_form_check_finds_an_implied_option_an_implied_code_or_a_default_member" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:28:19.633+09:00" time="128.408"/>
+        <testcase name="atip_claim14_03_a_command_document_carries_the_call_surface_only" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:28:19.634+09:00" time="129.335"/>
+        <testcase name="atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_on_1_5" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:29:58.065+09:00" time="34.091"/>
+        <testcase name="atip_claim14_02_schema_answers_the_same_bytes_without_a_repository_and_the_form_check_finds_a_1_3_tree" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:28:19.634+09:00" time="141.499"/>
+        <testcase name="atip_claim14_07_schemas_answers_exactly_the_referenced_schemas_the_derived_input_and_rejects" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:28:19.634+09:00" time="159.271"/>
+        <testcase name="atip_claim14_09_no_schema_answer_and_no_envelope_has_whitespace_outside_a_string" classname="canon-cli::atip_claim14" timestamp="2026-11-14T06:29:57.489+09:00" time="64.921"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_claim15" tests="16" skipped="0" errors="0" failures="0">
+        <testcase name="atip_claim15_02_a_declaration_of_1_4_fails_the_check_and_the_crate_judges_a_document_by_the_declared_minor" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:09.744+09:00" time="0.833"/>
+        <testcase name="atip_claim15_04_the_property_is_the_white_space_of_the_old_lists_over_every_scalar_value" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:14.472+09:00" time="12.289"/>
+        <testcase name="atip_claim15_07_a_formatted_document_and_a_member_at_its_default_fail_the_checks" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:28.970+09:00" time="0.018"/>
+        <testcase name="atip_claim15_05_the_checks_find_a_listed_class_a_shorthand_an_alias_and_a_value_that_changed_sides" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:26.761+09:00" time="5.601"/>
+        <testcase name="atip_claim15_03_no_declared_pattern_lists_white_space_and_each_says_it_as_the_property" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:10.578+09:00" time="29.497"/>
+        <testcase name="atip_claim15_11_lowering_the_declaration_the_fixture_the_job_or_a_recipe_fails_the_agreement" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:40.075+09:00" time="0.045"/>
+        <testcase name="atip_claim15_13_the_consumer_scan_finds_a_declaration_below_1_5_and_a_shown_list_of_white_space" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:41.134+09:00" time="0.028"/>
+        <testcase name="atip_claim15_12_the_consumers_declare_1_5_and_show_no_list_of_white_space" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:40.120+09:00" time="4.800"/>
+        <testcase name="atip_claim15_15_the_entry_check_fails_when_the_table_a_length_or_the_callers_paragraph_is_missing" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:44.920+09:00" time="0.022"/>
+        <testcase name="atip_claim15_01_every_envelope_and_schema_answer_says_1_5_and_the_tree_says_l2" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:08.063+09:00" time="42.626"/>
+        <testcase name="atip_claim15_06_the_rules_of_1_4_hold_at_1_5_compact_documents_usage_for_help_json_and_no_default_members" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:28.042+09:00" time="32.064"/>
+        <testcase name="atip_claim15_10_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fixture_and_the_deep_report_binds" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:32.362+09:00" time="27.920"/>
+        <testcase name="atip_claim15_09_a_document_that_declares_1_4_has_its_property_pattern_read_as_a_problem" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:32.157+09:00" time="28.435"/>
+        <testcase name="atip_claim15_08_a_1_4_profile_reads_the_property_as_a_problem_and_a_compile_only_caller_takes_the_same_values" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:28.988+09:00" time="31.692"/>
+        <testcase name="atip_claim15_04_each_pattern_takes_and_refuses_the_values_it_did_in_0_36" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:12.480+09:00" time="50.374"/>
+        <testcase name="atip_claim15_14_the_changelog_entry_has_the_table_the_lengths_and_the_note_for_callers" classname="canon-cli::atip_claim15" timestamp="2026-11-14T06:30:41.163+09:00" time="26.515"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_claim16" tests="14" skipped="0" errors="0" failures="0">
+        <testcase name="atip_claim16_05_a_comma_list_is_refused_whole_and_one_option_per_value_passes" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:00.283+09:00" time="0.350"/>
+        <testcase name="atip_claim16_11_the_install_lines_and_the_dependency_name_the_tags_of_0_3_0" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:07.678+09:00" time="0.065"/>
+        <testcase name="atip_claim16_12_a_line_at_a_tag_of_0_2_0_is_found" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:07.743+09:00" time="0.019"/>
+        <testcase name="atip_claim16_13_the_changelog_entry_has_the_table_the_callers_note_and_the_reasons" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:07.762+09:00" time="0.019"/>
+        <testcase name="atip_claim16_14_an_entry_without_the_callers_note_the_table_or_the_reasons_is_found" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:07.782+09:00" time="0.029"/>
+        <testcase name="atip_claim16_01_every_envelope_and_schema_answer_says_1_6_and_the_tree_says_l2" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:30:44.943+09:00" time="29.891"/>
+        <testcase name="atip_claim16_02_a_declaration_of_1_5_fails_the_declaration_check" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:30:50.689+09:00" time="26.055"/>
+        <testcase name="atip_claim16_07_the_longest_path_is_two_words_and_the_tree_has_no_path_shape" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:00.633+09:00" time="25.489"/>
+        <testcase name="atip_claim16_03_no_document_has_comma_list_or_path_shape" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:30:58.906+09:00" time="27.457"/>
+        <testcase name="atip_claim16_04_a_document_with_a_member_of_1_6_or_an_expectation_that_differs_beyond_the_declaration_is_found" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:00.107+09:00" time="26.305"/>
+        <testcase name="atip_claim16_06_a_declared_comma_list_the_parser_does_not_split_is_found" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:00.592+09:00" time="25.966"/>
+        <testcase name="atip_claim16_08_a_tree_with_a_three_word_entry_or_a_path_shape_fails_the_depth_check" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:00.680+09:00" time="25.955"/>
+        <testcase name="atip_claim16_09_an_option_name_has_one_value_name_and_one_value_kind_in_every_document" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:02.410+09:00" time="24.853"/>
+        <testcase name="atip_claim16_10_a_document_set_with_one_name_and_two_meanings_fails_the_check" classname="canon-cli::atip_claim16" timestamp="2026-11-14T06:31:02.854+09:00" time="24.541"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_claiml2" tests="14" skipped="0" errors="0" failures="0">
+        <testcase name="atip_claiml2_01_every_envelope_declares_1_5_and_the_schema_tree_says_l2" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:07.811+09:00" time="7.010"/>
+        <testcase name="atip_claiml2_02_no_consumer_spells_canons_declaration_as_an_earlier_minor" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:14.820+09:00" time="0.369"/>
+        <testcase name="atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_5" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:15.189+09:00" time="0.016"/>
+        <testcase name="atip_claiml2_06_input_too_large_names_the_field_input" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:14.834+09:00" time="0.407"/>
+        <testcase name="atip_claiml2_11_every_obligation_of_contract_17_2_has_a_row_with_live_tests_or_a_stated_reason" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:15.241+09:00" time="0.047"/>
+        <testcase name="atip_claiml2_13_the_release_section_carries_every_change_of_the_release_once_and_the_evidence_list" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:16.744+09:00" time="0.025"/>
+        <testcase name="atip_claiml2_09_the_fixture_claims_1_5_and_lists_what_the_l2_rows_need" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:15.205+09:00" time="1.693"/>
+        <testcase name="atip_claiml2_14_an_entry_taken_out_of_the_release_section_fails_the_check" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:16.769+09:00" time="0.451"/>
+        <testcase name="atip_claiml2_12_a_row_taken_out_of_the_list_or_a_test_that_is_not_live_fails_the_check" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:15.289+09:00" time="2.680"/>
+        <testcase name="atip_claiml2_16_the_preview_of_a_move_to_the_local_store_leads_with_the_commit_call" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:17.221+09:00" time="6.355"/>
+        <testcase name="atip_claiml2_15_a_batch_of_unchanged_elements_has_only_items_in_data" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:16.898+09:00" time="8.888"/>
+        <testcase name="atip_claiml2_18_no_command_of_canon_reads_a_terminal_for_input_and_init_asks_nothing_on_one" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:23.576+09:00" time="2.381"/>
+        <testcase name="atip_claiml2_19_a_fixture_missing_a_required_item_is_refused_by_the_fixture_test" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:25.786+09:00" time="0.826"/>
+        <testcase name="atip_claiml2_17_a_known_secret_of_the_environment_reaches_no_output_and_no_file" classname="canon-cli::atip_claiml2" timestamp="2026-11-14T06:31:17.969+09:00" time="41.670"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_constraints" tests="23" skipped="0" errors="0" failures="0">
+        <testcase name="atip_constraints_06_the_id_patterns_agree_with_the_rust_parsers" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:26.558+09:00" time="1.407"/>
+        <testcase name="atip_constraints_01_clap_relations_are_constraints_of_the_document" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:25.957+09:00" time="2.157"/>
+        <testcase name="atip_constraints_06_every_domain_is_in_the_profile_and_holds_the_defaults" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:26.413+09:00" time="1.906"/>
+        <testcase name="atip_constraints_06_the_time_pattern_admits_everything_the_parser_accepts" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:26.613+09:00" time="1.817"/>
+        <testcase name="atip_constraints_12_the_guides_and_the_spec_read_the_constraints_of_the_documents" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:28.114+09:00" time="0.423"/>
+        <testcase name="atip_constraints_14_a_relayed_approval_is_a_relation_with_its_validators_and_the_environment_is_declared" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:28.326+09:00" time="0.287"/>
+        <testcase name="atip_constraints_16_the_shape_of_input_is_the_parsers_and_no_document_declares_it" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:28.537+09:00" time="1.134"/>
+        <testcase name="atip_constraints_15_a_relayed_approval_without_role_actor_or_answer_is_refused_before_any_state_is_read" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:28.431+09:00" time="1.296"/>
+        <testcase name="atip_constraints_20_a_requires_clap_skips_because_of_a_conflict_is_enforced" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:29.727+09:00" time="0.928"/>
+        <testcase name="atip_constraints_21_a_negative_integer_names_its_option_and_minus_zero_is_zero" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:30.691+09:00" time="1.506"/>
+        <testcase name="atip_constraints_22_the_retrieve_role_regime_refusal_names_for_role" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:32.261+09:00" time="0.190"/>
+        <testcase name="atip_constraints_02_a_relation_stated_twice_is_found_and_a_broken_pair_names_its_argument" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:26.123+09:00" time="6.917"/>
+        <testcase name="atip_constraints_03_handler_relations_are_constraints_with_their_codes" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:26.363+09:00" time="7.921"/>
+        <testcase name="atip_constraints_07_every_time_option_declares_the_calendar_validator_and_refuses_an_impossible_date" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:26.636+09:00" time="7.780"/>
+        <testcase name="atip_constraints_25_an_integer_refusal_names_the_declared_bound" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:34.286+09:00" time="0.208"/>
+        <testcase name="atip_constraints_26_a_stateless_fault_in_a_later_element_beats_the_first_elements_missing_repository" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:34.416+09:00" time="0.616"/>
+        <testcase name="atip_constraints_08_an_export_window_that_ends_before_it_starts_is_refused" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:27.264+09:00" time="8.401"/>
+        <testcase name="atip_constraints_17_one_approval_code_has_a_reason_for_the_arguments_and_one_for_the_signature" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:28.628+09:00" time="7.288"/>
+        <testcase name="atip_constraints_18_a_declared_domain_or_rule_answers_before_any_state_is_read_and_in_the_contracts_order" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:29.671+09:00" time="6.388"/>
+        <testcase name="atip_constraints_11_a_sixty_four_bit_integer_outside_the_safe_range_is_refused_and_never_rounded" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:27.965+09:00" time="9.125"/>
+        <testcase name="atip_constraints_10_the_edge_of_the_safe_range_is_accepted_and_no_domain_goes_beyond_it" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:27.395+09:00" time="9.815"/>
+        <testcase name="atip_constraints_24_the_semantic_checks_clap_ran_answer_after_the_domains_and_the_constraints" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:33.040+09:00" time="5.153"/>
+        <testcase name="atip_constraints_23_a_stateless_fault_in_any_batch_element_refuses_the_batch_before_it_writes" classname="canon-cli::atip_constraints" timestamp="2026-11-14T06:31:32.502+09:00" time="10.697"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_contract11" tests="7" skipped="0" errors="0" failures="0">
+        <testcase name="atip_contract11_09_a_usage_that_cannot_name_its_argument_has_no_field_and_points_at_the_schema_of_the_command" classname="canon-cli::atip_contract11" timestamp="2026-11-14T06:31:35.665+09:00" time="0.720"/>
+        <testcase name="atip_contract11_10_a_retrieve_with_no_scope_hints_a_template_and_not_prose_that_starts_with_canon" classname="canon-cli::atip_contract11" timestamp="2026-11-14T06:31:35.917+09:00" time="0.560"/>
+        <testcase name="atip_contract11_08_an_empty_value_the_caller_sent_is_received_empty_and_a_value_never_sent_has_no_received" classname="canon-cli::atip_contract11" timestamp="2026-11-14T06:31:35.032+09:00" time="1.627"/>
+        <testcase name="atip_contract11_16_a_group_option_that_is_not_tool_wide_or_has_no_value_is_still_usage_naming_the_option" classname="canon-cli::atip_contract11" timestamp="2026-11-14T06:31:36.385+09:00" time="0.407"/>
+        <testcase name="atip_contract11_17_an_envelope_without_the_contract_or_with_version_1_0_or_another_contract_fails_the_envelope_schema" classname="canon-cli::atip_contract11" timestamp="2026-11-14T06:31:36.477+09:00" time="0.324"/>
+        <testcase name="atip_contract11_11_a_tool_wide_option_after_a_group_word_is_command_required_and_an_unknown_one_is_usage" classname="canon-cli::atip_contract11" timestamp="2026-11-14T06:31:36.060+09:00" time="0.848"/>
+        <testcase name="atip_contract11_01_every_envelope_declares_the_contract_and_its_version_and_a_registry_answer_names_its_kind" classname="canon-cli::atip_contract11" timestamp="2026-11-14T06:31:34.494+09:00" time="3.091"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_crate12" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="atip_crate12_14_the_reserved_codes_canon_registers_have_the_exit_and_retryability_of_the_crates_table" classname="canon-cli::atip_crate12" timestamp="2026-11-14T06:31:36.801+09:00" time="0.604"/>
+        <testcase name="atip_crate12_15_a_reserved_code_registered_with_another_exit_or_retryability_is_a_problem_and_the_midway_code_is_judged_in_1_2_alone" classname="canon-cli::atip_crate12" timestamp="2026-11-14T06:31:36.908+09:00" time="0.503"/>
+        <testcase name="atip_crate12_12_canon_declares_the_minor_of_its_answers_by_its_own_constant_and_the_crate_knows_it" classname="canon-cli::atip_crate12" timestamp="2026-11-14T06:31:36.660+09:00" time="2.136"/>
+        <testcase name="atip_crate12_13_a_text_that_is_no_minor_is_refused_and_no_source_of_canon_reads_the_crates_contract_version" classname="canon-cli::atip_crate12" timestamp="2026-11-14T06:31:36.792+09:00" time="2.312"/>
+        <testcase name="atip_crate12_18_field_rules_follow_the_declared_minor_and_a_minor_the_crate_does_not_know_is_refused" classname="canon-cli::atip_crate12" timestamp="2026-11-14T06:31:37.090+09:00" time="2.065"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_l0" tests="31" skipped="0" errors="0" failures="0">
+        <testcase name="atip_contract11_04_every_input_error_the_corpus_froze_has_a_registered_reason" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:37.406+09:00" time="0.662"/>
+        <testcase name="atip_l0_03_an_unresolved_command_leaves_command_out_and_a_half_resolved_one_names_the_path" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:38.844+09:00" time="0.099"/>
+        <testcase name="atip_l0_02_an_output_is_named_when_the_command_declares_several" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:38.193+09:00" time="0.860"/>
+        <testcase name="atip_contract11_04_every_reason_canon_emits_is_registered_under_its_code_and_a_missing_one_fails" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:37.410+09:00" time="1.911"/>
+        <testcase name="atip_contract11_04_no_source_emits_input_invalid_or_input_too_large_without_a_registered_reason" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:37.585+09:00" time="1.865"/>
+        <testcase name="atip_contract11_03_a_source_over_the_limits_is_input_too_large_with_its_reason" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:37.210+09:00" time="3.091"/>
+        <testcase name="atip_l0_01_status_json_names_the_tool_its_version_and_the_contract" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:38.068+09:00" time="2.337"/>
+        <testcase name="atip_l0_08_a_page_is_in_meta_page_with_a_next_step_for_the_next_one" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:39.156+09:00" time="2.225"/>
+        <testcase name="atip_l0_10_projected_and_paged_output_holds_only_defined_meta_members" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:39.450+09:00" time="2.351"/>
+        <testcase name="atip_l0_05_a_member_with_no_value_is_absent" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:39.053+09:00" time="2.748"/>
+        <testcase name="atip_l0_15_an_unknown_command_answers_unknown_command" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:41.801+09:00" time="0.154"/>
+        <testcase name="atip_l0_04_context_holds_only_the_context_options_with_relative_paths" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:38.943+09:00" time="3.149"/>
+        <testcase name="atip_l0_16_a_bare_tool_or_group_answers_command_required" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:41.988+09:00" time="0.527"/>
+        <testcase name="atip_l0_06_every_envelope_the_binary_prints_passes_the_contract_schema" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:39.113+09:00" time="4.086"/>
+        <testcase name="atip_l0_20_a_panic_answers_internal_with_exit_one_never_101" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:43.199+09:00" time="0.107"/>
+        <testcase name="atip_l0_11_a_cursor_canon_did_not_issue_is_refused_with_cursor_invalid" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:40.301+09:00" time="3.105"/>
+        <testcase name="atip_l0_09_a_repeated_write_reports_unchanged_in_data_and_the_role_split_in_data" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:39.327+09:00" time="4.089"/>
+        <testcase name="atip_l0_12_next_entries_are_runnable_with_reason_and_json" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:40.406+09:00" time="3.153"/>
+        <testcase name="atip_l0_13_a_warning_is_a_coded_object_with_a_registered_code" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:41.381+09:00" time="2.238"/>
+        <testcase name="atip_l0_19_the_registry_holds_the_reserved_codes_and_none_of_the_old_names" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:43.199+09:00" time="1.007"/>
+        <testcase name="atip_l0_17_an_unknown_option_a_missing_value_or_an_unknown_field_name_is_usage" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:42.127+09:00" time="2.107"/>
+        <testcase name="atip_l0_14_guidance_with_a_placeholder_is_not_a_next_entry" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:41.801+09:00" time="2.445"/>
+        <testcase name="atip_l0_18_a_text_error_opens_stderr_with_the_tool_code_and_message" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:42.530+09:00" time="2.176"/>
+        <testcase name="atip_l0_26_the_spec_file_and_the_conformance_corpus_are_the_new_contract" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:43.416+09:00" time="1.321"/>
+        <testcase name="atip_l0_21_a_closed_stdout_is_a_signal_exit_outside_the_registry" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:43.307+09:00" time="2.368"/>
+        <testcase name="atip_l0_29_input_twice_or_without_a_value_is_usage_on_input" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:43.619+09:00" time="2.057"/>
+        <testcase name="atip_l0_22_input_dash_beside_another_stdin_reader_is_usage_and_on_a_terminal_input_invalid" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:43.406+09:00" time="2.556"/>
+        <testcase name="atip_l0_28_a_failure_names_the_tool_its_version_and_the_contract" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:43.559+09:00" time="2.771"/>
+        <testcase name="atip_l0_30_the_framing_faults_of_input_carry_a_reason_and_a_document_fault_a_pointer" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:44.206+09:00" time="3.432"/>
+        <testcase name="atip_l0_32_an_envelope_or_error_with_a_null_or_empty_optional_member_fails_the_contract_schema" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:44.246+09:00" time="3.400"/>
+        <testcase name="atip_l0_31_every_error_object_passes_the_contract_error_schema" classname="canon-cli::atip_l0" timestamp="2026-11-14T06:31:44.234+09:00" time="3.518"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_optionforms" tests="19" skipped="0" errors="0" failures="0">
+        <testcase name="atip_daterefusals_04_the_changelog_has_the_row_of_the_leap_second_and_the_entry_of_the_new_sentence" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:45.676+09:00" time="0.179"/>
+        <testcase name="atip_daterefusals_05_the_check_of_the_changelog_fails_without_the_row_or_the_entry" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:45.863+09:00" time="0.073"/>
+        <testcase name="atip_optionforms_04_evidence_add_with_another_instant_or_a_refused_spelling_records_nothing" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:47.638+09:00" time="11.282"/>
+        <testcase name="atip_optionforms_03_evidence_add_records_the_approval_signed_over_the_time_written_in_any_rfc_3339_spelling" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:46.330+09:00" time="14.025"/>
+        <testcase name="atip_optionforms_11_each_option_declares_one_domain_in_every_command_and_the_help_says_the_new_spelling" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:32:00.356+09:00" time="2.740"/>
+        <testcase name="atip_optionforms_12_the_table_of_values_inside_and_outside_each_domain_agrees_with_the_real_parser" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:32:03.099+09:00" time="0.614"/>
+        <testcase name="atip_optionforms_13_the_changelog_has_a_row_for_every_spelling_0_36_took_and_this_build_refuses" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:32:03.713+09:00" time="0.423"/>
+        <testcase name="atip_optionforms_14_the_check_of_the_changelog_fails_for_a_missing_row_a_missing_answer_and_a_missing_note" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:32:04.136+09:00" time="0.351"/>
+        <testcase name="atip_optionforms_15_the_checker_fixture_lists_values_the_new_domains_refuse_and_the_recipes_run_at_1_5" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:32:04.545+09:00" time="0.308"/>
+        <testcase name="atip_optionforms_16_the_golden_file_is_the_measure_of_0_36_and_its_classes_are_each_described" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:32:04.853+09:00" time="0.038"/>
+        <testcase name="atip_daterefusals_03_a_misspelled_value_keeps_the_spelling_refusal_of_0_37" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:45.675+09:00" time="21.903"/>
+        <testcase name="atip_optionforms_01_an_instant_in_any_rfc_3339_spelling_is_one_payload_and_the_payload_reads_no_clock" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:45.956+09:00" time="23.984"/>
+        <testcase name="atip_optionforms_09_init_and_the_three_skills_commands_take_no_provider_and_each_name_as_the_list_of_0_37_was_taken" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:58.920+09:00" time="14.789"/>
+        <testcase name="atip_optionforms_10_a_provider_name_that_is_not_exact_is_refused_by_the_four_commands_and_nothing_is_written" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:59.640+09:00" time="20.597"/>
+        <testcase name="atip_optionforms_02_a_date_or_a_padded_or_loose_time_is_refused_for_approval_at_with_exit_2_and_no_bytes" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:45.962+09:00" time="49.284"/>
+        <testcase name="atip_optionforms_07_the_date_options_take_a_full_date_or_a_date_time_and_a_date_is_utc_midnight" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:47.646+09:00" time="49.016"/>
+        <testcase name="atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refused_in_the_twelve_places_and_says_what_does_not_exist" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:44.795+09:00" time="52.022"/>
+        <testcase name="atip_optionforms_08_a_loose_or_impossible_time_is_refused_for_each_date_option_and_nothing_is_recorded" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:47.752+09:00" time="71.652"/>
+        <testcase name="atip_daterefusals_01_a_leap_second_is_refused_in_the_twelve_places_and_the_second_before_and_the_next_day_are_taken" classname="canon-cli::atip_optionforms" timestamp="2026-11-14T06:31:44.706+09:00" time="77.554"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_optionvalues" tests="17" skipped="0" errors="0" failures="0">
+        <testcase name="atip_optionvalues_03_every_name_and_sentence_option_declares_one_domain_in_every_command" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:13.709+09:00" time="0.232"/>
+        <testcase name="atip_optionvalues_01_project_role_and_domain_take_a_kebab_slug_and_nothing_else" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:04.891+09:00" time="11.970"/>
+        <testcase name="atip_optionvalues_03_a_name_is_trimmed_and_the_trimmed_value_is_what_is_recorded_and_signed" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:09.940+09:00" time="14.065"/>
+        <testcase name="atip_optionvalues_02_a_value_that_is_no_kebab_slug_is_refused_with_exit_2_and_nothing_is_written" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:07.578+09:00" time="20.157"/>
+        <testcase name="atip_optionvalues_04_a_blank_name_or_one_with_a_control_character_or_a_line_break_inside_is_refused" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:13.941+09:00" time="16.365"/>
+        <testcase name="atip_optionvalues_06_a_sentence_is_trimmed_and_the_trimmed_value_is_what_is_recorded_and_hashed" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:20.236+09:00" time="10.113"/>
+        <testcase name="atip_optionvalues_08_retrieve_and_dispatch_begin_declare_the_same_regime_key_and_take_the_same_keys" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:27.735+09:00" time="8.020"/>
+        <testcase name="atip_optionvalues_12_every_option_of_the_same_name_has_one_domain_in_every_command" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:35.755+09:00" time="0.258"/>
+        <testcase name="atip_optionvalues_13_a_command_that_declares_another_domain_for_the_same_name_fails_the_sweep" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:36.027+09:00" time="0.366"/>
+        <testcase name="atip_optionvalues_14_the_changelog_has_a_row_for_every_value_0_36_took_and_this_build_refuses_and_an_entry_for_the_trimmed_ones" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:36.423+09:00" time="0.700"/>
+        <testcase name="atip_optionvalues_16_the_checker_fixture_lists_values_the_new_domains_refuse_and_the_recipes_run_at_1_5" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:36.817+09:00" time="0.324"/>
+        <testcase name="atip_optionvalues_15_the_check_of_the_changelog_fails_for_a_missing_row_a_missing_answer_and_a_missing_entry" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:36.663+09:00" time="0.714"/>
+        <testcase name="atip_optionvalues_09_a_key_of_three_parts_or_with_a_space_is_refused_by_dispatch_begin_as_retrieve_refuses_it" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:30.307+09:00" time="8.810"/>
+        <testcase name="atip_optionvalues_11_round_0_limit_0_and_closing_a_finding_to_open_are_refused_with_exit_2_and_nothing_is_recorded" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:35.246+09:00" time="6.553"/>
+        <testcase name="atip_optionvalues_10_round_and_limit_start_at_1_and_a_finding_is_closed_by_fixed_rejected_or_deferred" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:30.350+09:00" time="12.257"/>
+        <testcase name="atip_optionvalues_05_the_tool_of_a_relayed_approval_is_one_word_the_same_on_the_four_commands" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:16.861+09:00" time="29.001"/>
+        <testcase name="atip_optionvalues_07_a_blank_sentence_or_one_with_a_control_character_or_a_line_break_inside_is_refused_with_the_commands_own_code" classname="canon-cli::atip_optionvalues" timestamp="2026-11-14T06:32:24.006+09:00" time="23.052"/>
+    </testsuite>
+    <testsuite name="canon-cli::grammar_t5_errors" tests="8" skipped="0" errors="0" failures="0">
+        <testcase name="atip_contract11_06_a_registry_option_the_other_registry_owns_or_does_not_know_is_usage" classname="canon-cli::grammar_t5_errors" timestamp="2026-11-14T06:32:39.116+09:00" time="0.504"/>
+        <testcase name="a_leaf_lists_only_registered_codes_and_the_exits_of_the_table" classname="canon-cli::grammar_t5_errors" timestamp="2026-11-14T06:32:37.122+09:00" time="2.528"/>
+        <testcase name="not_found_unreadable_and_invalid_argument_exit_2" classname="canon-cli::grammar_t5_errors" timestamp="2026-11-14T06:32:39.651+09:00" time="0.016"/>
+        <testcase name="atip_codeexit_12_the_scan_reads_the_refuse_helper_and_the_cause_literal" classname="canon-cli::grammar_t5_errors" timestamp="2026-11-14T06:32:37.142+09:00" time="2.844"/>
+        <testcase name="every_code_a_source_builds_is_registered" classname="canon-cli::grammar_t5_errors" timestamp="2026-11-14T06:32:39.620+09:00" time="0.389"/>
+        <testcase name="the_specs_error_list_is_the_registry" classname="canon-cli::grammar_t5_errors" timestamp="2026-11-14T06:32:39.989+09:00" time="0.249"/>
+        <testcase name="atip_contract11_05_schema_lists_every_warning_and_explains_each" classname="canon-cli::grammar_t5_errors" timestamp="2026-11-14T06:32:37.397+09:00" time="4.428"/>
+        <testcase name="schema_explains_every_code_and_lists_them_all" classname="canon-cli::grammar_t5_errors" timestamp="2026-11-14T06:32:39.667+09:00" time="11.085"/>
+    </testsuite>
+    <testsuite name="canon-cli::schema_doc" tests="20" skipped="0" errors="0" failures="0">
+        <testcase name="atip_schemadoc_02_schema_answers_outside_a_repo_with_no_environment_and_writes_nothing" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:40.238+09:00" time="1.363"/>
+        <testcase name="atip_schemadoc_04_an_unknown_path_names_what_is_valid_and_overlapping_selectors_are_usage" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:41.826+09:00" time="0.683"/>
+        <testcase name="atip_schemadoc_04_an_unknown_path_word_names_the_field_command_and_expects_only_where_a_word_is_valid" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:42.509+09:00" time="0.580"/>
+        <testcase name="atip_schemadoc_03_a_group_lists_its_children_and_a_path_in_words_or_one_string_is_one_answer" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:41.601+09:00" time="2.127"/>
+        <testcase name="atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:40.009+09:00" time="4.208"/>
+        <testcase name="atip_schemadoc_06_a_custom_parser_missing_from_the_table_fails_the_generation" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:44.218+09:00" time="0.022"/>
+        <testcase name="atip_schemadoc_05_an_option_that_an_environment_variable_fills_declares_it" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:42.607+09:00" time="1.928"/>
+        <testcase name="atip_schemadoc_05_every_option_has_a_value_type_a_typed_default_and_no_id_suffix" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:43.089+09:00" time="1.447"/>
+        <testcase name="atip_schemadoc_08_a_dangling_ref_and_a_schema_that_does_not_compile_are_found" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:44.536+09:00" time="0.332"/>
+        <testcase name="atip_schemadoc_07_errors_outputs_and_schemas_hold_together_in_every_command_document" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:44.240+09:00" time="0.758"/>
+        <testcase name="atip_schemadoc_05_help_defaults_equal_the_documented_defaults_and_a_name_means_one_thing" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:43.762+09:00" time="1.281"/>
+        <testcase name="atip_schemadoc_12_a_command_without_the_line_is_found" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:45.043+09:00" time="0.017"/>
+        <testcase name="atip_schemadoc_10_an_unparsable_example_a_placeholder_and_a_bad_fragment_are_found" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:44.868+09:00" time="0.273"/>
+        <testcase name="atip_schemadoc_09_the_input_fragment_and_every_example_hold" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:44.537+09:00" time="0.654"/>
+        <testcase name="atip_schemadoc_11_every_help_starts_with_the_line_that_points_at_schema" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:44.998+09:00" time="0.193"/>
+        <testcase name="atip_schemadoc_14_a_revived_old_name_is_found" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:45.191+09:00" time="0.017"/>
+        <testcase name="atip_schemadoc_13_no_consumer_uses_an_old_name" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:45.060+09:00" time="1.453"/>
+        <testcase name="atip_schemadoc_13_no_source_uses_an_old_name" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:45.142+09:00" time="2.082"/>
+        <testcase name="atip_schemadoc_03_a_group_under_as_lists_what_the_roles_tree_lists" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:41.799+09:00" time="17.227"/>
+        <testcase name="atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command" classname="canon-cli::schema_doc" timestamp="2026-11-14T06:32:45.191+09:00" time="40.769"/>
+    </testsuite>
+</testsuites>
