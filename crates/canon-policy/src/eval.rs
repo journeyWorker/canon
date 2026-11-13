@@ -391,13 +391,23 @@ mod tests {
     #[test]
     fn budget_exceeded_never_blocks_the_caller() {
         let bindings = bindings_for(RecordKind::Task, &SchemaRegistry::load());
-        // A comprehension over a large synthetic range is enough real
-        // work to reliably exceed a near-zero budget without relying on
-        // any interpreter-internal timing assumption.
+        // The evaluation thread can finish and send before the caller reaches
+        // `recv_timeout`, even with a 1 ns budget, when the caller is descheduled
+        // right after the spawn (it happened on a loaded CI runner, main push of
+        // 0.41.0). So one call cannot prove the timeout path; many calls can:
+        // every answer is either the timeout or the true result, the timeout
+        // is reached, and no call waits for the evaluation.
         let compiled = compile("[1,2,3,4,5,6,7,8,9,10].map(x, x * 2).map(x, x * 2).map(x, x * 2) != []", &bindings).unwrap();
         let now = Utc::now();
-        let result = evaluate(&compiled, &task_record(), now, EvalBudget(Duration::from_nanos(1)));
-        assert!(matches!(result, Err(PolicyError::BudgetExceeded(_))), "expected BudgetExceeded, got {result:?}");
+        let mut timed_out = 0;
+        for _ in 0..200 {
+            match evaluate(&compiled, &task_record(), now, EvalBudget(Duration::from_nanos(1))) {
+                Err(PolicyError::BudgetExceeded(_)) => timed_out += 1,
+                Ok(PolicyValue::Bool(true)) => {}
+                other => panic!("expected BudgetExceeded or the true result, got {other:?}"),
+            }
+        }
+        assert!(timed_out > 0, "200 evaluations with a 1 ns budget never reached the timeout");
     }
 
     #[test]
