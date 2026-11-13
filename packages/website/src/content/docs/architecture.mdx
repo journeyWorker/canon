@@ -127,7 +127,7 @@ agent runtime** and does not schedule or execute declared plans.
 The command line is defined once, in `docs/cli/canon.cli.json`: the tree of
 groups and commands, and for every command its operands and options with their
 value types and typed defaults, effect (`read`, `write` or `destructive`), roles,
-error codes, outputs with their JSON Schemas, and an example. The parser, `canon schema` (which answers in the atip/1 1.4 form, which atip/1 1.5 keeps: a call surface per command, the schemas apart under `--schemas`), the generated
+error codes, outputs with their JSON Schemas, and an example. The parser, `canon schema` (which answers in the atip/1 1.4 form, which atip/1 1.5 and 1.6 keep: a call surface per command, the schemas apart under `--schemas`), the generated
 tables in the [CLI reference](/cli/), the removed-spelling hints and the guide
 are all produced from it, so they cannot disagree. Every command answers with
 one envelope, `{ok, data, meta}` (or `{ok: false, error, meta}`) under

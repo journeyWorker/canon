@@ -739,7 +739,7 @@ fn atip_optionvalues_15_the_check_of_the_changelog_fails_for_a_missing_row_a_mis
 #[test]
 fn atip_optionvalues_16_the_checker_fixture_lists_values_the_new_domains_refuse_and_the_recipes_run_at_1_5() {
     let fixture: Value = serde_json::from_str(&read("crates/canon-cli/tests/atip/canon.fixture.json")).expect("the fixture is JSON");
-    assert_eq!(fixture["contractVersion"], "1.5");
+    assert_eq!(fixture["contractVersion"], "1.6");
     let commands = fixture["commands"].as_object().expect("commands");
     let mut listed = BTreeSet::new();
     for (command, entry) in commands {
@@ -758,5 +758,5 @@ fn atip_optionvalues_16_the_checker_fixture_lists_values_the_new_domains_refuse_
         assert!(listed.contains(&(cell.0.to_string(), cell.1.to_string())), "the fixture lists values `{} --{}` refuses", cell.0, cell.1);
     }
     let justfile = read("justfile");
-    assert!(justfile.contains("--contract 1.5"), "the recipes run the checker at 1.5");
+    assert!(justfile.contains("--contract 1.6"), "the recipes run the checker at 1.6");
 }
