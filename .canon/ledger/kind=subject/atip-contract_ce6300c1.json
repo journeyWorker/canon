@@ -1,0 +1,61 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "planner"
+  },
+  "at": "2026-11-13T20:49:25.520359Z",
+  "change_ids": [
+    "canon-0-33-atip-crate",
+    "canon-0-33-atip-l0",
+    "canon-0-34-atip-paging-fields",
+    "canon-0-34-atip-1-1",
+    "canon-0-35-crate-shell",
+    "canon-0-35-crate-1-2",
+    "canon-0-35-crate-validate",
+    "canon-0-35-crate-cursor",
+    "canon-0-35-crate-plan",
+    "canon-0-35-release-rc",
+    "canon-0-35-canon-cursor-1-2",
+    "canon-0-35-canon-check-order",
+    "canon-0-35-canon-stopped-midway",
+    "canon-0-35-claim-l2",
+    "canon-0-35-read-writes",
+    "canon-0-36-codes-rename",
+    "canon-0-36-codes-exit",
+    "canon-0-36-codes-refusals",
+    "canon-0-36-codes-stored",
+    "canon-0-36-codes-incomplete",
+    "canon-0-36-code-reasons",
+    "canon-0-36-codes-table",
+    "canon-0-36-claim-1-4",
+    "canon-0-36-atip-dep",
+    "canon-0-37-atip-dep",
+    "canon-0-37-claim-1-5",
+    "canon-0-41-atip-1-6"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "reopen": {
+    "actor": {
+      "agent_id": "orchestrator-oco",
+      "role": "orchestrator",
+      "session_id": "s-0-41-orch"
+    },
+    "change": "canon-0-41-atip-1-6",
+    "reason": "0.41: canon-0-41-atip-1-6 (atip/1 1.6) adopted; scenarios atip.claim16.01-14 added and the 1.5 ones re-worded, evidence and review owed again"
+  },
+  "schema": 1,
+  "status": "verifying",
+  "status_reason": {
+    "actor": {
+      "agent_id": "orchestrator-oco",
+      "role": "orchestrator",
+      "session_id": "s-0-41-orch"
+    },
+    "reason": "0.41: canon-0-41-atip-1-6 (atip/1 1.6) adopted; scenarios atip.claim16.01-14 added and the 1.5 ones re-worded, evidence and review owed again"
+  },
+  "subject_id": "atip-contract",
+  "summary": "Output selection, envelope, errors, registry and exit codes of canon follow atip/1 L0",
+  "title": "ATIP: canon's atip/1 L0 output contract"
+}
