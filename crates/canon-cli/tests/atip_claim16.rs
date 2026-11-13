@@ -442,18 +442,18 @@ fn atip_claim16_12_a_line_at_a_tag_of_0_2_0_is_found() {
 
 const ENTRY_HEADING: &str = "canon declares atip/1 1.6";
 
-/// Every problem of the newest section of the CHANGELOG (`Unreleased` or the release it became): one entry that names the declaration with a before and after table
+/// Every problem of the `## 0.41.0` section of the CHANGELOG: one entry that names the declaration with a before and after table
 /// (the declaration, the tags, the options that declare `commaList`, `pathShape`, the longest path, the names with two meanings, the advice), a `**Callers:**` paragraph,
 /// a `**Not used:**` paragraph that says why neither member is used and how to use it, and the contributors line.
 fn changelog_problems(text: &str) -> Vec<String> {
     let lines: Vec<&str> = text.lines().collect();
-    let Some(start) = lines.iter().position(|line| line.starts_with("## ")) else { return vec!["the CHANGELOG has no section".to_string()] };
+    let Some(start) = lines.iter().position(|line| line.starts_with("## 0.41.0")) else { return vec!["the CHANGELOG has no 0.41.0 section".to_string()] };
     let end = lines.iter().enumerate().skip(start + 1).find(|(_, line)| line.starts_with("## ")).map_or(lines.len(), |(index, _)| index);
     let section = &lines[start + 1..end];
     let mut found = Vec::new();
     let headings: Vec<usize> = section.iter().enumerate().filter(|(_, line)| line.contains(ENTRY_HEADING)).map(|(index, _)| index).collect();
     if headings.len() != 1 {
-        return vec![format!("the newest section holds {} lines that name `{ENTRY_HEADING}`, not one", headings.len())];
+        return vec![format!("the 0.41.0 section holds {} lines that name `{ENTRY_HEADING}`, not one", headings.len())];
     }
     let entry = &section[headings[0]..];
     let table = entry.iter().filter(|line| line.trim_start().starts_with('|')).copied().collect::<Vec<_>>().join("\n").to_lowercase();
@@ -505,7 +505,7 @@ fn complete_entry() -> String {
         "| SHOULD advice | `--kind` | `--kind` |",
     ];
     format!(
-        "## Unreleased\n\n### Changed\n\n**{ENTRY_HEADING}** (`canon-0-41-atip-1-6`).\n\n{}\n\n**Callers:** a 1.5 caller has nothing to change (spec 15.10); a caller that compares the string reads \"1.6\" for \"1.5\".\n\n**Not used:** `commaList` (an option splits at `value_delimiter`; `L1.comma-list` judges it) and `pathShape` (`L1.depth`).\n\n### Contributors\n\ncommit 9cbc74a: atip-crate-v0.3.0 and atip-check-v0.3.0.\n\n## 0.40.0\n",
+        "## Unreleased\n\n## 0.41.0 — 2026-11-14\n\n### Changed\n\n**{ENTRY_HEADING}** (`canon-0-41-atip-1-6`).\n\n{}\n\n**Callers:** a 1.5 caller has nothing to change (spec 15.10); a caller that compares the string reads \"1.6\" for \"1.5\".\n\n**Not used:** `commaList` (an option splits at `value_delimiter`; `L1.comma-list` judges it) and `pathShape` (`L1.depth`).\n\n### Contributors\n\ncommit 9cbc74a: atip-crate-v0.3.0 and atip-check-v0.3.0.\n\n## 0.40.0\n",
         rows.join("\n")
     )
 }
@@ -515,7 +515,7 @@ fn complete_entry() -> String {
 fn atip_claim16_13_the_changelog_entry_has_the_table_the_callers_note_and_the_reasons() {
     assert_eq!(changelog_problems(&complete_entry()), Vec::<String>::new(), "the checker passes a complete entry");
     let problems = changelog_problems(&read("CHANGELOG.md"));
-    assert!(problems.is_empty(), "the newest CHANGELOG section: {problems:#?}");
+    assert!(problems.is_empty(), "the 0.41.0 CHANGELOG section: {problems:#?}");
 }
 
 /// atip.claim16.14: an entry without the callers note, the reasons, a table row or the contributors line is found.
@@ -530,5 +530,5 @@ fn atip_claim16_14_an_entry_without_the_callers_note_the_table_or_the_reasons_is
     assert_found("no longest path row", &changelog_problems(&without_row), "longest path");
     let without_contributors = complete.replace("9cbc74a", "0000000");
     assert_found("no commit", &changelog_problems(&without_contributors), "contributors line");
-    assert_found("no entry", &changelog_problems("## Unreleased\n\n### Changed\n\nother\n"), "not one");
+    assert_found("no entry", &changelog_problems("## 0.41.0 — 2026-11-14\n\n### Changed\n\nother\n"), "not one");
 }

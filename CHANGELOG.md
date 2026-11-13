@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.41.0 — 2026-11-14
+
+canon 0.41 declares atip/1 1.6 (the `atip` crate and the checker at 0.3.0, CI and the `atip` recipes at `--contract 1.6`) and fixes a flaky pre-dispatch hook test. It is not BREAKING for callers: a 1.5 caller has nothing to change (ATIP 15.10), the documents keep the shape they had, and only the declaration strings (`meta.contractVersion`, `meta.schemaVersion`) read `1.6` where they read `1.5`. The test fix: the pre-dispatch hook test takes a closed pipe (EPIPE) when the hook exits before reading stdin.
+
 ### Changed
 
 **canon declares atip/1 1.6 and takes the `atip` crate and the checker at atip v1.6.0** (`canon-0-41-atip-1-6`, scenarios `atip.claim16.01-14`; atip/1 spec 4.1.1, 9.7.6, 15.1, 15.7, 15.10, annex-schema S1 item 4 and S2 rules 18 and 19). Every envelope says `meta.contractVersion` `1.6`, a `schema` answer says `meta.schemaVersion` `1.6`, and the tree still claims level `L2`. Nothing else in what canon prints moved: measured over the 217 answers of `canon schema` (the tree for each role, the 78 command documents, the 27 group documents, each `--schemas`, `--errors`, `--warnings`), the 0.40.0 binary and this build differ in the declaration strings (`contractVersion`, `schemaVersion`) alone, and the build with the crate at 0.3.0 and the declaration still at 1.5 prints the same bytes as the build before it. Option names, value names and the `--help` usage lines are as they were.
