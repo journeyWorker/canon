@@ -391,12 +391,12 @@ mod tests {
     #[test]
     fn budget_exceeded_never_blocks_the_caller() {
         let bindings = bindings_for(RecordKind::Task, &SchemaRegistry::load());
-        // The evaluation thread can finish and send before the caller reaches
-        // `recv_timeout`, even with a 1 ns budget, when the caller is descheduled
-        // right after the spawn (it happened on a loaded CI runner, main push of
-        // 0.41.0). So one call cannot prove the timeout path; many calls can:
-        // every answer is either the timeout or the true result, the timeout
-        // is reached, and no call waits for the evaluation.
+        // The evaluation thread can finish and send before `recv_timeout` makes
+        // its first receive attempt, even with a 1 ns budget, when the caller is
+        // descheduled right after the spawn (it happened on a loaded CI runner,
+        // main push of 0.41.0); an already-sent result is returned. So one call
+        // cannot prove the timeout path; many calls can: every answer is either
+        // the timeout or the true result, and the timeout is reached.
         let compiled = compile("[1,2,3,4,5,6,7,8,9,10].map(x, x * 2).map(x, x * 2).map(x, x * 2) != []", &bindings).unwrap();
         let now = Utc::now();
         let mut timed_out = 0;
