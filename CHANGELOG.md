@@ -33,7 +33,7 @@ canon 0.42 lets a human set a change aside: `canon change defer` for "not this r
 
 - The sweeps of `atip_check_order` and `arg_rules` read the calls that break or meet a rule from `crates/canon-cli/tests/atip/rule_calls.jsonl` instead of searching every set of the arguments a rule names (`evidence add` alone has 262,144). Every row carries a digest of what the search read (the rules, the arguments they name, the example words, the text of the searcher in `tests/rule_support/search.rs`, the `atip` revision in `Cargo.lock`); a row made from other inputs, a missing row, an extra row or a call that no longer breaks its rule fails the test and says how to make the table again. A test never falls back to searching; `atip_constraints_13` still searches, for its seeded document.
 - Make the table with `just rule-calls` (`CANON_BLESS_RULE_CALLS=1`); `just rule-calls-check` makes it again and fails when it differs from the repository's (run it once before a release, like `just atip-deep`).
-- `atip_validate` asks each distinct domain once (29 for the 202 declared; the key is the whole domain value) and prints its counts; `schema_codes` scans the sources once for its four tests and reads the command documents in process; `input` and `schema_doc` read declarations in process where they only read them, and `schema_doc` runs the two tests that check the printed bytes on six threads.
+- `atip_validate` asks each distinct domain once (29 for the 220 declared; the key is the whole domain value) and prints its counts; `schema_codes` scans the sources once for its four tests and reads the command documents in process; `input` and `schema_doc` read declarations in process where they only read them, and `schema_doc` runs the two tests that check the printed bytes on six threads.
 - Measured on the shared sandbox box (12 cores, load 4-6 from other jobs; CPU = user + system, median of three `cargo test -p canon-cli --test <binary>`, debug profile, same build):
 
 | binary | CPU before | CPU after | finished in, before | after |
@@ -56,8 +56,9 @@ canon 0.42 lets a human set a change aside: `canon change defer` for "not this r
 **Callers:**
 
 - A closed change drops out of the requirements.
+- A subject that ships while a change is deferred ships without it, so a human can still drop that change (`SHIPPED` refuses only a change a subject shipped while it was open); a ship after `canon change reopen` counts.
 - A repo without the `change_state` line under `routing:` runs `canon migrate` before the closing commands.
-- `canon migrate` or the 0.42 `canon init` adding `change_state` makes canon 0.41 and older refuse the `canon.yaml` with `CONFIG_INVALID`; to go back, run `canon migrate --revert` with 0.42 first (closed changes are then required again).
+- `canon migrate` or the 0.42 `canon init` adding `change_state` makes canon 0.41 and older refuse the `canon.yaml` with `CONFIG_INVALID`; to go back, delete the `change_state:` line under `routing:` by hand. `canon migrate --revert` restores the file only right after the `canon migrate --commit` that added the line (a repo set up by 0.42 `canon init` has no backup, and a revert after any later change to the repo is refused). 0.41 does not read the closings, so closed changes are required again.
 - A repo that wrote `.canon/ledger/*` into `.gitignore` by hand adds `!.canon/ledger/kind=change_state/`, or a new clone requires the closed change again; the `.gitignore` of `canon init` does not ignore the ledger whole.
 
 ## 0.41.0 — 2026-11-14
