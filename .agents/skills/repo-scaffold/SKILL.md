@@ -30,13 +30,17 @@ name match").
 ## Add a new CI matrix target / platform package
 
 canon's platform packages follow `@journeykit/canon-core-<platform>` naming
-(design D1/D3). Three ship today: `core-darwin-arm64`, `core-linux-x64`,
-`core-win32-x64` (the same rows as the sibling `lute` monorepo). Adding a
-target (e.g. `core-linux-arm64`, `core-darwin-x64`) is a CI matrix row
-plus a new package directory — never a redesign of the launcher (design
-non-goals). A matrix row carries `binary_ext` (`""` or `".exe"`); the
-build/stage/upload steps are written against it, and `strip` is skipped
-when it is non-empty.
+(design D1/D3). Four ship today: `core-darwin-arm64` (macOS 15.0 or later),
+`core-linux-x64` and `core-linux-arm64` (static musl binaries that run on any
+libc, no `libc` filter on the package), `core-win32-x64` (static C runtime).
+Adding a target (e.g. `core-darwin-x64`) is a CI matrix row plus a new package
+directory — never a redesign of the launcher (design non-goals). A matrix row
+carries `binary_ext` (`""` or `".exe"`); the build/stage/upload steps are
+written against it, and `strip` is skipped when it is non-empty. Runner
+labels are pinned images (`macos-26`, `ubuntu-26.04`, `ubuntu-26.04-arm`,
+`windows-2025`), never `-latest`; a Linux row builds a musl target on its own
+architecture, and only the aarch64 musl row has `lg_page: "16"` (jemalloc with
+64K pages).
 
 1. Create `packages/core-<platform>/package.json`: copy an existing
    platform package's shape, set `"os"`/`"cpu"` to the new target's values,
@@ -47,15 +51,19 @@ when it is non-empty.
 3. Add the new target as a matrix row in both `.github/workflows/
    build-native.yml` and `.github/workflows/publish.yml`'s `build` job
    (`host`, `target`, `package_dir`, `binary_ext` — `package_name` too, in
-   `publish.yml`).
+   `publish.yml`), and teach `scripts/check-release-binary.py` the target's
+   floor (its `TARGETS` table).
 4. Add the new platform package to `packages/cli/package.json`'s
-   `optionalDependencies` as `"@journeykit/canon-core-<platform>": "workspace:*"`.
-5. If the target needs a new libc/arch branch, extend
-   `packages/cli/src/index.ts`'s `resolveTargetPackageName` /
-   `resolveRustTargetTriple` — both already generalize past S0's two rows
-   (design D2), so this is usually a one-line addition, not new logic.
-6. Add the platform package to `publish.yml`'s binary-download and
-   `npm publish` steps.
+   `optionalDependencies` as `"@journeykit/canon-core-<platform>": "workspace:*"`
+   and refresh `bun.lock` (`bun install`).
+5. Extend `packages/cli/src/index.ts`'s `resolveTargetPackageName` /
+   `resolveRustTargetTriple` (there is no libc detection: a platform and an
+   arch name one package).
+6. Add the platform package to `publish.yml`'s binary download, checksum,
+   executable, version, `npm pack` and pre-flight lists and give it an
+   `npm publish` step (a new package's first publish needs `NPM_TOKEN`: put it
+   first among the platform packages). `scripts/check-release-workflow-safety.py`
+   names every place that lacks the package.
 
 ## Run `canon skills install` locally
 
