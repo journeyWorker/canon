@@ -62,10 +62,10 @@ Feature: change drop
   @flow:canon-0-42-change-drop.F1
   @change.drop.06
   Scenario: A change that already shipped cannot be closed, and one that never shipped can, whatever its later approvals
-    Given a subject that moved to shipped with the change, then was reopened and the change approved again; another change adopted into the already shipped subject; and one that was an unapproved draft when the subject shipped
+    Given a subject that moved to shipped with the change, then was reopened and the change approved again; another change adopted into the already shipped subject; one that was an unapproved draft when the subject shipped; and one that was deferred when its subject shipped without it
     When canon change defer or drop is run on each
-    Then the first is CHANGE_CONFLICT with reason SHIPPED and writes nothing, the other two are closed
-    And a move history that cannot be read is refused the same way with a hint to write a new change
+    Then the first is CHANGE_CONFLICT with reason SHIPPED and writes nothing, the other three are closed
+    And a change reopened and shipped with again after that deferral is refused as SHIPPED, and a move history or a decision history that cannot be read is refused the same way with a hint to write a new change
 
   # canon: {"schema":1,"at":"2026-11-16T05:57:41Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:subject-lifecycle

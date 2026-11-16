@@ -37,7 +37,7 @@ fn answer(args: &[&str]) -> (Option<i32>, Value, String) {
 }
 
 /// The answers of `argvs` from the binary, in order, on six threads (each call builds the whole model: a quarter of a second in a debug build);
-/// the pool shortens the wall time when cores are idle and costs the same CPU time.
+/// the pool shortens the wall time (it uses idle cores) and costs more CPU time in total when the cores are busy.
 fn pooled(dir: &Path, argvs: &[Vec<String>]) -> Vec<Output> {
     let next = AtomicUsize::new(0);
     let done: Mutex<Vec<Option<Output>>> = Mutex::new(argvs.iter().map(|_| None).collect());
@@ -955,7 +955,7 @@ fn atip_schemadoc_09_the_input_fragment_and_every_example_hold() {
         assert!(doc["schemas"][name].get("required").is_none());
         assert!(input["argumentsRef"].is_string(), "the arguments schema is published: {}", doc["command"]);
     }
-    // The 33 commands whose old document schema had `required` now publish it as the arguments schema (0.42: `change defer`, `change drop`, `change reopen` each have required options).
+    // The 33 commands whose document schema for the input had `required` now publish it as the arguments schema (0.42: `change defer`, `change drop`, `change reopen` each have required options).
     let with_required = with_input.iter().filter(|doc| ref_name(doc["input"]["argumentsRef"].as_str().expect("ref")).is_some_and(|name| doc["schemas"][name].get("required").is_some())).count();
     assert_eq!(with_required, 33);
     for doc in COMMANDS.iter() {
