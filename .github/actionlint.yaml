@@ -1,0 +1,5 @@
+# actionlint 1.7 predates the GitHub-hosted image `ubuntu-26.04` (test.yml and pr-guard.yml pin it, 0.42 `canon-0-42-ci-refresh`) and reports its label
+# as unknown. The label is GitHub's, not a self-hosted runner's; drop this entry when the linter knows it.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04
