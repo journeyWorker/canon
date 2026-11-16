@@ -249,12 +249,19 @@ fn change_drop_02_a_relayed_defer_records_the_relay_and_a_repeat_is_unchanged() 
     assert_eq!(states(repo), records);
 }
 
+const CHORE: &str = "---\nkind: chore\n---\n\n# Bump the client\n\n## Intent\n\nBump the client\n\nThe client is two versions behind.\n\n## Category\n\ndependency\n\n## Invariants\n\n- Nothing changes. ==**No behavior changes.**==\n\n## Checks\n\n- The suite runs again. ==**The suite is the check.**==\n\n## Out of scope\n\nNone.\n";
+
 /// change.drop.03: a change with a finding is deferred with `CHANGE_RECORDS_KEPT`, and the finding stays.
 #[test]
 fn change_drop_03_records_of_the_change_are_kept_and_counted_in_a_warning() {
     let dir = repo();
     let repo = dir.path();
-    write_brief(repo, CHANGE);
+    std::fs::write(brief_path(repo, CHANGE), CHORE).unwrap();
+    let tasks = repo.join(".canon/changes/add-login/tasks.md");
+    let mut plan = std::fs::read_to_string(&tasks).unwrap_or_else(|_| "# Tasks: Add login\n".to_string());
+    plan.push_str("\n- [ ] 1 Write the scenarios\n");
+    std::fs::write(&tasks, plan).unwrap();
+    ok(repo, &["ingest", "plans"]);
     approve(repo, CHANGE, "Go");
     commit_all(repo);
     ok(repo, &["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl", "--promote"]);
@@ -549,6 +556,7 @@ fn change_drop_20_unadopt_keeps_refusing_and_its_hint_names_change_defer_and_cha
     ok(repo, &["feature", "new", "auth.login", "--title", "Login"]);
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--change", "second", "--flow", "F1", "--feature", feature]);
+    ok(repo, &["inventory", "sync"]);
     let (exit, body) = call(repo, None, &["subject", "unadopt", "demo", "--change", "second"]);
     assert_eq!((exit, code(&body)), (2, ("SUBJECT_CONFLICT", "FLOW_TAGGED")), "{body}");
     let hint = body["error"]["hint"].as_str().unwrap();

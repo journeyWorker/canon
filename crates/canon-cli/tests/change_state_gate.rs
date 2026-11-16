@@ -300,25 +300,26 @@ fn change_drop_10_the_scenarios_only_a_closed_change_made_are_set_aside_and_its_
 fn change_drop_11_a_set_aside_scenarios_stale_evidence_and_divergent_verdict_do_not_turn_gate_check_red() {
     let dir = two_changes();
     let r = dir.path();
+    // Two surfaces (`diverged`, `gone`): a scenario file holds one surface, so the two scenarios do not share a file.
+    scenario(r, "world.diverged.01", &["c-gone.F1"], IN_WINDOW);
     scenario(r, "world.gone.01", &["c-gone.F1"], IN_WINDOW);
-    scenario(r, "world.gone.02", &["c-gone.F1"], IN_WINDOW);
     std::fs::write(r.join("code.rs"), "1").unwrap();
     commit(r, "code 1", "2026-02-02T12:00:00Z");
     let base = git(r, &["rev-parse", "HEAD"], None);
-    evidence(r, "world.gone.01", EvidenceVerdict::Divergent, None);
-    evidence(r, "world.gone.02", EvidenceVerdict::Faithful, Some(&base));
+    evidence(r, "world.diverged.01", EvidenceVerdict::Divergent, None);
+    evidence(r, "world.gone.01", EvidenceVerdict::Faithful, Some(&base));
     for n in 2..=4 {
         std::fs::write(r.join("code.rs"), n.to_string()).unwrap();
         commit(r, &format!("code {n}"), "2026-02-03T12:00:00Z");
     }
     let (_, violations, _) = gate(r);
-    assert!(violations.iter().any(|v| v.contains("world.gone.01")), "the divergent verdict turns it red while the change is open: {violations:?}");
-    assert!(violations.iter().any(|v| v.starts_with("stale-evidence") && v.contains("world.gone.02")), "the stale evidence turns it red: {violations:?}");
+    assert!(violations.iter().any(|v| v.starts_with("uncovered-cell") && v.contains("world.diverged.01")), "the divergent verdict turns it red while the change is open: {violations:?}");
+    assert!(violations.iter().any(|v| v.starts_with("stale-evidence") && v.contains("world.gone.01")), "the stale evidence turns it red: {violations:?}");
 
     seed_state(r, "c-gone", ChangeDecision::Deferred, CLOSED_AT);
     let (code, violations, _) = gate(r);
     assert_eq!(code, Some(0), "{violations:?}");
-    assert!(violations.iter().all(|v| !v.contains("world.gone")), "{violations:?}");
+    assert!(violations.iter().all(|v| !v.contains("world.gone") && !v.contains("world.diverged")), "{violations:?}");
 }
 
 /// change.drop.12 (failure path): what another change requires stays required, a scenario tagged for a closed and
@@ -372,18 +373,29 @@ fn change_drop_13_a_tag_on_a_scenario_outside_the_window_is_ignored_and_reported
     scenario(r, "world.old.01", &["c-gone.F1"], BEFORE_BRIEF);
     scenario(r, "world.late.01", &["c-gone.F1"], AFTER_CLOSE);
     scenario(r, "world.gone.01", &["c-gone.F1"], IN_WINDOW);
-    scenario_undated(r, "world.nodate.01", &["c-gone.F1"]);
     seed_state(r, "c-gone", ChangeDecision::Deferred, CLOSED_AT);
 
     let (code, violations, advisories) = gate(r);
     assert_eq!(code, Some(1));
-    assert!(violations.iter().any(|v| v.contains("world.old.01")) && violations.iter().any(|v| v.contains("world.late.01")) && violations.iter().any(|v| v.contains("world.nodate.01")), "all three stay required: {violations:?}");
+    assert!(violations.iter().any(|v| v.contains("world.old.01")) && violations.iter().any(|v| v.contains("world.late.01")), "both stay required: {violations:?}");
     let lines = closed_lines(&advisories);
-    for (id, reason) in [("world.old.01", "outside_window"), ("world.late.01", "outside_window"), ("world.nodate.01", "no_creation_time")] {
-        assert!(lines.iter().any(|l| l.contains(id) && l.contains(reason) && l.contains("c-gone")), "{id} is listed with {reason}: {lines:?}");
+    for id in ["world.old.01", "world.late.01"] {
+        assert!(lines.iter().any(|l| l.contains(id) && l.contains("outside_window") && l.contains("c-gone")), "{id} is listed: {lines:?}");
     }
     assert!(lines.iter().all(|l| !(l.contains("world.gone.01") && l.contains("ignored"))), "{lines:?}");
     assert_eq!(set_aside_ids(&status_subject(r)), ["world.gone.01"]);
+
+    // A scenario with no creation time cannot be shown to be the closed change's: it stays required and its tag is reported. (Its file has no
+    // provenance line, so the gate names the subject and not the scenario.)
+    let dir = two_changes();
+    let r = dir.path();
+    scenario_undated(r, "world.nodate.01", &["c-gone.F1"]);
+    seed_state(r, "c-gone", ChangeDecision::Deferred, CLOSED_AT);
+    let (code, violations, advisories) = gate(r);
+    assert_eq!(code, Some(1), "{violations:?}");
+    let lines = closed_lines(&advisories);
+    assert!(lines.iter().any(|l| l.contains("world.nodate.01") && l.contains("no_creation_time") && l.contains("c-gone")), "{lines:?}");
+    assert!(set_aside_ids(&status_subject(r)).is_empty(), "nothing is set aside for it");
 }
 
 /// change.drop.14: a fresh full clone reads the same set aside, runs `inventory sync` and has a green `gate check`.
