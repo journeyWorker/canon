@@ -23,7 +23,9 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use atip::doc::RuleKind;
-use rule_support::{code_of, constraints, declared_role, docs, label, provision, solve, words_of, Goal, Outcome};
+use rule_support::calls::{self, Source};
+use rule_support::search::{code_of, constraints, solve, Found, Goal};
+use rule_support::{declared_role, docs, label, provision, words_of, Outcome};
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
@@ -90,7 +92,7 @@ fn refuses_for_unmet(outcome: &Outcome, doc: &Value, rule: &atip::doc::Constrain
         return false;
     }
     let Some(field) = outcome.field.as_deref().and_then(|field| field_argument(doc, field)) else { return false };
-    !rule_support::parse_call(doc, words).is_ok_and(|parsed| parsed.given.contains_key(&field))
+    !rule_support::search::parse_call(doc, words).is_ok_and(|parsed| parsed.given.contains_key(&field))
 }
 
 /// Runs `jobs` on a handful of threads and returns the problems they report.
@@ -126,15 +128,19 @@ fn selected(doc: &Value, only: &[&str]) -> bool {
     std::env::var("ARG_RULES_COMMANDS").map_or(true, |list| list.split(',').any(|name| name.trim() == command))
 }
 
-/// One rule of one command held to the binary: the problems it has (empty when it is true).
-pub fn drive_rule(doc: &Value, at: usize) -> Vec<String> {
+/// The call a rule's goal is given: read from the stored table, or searched for.
+type Find<'a> = &'a dyn Fn(&Value, &[String], Goal) -> Option<Found>;
+
+/// One rule of one command held to the binary: the problems it has (empty when it is true). `find` gives the call for a goal: the stored table
+/// for the declared commands, the search for a document the table does not describe.
+fn drive_rule_with(doc: &Value, at: usize, find: Find<'_>) -> Vec<String> {
     let path = doc["command"].as_str().unwrap_or_default();
     let rules = constraints(doc);
     let rule = &rules[at];
     let provision = provisioned(path);
     let mut problems = Vec::new();
     let tag = format!("`{path}` {}", label(rule));
-    match solve(doc, &provision.example, &rules, Goal::Violate(at)) {
+    match find(doc, &provision.example, Goal::Violate(at)) {
         None => problems.push(format!("{tag}: no call breaks it")),
         Some(found) => {
             let words = words_of(doc, &provision.example, &found.assignment);
@@ -153,7 +159,7 @@ pub fn drive_rule(doc: &Value, at: usize) -> Vec<String> {
         }
     }
     // A call that meets it is not refused for it.
-    match solve(doc, &provision.example, &rules, Goal::Satisfy(at)) {
+    match find(doc, &provision.example, Goal::Satisfy(at)) {
         None => {
             if !matches!(rule.rule, RuleKind::AtLeastOne | RuleKind::ExactlyOne | RuleKind::AtMostOne | RuleKind::Requires | RuleKind::Forbids) {
                 problems.push(format!("{tag}: no call meets it"));
@@ -170,6 +176,19 @@ pub fn drive_rule(doc: &Value, at: usize) -> Vec<String> {
         }
     }
     problems
+}
+
+/// One rule of one command, with the calls the stored table holds (a story's example: the one `arg_rules` runs the command from).
+pub fn drive_rule(doc: &Value, at: usize) -> Vec<String> {
+    drive_rule_with(doc, at, &|doc, example, goal| {
+        assert_eq!(example, harness::story_argv_of(doc).as_slice(), "the provisioned example is the story's example the table was made from");
+        calls::read(doc, example, Source::Story, goal)
+    })
+}
+
+/// One rule of a document the table does not describe, with the calls searched for it (`atip_constraints_13`).
+pub fn drive_rule_searched(doc: &Value, at: usize) -> Vec<String> {
+    drive_rule_with(doc, at, &|doc, example, goal| solve(doc, example, &constraints(doc), goal))
 }
 
 /// Every rule of every command (or of the commands `only` names) driven through the binary.
@@ -234,7 +253,7 @@ pub fn drive_domain(doc: &Value, argument: &Value) -> Vec<String> {
     let code = row.map_or("USAGE", |row| row.code);
     let provision = provisioned(path);
     let rules = constraints(doc);
-    let Ok(parsed) = rule_support::parse_call(doc, &provision.example) else { return vec![format!("`{path}`: the example does not parse")] };
+    let Ok(parsed) = rule_support::search::parse_call(doc, &provision.example) else { return vec![format!("`{path}`: the example does not parse")] };
     let base = rule_support::assignment_of(&parsed);
     let mut problems = Vec::new();
     for (value, inside, own_bound) in boundaries(domain, row) {
@@ -340,7 +359,7 @@ pub fn drive_validator(doc: &Value, validator: &Value) -> Vec<String> {
 }
 
 fn argument_value_name(doc: &Value, name: &str) -> Option<String> {
-    rule_support::argument(doc, name).and_then(|argument| argument["valueName"].as_str().map(str::to_string))
+    rule_support::search::argument(doc, name).and_then(|argument| argument["valueName"].as_str().map(str::to_string))
 }
 
 /// Every validator of every command (or of the commands `only` names).
@@ -440,11 +459,11 @@ fn atip_constraints_09_a_validator_whose_rejects_is_not_refused_is_found() {
 fn atip_constraints_13_a_declaration_with_no_check_behind_it_is_found() {
     let doc = seeded("query", "constraints", serde_json::json!({ "rule": "atMostOne", "names": ["kind", "since"] }));
     let at = doc["constraints"].as_array().map_or(0, Vec::len) - 1;
-    let problems = drive_rule(&doc, at);
+    let problems = drive_rule_searched(&doc, at);
     assert!(problems.iter().any(|problem| problem.contains("was not refused for it")), "{problems:?}");
     let wrong_code = seeded("finding close", "constraints", serde_json::json!({ "rule": "requires", "if": { "name": "disposition", "in": ["rejected"] }, "then": ["reason"], "code": "USAGE" }));
     let at = wrong_code["constraints"].as_array().map_or(0, Vec::len) - 1;
-    let problems = drive_rule(&wrong_code, at);
+    let problems = drive_rule_searched(&wrong_code, at);
     assert!(!problems.is_empty(), "a rule whose code the binary does not give is found");
     let mut domain = harness::leaf("query").clone();
     let limit = domain["options"].as_array_mut().and_then(|options| options.iter_mut().find(|option| option["name"] == "limit")).expect("--limit");
@@ -506,7 +525,7 @@ pub fn drive_subsets(doc: &Value) -> Vec<String> {
             .iter()
             .map(|name| {
                 let mut states = vec![None];
-                states.extend(rule_support::candidates(doc, &example, &rules, name).into_iter().map(Some));
+                states.extend(rule_support::search::candidates(doc, &example, &rules, name).into_iter().map(Some));
                 states
             })
             .collect();
@@ -519,12 +538,12 @@ pub fn drive_subsets(doc: &Value) -> Vec<String> {
             (0..budget).map(|_| options.iter().map(|states| generator.below(states.len())).collect()).collect()
         };
         for pick in picks {
-            let assignment: rule_support::Assignment = names.iter().zip(&pick).zip(&options).filter_map(|((name, at), states)| states[*at].clone().map(|value| (name.clone(), vec![value]))).collect();
+            let assignment: rule_support::search::Assignment = names.iter().zip(&pick).zip(&options).filter_map(|((name, at), states)| states[*at].clone().map(|value| (name.clone(), vec![value]))).collect();
             let words = words_of(doc, &example, &assignment);
             if !seen.insert(words.clone()) {
                 continue;
             }
-            let Ok(parsed) = rule_support::parse_call(doc, &words) else { continue };
+            let Ok(parsed) = rule_support::search::parse_call(doc, &words) else { continue };
             let broken = atip::constraint::violations(&rules, &parsed.given);
             let outcome = rule_support::run_empty(&words, declared_role(path, &parsed.text));
             let call = words.join(" ");
@@ -571,4 +590,38 @@ fn atip_constraints_19_every_combination_of_the_arguments_of_the_rules_is_answer
     let jobs: Vec<&'static Value> = docs().into_iter().filter(|doc| selected(doc, &[])).collect();
     let problems = in_parallel(&jobs, |doc| drive_subsets(doc));
     assert!(problems.is_empty(), "{} problems, the first thirty:\n{}", problems.len(), problems.iter().take(30).cloned().collect::<Vec<_>>().join("\n"));
+}
+
+// ------------------------------------------------------------------------------------------ the stored calls
+
+/// The stored table (`tests/atip/rule_calls.jsonl`) holds, for every rule the documents declare, the call the search finds; `atip_check_order`
+/// and the sweeps above read it and never search. This is the one place that says whether it is current: every row has a digest of what the
+/// search read, still equal to the inputs now, and its call still breaks (or meets) the rule it is for. With `CANON_BLESS_RULE_CALLS=1` it
+/// makes the table again (`just rule-calls`) and writes nothing otherwise.
+#[test]
+fn the_stored_rule_calls_are_the_ones_the_search_finds_now() {
+    let docs: Vec<Value> = harness::leaves().into_iter().cloned().collect();
+    let sources = calls::search_sources();
+    let atip = calls::lock_atip_rev();
+    let story = |doc: &Value| harness::story_argv_of(doc);
+    let world = calls::World { docs: &docs, story_example: &story, sources: &sources, atip: &atip };
+    if std::env::var_os(calls::BLESS).is_some() {
+        std::fs::write(calls::path(), calls::make(&world)).expect("write the table");
+        return;
+    }
+    let text = std::fs::read_to_string(calls::path()).unwrap_or_else(|why| panic!("cannot read {}: {why}; {}", calls::path().display(), calls::REMEDY));
+    let problems = calls::problems(&text, &world);
+    assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
+}
+
+/// A document the table does not describe (a rule more, a rule changed) is not read from it: the read fails and says how to make the table again.
+#[test]
+fn a_document_the_table_does_not_describe_is_refused_by_the_table() {
+    let doc = seeded("query", "constraints", json!({ "rule": "atMostOne", "names": ["kind", "since"] }));
+    let added = doc["constraints"].as_array().map_or(0, Vec::len) - 1;
+    let example = rule_support::search::doc_example(&doc);
+    let why = calls::table().found(&doc, &example, Source::Doc, Goal::Violate(added)).expect_err("a rule the table never saw has no row");
+    assert!(why.contains("no row") && why.contains(calls::REMEDY), "{why}");
+    let why = calls::table().found(&doc, &example, Source::Doc, Goal::Violate(0)).expect_err("the rules of the command changed, so its rows are stale");
+    assert!(why.contains("other inputs") && why.contains(calls::REMEDY), "{why}");
 }

@@ -11,7 +11,7 @@ mod rule_support;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use rule_support::{document_problems, run_empty_with, sample};
+use rule_support::{document_problems, run_empty_with, search::sample};
 use serde_json::{json, Value};
 
 fn canon_in(dir: &Path, args: &[&str]) -> std::process::Output {

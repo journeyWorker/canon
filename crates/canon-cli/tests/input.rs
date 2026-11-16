@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::LazyLock;
 
 use serde_json::{json, Value};
 use tempfile::TempDir;
@@ -206,16 +207,6 @@ fn validates(doc: &Value, name: &str, instance: &Value) {
     assert!(problems.is_empty(), "{name}: {problems:?}\n{instance}");
 }
 
-/// The `--schemas` answer of a leaf, from the binary: what a command document's `#/schemas/..` refs and its `Input` resolve in.
-fn schemas_of(dir: &Path, home: &Path, leaf: &str) -> Value {
-    let mut args: Vec<&str> = vec!["schema"];
-    args.extend(leaf.split(' '));
-    args.extend(["--schemas", "--json"]);
-    let answer = json_of(&canon(dir, home, &args, None))["data"].clone();
-    assert_eq!(answer["kind"], "schemas", "{leaf}");
-    answer
-}
-
 /// The spec node of a leaf, from the binary.
 fn node(dir: &Path, home: &Path, leaf: &str) -> Value {
     let mut args: Vec<&str> = vec!["schema"];
@@ -229,17 +220,37 @@ fn write_leaves(dir: &Path, home: &Path) -> Vec<String> {
     listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] != "group" && c["effect"] != "read").map(|c| c["command"].as_str().unwrap().to_string()).collect()
 }
 
+/// What `canon schema` answers, read in this process: the spec the generator writes (`canon_cli::spec::generate`). `atip_schemadoc_13` holds every
+/// command document and every `--schemas` answer of it to the bytes the binary prints, so a test that only reads a declaration reads it here and
+/// does not start the binary for it (0.42 `canon-0-42-test-cost`).
+static DECLARED: LazyLock<Value> = LazyLock::new(canon_cli::spec::generate);
+
+/// The command document of a leaf, as `canon schema <leaf> --json` prints it in `data`.
+fn declared_node(leaf: &str) -> Value {
+    DECLARED["commands"].as_array().unwrap().iter().find(|doc| doc["command"] == leaf).unwrap_or_else(|| panic!("`{leaf}` is no command")).clone()
+}
+
+/// The `--schemas` answer of a leaf, as `canon schema <leaf> --schemas --json` prints it in `data`.
+fn declared_schemas(leaf: &str) -> Value {
+    let answer = DECLARED["schemas"][leaf].clone();
+    assert_eq!(answer["kind"], "schemas", "{leaf}");
+    answer
+}
+
+/// The leaves that write, from the tree `canon schema --json` prints.
+fn declared_write_leaves() -> Vec<String> {
+    DECLARED["tree"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] != "group" && c["effect"] != "read").map(|c| c["command"].as_str().unwrap().to_string()).collect()
+}
+
 // ---------------------------------------------------------------- the spec
 
 #[test]
 fn every_writing_leaf_takes_input_and_no_read_leaf_does() {
-    let home = TempDir::new().unwrap();
-    let dir = TempDir::new().unwrap();
-    let listing = json_of(&canon(dir.path(), home.path(), &["schema", "--json"], None));
+    let listing = json!({ "data": DECLARED["tree"].clone() });
     let mut writers = 0;
     for command in listing["data"]["commands"].as_array().unwrap().iter().filter(|c| c["kind"] != "group") {
         let leaf = command["command"].as_str().unwrap();
-        let detail = node(dir.path(), home.path(), leaf);
+        let detail = declared_node(leaf);
         // `--input` is implied by `input`: the 1.4 document never lists it.
         assert!(!detail["options"].as_array().unwrap().iter().any(|o| o == "input" || o["name"] == "input"), "`{leaf}`: --input is implied and not listed");
         let writes = detail["effect"] != "read";
@@ -251,7 +262,7 @@ fn every_writing_leaf_takes_input_and_no_read_leaf_does() {
         writers += 1;
         let input = &detail["input"];
         assert_eq!(input["maxBytes"], 8 * 1024 * 1024, "{leaf}");
-        let answer = schemas_of(dir.path(), home.path(), leaf);
+        let answer = declared_schemas(leaf);
         validates(&answer, "Input", &input["example"]);
         // The batch variant is declared exactly where a batch is accepted.
         let outputs = detail["outputs"].as_array().unwrap();
@@ -268,19 +279,17 @@ fn every_writing_leaf_takes_input_and_no_read_leaf_does() {
         }
     }
     assert_eq!(writers, 50, "every leaf whose effect is write or destructive");
-    assert_eq!(write_leaves(dir.path(), home.path()).len(), writers);
+    assert_eq!(declared_write_leaves().len(), writers);
 }
 
 /// The `input.example` of every writing command is one valid document of its schema, and an array of it is a valid batch.
 #[test]
 fn the_published_input_examples_are_valid_documents() {
-    let home = TempDir::new().unwrap();
-    let dir = TempDir::new().unwrap();
     let mut seen = 0;
-    for leaf in write_leaves(dir.path(), home.path()) {
-        let detail = node(dir.path(), home.path(), &leaf);
+    for leaf in declared_write_leaves() {
+        let detail = declared_node(&leaf);
         let input = &detail["input"];
-        validates(&schemas_of(dir.path(), home.path(), &leaf), "Input", &input["example"]);
+        validates(&declared_schemas(&leaf), "Input", &input["example"]);
         assert!(input["example"].is_object(), "`{leaf}`: the example is one document, not a batch");
         assert!(input.get("batchExample").is_none(), "`{leaf}`");
         seen += 1;

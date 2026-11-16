@@ -9,7 +9,8 @@ mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::Output;
-use std::sync::LazyLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{LazyLock, Mutex};
 
 use jsonschema::{Registry, Resource};
 use serde_json::{json, Value};
@@ -33,6 +34,25 @@ fn answer(args: &[&str]) -> (Option<i32>, Value, String) {
     let text = String::from_utf8(out.stdout).expect("stdout is text");
     let value = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{args:?}: {e}: {text}"));
     (out.status.code(), value, text)
+}
+
+/// The answers of `argvs` from the binary, in order, on six threads (each call builds the whole model: a quarter of a second in a debug build);
+/// the pool shortens the wall time when cores are idle and costs the same CPU time.
+fn pooled(dir: &Path, argvs: &[Vec<String>]) -> Vec<Output> {
+    let next = AtomicUsize::new(0);
+    let done: Mutex<Vec<Option<Output>>> = Mutex::new(argvs.iter().map(|_| None).collect());
+    std::thread::scope(|scope| {
+        for _ in 0..6 {
+            scope.spawn(|| loop {
+                let at = next.fetch_add(1, Ordering::SeqCst);
+                let Some(argv) = argvs.get(at) else { break };
+                let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+                let out = run(&args, dir, None);
+                done.lock().expect("the answers")[at] = Some(out);
+            });
+        }
+    });
+    done.into_inner().expect("the answers").into_iter().map(|out| out.expect("every call answered")).collect()
 }
 
 /// The tree document, as the generator builds it.
@@ -570,12 +590,26 @@ fn atip_schemadoc_04_an_unknown_path_names_what_is_valid_and_overlapping_selecto
 #[test]
 fn atip_schemadoc_03_a_group_under_as_lists_what_the_roles_tree_lists() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let json = |args: &[&str]| -> (Option<i32>, Value) {
-        let out = run(args, dir.path(), None);
-        (out.status.code(), serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{args:?}: {e}")))
-    };
+    // Every call is run first, on the pool; the checks below read their answers.
+    let roles = ["planner", "implementer", "reviewer", "orchestrator"];
+    let groups: Vec<&Value> = TREE["commands"].as_array().expect("commands").iter().filter(|entry| entry["kind"] == "group").collect();
+    let mut calls: Vec<Vec<String>> = Vec::new();
+    for role in roles {
+        calls.push(["schema", "--as", role, "--json"].map(str::to_string).to_vec());
+        for group in &groups {
+            let mut args = vec!["schema".to_string()];
+            args.extend(names(group, "path"));
+            args.extend(["--as", role, "--json"].map(str::to_string));
+            calls.push(args);
+        }
+    }
+    calls.push(["schema", "brief", "--as", "reviewer", "--json"].map(str::to_string).to_vec());
+    calls.push(["schema", "brief", "--json"].map(str::to_string).to_vec());
+    let outputs = pooled(dir.path(), &calls);
+    let answers: BTreeMap<Vec<String>, (Option<i32>, Value)> = calls.iter().cloned().zip(outputs.iter().map(|out| (out.status.code(), serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{e}: {}", String::from_utf8_lossy(&out.stdout)))))).collect();
+    let json = |args: &[&str]| -> (Option<i32>, Value) { answers[&args.iter().map(ToString::to_string).collect::<Vec<String>>()].clone() };
     let mut refused = 0;
-    for role in ["planner", "implementer", "reviewer", "orchestrator"] {
+    for role in roles {
         let (_, tree) = json(&["schema", "--as", role, "--json"]);
         let entries = tree["data"]["commands"].as_array().expect("commands").clone();
         for group in TREE["commands"].as_array().expect("commands").iter().filter(|entry| entry["kind"] == "group") {
@@ -1031,15 +1065,25 @@ fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command(
     assert_eq!(commands.len(), 81);
     let dir = tempfile::tempdir().expect("tempdir");
     let mut problems = form_problems(&file["tree"], commands, &file["schemas"]);
-    for doc in commands {
+    // The two answers of every command, run first on the pool.
+    let argvs: Vec<Vec<String>> = commands
+        .iter()
+        .flat_map(|doc| {
+            let mut plain: Vec<String> = vec!["schema".to_string()];
+            plain.extend(doc["command"].as_str().expect("command").split(' ').map(str::to_string));
+            plain.push("--json".to_string());
+            let mut schemas = plain.clone();
+            schemas.insert(schemas.len() - 1, "--schemas".to_string());
+            [plain, schemas]
+        })
+        .collect();
+    let answered = pooled(dir.path(), &argvs);
+    for (at, doc) in commands.iter().enumerate() {
         let command = doc["command"].as_str().expect("command").to_string();
-        let path: Vec<&str> = command.split(' ').collect();
-        let mut args: Vec<&str> = vec!["schema"];
-        args.extend(path.iter().copied());
-        args.push("--json");
-        let out = run(&args, dir.path(), None);
+        let args = &argvs[2 * at];
+        let out = &answered[2 * at];
         assert_eq!(out.status.code(), Some(0), "{args:?}");
-        let text = String::from_utf8(out.stdout).expect("text");
+        let text = String::from_utf8(out.stdout.clone()).expect("text");
         let answer: Value = serde_json::from_str(&text).expect("JSON");
         assert_eq!(answer["data"], *doc, "`{command}`: the file and the answer differ");
         // The bytes of `data` in the answer are the bytes the serializer writes.
@@ -1047,8 +1091,8 @@ fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command(
         let printed = &text[text.find("\"data\":").expect("data") + "\"data\":".len()..text.rfind(",\"meta\":").expect("meta")];
         assert_eq!(printed, generated, "`{command}`");
         // The `schemas` map of the file holds what `--schemas` answers.
-        args.insert(args.len() - 1, "--schemas");
-        let out = run(&args, dir.path(), None);
+        let args = &argvs[2 * at + 1];
+        let out = &answered[2 * at + 1];
         assert_eq!(out.status.code(), Some(0), "{args:?}");
         let answer: Value = serde_json::from_slice(&out.stdout).expect("JSON");
         assert_eq!(answer["data"], file["schemas"][&command], "`{command}`: the file's schemas and the --schemas answer differ");

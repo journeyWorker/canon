@@ -13,12 +13,14 @@
 //! in one, and on a source file that holds codes but is not accounted for, so
 //! a new error site cannot be missing from `canon schema`.
 //! `CANON_BLESS_SCHEMA_CODES=1` rewrites the table.
+//!
+//! The scan runs once per process (the four tests share it) and reads the command documents in this process: `canon schema <command>` is not
+//! started (0.42 `canon-0-42-test-cost`).
 
-#[path = "support/hermetic.rs"]
-mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use canon_cli::cli_error::all_codes;
 use canon_cli::schema::{error_codes, META};
@@ -256,33 +258,40 @@ fn leaves_under(prefix: &str) -> Vec<&'static str> {
 
 /// The leaves `run::entry` refuses with `CONFIG_REQUIRED` when no `canon.yaml` is
 /// found: those with a `--repo` option that are not in
-/// `canon_cli::context::CONFIG_EXEMPT`. A leaf's options come from its own
-/// `canon schema` output, so a new `--repo` option is picked up by itself.
+/// `canon_cli::context::CONFIG_EXEMPT`. A leaf's options come from its command document, read in this process
+/// (`canon schema <command>` prints the same document: `atip_schemadoc_13` holds its bytes to the file's), so a new `--repo` option is picked up by itself.
 fn needs_config_leaves() -> Vec<&'static str> {
-    META.iter()
-        .map(|m| m.path)
-        .filter(|path| canon_cli::context::needs_config(path))
-        .filter(|path| {
-            let mut args: Vec<&str> = vec!["schema"];
-            args.extend(path.split(' '));
-            args.push("--json");
-            let out = hermetic::canon().args(&args).output().expect("spawn canon");
-            let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("schema is JSON");
-            // `--repo` is the tree's shared option: a 1.4 document names it (a string) unless it defines its own.
-            body["data"]["options"].as_array().expect("options").iter().any(|o| o == "repo" || o["name"] == "repo")
-        })
-        .collect()
+    let root = canon_cli::spec::built_root();
+    let docs = canon_cli::spec::commands(&root).expect("the commands are built");
+    // `--repo` is the tree's shared option: a 1.4 document names it (a string) unless it defines its own; the model form lists it as an option.
+    let with_repo: BTreeSet<String> = docs
+        .into_iter()
+        .map(|doc| serde_json::to_value(doc).expect("a command serializes"))
+        .filter(|doc| doc["options"].as_array().expect("options").iter().any(|o| o == "repo" || o["name"] == "repo"))
+        .map(|doc| doc["command"].as_str().expect("command").to_string())
+        .collect();
+    META.iter().map(|m| m.path).filter(|path| canon_cli::context::needs_config(path)).filter(|path| with_repo.contains(*path)).collect()
 }
 
-fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
-    derive_with_warnings().0
+type Table = BTreeMap<&'static str, BTreeSet<&'static str>>;
+
+/// The table, derived once per process.
+fn derive() -> &'static Table {
+    &derive_with_warnings().0
 }
 
-/// The table, and the codes that appear at a warning site.
-fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BTreeSet<&'static str>) {
+static DERIVED: LazyLock<(Table, BTreeSet<&'static str>)> = LazyLock::new(scan);
+
+/// The table, and the codes that appear at a warning site, derived once per process.
+fn derive_with_warnings() -> &'static (Table, BTreeSet<&'static str>) {
+    &DERIVED
+}
+
+fn scan() -> (Table, BTreeSet<&'static str>) {
     let mut warned: BTreeSet<&'static str> = BTreeSet::new();
-    let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
+    let mut table: Table = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
     let codes: Vec<&'static str> = all_codes().iter().map(|info| info.code).chain(canon_cli::cli_error::all_warnings().iter().map(|info| info.code)).filter(|c| !GLOBAL.contains(c)).collect::<BTreeSet<_>>().into_iter().collect();
+    let needles: Vec<String> = codes.iter().map(|c| format!("\"{c}\"")).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
     let mut files: Vec<PathBuf> = ["", "run", "search"]
@@ -311,7 +320,8 @@ fn derive_with_warnings() -> (BTreeMap<&'static str, BTreeSet<&'static str>>, BT
         for (i, line) in lines.iter().enumerate() {
             // A warning call may wrap: the code literal is then alone on the line after `warn_err!(`.
             let wrapped = i > 0 && lines[i - 1].trim_end().ends_with('(') && WARNING_SITES.iter().any(|marker| lines[i - 1].contains(marker));
-            for code in codes.iter().filter(|c| line.contains(&format!("\"{c}\"")) || helper_answers(line, c)) {
+            let maybe_helper = HELPER_SITES.iter().any(|(marker, _)| line.contains(marker)) || CALL_SITES.iter().any(|(marker, _, _)| line.contains(marker));
+            for code in codes.iter().zip(&needles).filter(|&(c, needle)| line.contains(needle.as_str()) || (maybe_helper && helper_answers(line, c))).map(|(c, _)| c) {
                 if wrapped || WARNING_SITES.iter().any(|marker| line.contains(marker)) {
                     warned.insert(code);
                     continue;
@@ -414,13 +424,13 @@ fn render(table: &BTreeMap<&str, BTreeSet<&str>>) -> String {
 #[test]
 fn the_schema_error_codes_are_the_codes_the_sources_emit() {
     let table = derive();
-    let rendered = render(&table);
+    let rendered = render(table);
     let checked_in = src_dir().join("schema_codes.rs");
     if std::env::var_os("CANON_BLESS_SCHEMA_CODES").is_some() {
         fs::write(&checked_in, &rendered).expect("write schema_codes.rs");
         return;
     }
-    for (path, codes) in &table {
+    for (path, codes) in table {
         let listed: BTreeSet<&str> = error_codes(path).into_iter().collect();
         let missing: Vec<&&str> = codes.difference(&listed).collect();
         let stale: Vec<&&str> = listed.difference(codes).collect();
@@ -446,7 +456,7 @@ fn atip_contract11_07_warning_only_codes_are_in_the_warning_registry_and_dual_co
     let emitted: BTreeSet<&str> = table.values().flatten().copied().collect();
     let errors: BTreeSet<&str> = all_codes().iter().map(|info| info.code).collect();
     let warnings: BTreeSet<&str> = canon_cli::cli_error::all_warnings().iter().map(|info| info.code).collect();
-    for code in &warned {
+    for code in warned {
         assert!(warnings.contains(code), "`{code}` is said as a warning and is not in the warning registry");
         if emitted.contains(code) {
             let (error, warning) = (canon_cli::cli_error::code_info(code).expect("an emitted code is registered"), canon_cli::cli_error::warning_info(code).expect("a warned code is registered"));

@@ -504,8 +504,11 @@ pub fn clean_brief() -> String {
         .to_string()
 }
 
-/// A strategy in the warm tier and the trajectories that corroborate it: what `strategy promote` re-renders.
-pub fn seed_strategy(repo: &Path) -> String {
+/// The id the story gives the strategy `strategy promote` re-renders: the example names this one, so the story's example is the same words in every run.
+pub const STORY_STRATEGY_ID: &str = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+/// A strategy `id` in the warm tier and the trajectories that corroborate it: what `strategy promote` re-renders.
+pub fn seed_strategy(repo: &Path, id: &str) {
     use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
     use canon_learn::{ParquetStrategyStore, ParquetTrajectoryStore, StrategyId, StrategyItem, StrategyItemFields, StrategyLifecycle, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, TrajectoryVerdict, VerdictOutcome};
     use canon_model::ids::{regime_key, RegimeKey, RoleId};
@@ -513,7 +516,7 @@ pub fn seed_strategy(repo: &Path) -> String {
 
     let regime = RegimeKey::parse(regime_key("dev", "canon", "join-spine", "9c93d024b1a2")).unwrap();
     let role = RoleId::parse("dev").unwrap();
-    let id = StrategyId::new();
+    let id = StrategyId::parse(id).expect("a strategy id");
     let item = StrategyItem::new(StrategyItemFields { id, regime_key: regime.clone(), role: role.clone(), title: "review guidance".into(), description: "one-liner".into(), content: "prefer the boring, correct option".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() }).with_lifecycle(StrategyLifecycle::Active);
     ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies")).append(&item).expect("seed strategy");
     let store = ParquetTrajectoryStore::open(repo.join(".canon").join("learn").join("trajectories"));
@@ -523,7 +526,6 @@ pub fn seed_strategy(repo: &Path) -> String {
         let trajectory = Trajectory::new(TrajectoryId::new(), regime.clone(), "landed the change", "fixture", vec![row], now - Duration::days(5 - i), vec![]).expect("a well formed trajectory");
         store.append(&trajectory.with_verdict_record(TrajectoryVerdict::new(VerdictOutcome::Success, 0.9))).expect("seed trajectory");
     }
-    id.to_string()
 }
 
 /// The first `--manifest` value of an example.
@@ -532,11 +534,34 @@ pub fn manifest_of(argv: &[String]) -> String {
     argv[at + 1].clone()
 }
 
+/// A leaf's first example as the story runs it: the example of its document with the ids the story builds for it in place of the ones the
+/// example names (`case`). The same words in every run: the story's ids are fixed (a run id a command makes is no part of an example of a
+/// command that has rules).
+pub fn story_argv_of(node: &Value) -> Vec<String> {
+    let argv = example_argv(node);
+    match path_of(node).as_str() {
+        // The example's `auth.login.02` is in the fixture already.
+        "scenario new" => swapped(argv, "auth.login.02", "auth.login.03"),
+        "review change" => swapped(argv, "add-login", "tidy"),
+        "brief approve" => swapped(argv, "add-search", "add-login"),
+        "plugin sync" => swapped(argv, "my-plugin", "porting"),
+        "strategy promote" => {
+            assert!(argv.iter().any(|token| token == STORY_STRATEGY_ID), "the example names the story's strategy: {argv:?}");
+            argv
+        }
+        _ => argv,
+    }
+}
+
+/// [`story_argv_of`] for the leaf `name`.
+pub fn story_argv(name: &str) -> Vec<String> {
+    story_argv_of(leaf(name))
+}
+
 /// The directory and command line a leaf's idempotency check runs: its example in a copy of the
 /// fixture, after the state the example needs is built (and the example's ids swapped for the ones built).
 pub fn case(name: &str, base: &Path, home: &Path) -> Case {
-    let node = leaf(name);
-    let mut argv = example_argv(node);
+    let mut argv = story_argv(name);
     let mut envs: Vec<(String, String)> = Vec::new();
     let mut guards = Vec::new();
     let (guard, repo) = copy_of(base);
@@ -549,11 +574,8 @@ pub fn case(name: &str, base: &Path, home: &Path) -> Case {
             dir = fresh.path().to_path_buf();
             guards.push(fresh);
         }
-        // The example's `auth.login.02` is in the fixture already.
-        "scenario new" => argv = swapped(argv, "auth.login.02", "auth.login.03"),
         "review change" => {
             ok(&repo, home, &["change", "new", "tidy", "--subject", "demo", "--title", "Tidy", "--change-kind", "chore"]);
-            argv = swapped(argv, "add-login", "tidy");
         }
         "context-pack add" | "prompt add" => put(&repo, &manifest_of(&argv), MANIFEST),
         "dispatch end" => {
@@ -564,10 +586,7 @@ pub fn case(name: &str, base: &Path, home: &Path) -> Case {
             let run_id = document(&out)["data"]["runId"].as_str().expect("the run id").to_string();
             argv = swapped(argv, "01ARZ3NDEKTSV4RRFFQ69G5FAV", &run_id);
         }
-        "brief approve" => {
-            put(&repo, ".canon/changes/add-login/brief.md", &clean_brief());
-            argv = swapped(argv, "add-search", "add-login");
-        }
+        "brief approve" => put(&repo, ".canon/changes/add-login/brief.md", &clean_brief()),
         "task done" => {
             put(&repo, ".canon/changes/add-login/brief.md", &clean_brief());
             put(&repo, ".canon/changes/add-login/tasks.md", "# Tasks: Add login\n\n- [ ] 1 Write the failure-path scenarios\n");
@@ -579,12 +598,8 @@ pub fn case(name: &str, base: &Path, home: &Path) -> Case {
             put(&repo, ".canon/plugins/porting/plugin.yaml", PORTING_YAML);
             put(&repo, ".canon/specs/inventory/kind=inventory/area=auth/surface=login/login.yaml", INVENTORY_YAML);
             ok(&repo, home, &["inventory", "sync"]);
-            argv = swapped(argv, "my-plugin", "porting");
         }
-        "strategy promote" => {
-            let id = seed_strategy(&repo);
-            argv = swapped(argv, "01ARZ3NDEKTSV4RRFFQ69G5FAV", &id);
-        }
+        "strategy promote" => seed_strategy(&repo, STORY_STRATEGY_ID),
         // The example's `cold` tier: declared in canon.yaml, backed by a local directory through the debug seam the tier tests use.
         "artifacts move" => {
             let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
