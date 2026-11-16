@@ -348,7 +348,7 @@ fn atip_optionvalues_04_a_blank_name_or_one_with_a_control_character_or_a_line_b
     }
 }
 
-/// The four commands that take `--relayed-via` check the tool the same way, and declare it the same way.
+/// The seven commands that take `--relayed-via` check the tool the same way, and declare it the same way.
 const RELAYED: &[(&str, &[&str])] = &[
     ("brief approve", &["brief", "approve", "add-login", "--approver", "Ana", "--note", "ok", "--actor", "impl", "--digest", "add-login=sha256:0123456789abcdef"]),
     ("policy approve", &["policy", "approve", "--approver", "Ana", "--note", "ok", "--actor", "impl"]),
@@ -360,7 +360,7 @@ const RELAYED: &[(&str, &[&str])] = &[
 ];
 
 #[test]
-fn atip_optionvalues_05_the_tool_of_a_relayed_approval_is_one_word_the_same_on_the_four_commands() {
+fn atip_optionvalues_05_the_tool_of_a_relayed_approval_is_one_word_the_same_on_the_seven_commands() {
     let mut descriptions = BTreeSet::new();
     for (command, args) in RELAYED {
         let doc = doc_of(command);
@@ -390,7 +390,7 @@ fn atip_optionvalues_05_the_tool_of_a_relayed_approval_is_one_word_the_same_on_t
             assert_eq!((got.exit, got.code(), got.field()), (2, "USAGE", "--relayed-via"), "`{command} --relayed-via {tool:?}`: {}", got.envelope);
         }
     }
-    assert_eq!(descriptions.len(), 1, "the four commands say it in the same words: {descriptions:?}");
+    assert_eq!(descriptions.len(), 1, "the seven commands say it in the same words: {descriptions:?}");
 }
 
 // ---------------------------------------------------------------------------
