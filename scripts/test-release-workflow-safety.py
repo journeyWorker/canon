@@ -199,7 +199,7 @@ class PrereleasePublishTests(unittest.TestCase):
 
     def expected(self, version: str, tag: str) -> list[str]:
         return [
-            f"publish tarballs/{package.removeprefix('@').replace('/', '-')}-{version}.tgz --provenance --access public{tag}"
+            f"publish ./tarballs/{package.removeprefix('@').replace('/', '-')}-{version}.tgz --provenance --access public{tag}"
             for _, package in self.publish_steps()
         ]
 
@@ -700,6 +700,11 @@ class SmokeTests(unittest.TestCase):
     def test_rejects_a_smoke_install_that_packs_its_own_tarballs(self) -> None:
         text = mutate(workflow("publish.yml"), "          name: npm-tarballs\n          path: tarballs\n\n      - name: Install the tarballs in the image", "          name: other\n          path: tarballs\n\n      - name: Install the tarballs in the image")
         self.assertTrue(any("`smoke-install` must download the `npm-tarballs`" in error for error in self.check(publish=text)))
+
+    def test_rejects_a_tarball_path_npm_would_read_as_a_github_repo(self) -> None:
+        # 0.42.0's tag run: `npm publish tarballs/x.tgz` ran `git ls-remote ssh://git@github.com/tarballs/x.tgz.git`.
+        text = workflow("publish.yml").replace('TARBALL="./tarballs/', 'TARBALL="tarballs/', 1)
+        self.assertTrue(any("must start with ./" in error for error in self.check(publish=text)))
 
 
 class ConditionTests(unittest.TestCase):

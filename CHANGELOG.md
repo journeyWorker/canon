@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Fixed
+
+- **The release publishes its tarballs by a `./` path.** The `v0.42.0` tag run stopped at its first publish: `npm publish tarballs/<file>.tgz` reads `tarballs/<file>` as a GitHub repository and ran `git ls-remote`, so nothing was published. `publish.yml` now names `./tarballs/…`, and `scripts/check-release-workflow-safety.py` refuses a `TARBALL` path without `./`, `../` or `/` in front. Release workflow only; canon's binary does not change.
+
 ## 0.42.0 — 2026-11-16
 
 canon 0.42 lets a human set a change aside and makes the release binaries say the floor they run on. `canon change defer` is for "not this release", `canon change drop` for the end, `canon change reopen` brings a deferred change back; a closed change drops out of what the subject and the gate require, and its evidence, reviews and findings stay. The binaries: static musl Linux on x64 and a new arm64 package, a static Windows C runtime, and macOS 15.0 or later. It is BREAKING for two callers. On macOS 11 to 14 the 0.42 binary no longer runs (stay on canon 0.41 or move to macOS 15). A repo that closes changes needs one more `routing:` line in `canon.yaml`, `change_state: local` (`canon migrate` adds it, `canon init` writes it), and canon 0.41 and older refuse a `canon.yaml` that has it. Every other caller has nothing to change: a repo without the line runs the other commands as before, the Linux and Windows binaries run on more hosts than they did, and the CI and test-cost changes touch no output of canon. The caller note below says what each caller does.

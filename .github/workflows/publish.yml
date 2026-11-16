@@ -707,7 +707,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
           test -f "$TARBALL"
           if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
             echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
@@ -725,7 +725,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
           test -f "$TARBALL"
           if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
             echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
@@ -743,7 +743,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
           test -f "$TARBALL"
           if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
             echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
@@ -761,7 +761,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
           test -f "$TARBALL"
           if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
             echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
@@ -779,7 +779,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
           test -f "$TARBALL"
           if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
             echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
