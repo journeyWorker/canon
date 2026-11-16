@@ -748,6 +748,20 @@ class PreflightTests(unittest.TestCase):
         text = mutate(text, '          else\n            echo "every package is already on npm', '          fi\n          if [ -n "$ABSENT" ]; then\n            true\n          else\n            echo "every package is already on npm')
         self.assertTrue(self.check(text))
 
+    def test_rejects_an_unguarded_whoami_next_to_a_guarded_one(self) -> None:
+        else_branch = '          else\n            echo "every package is already on npm'
+        for call in ("npm whoami", "if ! npm whoami; then exit 1; fi", "WHO=$(npm whoami)", "echo \"$(npm whoami)\""):
+            text = mutate(workflow("publish.yml"), else_branch, f"          else\n            {call}\n            echo \"every package is already on npm")
+            errors = self.check(text)
+            self.assertTrue(any("must run only under" in error for error in errors), (call, errors))
+
+    def test_counts_the_command_substitution_form_as_a_whoami(self) -> None:
+        text = mutate(workflow("publish.yml"), "            if ! npm whoami; then\n", "            if ! WHO=$(npm whoami); then\n")
+        self.assertEqual(self.check(text), [])
+        text = mutate(workflow("publish.yml"), self.WHOAMI_GUARD, '          if true; then\n')
+        text = mutate(text, "            if ! npm whoami; then\n", "            if ! WHO=$(npm whoami); then\n")
+        self.assertTrue(any("must run only under" in error for error in self.check(text)))
+
     def test_rejects_a_preflight_without_whoami(self) -> None:
         text = mutate(workflow("publish.yml"), "            if ! npm whoami; then\n", "            if ! true; then\n")
         self.assertTrue(any("must run `npm whoami`" in error for error in self.check(text)))

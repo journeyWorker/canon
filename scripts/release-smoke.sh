@@ -106,6 +106,8 @@ if [ -n "$pkgs" ]; then
 fi
 git config --global --add safe.directory '*'
 echo "image: $(. /etc/os-release && echo "$PRETTY_NAME")"
+# The libc in the log: glibc prints its version here, musl prints its banner on stderr (and exits 1).
+(ldd --version 2>&1 || true) | head -n 1
 SH
 }
 

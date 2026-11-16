@@ -855,16 +855,18 @@ def preflight_errors(text: str, workflow: str) -> list[str]:
     if "npm view" not in step:
         errors.append(f"{workflow}: the pre-flight must ask npm (`npm view`) whether each package exists")
     stack: list[tuple[str, bool]] = []  # (condition, in its then-branch)
-    whoami_guarded = False
     whoami = 0
+    unguarded = 0
     for raw in step.splitlines():
         line = raw.strip()
         if line.startswith("#"):
             continue
-        if re.match(r"^(?:if\s+!?\s*)?npm whoami\b", line):
+        # Every call counts: bare, `if [!] npm whoami`, `$(npm whoami)`, `VAR=$(npm whoami)`, after `;`/`&&`/`||`/`then`.
+        # An `echo "...npm whoami..."` message is text, not a call.
+        if re.search(r"(?:^|[;&|(!`]|\bif|\bthen|\bdo|\belse)\s*npm whoami\b", line):
             whoami += 1
-            if any(cond == '[ -n "$ABSENT" ]' and then for cond, then in stack):
-                whoami_guarded = True
+            if not any(cond == '[ -n "$ABSENT" ]' and then for cond, then in stack):
+                unguarded += 1
         if re.match(r"^if .*; then$", line):
             stack.append((line[3:-6].strip(), True))
         elif line.startswith("elif ") or line == "else":
@@ -874,8 +876,8 @@ def preflight_errors(text: str, workflow: str) -> list[str]:
             stack.pop()
     if whoami == 0:
         errors.append(f"{workflow}: the pre-flight must run `npm whoami` while a package is missing from npm (a first publish needs the token)")
-    elif not whoami_guarded:
-        errors.append(f"{workflow}: the pre-flight's `npm whoami` must run only under `if [ -n \"$ABSENT\" ]; then` (a package of the set is not on npm); once all are, trusted publishing needs no token")
+    elif unguarded:
+        errors.append(f"{workflow}: every `npm whoami` in the pre-flight must run only under `if [ -n \"$ABSENT\" ]; then` (a package of the set is not on npm); once all are, trusted publishing needs no token ({unguarded} of {whoami} do not)")
     if "recovery=true and dry_run=false" not in step:
         errors.append(f"{workflow}: the already-published message must name `recovery=true and dry_run=false`")
     read_version = _job_block(text, "read-version")
