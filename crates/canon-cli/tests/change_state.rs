@@ -368,6 +368,30 @@ fn change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_clos
     let (exit, body) = call(repo, None, &closing("defer", CHANGE, REASON));
     assert_eq!((exit, code(&body)), (2, ("CHANGE_CONFLICT", "SHIPPED")), "{body}");
     assert!(states(repo).is_empty());
+
+    // A change deferred while its subject shipped without it did not ship: a human drops it.
+    let dir = repo_with_approved_change();
+    let repo = dir.path();
+    let (exit, body) = call(repo, None, &closing("defer", CHANGE, REASON));
+    assert_eq!(exit, 0, "{body}");
+    plant_subject(repo, "demo", "shipped", Utc::now(), &[CHANGE]);
+    let (exit, body) = call(repo, None, &closing("drop", CHANGE, "not building it"));
+    assert_eq!((exit, body["data"]["state"].as_str()), (0, Some("dropped")), "a change the subject shipped without is not a shipped change: {body}");
+
+    // The subject reopened, the change reopened, approved again and shipped with it: that move is a ship.
+    let dir = repo_with_approved_change();
+    let repo = dir.path();
+    let (exit, body) = call(repo, None, &closing("defer", CHANGE, REASON));
+    assert_eq!(exit, 0, "{body}");
+    plant_subject(repo, "demo", "shipped", Utc::now(), &[CHANGE]);
+    plant_subject(repo, "demo", "verifying", Utc::now(), &[CHANGE]);
+    let (exit, body) = call(repo, None, &reopening(CHANGE));
+    assert_eq!(exit, 0, "{body}");
+    approve(repo, CHANGE, "Go again");
+    plant_subject(repo, "demo", "shipped", Utc::now(), &[CHANGE]);
+    let (exit, body) = call(repo, None, &closing("drop", CHANGE, "not building it"));
+    assert_eq!((exit, code(&body)), (2, ("CHANGE_CONFLICT", "SHIPPED")), "the move after the reopening shipped it: {body}");
+    assert_eq!(states(repo).iter().map(|s| s["state"].as_str().unwrap()).collect::<Vec<_>>(), ["reopened"], "nothing was written");
 }
 
 fn repo_with_approved_change() -> TempDir {
