@@ -176,7 +176,7 @@ canon 0.41.0에는 승인된 변경을 계획에서 빼는 명령이 없다. 0.4
 - 호출자 노트:
   - 닫힌 변경은 요구에서 빠진다.
   - 줄이 없는 저장소는 닫는 명령 전에 `canon migrate`를 돌린다.
-  - `canon migrate`나 0.42의 `canon init`이 `change_state`를 더한 저장소를 canon 0.41 이하는 `CONFIG_INVALID`로 거절한다. 되돌리려면 내리기 전에 0.42에서 `canon migrate --revert`를 돌린다. 그러면 닫힘이 적용되지 않고 닫힌 변경이 다시 요구된다.
+  - `canon migrate`나 0.42의 `canon init`이 `change_state`를 더한 저장소를 canon 0.41 이하는 `CONFIG_INVALID`로 거절한다. 되돌리려면 `routing:` 아래 `change_state:` 줄을 손으로 지운다. `canon migrate --revert`는 그 줄을 더한 `canon migrate --commit` 바로 뒤에만 파일을 되돌린다(0.42 `canon init`이 만든 저장소에는 백업이 없고, 그 뒤 저장소가 바뀌면 되돌리기는 거절된다). 0.41은 닫힘을 읽지 않으므로 닫힌 변경이 다시 요구된다.
   - `.gitignore`에 `.canon/ledger/*`를 직접 쓴 저장소는 `!.canon/ledger/kind=change_state/`를 손으로 더한다. `canon init`이 쓰는 `.gitignore`는 원장을 통째로 무시하지 않아 그대로 커밋된다.
 - 이 저장소의 `canon.yaml` 74개 수정은 0.42 바이너리를 설치하는 것과 같은 시점에 들어간다. 0.41.0이 PATH에 있는 세션은 그 줄 때문에 `gate check`, `evidence add`, `review add`가 거절된다.
 
@@ -242,7 +242,7 @@ canon 0.41.0에는 승인된 변경을 계획에서 빼는 명령이 없다. 0.4
 - 결정: 닫힌 변경의 코드는 이 길이 건드리지 않는다. 가지와 파일은 사람이 정리한다.
 - 가정: 읽는 곳이 모두 따르도록 치움은 한 번 계산해 `gate check`, `status`, `subject move`와 낡은 증거, 판정, divergence 검사에 같은 집합을 넘긴다. 이 목록에 없는 시나리오별 읽는 곳이 있으면 F3의 목록에 더해 같은 시험을 건다.
 - 가정: 창의 시작은 브리프를 처음 추가한 커밋의 시각이다. 시나리오는 승인 뒤에 쓰므로 그 커밋보다 늦다. 브리프가 아직 커밋되지 않은 변경은 닫아도 치우는 시나리오가 없다. 창 안에서 만든 시나리오에 손으로 닫힌 변경의 태그를 붙이는 것까지는 막지 못한다.
-- 가정: 이 저장소 밖의 사용자는 `canon migrate`를 한 번 돌려 `canon.yaml`에 한 줄을 더한다. 줄이 있는 저장소는 canon 0.41 이하가 거절하므로 내리려면 0.42에서 `canon migrate --revert`를 먼저 돌린다.
+- 가정: 이 저장소 밖의 사용자는 `canon migrate`를 한 번 돌려 `canon.yaml`에 한 줄을 더한다. 줄이 있는 저장소는 canon 0.41 이하가 거절하므로 내리려면 그 줄을 손으로 지운다(`--revert`는 migrate 직후에만 된다).
 - 결정(소유자): 라우팅은 종류마다 명시한다. `routing.default`도 코드의 기본값도 두지 않는다. `canon init`이 `change_state: local`을 쓰고(`init`이 모든 종류를 돈다) 줄이 없는 옛 저장소는 `canon migrate`가 더한다(F9). 이유: 새 종류는 드물다(`finding`이 v0.1 이후 유일하다). `routing.default`도 기존 저장소마다 `migrate`가 한 번은 필요하다(저장소 기록 저장 검토 `storage-review.md` §4, `/Volumes/MoeLive/storage/journey-temp/projects/canon/2026-11-14-0.41-plan-review/`). 줄이 없는 저장소에서 `status`와 `gate check`는 닫힌 변경을 읽지 못한 채 지나가지만 그 저장소는 닫는 기록을 쓸 수도 없고 거절 힌트가 `canon migrate`를 말한다. 이 저장소의 `routing:`이 있는 `canon.yaml` 74개는 이 변경에서 줄을 더한다.
 - 결정: `canon migrate`의 이 단계는 0.39 단계처럼 모든 역할에 열려 있다. 한 줄을 더하고 백업과 `--revert`가 있어 파괴적이지 않다.
 - 결정: `canon migrate`는 `.gitignore`의 `.canon/ledger/*`와 다시 포함 줄을 고치지 않고 `canon init`의 `.gitignore` 줄에도 `change_state`를 더하지 않는다. `canon init`은 원장을 통째로 무시하지 않아 `kind=change_state`가 그대로 커밋된다. 원장을 직접 무시한 저장소는 호출자 노트가 말하는 한 줄을 손으로 더한다.
@@ -256,4 +256,4 @@ canon 0.41.0에는 승인된 변경을 계획에서 빼는 명령이 없다. 0.4
 - 미룸의 만료일, 대시보드에서 닫는 화면, 플로 태그를 시나리오 기록으로 옮기는 일.
 - `status`의 `statusVersion`을 올리는 일과 보고서(`report`)의 새 패널.
 
-Approved: journey 2026-11-16T05:51:15Z — "오너가 채팅에서 오케스트레이터에게 승인을 위임함 (2026-11-16, '일단 한번에 가자 기본안대로'). 독립 계획 리뷰 3라운드 approve(P1 5건 수정 확인). P2 3_1은 후속 목록. 오너는 브리프 본문을 읽지 않음." (relayed by planner planner-oco via chat) (code tree f41bb88d9c43e1d43b2e67ad37c1cc46ab96a8e3) (brief sha256:7f6730a97a51003bf148ae8f00ec18423484d191f09a7509cd9c90dc301ff153)
+Approved: journey 2026-11-16T12:01:26Z — "오너가 채팅에서 오케스트레이터에게 승인을 위임함 (2026-11-16, '일단 한번에 가자 기본안대로'). 구현 리뷰 1라운드 finding 1_3(0.41로 내리는 안내가 실제로 안 되는 경로를 적음)에 따라 F8 호출자 노트와 가정 한 줄을 실제 동작(줄을 손으로 지움, --revert는 migrate 직후만)으로 고침. 오너는 브리프 본문을 읽지 않음." (relayed by planner planner-oco via chat) (code tree 7a8f9d3a4f70c7ad7e85c8a4a675e0bd4275d444) (brief sha256:2e7da23123988a24656d359232de53f3b575a6658c10fbb62478b0d13457ff60)
