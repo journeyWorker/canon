@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-0-42",
+    "role": "implementer",
+    "session_id": "s-0-42-impl"
+  },
+  "at": "2026-11-16T11:13:03.263757882Z",
+  "attachments": [
+    {
+      "case": "artifact_store::tests::evidence_add_66_publish_counts_only_the_blobs_it_wrote",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "4292f540353441043cdcb353be3e982ee5756bafa300fbd69f35ccd55d6ebe71"
+    },
+    {
+      "case": "artifact_store::tests::evidence_add_66_a_rollback_never_removes_a_blob_another_writer_published",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "4292f540353441043cdcb353be3e982ee5756bafa300fbd69f35ccd55d6ebe71"
+    },
+    {
+      "case": "artifact_store::tests::evidence_add_66_a_second_store_writer_waits_for_the_lock",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "4292f540353441043cdcb353be3e982ee5756bafa300fbd69f35ccd55d6ebe71"
+    }
+  ],
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (4158 passed, 2 skipped) from the clean tree at eb34d1623, --rev eb34d1623"
+  },
+  "evidence_sha": "eb34d1623438b2e0cb9224f64c3d101ae19cb021",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2084,
+  "scenario_id": "evidence.add.66",
+  "schema": 1,
+  "staging_id": "c592bac9",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

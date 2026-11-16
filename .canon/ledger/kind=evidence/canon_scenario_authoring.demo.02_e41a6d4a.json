@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-0-42",
+    "role": "implementer",
+    "session_id": "s-0-42-impl"
+  },
+  "at": "2026-11-16T11:13:03.263757882Z",
+  "attachments": [
+    {
+      "case": "authoring_demo_02_demo_init_refuses_a_config_whose_gitignore_has_no_canon_lines_and_keeps_the_policy",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "4292f540353441043cdcb353be3e982ee5756bafa300fbd69f35ccd55d6ebe71"
+    },
+    {
+      "case": "authoring_demo_02_demo_init_in_a_directory_that_already_has_a_canon_yaml_is_refused_and_changes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "4292f540353441043cdcb353be3e982ee5756bafa300fbd69f35ccd55d6ebe71"
+    }
+  ],
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (4158 passed, 2 skipped) from the clean tree at eb34d1623, --rev eb34d1623"
+  },
+  "evidence_sha": "eb34d1623438b2e0cb9224f64c3d101ae19cb021",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 159,
+  "scenario_id": "authoring.demo.02",
+  "schema": 1,
+  "staging_id": "4e82dcf0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
