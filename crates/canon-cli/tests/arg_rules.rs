@@ -625,3 +625,54 @@ fn a_document_the_table_does_not_describe_is_refused_by_the_table() {
     let why = calls::table().found(&doc, &example, Source::Doc, Goal::Violate(0)).expect_err("the rules of the command changed, so its rows are stale");
     assert!(why.contains("other inputs") && why.contains(calls::REMEDY), "{why}");
 }
+
+/// The drift check itself fails on each kind of drift: a row missing, a row made from other inputs, a row no document declares, a header made with
+/// another atip, a row that lost its call, a rule added to a document, and a changed searcher. Each planted change is made in memory on the stored
+/// table text, the documents or the searcher's sources, and `calls::problems` answers with the remedy first and the problem named.
+#[test]
+fn the_drift_check_fails_on_each_planted_change() {
+    let docs: Vec<Value> = harness::leaves().into_iter().cloned().collect();
+    let sources = calls::search_sources();
+    let atip = calls::lock_atip_rev();
+    let story = |doc: &Value| harness::story_argv_of(doc);
+    let world = calls::World { docs: &docs, story_example: &story, sources: &sources, atip: &atip };
+    let text = std::fs::read_to_string(calls::path()).expect("the stored table");
+    let lines: Vec<&str> = text.lines().collect();
+    let row_at = lines.iter().position(|line| line.contains("\"goal\":\"violate\"") && line.contains("\"found\":{")).expect("a row with a call");
+    let joined = |lines: &[String]| format!("{}\n", lines.join("\n"));
+    let edit = |at: usize, change: &dyn Fn(&mut Value)| -> Vec<String> {
+        let mut out: Vec<String> = lines.iter().map(ToString::to_string).collect();
+        let mut value: Value = serde_json::from_str(lines[at]).expect("a line of the table");
+        change(&mut value);
+        out[at] = value.to_string();
+        out
+    };
+    let drifted = |what: &str, text: &str, world: &calls::World<'_>, needle: &str| {
+        let problems = calls::problems(text, world);
+        assert!(problems.first().is_some_and(|first| first.contains(calls::REMEDY)), "{what}: the answer starts with the remedy: {problems:?}");
+        assert!(problems.iter().any(|problem| problem.contains(needle)), "{what}: no problem says `{needle}`: {problems:?}");
+    };
+
+    let mut without = edit(row_at, &|_| {});
+    without.remove(row_at);
+    drifted("a row missing", &joined(&without), &world, ": no row");
+    drifted("a row made from other inputs", &joined(&edit(row_at, &|row| row["digest"] = json!("0000000000000000"))), &world, "made from other inputs");
+    let mut extra = edit(row_at, &|row| row["command"] = json!("no-such-command"));
+    extra.push(extra[row_at].clone());
+    extra[row_at] = lines[row_at].to_string();
+    drifted("a row no document declares", &joined(&extra), &world, "no document declares this row");
+    drifted("a header made with another atip", &joined(&edit(0, &|header| header["atip"] = json!("deadbeef"))), &world, "the table was made with atip");
+    drifted("a row that lost its call", &joined(&edit(row_at, &|row| row["found"] = Value::Null)), &world, "has no call");
+
+    let mut changed_docs = docs.clone();
+    let at = changed_docs.iter().position(|doc| doc["command"] == "query").expect("the query document");
+    changed_docs[at] = seeded("query", "constraints", json!({ "rule": "atMostOne", "names": ["kind", "since"] }));
+    let world_with_rule = calls::World { docs: &changed_docs, story_example: &story, sources: &sources, atip: &atip };
+    drifted("a rule added to a document", &text, &world_with_rule, "no row");
+
+    let planted = format!("{}\n// planted", sources[0].1);
+    let mut changed_sources = sources.clone();
+    changed_sources[0].1 = &planted;
+    let world_with_searcher = calls::World { docs: &docs, story_example: &story, sources: &changed_sources, atip: &atip };
+    drifted("a changed searcher", &text, &world_with_searcher, "made from other inputs");
+}
