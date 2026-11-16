@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // `@journeykit/canon`'s launcher: platform detection, binary resolution,
-// argv/exit-code passthrough. Adapted line-for-line (design D2) from
-// the vendored upstream launcher's `resolveTargetPackageName`
-// / libc-kind probing / search-path order / self-reference guarding — this
-// file is dense, adversarially-tested logic the upstream launcher already hardened
-// against real install-topology bugs; re-deriving it risks reintroducing
-// them.
+// argv/exit-code passthrough. Adapted (design D2) from the vendored
+// upstream launcher's `resolveTargetPackageName` / search-path order /
+// self-reference guarding — this file is dense, adversarially-tested logic
+// the upstream launcher already hardened against real install-topology
+// bugs; re-deriving it risks reintroducing them. The upstream launcher's
+// libc probing is gone: the Linux binaries are static musl and run on any
+// libc, so the launcher never asks which one the host has.
 //
 // Deviation from the upstream launcher (native-launcher spec, "Workspace dev build
 // takes priority over the packaged binary"): the search-path order here
@@ -15,8 +16,8 @@
 // package. The upstream launcher's own order happens to work the same way in practice
 // (its monorepo-dev candidate is rarely populated), but canon makes the
 // priority explicit and structural rather than incidental.
-import { spawnSync, execSync } from "node:child_process";
-import { existsSync, readdirSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, realpathSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { resolve, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,92 +41,14 @@ const cliDir = isSubDir ? resolve(currentDir, "..") : currentDir;
 const scopeDir = resolve(cliDir, "..");
 const workspaceRoot = resolve(scopeDir, "..");
 
-type LibcKind = "gnu" | "musl";
-
-function detectLibcKind(): LibcKind {
-  const override = process.env.CANON_LIBC?.trim().toLowerCase();
-  if (override === "musl") return "musl";
-  if (override === "gnu" || override === "glibc") return "gnu";
-
-  const report = process.report?.getReport?.() as
-    | {
-        header?: {
-          glibcVersionRuntime?: string;
-          release?: { sourceUrl?: string };
-        };
-        sharedObjects?: string[];
-      }
-    | undefined;
-
-  if (report?.header?.glibcVersionRuntime) {
-    return "gnu";
-  }
-
-  if (
-    Array.isArray(report?.sharedObjects) &&
-    report.sharedObjects.some((obj) => obj.toLowerCase().includes("musl"))
-  ) {
-    return "musl";
-  }
-
-  // Bun reports neither glibcVersionRuntime nor sharedObjects, but its
-  // release.sourceUrl names the build flavor (e.g. bun-linux-x64-musl-baseline.zip).
-  if (report?.header?.release?.sourceUrl?.toLowerCase().includes("musl")) {
-    return "musl";
-  }
-
-  try {
-    const output = execSync("ldd --version", {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
-    }).toLowerCase();
-    if (output.includes("musl")) return "musl";
-    if (output.includes("glibc") || output.includes("gnu")) return "gnu";
-  } catch (error) {
-    // musl's ldd rejects --version: it prints "musl libc" to stderr and
-    // exits non-zero, so the answer is in the error, not the output.
-    const { stdout, stderr } = (error ?? {}) as { stdout?: unknown; stderr?: unknown };
-    const combined = `${stdout ?? ""}\n${stderr ?? ""}`.toLowerCase();
-    if (combined.includes("musl")) return "musl";
-    if (combined.includes("glibc") || combined.includes("gnu")) return "gnu";
-  }
-
-  // ldd missing or inconclusive: look for dynamic loaders. Either loader
-  // can coexist with the other's libc (Debian's musl package installs
-  // ld-musl-*; Alpine's gcompat installs ld-linux-*), so when both are
-  // present, let the distro break the tie.
-  const hasGnuLoader = loaderPresent("ld-linux-");
-  const hasMuslLoader = loaderPresent("ld-musl-");
-  if (hasGnuLoader !== hasMuslLoader) return hasMuslLoader ? "musl" : "gnu";
-  if (hasGnuLoader && hasMuslLoader) {
-    return existsSync("/etc/alpine-release") ? "musl" : "gnu";
-  }
-
-  return "gnu";
-}
-
-// Glibc ships ld-linux-*.so.* in /lib64 (or /lib on some arches); musl
-// distros (Alpine, Void-musl, ...) ship /lib/ld-musl-<arch>.so.1.
-function loaderPresent(prefix: string): boolean {
-  for (const dir of ["/lib", "/lib64"]) {
-    try {
-      if (readdirSync(dir).some((entry) => entry.startsWith(prefix))) {
-        return true;
-      }
-    } catch {
-      // Directory unreadable or missing; try the next one.
-    }
-  }
-  return false;
-}
-
-// Only the shipped platforms (S0's acceptance bar: macOS arm64, Linux
-// x64 gnu; plus Windows x64 msvc, matching the sibling `lute` launcher)
-// resolve to a real `@journeykit/canon-core-<platform>` package. Every
-// other platform/arch/libc combination returns null and hits the
-// "Unsupported platform fails with an actionable error" scenario — adding
-// a target later is a new `packages/core-<platform>/` + a CI matrix row,
-// not a change to this function's shape (design non-goals).
+// Shipped platforms resolve to a real `@journeykit/canon-core-<platform>`
+// package: macOS arm64, Linux x64 and arm64 (static musl binaries, the host
+// libc is not asked), Windows x64. Every other platform/arch combination
+// returns null and hits the "Unsupported platform fails with an actionable
+// error" scenario — adding a target later is a new `packages/core-<platform>/`
+// + a CI matrix row, not a change to this function's shape (design
+// non-goals). scripts/check-release-workflow-safety.py reads the `core-`
+// names below and fails a release matrix row this function cannot resolve.
 function resolveTargetPackageName(): string | null {
   const arch = process.arch;
 
@@ -135,8 +58,8 @@ function resolveTargetPackageName(): string | null {
   }
 
   if (process.platform === "linux") {
-    const libc = detectLibcKind();
-    if (arch === "x64" && libc === "gnu") return "core-linux-x64";
+    if (arch === "x64") return "core-linux-x64";
+    if (arch === "arm64") return "core-linux-arm64";
     return null;
   }
 
@@ -148,11 +71,10 @@ function resolveTargetPackageName(): string | null {
   return null;
 }
 
-// Kept even though S0 only ships one Linux flavor (gnu-glibc x64): the
-// libc-kind probing generalizes to musl targets without a rewrite (design
-// D2), and the workspace-dev-build search path below wants the full Rust
-// target triple regardless of whether a published platform package exists
-// for it yet.
+// The workspace-dev-build search path below wants the full Rust target triple
+// regardless of whether a published platform package exists for it. Linux dev
+// builds are looked for in the musl directory first (the target the release
+// builds), then in `target/release/`.
 function resolveRustTargetTriple(): string | null {
   const arch = process.arch;
 
@@ -163,13 +85,8 @@ function resolveRustTargetTriple(): string | null {
   }
 
   if (process.platform === "linux") {
-    const libc = detectLibcKind();
-    if (arch === "arm64") {
-      return libc === "musl" ? "aarch64-unknown-linux-musl" : "aarch64-unknown-linux-gnu";
-    }
-    if (arch === "x64") {
-      return libc === "musl" ? "x86_64-unknown-linux-musl" : "x86_64-unknown-linux-gnu";
-    }
+    if (arch === "arm64") return "aarch64-unknown-linux-musl";
+    if (arch === "x64") return "x86_64-unknown-linux-musl";
     return null;
   }
 
