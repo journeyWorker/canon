@@ -254,15 +254,24 @@ fn change_drop_02_a_relayed_defer_records_the_relay_and_a_repeat_is_unchanged() 
 fn change_drop_03_records_of_the_change_are_kept_and_counted_in_a_warning() {
     let dir = repo();
     let repo = dir.path();
+    write_brief(repo, CHANGE);
+    approve(repo, CHANGE, "Go");
     commit_all(repo);
+    ok(repo, &["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl", "--promote"]);
+    ok(repo, &["review", "change", CHANGE, "--actor", "reviewer-3", "--role", "reviewer", "--original-spec-ref", ".canon/changes/add-login/brief.md"]);
     ok(repo, &["finding", "add", "--change", CHANGE, "--round", "1", "--seq", "1", "--severity", "note", "--actor", "bob", "--summary", "Naming nit", "--promote"]);
-    let before = records_under(&repo.join(".canon/ledger/kind=finding"));
-    assert_eq!(before.len(), 1, "{before:?}");
+    let kept = |repo: &Path| ["evidence", "review", "finding"].map(|kind| records_under(&repo.join(format!(".canon/ledger/kind={kind}"))));
+    let before = kept(repo);
+    assert_eq!(before.iter().map(Vec::len).collect::<Vec<_>>(), [1, 1, 1], "{before:?}");
     let (exit, body) = call(repo, None, &closing("defer", CHANGE, REASON));
     assert_eq!(exit, 0, "{body}");
     assert!(warning_codes(&body).contains(&"CHANGE_RECORDS_KEPT".to_string()), "{body}");
-    assert_eq!(body["data"]["recordsKept"]["findings"], 1, "{body}");
-    assert_eq!(records_under(&repo.join(".canon/ledger/kind=finding")), before, "the finding is as it was");
+    assert_eq!(body["data"]["recordsKept"], json!({"evidence": 1, "reviews": 1, "findings": 1}), "{body}");
+    assert_eq!(kept(repo), before, "every record is as it was");
+    for (kind, needle) in [("evidence", "add-login#1"), ("review", "add-login"), ("finding", "Naming nit")] {
+        let (exit, listed) = call(repo, None, &["query", "--kind", kind]);
+        assert!(exit == 0 && listed.to_string().contains(needle), "{kind} is still queried: {listed}");
+    }
 }
 
 /// change.drop.04: the human-only, relay and argument refusals each write nothing.
@@ -402,10 +411,19 @@ fn repo_with_approved_change() -> TempDir {
     dir
 }
 
-/// change.drop.07: a draft and a deferred change are dropped, each recorded as dropped (the deferral is history).
+/// change.drop.07: an approved change, a deferred change and a draft are dropped, each recorded as dropped (the deferral is history), and the
+/// report says a dropped change is not brought back, only a new change is.
 #[test]
-fn change_drop_07_a_human_drops_a_draft_and_a_deferred_change() {
-    let dir = repo();
+fn change_drop_07_a_human_drops_an_approved_change_a_deferred_change_and_a_draft() {
+    let dir = repo_with_approved_change();
+    let repo = dir.path();
+    let said = text(&ok(repo, &closing("drop", CHANGE, "not building it")));
+    assert!(said.contains("recorded change `add-login` as dropped"), "{said}");
+    assert!(said.contains("a dropped change is not brought back, only a new change is"), "the report says it: {said}");
+    assert!(said.contains("canon change new") && said.contains("`add-login`") && said.contains("`Source:`"), "and names the way: {said}");
+    assert_eq!(states(repo)[0]["state"], "dropped");
+
+    let dir = crate::repo();
     let repo = dir.path();
     let (exit, body) = call(repo, None, &closing("drop", CHANGE, "not building it"));
     assert_eq!((exit, body["data"]["state"].as_str()), (0, Some("dropped")), "{body}");
@@ -501,6 +519,16 @@ fn change_drop_19_only_a_deferred_change_reopens_and_only_with_the_humans_answer
     let (exit, body) = call(repo, Some("implementer"), &with(reopening(CHANGE), &["--relayed-via", "ask", "--actor", "impl-1"]));
     assert_eq!(exit, 0, "{body}");
     assert_eq!(states(repo)[0]["relay"]["actor"], "impl-1");
+
+    // A repo that denies relaying refuses a relayed reopening, and the change stays deferred.
+    let dir = crate::repo();
+    let repo = dir.path();
+    call(repo, None, &closing("defer", CHANGE, REASON));
+    let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    std::fs::write(repo.join("canon.yaml"), format!("{yaml}\napproval:\n  relay: deny\n")).unwrap();
+    let (exit, body) = call(repo, Some("implementer"), &with(reopening(CHANGE), &["--relayed-via", "ask", "--actor", "impl-1"]));
+    assert_eq!((exit, code(&body).0), (2, "ACTOR_DENIED"), "{body}");
+    assert_eq!(states(repo).iter().map(|s| s["state"].as_str().unwrap()).collect::<Vec<_>>(), ["deferred"], "nothing was written");
 }
 
 /// change.drop.20: `subject unadopt` keeps refusing an approved change, and its hint names the two decisions.
@@ -512,6 +540,17 @@ fn change_drop_20_unadopt_keeps_refusing_and_its_hint_names_change_defer_and_cha
     approve(repo, CHANGE, "Go");
     let (exit, body) = call(repo, None, &["subject", "unadopt", "demo", "--change", CHANGE]);
     assert_eq!((exit, code(&body)), (2, ("SUBJECT_CONFLICT", "APPROVED_BRIEF")), "{body}");
+    let hint = body["error"]["hint"].as_str().unwrap();
+    assert!(hint.contains("canon change defer") && hint.contains("canon change drop"), "{hint}");
+
+    // A change with a flow-tagged scenario: unadopt refuses too, and its hint names the same two decisions.
+    ok(repo, &["change", "new", "second", "--subject", "demo", "--title", "Second"]);
+    write_brief(repo, "second");
+    ok(repo, &["feature", "new", "auth.login", "--title", "Login"]);
+    let feature = ".canon/specs/kind=feature/area=auth/login.feature";
+    ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--change", "second", "--flow", "F1", "--feature", feature]);
+    let (exit, body) = call(repo, None, &["subject", "unadopt", "demo", "--change", "second"]);
+    assert_eq!((exit, code(&body)), (2, ("SUBJECT_CONFLICT", "FLOW_TAGGED")), "{body}");
     let hint = body["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("canon change defer") && hint.contains("canon change drop"), "{hint}");
 }

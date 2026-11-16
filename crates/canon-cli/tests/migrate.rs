@@ -1095,6 +1095,13 @@ fn change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical() {
     let again = ok_commit(repo);
     assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"), "{again}");
     assert_eq!(read(repo, "canon.yaml"), yaml);
+
+    // The closing command on such a file says to add the section by hand: `canon migrate` adds nothing to it, so its preview is no way out.
+    let refused = canon(repo, &["change", "defer", "add-login", "--reason", "not this release", "--ref", "chat 2026-11-16", "--approver", "Ana", "--json"]);
+    let doc = json_of(&refused);
+    assert_eq!((refused.status.code(), doc["error"]["code"].as_str(), doc["error"]["reason"].as_str()), (Some(2), Some("CONFIG_INVALID"), Some("TIERS")), "{doc}");
+    let hint = doc["error"]["hint"].as_str().unwrap();
+    assert!(hint.contains("`routing:`") && hint.contains("`change_state: local`") && hint.contains("by hand") && !hint.contains("run `canon migrate`"), "{hint}");
 }
 
 /// change.drop.27 (failure path): a `canon.yaml` changed after the preview makes the old digest `PLAN_STALE`, and the file stays as it was.

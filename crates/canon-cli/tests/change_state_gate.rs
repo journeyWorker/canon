@@ -118,14 +118,23 @@ fn chore_brief(approved: &str) -> String {
 }
 
 /// One scenario `id` (`<area>.<surface>.<nn>`) in project `demo`, owned by `demo-subject`, tagged with `flows`
-/// (`<change>.F1` values) and created at `created`; `created: None` writes no provenance time.
+/// (`<change>.F1` values) and created at `created`.
 fn scenario(repo: &Path, id: &str, flows: &[&str], created: &str) {
+    let provenance = format!("# canon: {{\"schema\":1,\"at\":\"{created}\",\"actor\":{{\"agent_id\":\"canon\"}}}}");
+    write_scenario(repo, id, flows, &provenance);
+}
+
+/// The same scenario with no provenance line, so no creation time.
+fn scenario_undated(repo: &Path, id: &str, flows: &[&str]) {
+    write_scenario(repo, id, flows, "");
+}
+
+fn write_scenario(repo: &Path, id: &str, flows: &[&str], provenance: &str) {
     support::declare_spec_root(repo, "demo");
     let mut parts = id.split('.');
     let (area, surface) = (parts.next().unwrap(), parts.next().unwrap());
     let dir = repo.join(format!("specs-demo/kind=feature/area={area}"));
     std::fs::create_dir_all(&dir).unwrap();
-    let provenance = format!("# canon: {{\"schema\":1,\"at\":\"{created}\",\"actor\":{{\"agent_id\":\"canon\"}}}}");
     let tags: String = flows.iter().map(|f| format!("  @flow:{f}\n")).collect();
     let text = format!("Feature: {area} {surface}\n  {provenance}\n\n  {provenance}\n  @subject:demo-subject\n{tags}  @{id}\n  Scenario: {id} seeded\n    Given a step\n");
     std::fs::write(dir.join(format!("{surface}.feature")), text).unwrap();
@@ -232,6 +241,24 @@ fn change_drop_09_a_closed_change_stops_turning_gate_check_red_and_stops_being_a
     write_brief(r, "bump-client", &chore_brief("2026-02-13T00:00:00Z"));
     let (code, violations, _) = gate(r);
     assert_eq!(code, Some(1), "a reopened and approved-again change is asked for again: {violations:?}");
+
+    // The ship guard asked for the chore while it was approved and unreviewed; the deferral takes it out, and the shipped subject reopens.
+    let dir = repo();
+    let r = dir.path();
+    seed_subject(r, SubjectStatus::Verifying, &["c-live", "bump-client"]);
+    feature_brief(r, "c-live");
+    write_brief(r, "bump-client", &chore_brief("2026-02-05T00:00:00Z"));
+    commit(r, "briefs", BRIEF_AT);
+    scenario(r, "world.live.01", &["c-live.F1"], IN_WINDOW);
+    evidence(r, "world.live.01", EvidenceVerdict::Faithful, None);
+    review(r, "world.live.01");
+    let refused = run(r, &["subject", "move", "demo-subject", "--to", "shipped"]);
+    assert!(!refused.status.success() && stderr(&refused).contains("bump-client"), "the ship guard asks for the chore: {}", stderr(&refused));
+    seed_state(r, "bump-client", ChangeDecision::Deferred, CLOSED_AT);
+    let shipped = run(r, &["subject", "move", "demo-subject", "--to", "shipped"]);
+    assert!(shipped.status.success() && !stderr(&shipped).contains("bump-client"), "the ship guard no longer asks: {}", stderr(&shipped));
+    let reopened = run(r, &["subject", "move", "demo-subject", "--to", "verifying", "--reason", "follow-up"]);
+    assert!(reopened.status.success() && !stderr(&reopened).contains("bump-client"), "the reopen guard does not ask for it: {}", stderr(&reopened));
 }
 
 /// change.drop.10: the scenarios only a closed change made are set aside, `status` and `gate check` say so, and the
@@ -285,7 +312,7 @@ fn change_drop_11_a_set_aside_scenarios_stale_evidence_and_divergent_verdict_do_
         commit(r, &format!("code {n}"), "2026-02-03T12:00:00Z");
     }
     let (_, violations, _) = gate(r);
-    assert!(violations.iter().all(|v| !v.contains("world.gone.01")), "{violations:?}");
+    assert!(violations.iter().any(|v| v.contains("world.gone.01")), "the divergent verdict turns it red while the change is open: {violations:?}");
     assert!(violations.iter().any(|v| v.starts_with("stale-evidence") && v.contains("world.gone.02")), "the stale evidence turns it red: {violations:?}");
 
     seed_state(r, "c-gone", ChangeDecision::Deferred, CLOSED_AT);
@@ -345,14 +372,15 @@ fn change_drop_13_a_tag_on_a_scenario_outside_the_window_is_ignored_and_reported
     scenario(r, "world.old.01", &["c-gone.F1"], BEFORE_BRIEF);
     scenario(r, "world.late.01", &["c-gone.F1"], AFTER_CLOSE);
     scenario(r, "world.gone.01", &["c-gone.F1"], IN_WINDOW);
+    scenario_undated(r, "world.nodate.01", &["c-gone.F1"]);
     seed_state(r, "c-gone", ChangeDecision::Deferred, CLOSED_AT);
 
     let (code, violations, advisories) = gate(r);
     assert_eq!(code, Some(1));
-    assert!(violations.iter().any(|v| v.contains("world.old.01")) && violations.iter().any(|v| v.contains("world.late.01")), "both stay required: {violations:?}");
+    assert!(violations.iter().any(|v| v.contains("world.old.01")) && violations.iter().any(|v| v.contains("world.late.01")) && violations.iter().any(|v| v.contains("world.nodate.01")), "all three stay required: {violations:?}");
     let lines = closed_lines(&advisories);
-    for id in ["world.old.01", "world.late.01"] {
-        assert!(lines.iter().any(|l| l.contains(id) && l.contains("outside_window") && l.contains("c-gone")), "{id} is listed: {lines:?}");
+    for (id, reason) in [("world.old.01", "outside_window"), ("world.late.01", "outside_window"), ("world.nodate.01", "no_creation_time")] {
+        assert!(lines.iter().any(|l| l.contains(id) && l.contains(reason) && l.contains("c-gone")), "{id} is listed with {reason}: {lines:?}");
     }
     assert!(lines.iter().all(|l| !(l.contains("world.gone.01") && l.contains("ignored"))), "{lines:?}");
     assert_eq!(set_aside_ids(&status_subject(r)), ["world.gone.01"]);
