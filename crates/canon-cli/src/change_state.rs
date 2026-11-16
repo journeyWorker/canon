@@ -22,7 +22,8 @@
 //!
 //! `CHANGE_NOT_FOUND` for a change with no record. `defer` and `drop` also refuse a change that already shipped
 //! (`CHANGE_CONFLICT`, reason `SHIPPED`, [`shipped`]): a shipped change is not closed, a new change removes its
-//! behavior. Every refusal writes nothing, `--dry-run` included. The leaves are not destructive: they append a
+//! behavior. A subject that moved to `shipped` while the change was deferred or dropped shipped without it, so
+//! that move is no ship of the change (a move after a reopening is). Every refusal writes nothing, `--dry-run` included. The leaves are not destructive: they append a
 //! record and delete nothing, so there is no `--commit`.
 //!
 //! # Reopening and the old approval
@@ -213,15 +214,27 @@ pub(crate) fn closed_refusal(repo: &Path, change: &ChangeId) -> Option<CliError>
     Some(CliError::refused("CHANGE_CONFLICT", format!("change `{id}` is {} (decided by {}: {}), so nothing is written for it", state.state.as_str(), state.approver, state.reason)).reason("CLOSED").hint(hint))
 }
 
-/// The refusal for a call on a repo whose `canon.yaml` has no `change_state` line under `routing:`: the hint names
-/// `canon migrate`, which adds the line. Any other fault of the tiers is as every read of the repo says it.
-fn tiers_refusal(message: String) -> CliError {
+/// Whether `canon.yaml` has no `routing:` section with an entry in it: `canon migrate` adds a line to a section that exists
+/// and leaves any other file as it is, so for this file its preview is no way to the line.
+fn has_no_routing_entries(canon_yaml: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(canon_yaml) else { return false };
+    let Ok(document) = serde_yaml::from_str::<serde_yaml::Value>(&text) else { return false };
+    document.get("routing").and_then(serde_yaml::Value::as_mapping).is_none_or(serde_yaml::Mapping::is_empty)
+}
+
+/// The refusal for a call on a repo whose `canon.yaml` has no `change_state` line under `routing:`. With a `routing:` section the hint names
+/// `canon migrate`, which adds the line; with none `canon migrate` adds nothing, so the hint says to add the section by hand. Any other
+/// fault of the tiers is as every read of the repo says it.
+fn tiers_refusal(canon_yaml: &Path, message: String) -> CliError {
     let error = crate::read_cause::repo_error(message);
     let names_kind = {
         let lower = error.message.to_ascii_lowercase();
         lower.contains("changestate") || lower.contains("change_state")
     };
     if error.code == "CONFIG_INVALID" && error.reason_name() == Some("TIERS") && names_kind {
+        if has_no_routing_entries(canon_yaml) {
+            return error.hint("canon.yaml has no `routing:` section (canon 0.42 routes every record kind with a line there), and `canon migrate` adds nothing to a file without one: add a `routing:` section with the entry `change_state: local` by hand (the lines `canon init` writes show the other kinds), then run this command again");
+        }
         return error.hint("canon.yaml has no `change_state` line under `routing:` (canon 0.42 added the record kind): run `canon migrate` to preview the line it adds, then `canon migrate --commit --plan-digest <PLAN_DIGEST>`, then run this command again");
     }
     error
@@ -351,13 +364,31 @@ pub fn ship_moves(versions: &[Version], change: &ChangeId) -> Vec<(SubjectId, Da
     moves
 }
 
-/// Whether `change` shipped: a subject moved to `shipped` with the change on its list, and the change was not an
-/// unapproved draft at that time (its first approval is no later than the move). Re-approving the brief or
+/// The decisions of one change (`deferred`, `dropped`, `reopened`) with their times, oldest first: what its `change_state` history holds.
+pub type Decisions = Vec<(DateTime<Utc>, ChangeDecision)>;
+
+/// Whether the change was closed (its latest decision no later than `at` is `deferred` or `dropped`) at `at`.
+fn closed_at(decisions: &[(DateTime<Utc>, ChangeDecision)], at: DateTime<Utc>) -> bool {
+    decisions.iter().filter(|(decided, _)| *decided <= at).max_by_key(|(decided, _)| *decided).is_some_and(|(_, state)| state.is_closed())
+}
+
+/// Whether `change` shipped: a subject moved to `shipped` with the change on its list while the change was not closed,
+/// and the change was not an unapproved draft at that time (its first approval is no later than the move). A subject
+/// that shipped while the change was deferred or dropped shipped without it (a closed change is no requirement of
+/// the subject), so that move is no ship of the change; a move after a reopening is. Re-approving the brief or
 /// reopening the subject afterwards changes nothing: the first approval is what counts, which is why
-/// `first_approval` reads the brief's history and not the current `Approved:` line. It is asked only when a move
-/// names the change.
-pub fn shipped(versions: &[Version], change: &ChangeId, first_approval: impl FnOnce() -> FirstApproval) -> Shipped {
+/// `first_approval` reads the brief's history and not the current `Approved:` line. `decisions` (the change's own
+/// `change_state` history) and `first_approval` are asked only when a move names the change.
+pub fn shipped(versions: &[Version], change: &ChangeId, decisions: impl FnOnce() -> Result<Decisions, String>, first_approval: impl FnOnce() -> FirstApproval) -> Shipped {
     let moves = ship_moves(versions, change);
+    if moves.is_empty() {
+        return Shipped::No;
+    }
+    let decisions = match decisions() {
+        Ok(decisions) => decisions,
+        Err(why) => return Shipped::Unknown(why),
+    };
+    let moves: Vec<_> = moves.into_iter().filter(|(_, at)| !closed_at(&decisions, *at)).collect();
     if moves.is_empty() {
         return Shipped::No;
     }
@@ -458,7 +489,25 @@ fn refuse_shipped(repo: &Path, ctx: &GateContext, change: &ChangeId) -> Result<(
             Err(e) => return Err(unreadable(format!("a stored subject version does not read: {e}"))),
         }
     }
-    match shipped(&versions, change, || first_approval(repo, change)) {
+    let decisions = || -> Result<Decisions, String> {
+        if ctx.unreadable_kinds.contains(&RecordKind::ChangeState) {
+            return Err("change_state records are routed to a store the local ledger does not hold".to_string());
+        }
+        let read = GitTier::new(&ctx.ctx.ledger_root).read_history(RecordKind::ChangeState).map_err(|e| format!("the change's decision history cannot be read: {e}"))?;
+        if !read.violations.is_empty() {
+            return Err("a stored change_state record does not read".to_string());
+        }
+        let mut decisions = Decisions::new();
+        for raw in read.records {
+            let state = serde_json::from_value::<ChangeState>(raw.0).map_err(|e| format!("a stored change_state record does not read: {e}"))?;
+            if &state.change_id == change {
+                decisions.push((state.envelope.at, state.state));
+            }
+        }
+        decisions.sort_by_key(|(at, _)| *at);
+        Ok(decisions)
+    };
+    match shipped(&versions, change, decisions, || first_approval(repo, change)) {
         Shipped::No => Ok(()),
         Shipped::Yes { subject, at } => Err(CliError::refused(
             "CHANGE_CONFLICT",
@@ -502,8 +551,8 @@ fn authorize(root: &Path, leaf: Leaf, call: &Call<'_>) -> Result<Option<Approval
         .map(|relay| relay.map(|relay| ApprovalRelay { approver: Some(call.approver.to_string()), answer: Some(call.reason.to_string()), ..relay }))
 }
 
-fn read_states(registry: &canon_store::registry::TierRegistry) -> Result<Vec<ChangeState>, CliError> {
-    let raws = crate::subject::latest_records(registry, RecordKind::ChangeState).map_err(|e| tiers_refusal(e.to_string()))?;
+fn read_states(registry: &canon_store::registry::TierRegistry, canon_yaml: &Path) -> Result<Vec<ChangeState>, CliError> {
+    let raws = crate::subject::latest_records(registry, RecordKind::ChangeState).map_err(|e| tiers_refusal(canon_yaml, e.to_string()))?;
     raws.into_iter()
         .map(|raw| serde_json::from_value::<ChangeState>(raw.0).map_err(|e| crate::read_cause::repo_error(format!("a stored change_state record is malformed: {e}")).hint("fix or remove the record the message names, then run the command again")))
         .collect()
@@ -547,8 +596,8 @@ fn execute(root: &Path, leaf: Leaf, call: &Call<'_>, relay: Option<ApprovalRelay
     let change = call.change;
     let id = change.as_str();
     let canon_yaml = resolve_canon_yaml(root);
-    let registry = crate::subject::registry_for(&canon_yaml, &[RecordKind::ChangeState, RecordKind::Change, RecordKind::Subject]).map_err(|e| tiers_refusal(e.to_string()))?;
-    let states = read_states(&registry)?;
+    let registry = crate::subject::registry_for(&canon_yaml, &[RecordKind::ChangeState, RecordKind::Change, RecordKind::Subject]).map_err(|e| tiers_refusal(&canon_yaml, e.to_string()))?;
+    let states = read_states(&registry, &canon_yaml)?;
     let Some(record) = read_change(&registry, change)? else {
         return Err(CliError::refused("CHANGE_NOT_FOUND", format!("change `{id}` does not exist (it has no change record, so there is nothing to {})", leaf.word()))
             .hint(format!("import the change first: `canon ingest plans` reads `.canon/changes/{id}/brief.md` into a change record and `canon subject adopt <subject> --change {id}` links it to its subject; check the id against the changes `canon status` lists")));
@@ -704,6 +753,9 @@ fn say(leaf: Leaf, call: &Call<'_>, report: &ChangeStateReport, unchanged: bool,
     if leaf == Leaf::Reopen && !call.dry_run {
         crate::say!(json, "  the old approval no longer counts: have the human approve the brief again (`canon brief approve {id} ...`)");
     }
+    if leaf == Leaf::Drop {
+        crate::say!(json, "  a dropped change is not brought back, only a new change is: write one with `canon change new <slug> --subject <id> --title <title>` and name `{id}` in its `Source:` line");
+    }
 }
 
 /// The last output: the report, and `meta.next` naming `canon status` and `canon gate check`, the two reads that now
@@ -766,7 +818,7 @@ mod tests {
     #[test]
     fn a_change_shipped_then_reopened_and_re_approved_is_shipped() {
         // The current `Approved:` line is of 250, after the first ship; the first approval (git history) is of 50.
-        let result = shipped(&shipped_reopened(), &change("c"), || FirstApproval::At(at(50)));
+        let result = shipped(&shipped_reopened(), &change("c"), open, || FirstApproval::At(at(50)));
         assert_eq!(result, Shipped::Yes { subject: subject("auth"), at: at(100) });
     }
 
@@ -780,22 +832,22 @@ mod tests {
             version("auth", 150, SubjectStatus::Shipped, &["c"]),
         ];
         assert!(ship_moves(&versions, &change("c")).is_empty());
-        assert_eq!(shipped(&versions, &change("c"), never), Shipped::No);
+        assert_eq!(shipped(&versions, &change("c"), open, never), Shipped::No);
     }
 
     /// change.drop.06: a change that was an unapproved draft when the subject shipped did not ship.
     #[test]
     fn a_change_that_was_an_unapproved_draft_when_the_subject_shipped_is_not_shipped() {
         // Approved at 150, shipped at 100: the draft rode along on the list but nothing approved shipped.
-        assert_eq!(shipped(&shipped_reopened()[..4], &change("c"), || FirstApproval::At(at(150))), Shipped::No);
+        assert_eq!(shipped(&shipped_reopened()[..4], &change("c"), open, || FirstApproval::At(at(150))), Shipped::No);
         // Never approved at all.
-        assert_eq!(shipped(&shipped_reopened(), &change("c"), || FirstApproval::Never), Shipped::No);
+        assert_eq!(shipped(&shipped_reopened(), &change("c"), open, || FirstApproval::Never), Shipped::No);
     }
 
     /// change.drop.06: a change shipped again after a later approval is shipped by the second move.
     #[test]
     fn a_change_approved_after_the_reopening_and_shipped_again_is_shipped_by_the_second_move() {
-        let result = shipped(&shipped_reopened()[3..], &change("c"), || FirstApproval::At(at(250)));
+        let result = shipped(&shipped_reopened()[3..], &change("c"), open, || FirstApproval::At(at(250)));
         // The first version of the slice is already shipped with no earlier one: counted as a move at 100, before the
         // approval; the move at 300 comes after it.
         assert_eq!(result, Shipped::Yes { subject: subject("auth"), at: at(300) });
@@ -805,19 +857,61 @@ mod tests {
     #[test]
     fn a_change_no_ship_names_is_not_shipped_and_the_history_is_not_read() {
         let versions = vec![version("auth", 10, SubjectStatus::Proposed, &["c"]), version("auth", 20, SubjectStatus::Shipped, &["other"])];
-        assert_eq!(shipped(&versions, &change("c"), never), Shipped::No);
-        assert_eq!(shipped(&[], &change("c"), never), Shipped::No);
+        assert_eq!(shipped(&versions, &change("c"), open, never), Shipped::No);
+        assert_eq!(shipped(&[], &change("c"), open, never), Shipped::No);
     }
 
     /// change.drop.06: history that cannot be read refuses, and a short history only when it cannot show the answer.
     #[test]
     fn a_history_that_cannot_be_read_is_unknown_and_a_short_one_only_when_it_cannot_say() {
         let versions = shipped_reopened();
-        assert!(matches!(shipped(&versions, &change("c"), || FirstApproval::Unknown("no git".to_string())), Shipped::Unknown(why) if why == "no git"));
+        assert!(matches!(shipped(&versions, &change("c"), open, || FirstApproval::Unknown("no git".to_string())), Shipped::Unknown(why) if why == "no git"));
         // The oldest approval the clone holds is already before the ship: the first one is no later.
-        assert_eq!(shipped(&versions, &change("c"), || FirstApproval::AtMost(at(80))), Shipped::Yes { subject: subject("auth"), at: at(100) });
+        assert_eq!(shipped(&versions, &change("c"), open, || FirstApproval::AtMost(at(80))), Shipped::Yes { subject: subject("auth"), at: at(100) });
         // The oldest approval it holds is after every ship: the earlier history that would say is missing.
-        assert!(matches!(shipped(&versions[..4], &change("c"), || FirstApproval::AtMost(at(500))), Shipped::Unknown(_)));
+        assert!(matches!(shipped(&versions[..4], &change("c"), open, || FirstApproval::AtMost(at(500))), Shipped::Unknown(_)));
+    }
+
+    /// A change with no decision in its history.
+    fn open() -> Result<Decisions, String> {
+        Ok(Vec::new())
+    }
+
+    /// change.drop.06: a subject that shipped while the change was deferred shipped without it, so the change did not ship.
+    #[test]
+    fn a_move_to_shipped_made_while_the_change_was_closed_is_no_ship_of_it() {
+        let versions = shipped_reopened()[..4].to_vec();
+        // Deferred at 95, before the move at 100.
+        let deferred = || Ok(vec![(at(95), ChangeDecision::Deferred)]);
+        assert_eq!(shipped(&versions, &change("c"), deferred, never), Shipped::No, "the approval history is not even read");
+        let dropped = || Ok(vec![(at(40), ChangeDecision::Deferred), (at(95), ChangeDecision::Dropped)]);
+        assert_eq!(shipped(&versions, &change("c"), dropped, never), Shipped::No);
+        // Deferred after the move: the subject had shipped with it.
+        let later = || Ok(vec![(at(150), ChangeDecision::Deferred)]);
+        assert_eq!(shipped(&versions, &change("c"), later, || FirstApproval::At(at(50))), Shipped::Yes { subject: subject("auth"), at: at(100) });
+    }
+
+    /// change.drop.06: the change reopened before the second move: that move is a ship; one still deferred is not.
+    #[test]
+    fn a_move_after_the_reopening_is_a_ship_and_the_closed_one_before_it_is_not() {
+        let versions = shipped_reopened();
+        // Deferred at 95 (the move at 100 is skipped), reopened at 250 (the move at 300 counts).
+        let reopened = || Ok(vec![(at(95), ChangeDecision::Deferred), (at(250), ChangeDecision::Reopened)]);
+        assert_eq!(shipped(&versions, &change("c"), reopened, || FirstApproval::At(at(50))), Shipped::Yes { subject: subject("auth"), at: at(300) });
+        // Deferred again at 260: the move at 300 was made while the change was closed again.
+        let again = || Ok(vec![(at(95), ChangeDecision::Deferred), (at(250), ChangeDecision::Reopened), (at(260), ChangeDecision::Deferred)]);
+        assert_eq!(shipped(&versions, &change("c"), again, never), Shipped::No);
+        // The order of the history does not matter, only the times.
+        let shuffled = || Ok(vec![(at(250), ChangeDecision::Reopened), (at(95), ChangeDecision::Deferred)]);
+        assert_eq!(shipped(&versions, &change("c"), shuffled, || FirstApproval::At(at(50))), Shipped::Yes { subject: subject("auth"), at: at(300) });
+    }
+
+    /// change.drop.06: a decision history that cannot be read refuses (fails closed), and only when a move names the change.
+    #[test]
+    fn a_decision_history_that_cannot_be_read_is_unknown() {
+        let unreadable = || Err("no ledger".to_string());
+        assert!(matches!(shipped(&shipped_reopened(), &change("c"), unreadable, never), Shipped::Unknown(why) if why == "no ledger"));
+        assert_eq!(shipped(&[], &change("c"), unreadable, never), Shipped::No);
     }
 
     /// The versions of two subjects do not mix: a move of one is not a move of the other.
