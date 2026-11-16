@@ -574,7 +574,9 @@ pub fn case(name: &str, base: &Path, home: &Path) -> Case {
             dir = fresh.path().to_path_buf();
             guards.push(fresh);
         }
-        "review change" => ok(&repo, home, &["change", "new", "tidy", "--subject", "demo", "--title", "Tidy", "--change-kind", "chore"]),
+        "review change" => {
+            ok(&repo, home, &["change", "new", "tidy", "--subject", "demo", "--title", "Tidy", "--change-kind", "chore"]);
+        }
         "context-pack add" | "prompt add" => put(&repo, &manifest_of(&argv), MANIFEST),
         "dispatch end" => {
             let mut begin = example_argv(leaf("dispatch begin"));
