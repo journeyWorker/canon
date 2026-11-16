@@ -94,7 +94,7 @@ fn declared() -> Vec<Declared> {
 /// The distinct domains of `declared`, each with the first argument that declares it, in the order they first appear.
 fn distinct(declared: &[Declared]) -> Vec<(String, &Declared)> {
     let mut seen = std::collections::BTreeSet::new();
-    declared.iter().filter_map(|one| seen.insert(key(&one.domain)).then(|| (key(&one.domain), one))).collect()
+    declared.iter().filter(|one| seen.insert(key(&one.domain))).map(|one| (key(&one.domain), one)).collect()
 }
 
 #[test]

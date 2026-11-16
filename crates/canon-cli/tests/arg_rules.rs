@@ -128,9 +128,12 @@ fn selected(doc: &Value, only: &[&str]) -> bool {
     std::env::var("ARG_RULES_COMMANDS").map_or(true, |list| list.split(',').any(|name| name.trim() == command))
 }
 
+/// The call a rule's goal is given: read from the stored table, or searched for.
+type Find<'a> = &'a dyn Fn(&Value, &[String], Goal) -> Option<Found>;
+
 /// One rule of one command held to the binary: the problems it has (empty when it is true). `find` gives the call for a goal: the stored table
 /// for the declared commands, the search for a document the table does not describe.
-fn drive_rule_with(doc: &Value, at: usize, find: &dyn Fn(&Value, &[String], Goal) -> Option<Found>) -> Vec<String> {
+fn drive_rule_with(doc: &Value, at: usize, find: Find<'_>) -> Vec<String> {
     let path = doc["command"].as_str().unwrap_or_default();
     let rules = constraints(doc);
     let rule = &rules[at];
