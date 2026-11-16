@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-ship",
+    "role": "reviewer",
+    "session_id": "s-0-42-ship-rev"
+  },
+  "at": "2026-11-16T11:31:18.928835693Z",
+  "change_id": "canon-0-42-ci-refresh",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "kind": "review",
+  "pin": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "49c3a408b2d59a5c5e7d383d17d4f83102f82eb1d3a3ace46c34136447c72cf0",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-42-ci-refresh/brief.md"
+  },
+  "review_id": "01M7J20DRGDYWQE3NPQ49F0D7B",
+  "reviewer": "rev-0-42-ship",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-opus",
+  "schema": 2,
+  "worktree_dirty": false
+}
