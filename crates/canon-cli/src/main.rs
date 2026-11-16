@@ -13,6 +13,12 @@ use clap::FromArgMatches;
 /// Where to report a bug: the message of an `INTERNAL` error names it.
 const ISSUES: &str = "https://github.com/journeyWorker/canon/issues";
 
+/// musl's allocator is slow for canon's allocation pattern; a musl build (the static Linux release binary) allocates through jemalloc instead.
+/// Other targets keep the system allocator and do not depend on the crate.
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static ALLOCATOR: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 fn main() -> ExitCode {
     set_sigpipe(true);
     install_panic_hook();
