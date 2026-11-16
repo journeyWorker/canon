@@ -1,6 +1,6 @@
 {
   "name": "@journeykit/canon-core-win32-x64",
-  "version": "0.41.0",
+  "version": "0.42.0",
   "description": "canon CLI binary for windows x64 (static C runtime, no Visual C++ redistributable needed)",
   "license": "MIT",
   "type": "module",

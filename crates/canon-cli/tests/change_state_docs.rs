@@ -122,13 +122,13 @@ fn human_only_problems(closed: &[String]) -> Vec<String> {
     }
 }
 
-/// What the Unreleased section of `changelog` lacks about this change: the Added entries, the Changed entries and the `**Callers:**` note with its four facts.
+/// What the 0.42.0 section of `changelog` lacks about this change: the Added entries, the Changed entries and the `**Callers:**` note with its four facts.
 fn release_problems(changelog: &str) -> Vec<String> {
-    let Some(unreleased) = changelog.split("\n## ").find(|section| section.starts_with("Unreleased")) else { return vec!["the CHANGELOG has no Unreleased section".to_string()] };
+    let Some(unreleased) = changelog.split("\n## ").find(|section| section.starts_with("0.42.0")) else { return vec!["the CHANGELOG has no 0.42.0 section".to_string()] };
     let mut problems = Vec::new();
     let part = |name: &str| unreleased.split("\n### ").find(|part| part.starts_with(name));
     let needs = |label: &str, text: Option<&str>, needles: &[&str], problems: &mut Vec<String>| match text {
-        None => problems.push(format!("the Unreleased section has no {label} part")),
+        None => problems.push(format!("the 0.42.0 section has no {label} part")),
         Some(text) => {
             for needle in needles {
                 if !text.contains(needle) {
@@ -158,7 +158,7 @@ fn release_problems(changelog: &str) -> Vec<String> {
     );
     needs("Changed", part("Changed"), &["`routing:`", "`change_state: local`", "`APPROVED_BRIEF`", "`CHANGE_ARGUMENT_INVALID`", "thirteen", "writes a new line"], &mut problems);
     let Some(start) = unreleased.find("**Callers:**") else {
-        problems.push("the Unreleased section has no `**Callers:**` note".to_string());
+        problems.push("the 0.42.0 section has no `**Callers:**` note".to_string());
         return problems;
     };
     let note = &unreleased[start..];
@@ -279,9 +279,9 @@ fn change_drop_25_a_guide_line_off_the_schema_a_list_that_is_not_six_or_a_change
     // A CHANGELOG without the caller note, and without one of its four facts.
     let real = changelog();
     assert_eq!(release_problems(&real), Vec::<String>::new());
-    assert_eq!(release_problems("# Changelog\n\n## Unreleased\n\n## 0.41.0\n"), ["the Unreleased section has no Added part", "the Unreleased section has no Changed part", "the Unreleased section has no `**Callers:**` note"]);
-    assert_eq!(release_problems("# Changelog\n\n## 0.41.0\n"), ["the CHANGELOG has no Unreleased section"]);
-    assert_eq!(release_problems(&real.replace("**Callers:**", "**Notes:**")), ["the Unreleased section has no `**Callers:**` note"]);
+    assert_eq!(release_problems("# Changelog\n\n## Unreleased\n\n## 0.42.0\n"), ["the 0.42.0 section has no Added part", "the 0.42.0 section has no Changed part", "the 0.42.0 section has no `**Callers:**` note"]);
+    assert_eq!(release_problems("# Changelog\n\n## 0.41.0\n"), ["the CHANGELOG has no 0.42.0 section"]);
+    assert_eq!(release_problems(&real.replace("**Callers:**", "**Notes:**")), ["the 0.42.0 section has no `**Callers:**` note"]);
     let facts = [
         ("- A closed change drops out of the requirements.", "the callers note lacks the fact: a closed change drops out of the requirements"),
         ("`canon migrate` before the closing commands", "the callers note lacks the fact: a repo without the routing line runs `canon migrate` before the closing commands"),
