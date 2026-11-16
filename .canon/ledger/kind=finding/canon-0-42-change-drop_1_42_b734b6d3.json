@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-atip",
+    "role": "reviewer",
+    "session_id": "Rev42_atip"
+  },
+  "at": "2026-11-16T13:03:50.523882434Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=atip/optionvalues.feature:76-79; crates/canon-cli/tests/atip_optionvalues.rs:425-474",
+  "introduced_by": "2890ca575196b03186d73ec70f1988d96b2c62bd",
+  "kind": "finding",
+  "resolution_code_tree": "d09bfae19ba2d0c4c2e5b8773290887af1aaec4e",
+  "resolution_sha": "242684402e383c32722e1ac267065b92f2ceb77a",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.optionvalues.07"
+  ],
+  "schema": 2,
+  "seq": 42,
+  "severity": "should_fix",
+  "summary": "P2 (spec fidelity): the Given of atip.optionvalues.07 is unchanged and still says the ten commands that take --reason, --summary or --override-reason. Its first bound test now runs thirteen cases: 0f4e77602 added change defer, drop and reopen --reason. A second test bound by its name, atip_optionvalues_07_a_blank_reference_of_a_closing_leaf_is_refused_with_the_commands_own_code (2890ca575), checks that a blank --ref on the three closing leaves gets CHANGE_ARGUMENT_INVALID. The scenario does not state that. The test's doc comment says it proves change.drop.04, but change.drop.04's Given names 'no reference', not a blank one, and its evidence binds only change_drop_04_*. So no scenario states the blank-reference domain that a test pins. The binary refuses --ref \"\" and a multi-line --reason with exit 2 CHANGE_ARGUMENT_INVALID, naming the option and writing nothing (probed at 24b8194a6). Fix: make the Given say thirteen (or name the commands). Then either add the blank --ref of change defer|drop|reopen to this scenario, or rename the test to a change.drop scenario whose text states a blank reference.",
+  "worktree_dirty": false
+}

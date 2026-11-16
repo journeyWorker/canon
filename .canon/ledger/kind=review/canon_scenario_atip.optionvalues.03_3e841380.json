@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-atip",
+    "role": "reviewer",
+    "session_id": "Rev42_atip"
+  },
+  "at": "2026-11-16T13:04:56.552263050Z",
+  "code_tree": "7368ebf477da839ae134cccfc86b83aece897005",
+  "kind": "review",
+  "pin": "f5ce5de4a1cf67353980659543e306b9b45cacdc",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_optionvalues_03_a_name_is_trimmed_and_the_trimmed_value_is_what_is_recorded_and_signed",
+          "junit:atip_optionvalues_03_every_name_and_sentence_option_declares_one_domain_in_every_command"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "619a91ddfc21e2e6b31b6924e488f8595be2756cec7045abe15d47952fe6c8c7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-42-change-drop/brief.md"
+  },
+  "review_id": "01M7J7BVQ86HRJH4CBKC19PRKW",
+  "reviewer": "rev-0-42-atip",
+  "scenario_id": "atip.optionvalues.03",
+  "schema": 2,
+  "worktree_dirty": false
+}
