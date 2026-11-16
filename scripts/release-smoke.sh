@@ -199,7 +199,7 @@ elif grep -Eiq 'dns error|failed to lookup|name or service not known|temporary f
   echo "NETWORK-SMOKE-RESULT: name-resolution-failed"
 elif grep -Eiq 'certificate|unknownissuer|unknown issuer|invalid peer' /tmp/cold.json; then
   echo "NETWORK-SMOKE-RESULT: certificate-error"
-elif grep -Eiq 'error trying to connect|connection refused|connect error|timed out|connection reset' /tmp/cold.json; then
+elif grep -Eiq 'error trying to connect|connection refused|connect error|timed out|connection reset|error sending request' /tmp/cold.json; then
   echo "NETWORK-SMOKE-RESULT: connection-failed"
 else
   echo "NETWORK-SMOKE-RESULT: unexpected"
@@ -246,7 +246,7 @@ SH
       s3-rejected-authentication) ;;
       name-resolution-failed) die "the S3 endpoint's name did not resolve" ;;
       certificate-error) die "the S3 endpoint's certificate was rejected: the TLS trust store cannot verify it" ;;
-      connection-failed) die "the connection to the S3 endpoint failed" ;;
+      connection-failed) die "the request to the S3 endpoint failed before any answer: name resolution, connection or certificate (a host with an untrusted certificate ends here: the client's error does not say which)" ;;
       *) die "the cold tier answered neither an authentication rejection nor a known network failure (the output above)" ;;
     esac
     # The schema the hot tier creates on connect must be in the database the binary reached by host name.
