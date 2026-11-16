@@ -86,10 +86,10 @@ Feature: atip schema: the L1 self-description documents
   @case:happy
   @flow:canon-0-34-atip-schema-doc.F5
   @atip.schemadoc.09
-  Scenario: The 47 input declarations hold a fragment schema without required or flag-only keys and an example that passes it, and every example parses with the real parser
+  Scenario: The 50 input declarations hold a fragment schema without required or flag-only keys and an example that passes it, and every example parses with the real parser
     Given the 50 commands that take --input
     When the fragment, the arguments schema, the example and every example line are read
-    Then no fragment has a root required or a flag-only property, additionalProperties is false, the example passes both Input of the --schemas answer and the arguments schema, the 30 that had required publish it as argumentsRef, and every examples line parses with the real parser, ends with --json after the path and holds no placeholder or --input
+    Then no fragment has a root required or a flag-only property, additionalProperties is false, the example passes both Input of the --schemas answer and the arguments schema, the 33 that have required publish it as argumentsRef, and every examples line parses with the real parser, ends with --json after the path and holds no placeholder or --input
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:38Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema
