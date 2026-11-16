@@ -12,8 +12,8 @@
 //! dynamic, verdict-bearing evidence stream) — this module generalizes
 //! that SAME split onto canon-model's own closed kind set rather than
 //! introducing a THIRD, canon-specific notion of "corpus": **corpus**
-//! = `change`/`task`/`scenario`/`subject` records (the declarative
-//! "what exists to be verified" side); **ledger head** =
+//! = `change`/`task`/`scenario`/`subject`/`change_state` records (the declarative
+//! "what exists to be verified" side; a `change_state` is the git-tracked declaration of what is still required, not a verdict); **ledger head** =
 //! `evidence`/`review`/`divergence`/`finding` records (the
 //! dynamic verdict/attestation side). Which side each kind lands on
 //! is [`digest_side`]'s exhaustive `match`, never a hand-kept list —
