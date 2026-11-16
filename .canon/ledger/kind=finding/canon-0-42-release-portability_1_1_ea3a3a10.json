@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-ship",
+    "role": "reviewer",
+    "session_id": "s-0-42-ship-rev"
+  },
+  "at": "2026-11-16T11:39:57.373672573Z",
+  "change_id": "canon-0-42-release-portability",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": "scripts/check-release-workflow-safety.py:858-878",
+  "introduced_by": "bda55ea3058c1f7c11626db78764b1b3bfce8161",
+  "kind": "finding",
+  "resolution_code_tree": "74b412c71f78b6ffc0ca1d52bc6b1bf3527071dd",
+  "resolution_sha": "4d987de81f8272835a28441e75d791afb48f7692",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-ship",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "(standards pass) preflight_errors accepts an unguarded `npm whoami` when a guarded one also exists: whoami_guarded turns True as soon as ANY call sits under `if [ -n \"$ABSENT\" ]; then`, and a call not at the start of a line (`WHO=$(npm whoami)`) is not counted at all. Probe on a copy of publish.yml at 24b8194a6: adding `npm whoami` (or `WHO=$(npm whoami)`) before the ABSENT block leaves check-release-workflow-safety.py at exit 0. That is the I11 case 'the pre-flight npm whoami runs without the package-absence condition', and the failure it exists to stop (an expired NPM_TOKEN blocking every release after trusted publishing takes over) would ship unnoticed. Fix: fail on every `npm whoami` in a source line of the step that is not inside the ABSENT then-branch, and add a test with one guarded and one unguarded call. Blast radius: the shipped publish.yml is correct today; only a later edit is unprotected.",
+  "worktree_dirty": false
+}

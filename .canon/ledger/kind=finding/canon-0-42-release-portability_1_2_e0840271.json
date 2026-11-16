@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-ship",
+    "role": "reviewer",
+    "session_id": "s-0-42-ship-rev"
+  },
+  "at": "2026-11-16T11:39:57.906769886Z",
+  "change_id": "canon-0-42-release-portability",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": ".github/workflows/build-native.yml:20-30",
+  "introduced_by": "3cef3f331e526350bf1e676c2fb5c44c0f787fa7",
+  "kind": "finding",
+  "resolution_code_tree": "74b412c71f78b6ffc0ca1d52bc6b1bf3527071dd",
+  "resolution_sha": "4d987de81f8272835a28441e75d791afb48f7692",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-ship",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "(standards pass) This change makes .cargo/config.toml the one carrier of the msvc `+crt-static` flag, but build-native.yml's pull_request paths do not include `.cargo/**`: a PR that touches only that file (another [target] rustflags table, a profile setting) does not run the Windows row's import check or any binary floor check; pr-guard's safety check catches only a removed crt-static. Fix: add `.cargo/**` to build-native.yml's pull_request paths.",
+  "worktree_dirty": false
+}
