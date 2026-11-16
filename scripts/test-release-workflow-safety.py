@@ -355,11 +355,60 @@ class BuildRowTests(unittest.TestCase):
         errors = self.broken("publish.yml", '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n', '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n            lg_page: "16"\n')
         self.assertTrue(any("only the aarch64-unknown-linux-musl row sets `lg_page`" in error for error in errors), errors)
 
+    def test_the_aarch64_musl_row_must_name_an_alpine_image(self) -> None:
+        image = "            alpine_image: rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383\n"
+        errors = self.broken("publish.yml", image, "")
+        self.assertTrue(any("must set `alpine_image:" in error and "found None" in error for error in errors), errors)
+        errors = self.broken("build-native.yml", "alpine_image: rust:1.99.1-alpine3.24@sha256:", "alpine_image: ubuntu:26.04@sha256:")
+        self.assertTrue(any("must set `alpine_image:" in error for error in errors), errors)
+
+    def test_the_x86_64_row_must_not_have_an_alpine_image(self) -> None:
+        errors = self.broken("publish.yml", '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n', '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n            alpine_image: rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383\n')
+        self.assertTrue(any("only the aarch64-unknown-linux-musl row sets `alpine_image`" in error for error in errors), errors)
+
+    def test_the_alpine_image_is_pinned_by_digest(self) -> None:
+        text = mutate(workflow("publish.yml"), "rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383", "rust:1.99.1-alpine3.24")
+        errors = CHECKER.image_digest_errors(text, "publish.yml")
+        self.assertTrue(any("must be pinned with an @sha256: digest" in error for error in errors), errors)
+
     def test_macos_and_windows_are_one_arch_each(self) -> None:
         errors = self.broken("publish.yml", "target: aarch64-apple-darwin", "target: x86_64-apple-darwin")
         self.assertTrue(any("arm64 only" in error for error in errors), errors)
         errors = self.broken("publish.yml", "target: x86_64-pc-windows-msvc", "target: aarch64-pc-windows-msvc")
         self.assertTrue(any("x64 only" in error for error in errors), errors)
+
+
+class AlpineBuildTests(unittest.TestCase):
+    def test_accepts_the_shipped_workflows(self) -> None:
+        for name in ("build-native.yml", "publish.yml"):
+            self.assertEqual(CHECKER.alpine_build_errors(workflow(name), name), [])
+
+    def test_both_workflows_name_the_same_image(self) -> None:
+        images = {name: re.search(r"alpine_image: (\S+)", workflow(name)).group(1) for name in ("build-native.yml", "publish.yml")}
+        self.assertEqual(len(set(images.values())), 1, images)
+
+    def test_rejects_a_step_that_does_not_run_the_rows_image(self) -> None:
+        text = mutate(workflow("publish.yml"), '"$ALPINE_IMAGE" sh -s', "alpine:3.24 sh -s")
+        errors = CHECKER.alpine_build_errors(text, "publish.yml")
+        self.assertTrue(any('run the image `"$ALPINE_IMAGE"`' in error for error in errors), errors)
+
+    def test_rejects_a_step_that_does_not_mount_the_workspace(self) -> None:
+        text = mutate(workflow("build-native.yml"), '-v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \\\n', "")
+        self.assertTrue(any("mount the workspace" in error for error in CHECKER.alpine_build_errors(text, "build-native.yml")))
+
+    def test_rejects_a_step_that_loses_the_page_size_or_the_dashboard(self) -> None:
+        text = mutate(workflow("publish.yml"), "-e CANON_DASHBOARD_DIST -e JEMALLOC_SYS_WITH_LG_PAGE ", "")
+        errors = CHECKER.alpine_build_errors(text, "publish.yml")
+        self.assertTrue(any("pass CANON_DASHBOARD_DIST" in error for error in errors), errors)
+        self.assertTrue(any("pass JEMALLOC_SYS_WITH_LG_PAGE" in error for error in errors), errors)
+
+    def test_rejects_a_step_that_does_not_compare_the_toolchain(self) -> None:
+        text = mutate(workflow("publish.yml"), '[ "$got" != "$want" ]', "false")
+        self.assertTrue(any("compare the image's rustc" in error for error in CHECKER.alpine_build_errors(text, "publish.yml")))
+
+    def test_rejects_a_host_toolchain_install_on_the_alpine_row(self) -> None:
+        text = mutate(workflow("build-native.yml"), "        if: matrix.settings.alpine_image == ''\n", "")
+        self.assertTrue(any("`Install Rust` step must skip" in error for error in CHECKER.alpine_build_errors(text, "build-native.yml")))
 
 
 class JemallocTests(unittest.TestCase):

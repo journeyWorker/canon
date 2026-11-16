@@ -27,10 +27,11 @@ runs:
         TARGET: ${{ inputs.target }}
       run: rustup target add "$TARGET"
 
-    # A Linux musl row links static binaries on the Ubuntu host: musl-tools is
-    # the C compiler (`musl-gcc`, either architecture) the C code of the
-    # dependencies compiles with (aws-lc-sys, ring, SQLite, zstd, jemalloc); the
-    # `cc` crate is told to use it for this target, on the arm runner too.
+    # The x86_64 musl row links its static binary on the Ubuntu host: musl-tools
+    # is the C compiler (`musl-gcc`) the C code of the dependencies compiles with
+    # (aws-lc-sys, ring, SQLite, zstd, jemalloc); the `cc` crate is told to use it
+    # for this target. The aarch64 musl row does not come here: its jemalloc does
+    # not compile with Ubuntu's musl-gcc, so it builds in an Alpine image.
     - name: Install the musl C toolchain
       if: contains(inputs.target, '-linux-musl')
       shell: bash

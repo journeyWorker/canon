@@ -75,7 +75,7 @@ ALLOWED_RUNNERS = ("macos-26", "ubuntu-26.04", "ubuntu-26.04-arm", "windows-2025
 # The scalar fields every `matrix.settings` row carries that must agree
 # across the two workflows (publish additionally carries `package_name`,
 # checked separately against the manifests).
-SHARED_MATRIX_FIELDS = ("host", "target", "package_dir", "lg_page")
+SHARED_MATRIX_FIELDS = ("host", "target", "package_dir", "lg_page", "alpine_image")
 
 
 def read(path: pathlib.Path) -> str:
@@ -399,7 +399,8 @@ def runner_label_errors(text: str, workflow: str) -> list[str]:
 
 def build_row_errors(rows: list[dict[str, str]], workflow: str) -> list[str]:
     """The four build rows: macOS arm64, and Linux x64 and arm64 built as musl targets on their own host
-    (no container: `container:` is checked with the build job), Windows x64; `lg_page` on the aarch64 musl row alone."""
+    (no job `container:`; the aarch64 row runs a digest-pinned `rust:alpine` image in a step, see
+    `alpine_build_errors`), Windows x64; `lg_page` and `alpine_image` on the aarch64 musl row alone."""
     errors: list[str] = []
     by_target = {row.get("target", ""): row for row in rows}
     for target in EXPECTED_TARGETS:
@@ -425,6 +426,11 @@ def build_row_errors(rows: list[dict[str, str]], workflow: str) -> list[str]:
             errors.append(f"{workflow}: the {LG_PAGE_TARGET} row must set `lg_page: \"{LG_PAGE}\"` (JEMALLOC_SYS_WITH_LG_PAGE={LG_PAGE}, 64K pages), found {row.get('lg_page')!r}")
         elif target != LG_PAGE_TARGET and has_page:
             errors.append(f"{workflow}: only the {LG_PAGE_TARGET} row sets `lg_page`; {target} has it (x86_64 is 4K pages, other targets have no jemalloc)")
+        image = row.get("alpine_image")
+        if target == LG_PAGE_TARGET and not (image and re.match(r"^rust:[\w.]+-alpine[\w.]*@sha256:", image)):
+            errors.append(f"{workflow}: the {LG_PAGE_TARGET} row must set `alpine_image: rust:<toolchain>-alpine<version>@sha256:<digest>` (Ubuntu's musl-gcc cannot compile jemalloc there), found {image!r}")
+        elif target != LG_PAGE_TARGET and image is not None:
+            errors.append(f"{workflow}: only the {LG_PAGE_TARGET} row sets `alpine_image`; {target} has it (the other rows build on their host)")
     return errors
 
 
@@ -445,8 +451,33 @@ def jemalloc_errors(text: str, workflow: str, cargo_text: str, main_text: str) -
         errors.append(f"{workflow}: the `Build canon-cli binary` step must set `JEMALLOC_SYS_WITH_LG_PAGE: ${{{{ matrix.settings.lg_page }}}}` (the aarch64 musl row's 64K pages)")
     for number, line in enumerate(text.splitlines(), 1):
         source = _source_line(line)
-        if "JEMALLOC_SYS_WITH_LG_PAGE" in source and "matrix.settings.lg_page" not in source and "unset" not in source and '[ -n "$JEMALLOC' not in source:
+        if "JEMALLOC_SYS_WITH_LG_PAGE" in source and "matrix.settings.lg_page" not in source and "unset" not in source and '[ -n "$JEMALLOC' not in source and "-e JEMALLOC_SYS_WITH_LG_PAGE" not in source:
             errors.append(f"{workflow}:{number}: JEMALLOC_SYS_WITH_LG_PAGE may only be set from the matrix row's `lg_page`")
+    return errors
+
+
+def alpine_build_errors(text: str, workflow: str) -> list[str]:
+    """The aarch64 musl row builds in its `alpine_image`: the one `Build canon-cli binary` step reads the row's image
+    and runs it with `docker run` (the workspace mounted, the dashboard and the page size passed in), and the
+    toolchain inside is checked against rust-toolchain.toml; the host `Install Rust` step skips that row."""
+    errors: list[str] = []
+    build = _job_block(text, "build")
+    step = _step_block(build, "Build canon-cli binary")
+    for needle, why in (
+        ("ALPINE_IMAGE: ${{ matrix.settings.alpine_image }}", "read the row's `alpine_image` into ALPINE_IMAGE"),
+        ('docker run --rm -i', "run the image with `docker run --rm -i`"),
+        ('"$ALPINE_IMAGE" sh -s', 'run the image `"$ALPINE_IMAGE"` (the row\'s, nothing else) with `sh -s`'),
+        ('-v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE"', "mount the workspace"),
+        ("-e CANON_DASHBOARD_DIST", "pass CANON_DASHBOARD_DIST into the container"),
+        ("-e JEMALLOC_SYS_WITH_LG_PAGE", "pass JEMALLOC_SYS_WITH_LG_PAGE into the container"),
+        ('"$got" != "$want"', "compare the image's rustc with rust-toolchain.toml"),
+        ("cargo build --locked --release -p canon-cli", "run `cargo build --locked --release -p canon-cli`"),
+    ):
+        if needle not in step:
+            errors.append(f"{workflow}: the `Build canon-cli binary` step must {why}")
+    install = _step_block(build, "Install Rust")
+    if "if: matrix.settings.alpine_image == ''" not in install:
+        errors.append(f"{workflow}: the `Install Rust` step must skip the rows that build in an `alpine_image` (`if: matrix.settings.alpine_image == ''`)")
     return errors
 
 
@@ -487,7 +518,7 @@ def binary_check_errors(text: str, workflow: str, rows: list[dict[str, str]], ch
         if row.get("target") not in known:
             errors.append(f"{workflow}: scripts/check-release-binary.py does not know the target {row.get('target')} of a build row")
     if re.search(r"^\s+container:", build, re.MULTILINE):
-        errors.append(f"{workflow}: the build job must not run in a `container:`; Linux rows link on the host")
+        errors.append(f"{workflow}: the build job must not run in a `container:`; the aarch64 musl row runs its image with `docker run` in a step, the other Linux rows link on the host")
     return errors
 
 
@@ -1395,6 +1426,8 @@ def main(argv: list[str] | None = None) -> int:
     binary_checker = read(ROOT / "scripts/check-release-binary.py")
     for name in ("build-native.yml", "publish.yml"):
         ERRORS.extend(jemalloc_errors(workflow_texts[name], name, cargo_toml, main_rs))
+    for name in ("build-native.yml", "publish.yml"):
+        ERRORS.extend(alpine_build_errors(workflow_texts[name], name))
     ERRORS.extend(binary_check_errors(build_text, "build-native.yml", build_rows, binary_checker))
     ERRORS.extend(binary_check_errors(publish_text, "publish.yml", publish_rows, binary_checker))
     ERRORS.extend(crt_static_errors(read(ROOT / ".cargo/config.toml"), {"build-native.yml": build_text, "publish.yml": publish_text, **other_texts}))

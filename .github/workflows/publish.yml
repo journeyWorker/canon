@@ -188,13 +188,18 @@ jobs:
           if-no-files-found: error
 
   # Every row builds on a host that is natively its target (no cross
-  # compilation): macOS and Windows as before, and Linux as static musl
-  # binaries linked on the Ubuntu host with `musl-tools`
-  # (.github/actions/setup-rust), x86_64 on `ubuntu-26.04` and aarch64 on
-  # `ubuntu-26.04-arm`. `lg_page` is the one per-row setting beyond the
-  # triple: the aarch64 musl row builds jemalloc for 64K pages
+  # compilation): macOS and Windows as before, Linux x86_64 as a static musl
+  # binary linked on `ubuntu-26.04` with `musl-tools`
+  # (.github/actions/setup-rust), and Linux aarch64 as a static musl binary
+  # built on `ubuntu-26.04-arm` inside a digest-pinned `rust:alpine` image
+  # (`alpine_image`): Ubuntu's musl-gcc wrapper cannot compile jemalloc's
+  # atomics there (tikv-jemalloc-sys: `atomic_memory_order_relaxed
+  # undeclared`), Alpine's gcc on musl can. The host job keeps the JS actions
+  # (checkout, cache, upload) and mounts the workspace into the container.
+  # `lg_page` and `alpine_image` are the per-row settings beyond the triple,
+  # both on the aarch64 musl row alone: it builds jemalloc for 64K pages
   # (`JEMALLOC_SYS_WITH_LG_PAGE=16`), so the binary runs on 4K, 16K (Asahi,
-  # Raspberry Pi 5) and 64K (RHEL) kernels; the x86_64 row has no such field.
+  # Raspberry Pi 5) and 64K (RHEL) kernels; the x86_64 row has neither field.
   build:
     name: Build - ${{ matrix.settings.target }}
     needs: [read-version, dashboard]
@@ -220,6 +225,7 @@ jobs:
             package_name: "@journeykit/canon-core-linux-arm64"
             binary_ext: ""
             lg_page: "16"
+            alpine_image: rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383
           - host: windows-2025
             target: x86_64-pc-windows-msvc
             package_dir: core-win32-x64
@@ -230,6 +236,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
+        if: matrix.settings.alpine_image == ''
         uses: ./.github/actions/setup-rust
         with:
           target: ${{ matrix.settings.target }}
@@ -255,11 +262,38 @@ jobs:
         env:
           CANON_DASHBOARD_DIST: ${{ github.workspace }}/dashboard-app
           JEMALLOC_SYS_WITH_LG_PAGE: ${{ matrix.settings.lg_page }}
+          ALPINE_IMAGE: ${{ matrix.settings.alpine_image }}
+          TARGET: ${{ matrix.settings.target }}
         run: |
           set -euo pipefail
           # Only the aarch64 musl row has a page size: an empty variable is no variable.
           [ -n "$JEMALLOC_SYS_WITH_LG_PAGE" ] || unset JEMALLOC_SYS_WITH_LG_PAGE
-          cargo build --locked --release -p canon-cli --target ${{ matrix.settings.target }}
+          if [ -z "$ALPINE_IMAGE" ]; then
+            cargo build --locked --release -p canon-cli --target "$TARGET"
+          else
+            # The workspace and the cargo caches are mounted at the paths the host
+            # steps see; the container runs as root and hands the files back.
+            mkdir -p "$HOME/.cargo/registry" "$HOME/.cargo/git"
+            docker run --rm -i \
+              -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
+              -v "$HOME/.cargo/registry:/usr/local/cargo/registry" \
+              -v "$HOME/.cargo/git:/usr/local/cargo/git" \
+              -e CANON_DASHBOARD_DIST -e JEMALLOC_SYS_WITH_LG_PAGE -e CARGO_TERM_COLOR -e CARGO_INCREMENTAL \
+              -e TARGET -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+              "$ALPINE_IMAGE" sh -s <<'ALPINE_BUILD'
+          set -eu
+          trap 'chown -R "$HOST_UID:$HOST_GID" target /usr/local/cargo/registry /usr/local/cargo/git' EXIT
+          apk add --no-cache make
+          want=$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' rust-toolchain.toml)
+          rustc --version
+          got=$(rustc --version | cut -d' ' -f2)
+          if [ -z "$want" ] || [ "$got" != "$want" ]; then
+            echo "::error::rustc is '$got', rust-toolchain.toml pins '$want'" >&2
+            exit 1
+          fi
+          cargo build --locked --release -p canon-cli --target "$TARGET"
+          ALPINE_BUILD
+          fi
 
       - name: Strip binary
         if: matrix.settings.binary_ext == ''
