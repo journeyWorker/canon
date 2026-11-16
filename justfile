@@ -54,10 +54,12 @@ docs:
 conformance:
     conformance/regenerate.sh
 
-# The release-workflow safety check and its test.
+# The release-workflow safety check and its test, and the release binary check's test.
+# On a binary: `python3 scripts/check-release-binary.py --target <triple> <canon>` (see its header).
 release-check:
     python3 scripts/check-release-workflow-safety.py
     python3 scripts/test-release-workflow-safety.py
+    python3 scripts/test-check-release-binary.py
 
 # The npm launcher's tests (test.yml `launcher`).
 launcher:

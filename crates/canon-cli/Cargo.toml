@@ -68,6 +68,12 @@ rustix = { version = "1.1.4", features = ["fs"] }
 # panicking on a closed stdout. Already in the lockfile.
 libc = "0.2"
 
+# The global allocator of a musl build (`main.rs`): musl's own allocator is the slow part of a static Linux binary (the 0.42 release-portability
+# measurement: `gate check` 1.00 s on musl against 0.76 s on glibc, 0.64 s with jemalloc). Only musl targets carry it: no other target's
+# dependency tree or binary contains it. The aarch64 musl release row builds it with 64K pages (`JEMALLOC_SYS_WITH_LG_PAGE=16`, publish.yml).
+[target.'cfg(target_env = "musl")'.dependencies]
+tikv-jemallocator = "0.6"
+
 [build-dependencies]
 flate2 = { workspace = true }
 

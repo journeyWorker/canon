@@ -1,14 +1,18 @@
 name: Publish
-run-name: "release ${{ github.ref_name }}"
+run-name: "release ${{ github.ref_name }}${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && ' (dry run)' || '' }}"
 
 # Adapted from the vendored upstream release pipeline's publish workflow (design
-# D3), simplified to canon's two-level package chain and a three-row
-# platform matrix (macOS arm64 + Linux x64 gnu + Windows x64 msvc, the
-# rows the sibling `lute` monorepo ships). Naming (s34): the
+# D3), simplified to canon's two-level package chain and a four-row
+# platform matrix: macOS arm64 (floor 15.0), Linux x64 and arm64 (static musl,
+# glibc is not a floor), Windows x64 (static C runtime). Naming (s34): the
 # launcher publishes as the SCOPED `@journeykit/canon` shipping
 # `bin: { canon: "./bin.js" }`, so `bunx @journeykit/canon` is the
 # friendly invocation while the installed bin stays `canon`; platform
 # binaries are `@journeykit/canon-core-<platform>`.
+#
+# Runners are pinned images, never `-latest` (the newest image, its label
+# written down): `macos-26`, `ubuntu-26.04`, `ubuntu-26.04-arm`, `windows-2025`.
+# scripts/check-release-workflow-safety.py fails a job on any other label.
 #
 # Version source of truth: the root Cargo.toml's [workspace.package]
 # version (design D3) — this workflow reads it, never bumps it. A release
@@ -16,18 +20,27 @@ run-name: "release ${{ github.ref_name }}"
 # pushing a matching `vX.Y.Z` tag; that tag is this workflow's trigger and
 # is verified against Cargo.toml before anything publishes.
 #
+# Dry run: a manual run (`workflow_dispatch`) takes `dry_run`, true by default.
+# It builds, checks, smokes and packs exactly as a release does and skips only
+# the five `npm publish` steps; a tag push has no input and always publishes.
+# Run it on the version-bump commit before the tag.
+#
 # Prereleases: a version with a hyphen (`0.35.0-rc.1`, tag `v0.35.0-rc.1`)
-# publishes under the `next` dist-tag in all four `npm publish` steps and
-# never under `latest` (npm itself refuses a prerelease without `--tag`).
-# A stable `vX.Y.Z` runs the same `npm publish --provenance --access public`
-# as before and lands on `latest`. scripts/check-release-workflow-safety.py
+# publishes under the `next` dist-tag in every `npm publish` step
+# and never under `latest` (npm itself refuses a prerelease without `--tag`).
+# A stable `vX.Y.Z` runs `npm publish "$TARBALL" --provenance --access public`
+# and lands on `latest`. scripts/check-release-workflow-safety.py
 # fails the workflow if any publish step lacks that split.
+#
+# What is published is exactly what was smoked: `package` runs `npm pack` once
+# for every package, `smoke-install` installs those tarballs, and `publish`
+# publishes those files (`npm publish "$TARBALL"`), never a second pack.
 #
 # Fail-closed (native-release-pipeline spec, "Missing platform binary
 # fails the workflow, not the consumer"): `publish` only runs if `build`'s
-# entire matrix succeeded — GitHub Actions does not start a job that
-# `needs` a matrix job until every row of that matrix has passed — so a
-# single failed target row blocks every publish step, never just its own
+# entire matrix and every smoke succeeded — GitHub Actions does not start a
+# job that `needs` a matrix job until every row of that matrix has passed — so
+# a single failed row blocks every publish step, never just its own
 # platform package.
 
 on:
@@ -37,9 +50,13 @@ on:
   workflow_dispatch:
     inputs:
       recovery:
-        description: "Resume a partially-published release: skip packages already on npm at this version instead of failing the fresh-release gate."
+        description: "Resume a partially-published release: skip packages already on npm at this version instead of failing the fresh-release gate. Needs dry_run=false."
         type: boolean
         default: false
+      dry_run:
+        description: "Dry run: build, check, smoke and pack everything, publish nothing. Untick it for a real release from this run (a tag push always is one)."
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -47,16 +64,30 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # The macOS binary's floor: its `minos` is exactly this (scripts/check-release-binary.py fails any other).
+  MACOSX_DEPLOYMENT_TARGET: "15.0"
 
 jobs:
   read-version:
     name: Read workspace version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       version: ${{ steps.read.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # A recovery resumes a real, partly published release; a dry run
+      # publishes nothing. Together they would end green with nothing resumed.
+      - name: Refuse recovery together with dry_run
+        env:
+          RECOVERY: ${{ github.event.inputs.recovery }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          if [ "${RECOVERY:-false}" = "true" ] && [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "::error::recovery=true resumes a real release and dry_run=true publishes nothing; run it with recovery=true and dry_run=false." >&2
+            exit 1
+          fi
 
       # Cross-workflow drift guard (the upstream release pipeline's lesson,
       # recommended action #1) — the FIRST thing a release does, so a
@@ -98,7 +129,7 @@ jobs:
   dashboard:
     name: Build dashboard app
     needs: read-version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -128,7 +159,7 @@ jobs:
   man:
     name: Generate man pages
     needs: read-version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -156,6 +187,14 @@ jobs:
           path: man-pages
           if-no-files-found: error
 
+  # Every row builds on a host that is natively its target (no cross
+  # compilation): macOS and Windows as before, and Linux as static musl
+  # binaries linked on the Ubuntu host with `musl-tools`
+  # (.github/actions/setup-rust), x86_64 on `ubuntu-26.04` and aarch64 on
+  # `ubuntu-26.04-arm`. `lg_page` is the one per-row setting beyond the
+  # triple: the aarch64 musl row builds jemalloc for 64K pages
+  # (`JEMALLOC_SYS_WITH_LG_PAGE=16`), so the binary runs on 4K, 16K (Asahi,
+  # Raspberry Pi 5) and 64K (RHEL) kernels; the x86_64 row has no such field.
   build:
     name: Build - ${{ matrix.settings.target }}
     needs: [read-version, dashboard]
@@ -165,17 +204,23 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-15
+          - host: macos-26
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             package_name: "@journeykit/canon-core-darwin-arm64"
             binary_ext: ""
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+          - host: ubuntu-26.04
+            target: x86_64-unknown-linux-musl
             package_dir: core-linux-x64
             package_name: "@journeykit/canon-core-linux-x64"
             binary_ext: ""
-          - host: windows-latest
+          - host: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-musl
+            package_dir: core-linux-arm64
+            package_name: "@journeykit/canon-core-linux-arm64"
+            binary_ext: ""
+            lg_page: "16"
+          - host: windows-2025
             target: x86_64-pc-windows-msvc
             package_dir: core-win32-x64
             package_name: "@journeykit/canon-core-win32-x64"
@@ -206,13 +251,29 @@ jobs:
           path: dashboard-app
 
       - name: Build canon-cli binary
+        shell: bash
         env:
           CANON_DASHBOARD_DIST: ${{ github.workspace }}/dashboard-app
-        run: cargo build --locked --release -p canon-cli --target ${{ matrix.settings.target }}
+          JEMALLOC_SYS_WITH_LG_PAGE: ${{ matrix.settings.lg_page }}
+        run: |
+          set -euo pipefail
+          # Only the aarch64 musl row has a page size: an empty variable is no variable.
+          [ -n "$JEMALLOC_SYS_WITH_LG_PAGE" ] || unset JEMALLOC_SYS_WITH_LG_PAGE
+          cargo build --locked --release -p canon-cli --target ${{ matrix.settings.target }}
 
       - name: Strip binary
         if: matrix.settings.binary_ext == ''
         run: strip "target/${{ matrix.settings.target }}/release/canon"
+
+      # The floor this row promises, read from the binary it just built:
+      # Linux static with jemalloc (and 64K pages on aarch64), macOS minos
+      # 15.0, Windows with no VC runtime DLL. A failure stops the release here.
+      - name: Check the binary keeps the floor of its platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          PY=$(command -v python3 || command -v python)
+          "$PY" scripts/check-release-binary.py --target "${{ matrix.settings.target }}" "target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}"
 
       - name: Create binary checksum handoff
         shell: bash
@@ -238,14 +299,13 @@ jobs:
             target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}.sha256
           if-no-files-found: error
 
-  publish:
-    name: Publish npm packages
+  # Packs every package ONCE: the tarballs below are what `smoke-install`
+  # installs and what `publish` publishes, byte for byte.
+  package:
+    name: Pack the npm packages
     needs: [read-version, build, man]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      id-token: write
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -259,20 +319,6 @@ jobs:
         with:
           # 26: the launcher tests below need the runtime it execs on (26.1+).
           node-version: "26"
-          registry-url: https://registry.npmjs.org
-
-      # Trusted Publishing (OIDC) needs npm >= 11.5.1; ubuntu's bundled
-      # npm lags. npm tries OIDC FIRST (mints a short-lived token from
-      # `id-token: write` against each package's configured trusted publisher
-      # — owner journeyWorker / repo canon / workflow publish.yml) and only
-      # falls back to NODE_AUTH_TOKEN if OIDC is unavailable. The token is
-      # the BOOTSTRAP path: a brand-new package has no settings page yet, so
-      # a trusted publisher cannot be configured until it exists. Set the
-      # NPM_TOKEN repo secret for the first release; once trusted publishing
-      # is configured on all four package pages, OIDC is used and the token
-      # (and this secret) can be removed.
-      - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@11.5.1
 
       - name: Install workspace dependencies from the frozen lockfile
         run: bun install --frozen-lockfile
@@ -283,10 +329,16 @@ jobs:
           name: canon-binary-aarch64-apple-darwin
           path: packages/core-darwin-arm64/bin
 
+      - name: Download linux-arm64 binary artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canon-binary-aarch64-unknown-linux-musl
+          path: packages/core-linux-arm64/bin
+
       - name: Download linux-x64 binary artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: canon-binary-x86_64-unknown-linux-gnu
+          name: canon-binary-x86_64-unknown-linux-musl
           path: packages/core-linux-x64/bin
 
       - name: Download win32-x64 binary artifact
@@ -306,12 +358,14 @@ jobs:
         run: |
           set -euo pipefail
           (cd packages/core-darwin-arm64/bin && sha256sum -c canon.sha256)
+          (cd packages/core-linux-arm64/bin && sha256sum -c canon.sha256)
           (cd packages/core-linux-x64/bin && sha256sum -c canon.sha256)
           (cd packages/core-win32-x64/bin && sha256sum -c canon.exe.sha256)
 
       - name: Stage binaries executable
         run: |
           chmod +x packages/core-darwin-arm64/bin/canon
+          chmod +x packages/core-linux-arm64/bin/canon
           chmod +x packages/core-linux-x64/bin/canon
           chmod +x packages/core-win32-x64/bin/canon.exe
 
@@ -320,7 +374,7 @@ jobs:
           VERSION: ${{ needs.read-version.outputs.version }}
         run: |
           set -euo pipefail
-          for pkg in packages/cli packages/core-darwin-arm64 packages/core-linux-x64 packages/core-win32-x64; do
+          for pkg in packages/cli packages/core-darwin-arm64 packages/core-linux-arm64 packages/core-linux-x64 packages/core-win32-x64; do
             jq --arg v "$VERSION" '.version = $v' "$pkg/package.json" > "$pkg/package.json.tmp"
             mv "$pkg/package.json.tmp" "$pkg/package.json"
           done
@@ -331,7 +385,7 @@ jobs:
             '.optionalDependencies = (.optionalDependencies | with_entries(.value = $v))' \
             packages/cli/package.json > packages/cli/package.json.tmp
           mv packages/cli/package.json.tmp packages/cli/package.json
-          echo "Publishing all packages at $VERSION"
+          echo "Packing all packages at $VERSION"
 
       - name: Build @journeykit/canon launcher
         working-directory: packages/cli
@@ -345,43 +399,241 @@ jobs:
         working-directory: packages/cli
         run: bun test
 
+      - name: Pack every package into tarballs/
+        run: |
+          set -euo pipefail
+          mkdir tarballs
+          for pkg in packages/core-darwin-arm64 packages/core-linux-arm64 packages/core-linux-x64 packages/core-win32-x64 packages/cli; do
+            npm pack "./$pkg" --pack-destination tarballs --silent
+          done
+          ls -l tarballs
+
+      - name: Upload the tarballs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-tarballs
+          path: tarballs
+          if-no-files-found: error
+
+  # Smokes (design I9, I13, I15): they run here, in the release workflow, and nowhere else.
+  # A release without them does not publish: `publish` needs all three.
+  # Every image is pinned by digest (the tag in front of it is only a label);
+  # debian:12 is glibc 2.36, the image 0.41's glibc 2.39 floor killed.
+  smoke-binary:
+    name: Smoke the binary - ${{ matrix.settings.target }} in ${{ matrix.settings.image_name }}
+    needs: [read-version, build]
+    runs-on: ${{ matrix.settings.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - runner: ubuntu-26.04
+            target: x86_64-unknown-linux-musl
+            image_name: debian-12
+            image: debian:12@sha256:268fb24c39bca92d326dd83ea3abebe4a3f7751c804ffef23bb6d857dd343ff8
+          - runner: ubuntu-26.04
+            target: x86_64-unknown-linux-musl
+            image_name: alpine-3.24
+            image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+          - runner: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-musl
+            image_name: debian-12
+            image: debian:12@sha256:268fb24c39bca92d326dd83ea3abebe4a3f7751c804ffef23bb6d857dd343ff8
+          - runner: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-musl
+            image_name: alpine-3.24
+            image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+    steps:
+      # Full history: `canon gate check` reads reviews pinned at older commits (test.yml `offline`).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download the binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canon-binary-${{ matrix.settings.target }}
+          path: smoke-bin
+
+      - name: Run the binary in the image
+        env:
+          IMAGE: ${{ matrix.settings.image }}
+          VERSION: ${{ needs.read-version.outputs.version }}
+        run: scripts/release-smoke.sh binary --binary smoke-bin/canon --image "$IMAGE" --version "$VERSION" --repo "$GITHUB_WORKSPACE"
+
+  # The published tarballs, installed into a clean prefix of a Node image
+  # (the launcher needs Node): the launcher's own `canon --version`.
+  smoke-install:
+    name: Smoke the install - ${{ matrix.settings.platform_dir }} in ${{ matrix.settings.image_name }}
+    needs: [read-version, package]
+    runs-on: ${{ matrix.settings.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - runner: ubuntu-26.04
+            platform_dir: core-linux-x64
+            platform_tarball: journeykit-canon-core-linux-x64
+            image_name: node-26-bookworm-slim
+            image: node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
+          - runner: ubuntu-26.04
+            platform_dir: core-linux-x64
+            platform_tarball: journeykit-canon-core-linux-x64
+            image_name: node-26-alpine
+            image: node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
+          - runner: ubuntu-26.04-arm
+            platform_dir: core-linux-arm64
+            platform_tarball: journeykit-canon-core-linux-arm64
+            image_name: node-26-bookworm-slim
+            image: node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
+          - runner: ubuntu-26.04-arm
+            platform_dir: core-linux-arm64
+            platform_tarball: journeykit-canon-core-linux-arm64
+            image_name: node-26-alpine
+            image: node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download the tarballs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-tarballs
+          path: tarballs
+
+      - name: Install the tarballs in the image
+        env:
+          IMAGE: ${{ matrix.settings.image }}
+          VERSION: ${{ needs.read-version.outputs.version }}
+          PLATFORM_TARBALL: ${{ matrix.settings.platform_tarball }}
+        run: scripts/release-smoke.sh install --launcher "tarballs/journeykit-canon-$VERSION.tgz" --platform "tarballs/$PLATFORM_TARBALL-$VERSION.tgz" --image "$IMAGE" --version "$VERSION"
+
+  # The network path of the static binary: a hot tier (postgres) attached by
+  # host name on a docker network, and a cold tier (S3) over HTTPS rejecting a
+  # fake key. No real secret: the postgres password is made up for the run.
+  smoke-network:
+    name: Smoke the network path - ${{ matrix.settings.target }} in ${{ matrix.settings.image_name }}
+    needs: [read-version, build]
+    runs-on: ${{ matrix.settings.runner }}
+    timeout-minutes: 15
+    env:
+      # The service container of the smoke; the same digest docker-compose.yml pins for the live tier.
+      POSTGRES_IMAGE: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - runner: ubuntu-26.04
+            target: x86_64-unknown-linux-musl
+            image_name: debian-12
+            image: debian:12@sha256:268fb24c39bca92d326dd83ea3abebe4a3f7751c804ffef23bb6d857dd343ff8
+          - runner: ubuntu-26.04
+            target: x86_64-unknown-linux-musl
+            image_name: alpine-3.24
+            image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+          - runner: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-musl
+            image_name: debian-12
+            image: debian:12@sha256:268fb24c39bca92d326dd83ea3abebe4a3f7751c804ffef23bb6d857dd343ff8
+          - runner: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-musl
+            image_name: alpine-3.24
+            image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download the binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canon-binary-${{ matrix.settings.target }}
+          path: smoke-bin
+
+      - name: Reach postgres by host name and S3 over TLS
+        env:
+          IMAGE: ${{ matrix.settings.image }}
+        run: scripts/release-smoke.sh network --binary smoke-bin/canon --image "$IMAGE" --postgres-image "$POSTGRES_IMAGE" --repo "$GITHUB_WORKSPACE"
+
+  publish:
+    name: Publish npm packages
+    needs: [read-version, package, smoke-binary, smoke-install, smoke-network]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26"
+          registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing (OIDC) needs npm >= 11.5.1; ubuntu's bundled
+      # npm lags. npm tries OIDC FIRST (mints a short-lived token from
+      # `id-token: write` against each package's configured trusted publisher
+      # — owner journeyWorker / repo canon / workflow publish.yml) and only
+      # falls back to NODE_AUTH_TOKEN if OIDC is unavailable. The token is
+      # the BOOTSTRAP path: a brand-new package has no settings page yet, so
+      # a trusted publisher cannot be configured until it exists. Set the
+      # NPM_TOKEN repo secret for the first release of a package; once trusted
+      # publishing is configured on all five package pages, OIDC is used and
+      # the token (and this secret) can be removed.
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@11.5.1
+
+      - name: Download the tarballs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-tarballs
+          path: tarballs
+
       # The upstream release pipeline's lesson (recommended action #2): the
       # `@canon-dev/core-<platform>` fan-out is non-atomic across packages
       # on npm, so a runner death mid-publish leaves a partial release.
       # This gate + the per-package idempotent skips below make the whole
       # publish re-runnable: a fresh release must have NONE of its
-      # packages already on npm at $VERSION; `recovery=true` allows a
-      # partial prior publish and resumes it.
-      - name: Pre-flight npm release state (fresh-release gate + recovery)
+      # packages already on npm at $VERSION; `recovery=true` (with
+      # `dry_run=false`) allows a partial prior publish and resumes it.
+      #
+      # Read-only, so it runs in a dry run too. It also asks npm whether each
+      # package exists at all (`E404`: never published). While one does not,
+      # the first publish cannot use trusted publishing (no settings page yet)
+      # and depends on NODE_AUTH_TOKEN: `npm whoami` then proves the token is
+      # valid, before any package goes out. It sees only that the token is
+      # valid, not its scope or 2FA bypass. Once every package is on npm the
+      # token is not asked for.
+      - name: Pre-flight npm release state (fresh-release gate + recovery + first-publish token)
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
           RECOVERY: ${{ github.event.inputs.recovery }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          ABSENT=""
+          ALREADY=""
           # A published-version probe that FAILS CLOSED: only an explicit
           # npm E404 (the package has never been published) counts as
           # "absent". Any OTHER npm failure (auth / network / registry
           # outage) aborts the release rather than being silently read as
           # "not published" — otherwise a partial-publish collision could
           # slip past this gate on a transient error.
-          is_published() {
-            local pkg="$1" out
-            if out=$(npm view "$pkg" versions --json 2>&1); then
-              printf '%s' "$out" | jq -e --arg v "$VERSION" 'if type == "array" then any(.[]; . == $v) else . == $v end' >/dev/null
-              return
-            fi
-            if printf '%s' "$out" | grep -q 'E404'; then
-              return 1
-            fi
-            echo "::error::npm view $pkg failed (not a 404 — registry/auth/network), aborting release:" >&2
-            printf '%s\n' "$out" >&2
-            exit 1
-          }
-          ALREADY=""
-          for pkg_dir in core-darwin-arm64 core-linux-x64 core-win32-x64 cli; do
+          for pkg_dir in core-linux-arm64 core-darwin-arm64 core-linux-x64 core-win32-x64 cli; do
             PKG=$(jq -r .name "packages/$pkg_dir/package.json")
-            if is_published "$PKG"; then
-              ALREADY="$ALREADY $PKG"
+            if out=$(npm view "$PKG" versions --json 2>&1); then
+              if printf '%s' "$out" | jq -e --arg v "$VERSION" 'if type == "array" then any(.[]; . == $v) else . == $v end' >/dev/null; then
+                ALREADY="$ALREADY $PKG"
+              fi
+            elif printf '%s' "$out" | grep -q 'E404'; then
+              ABSENT="$ABSENT $PKG"
+            else
+              echo "::error::npm view $PKG failed (not a 404 — registry/auth/network), aborting release:" >&2
+              printf '%s\n' "$out" >&2
+              exit 1
             fi
           done
           if [ -n "$ALREADY" ]; then
@@ -389,77 +641,116 @@ jobs:
               echo "recovery: already published at $VERSION, will be skipped:$ALREADY"
             else
               echo "::error::$VERSION is already partially published:$ALREADY" >&2
-              echo "Re-run this workflow with recovery=true to resume, or bump the version." >&2
+              echo "Re-run this workflow with recovery=true and dry_run=false to resume, or bump the version." >&2
               exit 1
             fi
           else
             echo "fresh release: no package is published at $VERSION yet."
           fi
+          if [ -n "$ABSENT" ]; then
+            echo "never published to npm:$ABSENT"
+            echo "A first publish cannot use trusted publishing; it needs NODE_AUTH_TOKEN. Checking the token:"
+            if ! npm whoami; then
+              echo "::error::npm whoami failed: the NPM_TOKEN secret is missing, expired or invalid, and a first publish needs it" >&2
+              exit 1
+            fi
+          else
+            echo "every package is already on npm: trusted publishing publishes, the token is not checked."
+          fi
 
-      # Platform packages first, then the @journeykit/canon wrapper LAST
+      # Platform packages first, the new core-linux-arm64 FIRST of them (its
+      # first publish depends on the token: if that fails, no other package
+      # of this version has gone out), then the @journeykit/canon wrapper LAST
       # (its optionalDependencies point at the platform packages, which
       # must already resolve on npm). Each step is idempotent: a re-run /
       # a recovery pass skips whatever already shipped at $VERSION.
-      - name: Publish @journeykit/canon-core-darwin-arm64 (idempotent)
-        working-directory: packages/core-darwin-arm64
+      # A dry run skips these five steps and no other.
+      - name: Publish @journeykit/canon-core-linux-arm64 (idempotent)
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
+          PACKAGE: "@journeykit/canon-core-linux-arm64"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          PKG=$(jq -r .name package.json)
-          if npm view "$PKG@$VERSION" version >/dev/null 2>&1; then
-            echo "$PKG@$VERSION already on npm — skipping (idempotent)."
+          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          test -f "$TARBALL"
+          if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
           elif [[ "$VERSION" == *-* ]]; then
-            npm publish --provenance --access public --tag next
+            npm publish "$TARBALL" --provenance --access public --tag next
           else
-            npm publish --provenance --access public
+            npm publish "$TARBALL" --provenance --access public
+          fi
+
+      - name: Publish @journeykit/canon-core-darwin-arm64 (idempotent)
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
+        env:
+          VERSION: ${{ needs.read-version.outputs.version }}
+          PACKAGE: "@journeykit/canon-core-darwin-arm64"
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          test -f "$TARBALL"
+          if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
+          elif [[ "$VERSION" == *-* ]]; then
+            npm publish "$TARBALL" --provenance --access public --tag next
+          else
+            npm publish "$TARBALL" --provenance --access public
           fi
 
       - name: Publish @journeykit/canon-core-linux-x64 (idempotent)
-        working-directory: packages/core-linux-x64
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
+          PACKAGE: "@journeykit/canon-core-linux-x64"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          PKG=$(jq -r .name package.json)
-          if npm view "$PKG@$VERSION" version >/dev/null 2>&1; then
-            echo "$PKG@$VERSION already on npm — skipping (idempotent)."
+          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          test -f "$TARBALL"
+          if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
           elif [[ "$VERSION" == *-* ]]; then
-            npm publish --provenance --access public --tag next
+            npm publish "$TARBALL" --provenance --access public --tag next
           else
-            npm publish --provenance --access public
+            npm publish "$TARBALL" --provenance --access public
           fi
 
       - name: Publish @journeykit/canon-core-win32-x64 (idempotent)
-        working-directory: packages/core-win32-x64
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
+          PACKAGE: "@journeykit/canon-core-win32-x64"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          PKG=$(jq -r .name package.json)
-          if npm view "$PKG@$VERSION" version >/dev/null 2>&1; then
-            echo "$PKG@$VERSION already on npm — skipping (idempotent)."
+          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          test -f "$TARBALL"
+          if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
           elif [[ "$VERSION" == *-* ]]; then
-            npm publish --provenance --access public --tag next
+            npm publish "$TARBALL" --provenance --access public --tag next
           else
-            npm publish --provenance --access public
+            npm publish "$TARBALL" --provenance --access public
           fi
 
       - name: Publish @journeykit/canon launcher (idempotent)
-        working-directory: packages/cli
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
+          PACKAGE: "@journeykit/canon"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          PKG=$(jq -r .name package.json)
-          if npm view "$PKG@$VERSION" version >/dev/null 2>&1; then
-            echo "$PKG@$VERSION already on npm — skipping (idempotent)."
+          TARBALL="tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
+          test -f "$TARBALL"
+          if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE@$VERSION already on npm — skipping (idempotent)."
           elif [[ "$VERSION" == *-* ]]; then
-            npm publish --provenance --access public --tag next
+            npm publish "$TARBALL" --provenance --access public --tag next
           else
-            npm publish --provenance --access public
+            npm publish "$TARBALL" --provenance --access public
           fi

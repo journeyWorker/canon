@@ -1,8 +1,9 @@
 name: Set up Rust
 description: >-
   Installs the toolchain pinned in rust-toolchain.toml with rustup (never a
-  floating `stable`), optionally adds one target, logs `rustc --version`, and
-  fails when that version differs from the pinned channel.
+  floating `stable`), optionally adds one target (a Linux musl target also
+  gets the musl C toolchain), logs `rustc --version`, and fails when that
+  version differs from the pinned channel.
 
 inputs:
   target:
@@ -25,6 +26,22 @@ runs:
       env:
         TARGET: ${{ inputs.target }}
       run: rustup target add "$TARGET"
+
+    # A Linux musl row links static binaries on the Ubuntu host: musl-tools is
+    # the C compiler (`musl-gcc`, either architecture) the C code of the
+    # dependencies compiles with (aws-lc-sys, ring, SQLite, zstd, jemalloc); the
+    # `cc` crate is told to use it for this target, on the arm runner too.
+    - name: Install the musl C toolchain
+      if: contains(inputs.target, '-linux-musl')
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        set -euo pipefail
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq musl-tools
+        musl-gcc --version | head -n 1
+        echo "CC_${TARGET//-/_}=musl-gcc" >> "$GITHUB_ENV"
 
     - name: Check rustc is the pinned version
       shell: bash

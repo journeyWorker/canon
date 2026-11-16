@@ -17,12 +17,17 @@
       },
       "optionalDependencies": {
         "@journeykit/canon-core-darwin-arm64": "workspace:*",
+        "@journeykit/canon-core-linux-arm64": "workspace:*",
         "@journeykit/canon-core-linux-x64": "workspace:*",
         "@journeykit/canon-core-win32-x64": "workspace:*",
       },
     },
     "packages/core-darwin-arm64": {
       "name": "@journeykit/canon-core-darwin-arm64",
+      "version": "0.41.0",
+    },
+    "packages/core-linux-arm64": {
+      "name": "@journeykit/canon-core-linux-arm64",
       "version": "0.41.0",
     },
     "packages/core-linux-x64": {
@@ -218,6 +223,8 @@
     "@journeykit/canon": ["@journeykit/canon@workspace:packages/cli"],
 
     "@journeykit/canon-core-darwin-arm64": ["@journeykit/canon-core-darwin-arm64@workspace:packages/core-darwin-arm64"],
+
+    "@journeykit/canon-core-linux-arm64": ["@journeykit/canon-core-linux-arm64@workspace:packages/core-linux-arm64"],
 
     "@journeykit/canon-core-linux-x64": ["@journeykit/canon-core-linux-x64@workspace:packages/core-linux-x64"],
 

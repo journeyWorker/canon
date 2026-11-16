@@ -1,16 +1,20 @@
 name: Build Native (Test Only)
 
 # Adapted from the vendored upstream release pipeline's build workflow (design
-# D3): S0's acceptance bar (macOS arm64 + Linux x64 gnu) plus Windows x64
-# msvc, the same three rows the sibling `lute` monorepo ships. Every
-# matrix row builds on a host that natively matches the target triple
-# (macos-15 runners are Apple Silicon; ubuntu-latest and windows-latest
-# runners are x86_64), so no cross-compilation toolchain (zig /
-# cargo-zigbuild) is needed for any row — that machinery only becomes
-# necessary once a target is added whose triple doesn't match any
-# available runner's native arch. The Windows row needs CMake + NASM
-# (aws-lc-sys / ring build scripts); both ship on the windows-latest
-# image. `binary_ext` is the only per-row difference the steps see.
+# D3), and the same four rows publish.yml releases: macOS arm64 (deployment
+# target 15.0), Linux x64 and arm64 as static musl binaries (jemalloc is
+# their allocator; glibc is not a floor), Windows x64 msvc with a static C
+# runtime. Every row builds on a host that natively matches the target (the
+# runners are pinned images, never `-latest`: macos-26, ubuntu-26.04,
+# ubuntu-26.04-arm, windows-2025), so no cross-compilation toolchain (zig /
+# cargo-zigbuild) is needed for any row. The Linux rows link on the host with
+# `musl-tools` (.github/actions/setup-rust). The Windows row needs CMake + NASM
+# (aws-lc-sys / ring build scripts); both ship on the windows-2025 image.
+# `binary_ext` is the only per-row difference the steps see besides `lg_page`:
+# the aarch64 musl row builds jemalloc for 64K pages. Each row reads its binary
+# with scripts/check-release-binary.py (static, jemalloc, minos 15.0, no VC
+# runtime DLL), and the smokes that run those binaries in containers belong to
+# publish.yml only.
 
 on:
   workflow_dispatch:
@@ -28,6 +32,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # The macOS binary's floor: its `minos` is exactly this (scripts/check-release-binary.py fails any other).
+  MACOSX_DEPLOYMENT_TARGET: "15.0"
 
 permissions:
   contents: read
@@ -40,7 +46,7 @@ concurrency:
 jobs:
   safety:
     name: Release workflow safety check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,7 +64,7 @@ jobs:
   dashboard:
     name: Build dashboard app
     needs: safety
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -88,7 +94,7 @@ jobs:
   man:
     name: Generate man pages
     needs: safety
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -125,15 +131,20 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-15
+          - host: macos-26
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             binary_ext: ""
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+          - host: ubuntu-26.04
+            target: x86_64-unknown-linux-musl
             package_dir: core-linux-x64
             binary_ext: ""
-          - host: windows-latest
+          - host: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-musl
+            package_dir: core-linux-arm64
+            binary_ext: ""
+            lg_page: "16"
+          - host: windows-2025
             target: x86_64-pc-windows-msvc
             package_dir: core-win32-x64
             binary_ext: ".exe"
@@ -163,13 +174,29 @@ jobs:
           path: dashboard-app
 
       - name: Build canon-cli binary
+        shell: bash
         env:
           CANON_DASHBOARD_DIST: ${{ github.workspace }}/dashboard-app
-        run: cargo build --locked --release -p canon-cli --target ${{ matrix.settings.target }}
+          JEMALLOC_SYS_WITH_LG_PAGE: ${{ matrix.settings.lg_page }}
+        run: |
+          set -euo pipefail
+          # Only the aarch64 musl row has a page size: an empty variable is no variable.
+          [ -n "$JEMALLOC_SYS_WITH_LG_PAGE" ] || unset JEMALLOC_SYS_WITH_LG_PAGE
+          cargo build --locked --release -p canon-cli --target ${{ matrix.settings.target }}
 
       - name: Strip binary
         if: matrix.settings.binary_ext == ''
         run: strip "target/${{ matrix.settings.target }}/release/canon"
+
+      # The floor this row promises, read from the binary it just built (the
+      # evidence that the pins took: static + jemalloc + 64K pages, minos 15.0,
+      # no VC runtime DLL). The log of this step is the proof for a PR.
+      - name: Check the binary keeps the floor of its platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          PY=$(command -v python3 || command -v python)
+          "$PY" scripts/check-release-binary.py --target "${{ matrix.settings.target }}" "target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}"
 
       - name: Stage into platform package (local verification only — not committed)
         shell: bash

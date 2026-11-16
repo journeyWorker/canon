@@ -6,3 +6,11 @@
 # drift. `cargo xtask write` regenerates and overwrites the committed files
 # (the developer workflow after a doc-comment/type change).
 xtask = "run -p canon-model --bin xtask --"
+
+# The Windows release binary links the C runtime statically (`+crt-static`), so it starts on a Windows without the Visual C++
+# redistributable (`VCRUNTIME140.dll`); the UCRT it still imports is a component of Windows. The setting lives here, in the one
+# file every cargo run reads, and the release workflows do not set `RUSTFLAGS`: that variable replaces these flags instead of adding
+# to them (scripts/check-release-workflow-safety.py fails a workflow that sets it, and scripts/check-release-binary.py fails a
+# Windows binary that imports a VC runtime DLL).
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
