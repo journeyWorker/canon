@@ -692,6 +692,11 @@ def smoke_errors(publish_text: str, build_text: str, other_texts: dict[str, str]
     for line in publish_text.splitlines():
         if "npm publish" in _source_line(line) and 'npm publish "$TARBALL"' not in line:
             errors.append(f"publish.yml: `{line.strip()}` must publish the packed tarball (npm publish \"$TARBALL\" ...)")
+    # npm reads `dir/file.tgz` as the GitHub shorthand `owner/repo` and tries `git ls-remote` (0.42.0's first
+    # tag run failed so); a path is a tarball only with `./`, `../` or `/` in front.
+    for value in re.findall(r'^\s*TARBALL="([^"]*)"', publish_text, re.MULTILINE):
+        if not value.startswith(("./", "../", "/")):
+            errors.append(f"publish.yml: TARBALL=\"{value}\" must start with ./ (npm reads a/b.tgz as a GitHub repo)")
     return errors
 
 
