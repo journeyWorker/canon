@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T11:36:16.674882257Z",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "kind": "review",
+  "pin": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:change_drop_17_a_change_never_closed_reads_as_an_empty_list",
+          "junit:change_drop_17_an_unknown_status_is_a_usage_error_listing_the_three_states",
+          "junit:change_drop_17_without_the_routing_line_the_query_fails_naming_the_kind"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "20b11f9c1ec479dc881b745004683cab1783da0f03ac2871163fe09cf4e51225",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-42-change-drop/brief.md"
+  },
+  "review_id": "01M7J29GH2G1Y507F3YRXH8TJT",
+  "reviewer": "rev-0-42-drop",
+  "reviewer_harness": "omp",
+  "scenario_id": "change.drop.17",
+  "schema": 2,
+  "worktree_dirty": false
+}

@@ -16,6 +16,12 @@
 //! records the tree of that moment; a repeat of the same approval over the same
 //! code writes nothing.
 //!
+//! A deferred or dropped change (`canon change defer|drop`) takes no approval: with one or several ids, one closed id
+//! refuses the call (`CHANGE_CONFLICT`, reason `CLOSED`) and nothing is written. A change brought back with
+//! `canon change reopen` has no approval until the human answers again: an `Approved:` line written no later than
+//! the reopening is replaced even when name, answer and code tree repeat it, and the new line is never dated
+//! before the reopening ([`crate::change_state::approval_time`]).
+//!
 //! Refused (exit 2) while `canon brief check` has blocker findings, and
 //! for an empty `--approver`/`--note`; exit 1 for an operational error. It takes
 //! one or more change ids (0.31): one name and answer for all, every id checked
@@ -210,6 +216,10 @@ struct Checked {
 /// appended where it will be read.
 fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved: bool, opts: Opts<'_>, tree: Option<&str>) -> Result<Checked, CliError> {
     let checked = check(repo, item.change)?;
+    // A deferred or dropped change takes no approval (0.42 `canon change defer|drop`): refused with nothing written.
+    if let Some(error) = crate::change_state::closed_refusal(repo, &checked.change) {
+        return Err(error);
+    }
     let path = repo.join(&checked.brief);
     if let Some(shown) = opts.shown {
         verify_shown(&checked.change, &checked.brief, &path, shown)?;
@@ -235,8 +245,10 @@ fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved:
         verify_bytes(&checked.brief, Some(text.as_bytes()), expected)?;
     }
     // The same approval again, by the same human, on a brief and a policy
-    // that already carry it: nothing to write.
-    let unchanged = already_approved_so(&text, by, note, opts.relay, tree) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note), opts.relay).is_some());
+    // that already carry it: nothing to write. A line older than the change's reopening (`canon change reopen`)
+    // is no approval, so the same words are written again.
+    let predates_reopening = field(&text, "Approved:").is_some_and(|line| crate::change_state::reopened_since(repo, &checked.change, line).is_some());
+    let unchanged = !predates_reopening && already_approved_so(&text, by, note, opts.relay, tree) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note), opts.relay).is_some());
     if !unchanged {
         approved_text(&text, by, "1970-01-01T00:00:00Z", note, opts.relay, tree).map_err(|e| refuse("BRIEF_INVALID", &format!("{}: {e}", checked.brief)).reason("UNAPPROVABLE"))?;
         // What the approval will write is checked here, with the rest, so an unwritable brief or approval file refuses before any id is written.
@@ -314,14 +326,14 @@ fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
     if checked.unchanged {
         return Ok((Approved { policy_held: held, ..already(checked, &by, policy_approved, None) }, true));
     }
-    let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let when = crate::change_state::approval_time(repo, &checked.change, Utc::now()).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     write_one(repo, checked, &by, &note, &when, policy_approved, None).map(|approved| (Approved { policy_held: held, ..approved }, false))
 }
 
 /// The error of a call with several ids when any is refused (0.31): the first refused id's own code and reason, with an
 /// `error.details` entry for each refused id (spec 7.2.2); no `data`, and nothing was written.
 fn refused_many(refused: Vec<(String, CliError)>) -> CliError {
-    let hint = "fix what each refused id names (`canon brief check` lists blocker findings, a missing brief needs `canon change new`, an unclosed fence needs closing), then ask the human to approve again";
+    let hint = "fix what each refused id names (`canon brief check` lists blocker findings, a missing brief needs `canon change new`, an unclosed fence needs closing, a deferred or dropped change takes no approval), then ask the human to approve again";
     let named = |id: &str, e: &CliError| {
         let error = CliError::refused(e.code, format!("`{id}`: {}", e.message)).hint(hint);
         match e.reason_name() {
@@ -383,7 +395,8 @@ pub fn approve_all_with(repo: &Path, items: &[Item<'_>], by: &str, note: &str, o
     } else if !refused.is_empty() {
         return Err(refused_many(refused));
     }
-    let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let now = Utc::now();
+    let when = checked.iter().map(|one| crate::change_state::approval_time(repo, &one.change, now)).max().unwrap_or(now).to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let mut entries: Vec<(ApprovalEntry, Option<Approved>)> = Vec::new();
     let mut failure: Option<CliError> = None;
     for one in checked {

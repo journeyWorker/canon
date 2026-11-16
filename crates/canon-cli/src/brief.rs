@@ -51,6 +51,13 @@
 //! for no evidence ([`crate::reverify`]). No marker (a line from before 0.37,
 //! or an approval with no git commit) reads as it always did.
 //!
+//! # A reopened change (0.42)
+//! A change a human deferred and then reopened (`canon change reopen`) comes back unapproved: an `Approved:` line
+//! written no later than the second of the reopening is not an approval ([`approval_in`],
+//! [`crate::change_state::approval_predates`]). [`brief_of`] reads the brief that way, so `status`, the ship and
+//! reopen guards and `evidence add` all see the change as awaiting a new approval ([`BriefStatus::reopened`]), and
+//! `canon brief approve` writes a new line even for the same name, answer and code tree.
+//!
 //! # Canon never writes into an external plan (0.17 D3)
 //! The approval is read only from that canon `brief.md`. A change
 //! `canon change new` wrote has its brief there already. A change
@@ -129,6 +136,9 @@ pub enum Approval {
     Unbound { line: String },
     /// The line's digest does not match: the brief changed after it.
     Changed { line: String, recorded: String, current: String },
+    /// The line is an approval of the brief's text, but it was written no later than the second of the reopening of
+    /// its change (`canon change reopen`): the approval is void and the human answers again.
+    Reopened { line: String, reopened: DateTime<Utc> },
 }
 
 impl Approval {
@@ -192,6 +202,20 @@ pub fn approval_of(text: &str) -> Approval {
                 Approval::Changed { recorded: recorded.to_string(), line, current }
             }
         }
+    }
+}
+
+/// [`approval_of`] for the brief of `change` under `repo`: an approval written no later than the second the change was
+/// reopened at (`canon change reopen`) reads as [`Approval::Reopened`], not as an approval. The one reading of a
+/// brief's approval that knows the change's decisions; a caller with no repo or change reads [`approval_of`].
+pub fn approval_in(repo: &Path, change: &ChangeId, text: &str) -> Approval {
+    let verdict = approval_of(text);
+    let (Approval::Bound { line } | Approval::Unbound { line }) = &verdict else {
+        return verdict;
+    };
+    match crate::change_state::reopened_since(repo, change, line) {
+        Some(reopened) => Approval::Reopened { line: line.clone(), reopened },
+        None => verdict,
     }
 }
 
@@ -271,6 +295,10 @@ pub struct BriefStatus {
     /// must run again.
     #[serde(skip)]
     pub changed: bool,
+    /// When the change was reopened (UTC, RFC 3339) while its `Approved:` line is older: the approval is stale, not
+    /// absent (`canon change reopen` voids it), and `canon brief approve` writes a new line.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reopened: Option<String>,
     /// The approval line has no digest (pre-0.19): approved, but status
     /// advises re-approving it so it binds to the brief's text.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
@@ -318,6 +346,11 @@ impl BriefStatus {
             (false, Some(source)) => format!(
                 "{brief} does not exist yet: change `{}` comes from the external plan {source}, which canon reads and never edits, so its approval lives in that canon file",
                 self.change.as_deref().unwrap_or_default()
+            ),
+            _ if self.reopened.is_some() => format!(
+                "{brief} carries an `Approved:` line older than the reopening of change `{}` ({}): the approval is stale because the change was reopened",
+                self.change.as_deref().unwrap_or_default(),
+                self.reopened.as_deref().unwrap_or_default()
             ),
             _ if self.changed => format!("{brief} changed after its approval ({CHANGED_CODE})"),
             _ => format!("{brief} has no `Approved:` line"),
@@ -397,6 +430,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             approval: None,
             relay: None,
             changed: false,
+            reopened: None,
             legacy_approval: false,
             tree_unchanged: false,
             scope_exempt: None,
@@ -410,8 +444,13 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
     let status = match brief {
         Some(path) => {
             let text = std::fs::read_to_string(&path).unwrap_or_default();
-            let verdict = approval_of(&text);
-            let approval = field(&text, "Approved:").map(str::to_string);
+            let verdict = approval_in(repo, change, &text);
+            let reopened = match &verdict {
+                Approval::Reopened { reopened, .. } => Some(reopened.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)),
+                _ => None,
+            };
+            // A stale approval is no approval: `status` says it is stale, not that it is there.
+            let approval = field(&text, "Approved:").filter(|_| reopened.is_none()).map(str::to_string);
             let old_format = canon_ingest::brief::parse(&text).old_format.map(|old| crate::old_briefs::OldBrief { change: change.as_str().to_string(), path: rel(repo, &path), what: old.describe() });
             BriefStatus {
                 status: BriefState::of(&verdict),
@@ -425,6 +464,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 relay: approval.as_deref().and_then(crate::relay::parse_marker),
                 approval,
                 changed: matches!(verdict, Approval::Changed { .. }),
+                reopened,
                 legacy_approval: matches!(verdict, Approval::Unbound { .. }),
                 tree_unchanged: false,
                 scope_exempt: None,
@@ -446,6 +486,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 approval: None,
                 relay: None,
                 changed: false,
+                reopened: None,
                 legacy_approval: false,
                 tree_unchanged: false,
                 scope_exempt: None,
@@ -466,6 +507,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 approval: None,
                 relay: None,
                 changed: false,
+                reopened: None,
                 legacy_approval: false,
                 tree_unchanged: false,
                 scope_exempt: None,
@@ -504,6 +546,7 @@ impl BriefState {
             Approval::Bound { .. } | Approval::Unbound { .. } => Self::Approved,
             Approval::Missing => Self::Unapproved,
             Approval::Changed { .. } => Self::Changed,
+            Approval::Reopened { .. } => Self::Unapproved,
         }
     }
 }

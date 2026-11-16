@@ -32,7 +32,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   Scenario: A name is trimmed and the trimmed value is what is recorded and signed, and every name and sentence option declares one domain in every command
     Given --actor with white space around it on scenario new and finding add, --approver with white space around it on evidence approval-payload, and every command document that has --actor, --approver, --relayed-via, --reason, --summary or --override-reason
     When the calls run and the documents are read
-    Then the record holds alice and not the padded value, the payload signed over the padded approver is the payload of the trimmed one, and the 43 declarations of the six options are one pattern with the class [^\p{Cc}\p{Zl}\p{Zp}]
+    Then the record holds alice and not the padded value, the payload signed over the padded approver is the payload of the trimmed one, and the 55 declarations of the six options are one pattern with the class [^\p{Cc}\p{Zl}\p{Zp}]
 
   # canon: {"schema":1,"at":"2026-11-05T14:12:44Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-schema
@@ -51,10 +51,10 @@ Feature: atip option values: an option of the same name takes the same value in 
   @case:edge
   @flow:canon-0-37-option-values.F2
   @atip.optionvalues.05
-  Scenario: The tool of a relayed approval is one word, the same on the four commands that take --relayed-via
-    Given brief approve, policy approve, divergence accept and migrate called with --relayed-via, with a tool of one word and with tools that have a space, a parenthesis, a quote, a no-break space, a tab, a line break, an escape or nothing
+  Scenario: The tool of a relayed approval is one word, the same on the seven commands that take --relayed-via
+    Given brief approve, policy approve, divergence accept, migrate, change defer, change drop and change reopen called with --relayed-via, with a tool of one word and with tools that have a space, a parenthesis, a quote, a no-break space, a tab, a line break, an escape or nothing
     When each call runs with --as implementer
-    Then the four commands declare the same pattern and the same one-word validator in the same words, take ask, AskUserQuestion and chat, and refuse every other value with USAGE naming --relayed-via and writing nothing
+    Then the seven commands declare the same pattern and the same one-word validator in the same words, take ask, AskUserQuestion and chat, and refuse every other value with USAGE naming --relayed-via and writing nothing
 
   # canon: {"schema":1,"at":"2026-11-05T14:13:06Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-schema
@@ -74,9 +74,9 @@ Feature: atip option values: an option of the same name takes the same value in 
   @flow:canon-0-37-option-values.F3
   @atip.optionvalues.07
   Scenario: A blank sentence, or one with a control character, a line break or an escape inside, is refused with the command's own code
-    Given --reason, --summary and --override-reason with a line feed, a tab, an escape, white space only and nothing, in the ten commands that take one, and a rollback reason with a line break
+    Given --reason, --summary and --override-reason with a line feed, a tab, an escape, white space only and nothing, in the thirteen command and option cases the test runs (change defer, change drop and change reopen among them), a rollback reason with a line break, and a blank --ref (white space only or nothing) on change defer, change drop and change reopen
     When each call runs with --json
-    Then each exits 2 with the code its command used for that option (FINDING_REASON_REQUIRED for the reason of finding close), names the option and writes nothing
+    Then each exits 2 with the code its command used for that option (FINDING_REASON_REQUIRED for the reason of finding close, CHANGE_ARGUMENT_INVALID for the --ref of the three change leaves), names the option and writes nothing
 
   # canon: {"schema":1,"at":"2026-11-05T14:13:28Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-schema

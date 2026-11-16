@@ -64,12 +64,18 @@ PUBLISH_WF = ROOT / ".github/workflows/publish.yml"
 # The env vars both workflows MUST declare identically (a mismatched
 # CARGO_INCREMENTAL/… between the test build and the release build means
 # the release binary was built under different flags than CI proved).
-REQUIRED_ENV = ("CARGO_TERM_COLOR", "CARGO_INCREMENTAL")
+REQUIRED_ENV = ("CARGO_TERM_COLOR", "CARGO_INCREMENTAL", "MACOSX_DEPLOYMENT_TARGET")
+
+# The macOS deployment target both workflows declare (the binary's `minos`, checked by check-release-binary.py).
+MACOS_DEPLOYMENT_TARGET = "15.0"
+
+# The only runner labels a release job may use: the newest image, its label written down, never `-latest`.
+ALLOWED_RUNNERS = ("macos-26", "ubuntu-26.04", "ubuntu-26.04-arm", "windows-2025")
 
 # The scalar fields every `matrix.settings` row carries that must agree
 # across the two workflows (publish additionally carries `package_name`,
 # checked separately against the manifests).
-SHARED_MATRIX_FIELDS = ("host", "target", "package_dir")
+SHARED_MATRIX_FIELDS = ("host", "target", "package_dir", "lg_page", "alpine_image")
 
 
 def read(path: pathlib.Path) -> str:
@@ -193,8 +199,8 @@ def dashboard_embed_errors(text: str, workflow: str) -> list[str]:
     return errors
 
 
-STABLE_PUBLISH = "npm publish --provenance --access public"
-PRERELEASE_PUBLISH = "npm publish --provenance --access public --tag next"
+STABLE_PUBLISH = 'npm publish "$TARBALL" --provenance --access public'
+PRERELEASE_PUBLISH = 'npm publish "$TARBALL" --provenance --access public --tag next'
 PRERELEASE_GUARD = re.compile(r'^(?:el)?if \[\[ "\$VERSION" == \*-\* \]\]; then$')
 GITHUB_RELEASE = re.compile(r"\bgh\s+release\b|action-gh-release|create-release")
 PRERELEASE_TEST = re.compile(r"\*-\*|contains\([^)]*'-'[^)]*\)")
@@ -218,7 +224,7 @@ def _steps(job: str) -> list[str]:
 def prerelease_publish_errors(text: str, workflow: str) -> list[str]:
     """A hyphenated version (`0.35.0-rc.1`) is a prerelease and publishes under
     the `next` dist-tag, never `latest`; a stable version keeps the one
-    `npm publish --provenance --access public` it always ran. Every `npm
+    `npm publish "$TARBALL" --provenance --access public` it always ran. Every `npm
     publish` step carries the split, so no package lands on `latest` alone
     (npm refuses a prerelease without `--tag`, and a `--tag latest` would
     defeat the point). A GitHub release, if the workflow creates one, is
@@ -266,6 +272,661 @@ def prerelease_publish_errors(text: str, workflow: str) -> list[str]:
         ):
             name = step.splitlines()[0].strip()
             errors.append(f"{workflow}: `{name}` creates a GitHub release and must mark a hyphenated version prerelease")
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# 0.42 release portability: the floor each release binary declares, the four
+# packages, the smokes before a publish, the dry run, the time limits.
+# Every function takes the text it reads (a workflow, a manifest, a source
+# file), so the tests feed it a copy with one rule broken.
+# ---------------------------------------------------------------------------
+
+EXPECTED_TARGETS = (
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+)
+LG_PAGE_TARGET = "aarch64-unknown-linux-musl"
+LG_PAGE = "16"
+SMOKE_JOBS = {"smoke-binary": "binary", "smoke-install": "install", "smoke-network": "network"}
+BINARY_CHECK_STEP = "Check the binary keeps the floor of its platform"
+RUNNER_REF = re.compile(r"^\$\{\{\s*matrix\.settings\.(\w+)\s*\}\}$")
+
+
+def _job_names(text: str) -> list[str]:
+    """The keys directly under `jobs:` (2-space indent), in order."""
+    names: list[str] = []
+    in_jobs = False
+    for line in text.splitlines():
+        if line.rstrip() == "jobs:":
+            in_jobs = True
+            continue
+        if in_jobs:
+            match = re.match(r"^  ([\w-]+):\s*$", line)
+            if match:
+                names.append(match.group(1))
+            elif line and not line.startswith(" "):
+                break
+    return names
+
+
+def _scan_rows(text: str) -> list[dict[str, str]]:
+    """Every `- key: value` list item with its deeper `key: value` lines, as a dict (matrix rows, and steps)."""
+    rows: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    row_indent = 0
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        item = re.match(r"^\s*- (\w+): (.+)$", line)
+        if item:
+            if current is not None:
+                rows.append(current)
+            current = {item.group(1): item.group(2).strip().strip('"')}
+            row_indent = indent
+            continue
+        if current is not None and indent > row_indent:
+            kv = re.match(r"^\s*(\w+): (.+)$", line)
+            if kv:
+                current[kv.group(1)] = kv.group(2).strip().strip('"')
+        elif current is not None:
+            rows.append(current)
+            current = None
+    if current is not None:
+        rows.append(current)
+    return rows
+
+
+def _field(job: str, key: str) -> str | None:
+    """A job's own scalar key (4-space indent)."""
+    match = re.search(rf"^    {re.escape(key)}:[ \t]*(.*?)[ \t]*$", job, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _needs(job: str) -> set[str]:
+    """The jobs a job waits for: `needs: x`, `needs: [x, y]` or a block list."""
+    lines = job.splitlines()
+    for index, line in enumerate(lines):
+        match = re.match(r"^    needs:\s*(.*)$", line)
+        if not match:
+            continue
+        value = match.group(1).strip()
+        if value.startswith("["):
+            return {item.strip() for item in value.strip("[]").split(",") if item.strip()}
+        if value:
+            return {value}
+        found: set[str] = set()
+        for follow in lines[index + 1 :]:
+            item = re.match(r"^      - (\S+)\s*$", follow)
+            if not item:
+                break
+            found.add(item.group(1))
+        return found
+    return set()
+
+
+def runner_label_errors(text: str, workflow: str) -> list[str]:
+    """Every job runs on a pinned runner image from ALLOWED_RUNNERS, a matrix row's included: `-latest` follows
+    the newest image and moves the floor of a binary with no change here."""
+    errors: list[str] = []
+    for name in _job_names(text):
+        job = _job_block(text, name)
+        runs_on = _field(job, "runs-on")
+        if runs_on is None:
+            errors.append(f"{workflow}: job `{name}` has no `runs-on`")
+            continue
+        labels: list[str] = []
+        reference = RUNNER_REF.match(runs_on)
+        if reference:
+            key = reference.group(1)
+            labels = [row[key] for row in _scan_rows(job) if key in row]
+            if not labels:
+                errors.append(f"{workflow}: job `{name}` runs on matrix.settings.{key} and no matrix row has it")
+        else:
+            labels = [runs_on.strip("\"'")]
+        for label in labels:
+            if label not in ALLOWED_RUNNERS:
+                reason = " (`-latest` is the newest image, not a floor)" if label.endswith("-latest") else ""
+                errors.append(
+                    f"{workflow}: job `{name}` runs on `{label}`{reason}; the allowed runner labels are {', '.join(ALLOWED_RUNNERS)}"
+                )
+    return errors
+
+
+def build_row_errors(rows: list[dict[str, str]], workflow: str) -> list[str]:
+    """The four build rows: macOS arm64, and Linux x64 and arm64 built as musl targets on their own host
+    (no job `container:`; the aarch64 row runs a digest-pinned `rust:alpine` image in a step, see
+    `alpine_build_errors`), Windows x64; `lg_page` and `alpine_image` on the aarch64 musl row alone."""
+    errors: list[str] = []
+    by_target = {row.get("target", ""): row for row in rows}
+    for target in EXPECTED_TARGETS:
+        if target not in by_target:
+            errors.append(f"{workflow}: the build matrix has no row for {target}")
+    for row in rows:
+        host, target = row.get("host", ""), row.get("target", "")
+        if host.startswith("ubuntu-"):
+            if not target.endswith("-unknown-linux-musl"):
+                errors.append(f"{workflow}: the Linux row {host}/{target} must build a musl target (a static binary has no glibc floor)")
+            elif (target.startswith("aarch64"), host.endswith("-arm")) not in {(True, True), (False, False)}:
+                errors.append(f"{workflow}: {target} must build on its own architecture: x86_64 on ubuntu-26.04, aarch64 on ubuntu-26.04-arm (found {host})")
+        elif host.startswith("macos-"):
+            if target != "aarch64-apple-darwin":
+                errors.append(f"{workflow}: the macOS row {host} builds {target}; macOS is arm64 only (aarch64-apple-darwin)")
+        elif host.startswith("windows-"):
+            if target != "x86_64-pc-windows-msvc":
+                errors.append(f"{workflow}: the Windows row {host} builds {target}; Windows is x64 only (x86_64-pc-windows-msvc)")
+        if "gnu" in target:
+            errors.append(f"{workflow}: row {target} is a gnu target; releases are musl (Linux), msvc (Windows) and darwin")
+        has_page = "lg_page" in row
+        if target == LG_PAGE_TARGET and row.get("lg_page") != LG_PAGE:
+            errors.append(f"{workflow}: the {LG_PAGE_TARGET} row must set `lg_page: \"{LG_PAGE}\"` (JEMALLOC_SYS_WITH_LG_PAGE={LG_PAGE}, 64K pages), found {row.get('lg_page')!r}")
+        elif target != LG_PAGE_TARGET and has_page:
+            errors.append(f"{workflow}: only the {LG_PAGE_TARGET} row sets `lg_page`; {target} has it (x86_64 is 4K pages, other targets have no jemalloc)")
+        image = row.get("alpine_image")
+        if target == LG_PAGE_TARGET and not (image and re.match(r"^rust:[\w.]+-alpine[\w.]*@sha256:", image)):
+            errors.append(f"{workflow}: the {LG_PAGE_TARGET} row must set `alpine_image: rust:<toolchain>-alpine<version>@sha256:<digest>` (Ubuntu's musl-gcc cannot compile jemalloc there), found {image!r}")
+        elif target != LG_PAGE_TARGET and image is not None:
+            errors.append(f"{workflow}: only the {LG_PAGE_TARGET} row sets `alpine_image`; {target} has it (the other rows build on their host)")
+    return errors
+
+
+def jemalloc_errors(text: str, workflow: str, cargo_text: str, main_text: str) -> list[str]:
+    """jemalloc is the allocator of musl builds only: the dependency hangs on `cfg(target_env = "musl")`, the
+    global allocator too, and the page size reaches the build through the one `Build canon-cli binary` step."""
+    errors: list[str] = []
+    deps = re.search(r"^\[dependencies\]\n(.*?)(?=^\[)", cargo_text, re.MULTILINE | re.DOTALL)
+    if deps and "tikv-jemallocator" in deps.group(1):
+        errors.append("crates/canon-cli/Cargo.toml: tikv-jemallocator is in [dependencies]; it belongs under [target.'cfg(target_env = \"musl\")'.dependencies] only")
+    musl = re.search(r"^\[target\.'cfg\(target_env = \"musl\"\)'\.dependencies\]\n(.*?)(?=^\[|\Z)", cargo_text, re.MULTILINE | re.DOTALL)
+    if not musl or "tikv-jemallocator" not in musl.group(1):
+        errors.append("crates/canon-cli/Cargo.toml: tikv-jemallocator must be a dependency of [target.'cfg(target_env = \"musl\")'.dependencies]")
+    if not re.search(r'#\[cfg\(target_env = "musl"\)\]\s*#\[global_allocator\]', main_text):
+        errors.append("crates/canon-cli/src/main.rs: the jemalloc #[global_allocator] must sit under #[cfg(target_env = \"musl\")]")
+    build = _step_block(_job_block(text, "build"), "Build canon-cli binary")
+    if "JEMALLOC_SYS_WITH_LG_PAGE: ${{ matrix.settings.lg_page }}" not in build:
+        errors.append(f"{workflow}: the `Build canon-cli binary` step must set `JEMALLOC_SYS_WITH_LG_PAGE: ${{{{ matrix.settings.lg_page }}}}` (the aarch64 musl row's 64K pages)")
+    for number, line in enumerate(text.splitlines(), 1):
+        source = _source_line(line)
+        if "JEMALLOC_SYS_WITH_LG_PAGE" in source and "matrix.settings.lg_page" not in source and "unset" not in source and '[ -n "$JEMALLOC' not in source and "-e JEMALLOC_SYS_WITH_LG_PAGE" not in source:
+            errors.append(f"{workflow}:{number}: JEMALLOC_SYS_WITH_LG_PAGE may only be set from the matrix row's `lg_page`")
+    return errors
+
+
+def alpine_build_errors(text: str, workflow: str) -> list[str]:
+    """The aarch64 musl row builds in its `alpine_image`: the one `Build canon-cli binary` step reads the row's image
+    and runs it with `docker run` (the workspace mounted, the dashboard and the page size passed in), and the
+    toolchain inside is checked against rust-toolchain.toml; the host `Install Rust` step skips that row."""
+    errors: list[str] = []
+    build = _job_block(text, "build")
+    step = _step_block(build, "Build canon-cli binary")
+    for needle, why in (
+        ("ALPINE_IMAGE: ${{ matrix.settings.alpine_image }}", "read the row's `alpine_image` into ALPINE_IMAGE"),
+        ('docker run --rm -i', "run the image with `docker run --rm -i`"),
+        ('"$ALPINE_IMAGE" sh -s', 'run the image `"$ALPINE_IMAGE"` (the row\'s, nothing else) with `sh -s`'),
+        ('-v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE"', "mount the workspace"),
+        ("-e CANON_DASHBOARD_DIST", "pass CANON_DASHBOARD_DIST into the container"),
+        ("-e JEMALLOC_SYS_WITH_LG_PAGE", "pass JEMALLOC_SYS_WITH_LG_PAGE into the container"),
+        ('"$got" != "$want"', "compare the image's rustc with rust-toolchain.toml"),
+        ("cargo build --locked --release -p canon-cli", "run `cargo build --locked --release -p canon-cli`"),
+    ):
+        if needle not in step:
+            errors.append(f"{workflow}: the `Build canon-cli binary` step must {why}")
+    install = _step_block(build, "Install Rust")
+    if "if: matrix.settings.alpine_image == ''" not in install:
+        errors.append(f"{workflow}: the `Install Rust` step must skip the rows that build in an `alpine_image` (`if: matrix.settings.alpine_image == ''`)")
+    return errors
+
+
+def macos_target_errors(env: dict[str, str], workflow: str) -> list[str]:
+    value = env.get("MACOSX_DEPLOYMENT_TARGET", "").strip("\"'")
+    if value != MACOS_DEPLOYMENT_TARGET:
+        return [f"{workflow}: env MACOSX_DEPLOYMENT_TARGET must be \"{MACOS_DEPLOYMENT_TARGET}\" (found {value or 'nothing'}): the macOS binary's minos is the floor"]
+    return []
+
+
+def crt_static_errors(cargo_config: str, workflows: dict[str, str]) -> list[str]:
+    """msvc links the C runtime statically from the one cargo config file; a workflow `RUSTFLAGS` would replace it."""
+    errors: list[str] = []
+    section = re.search(r"^\[target\.[^\]\n]*msvc[^\]\n]*\]\n(.*?)(?=^\[|\Z)", cargo_config, re.MULTILINE | re.DOTALL)
+    if not section or "target-feature=+crt-static" not in section.group(1):
+        errors.append(".cargo/config.toml: a [target.…msvc…] table must set rustflags with `target-feature=+crt-static`")
+    for name, text in workflows.items():
+        for number, line in enumerate(text.splitlines(), 1):
+            if re.search(r"\w*RUSTFLAGS\w*", _source_line(line)):
+                errors.append(f"{name}:{number}: a workflow must not set RUSTFLAGS: it replaces the flags of .cargo/config.toml (the msvc crt-static)")
+    return errors
+
+
+def binary_check_errors(text: str, workflow: str, rows: list[dict[str, str]], checker_text: str) -> list[str]:
+    """Every build row reads its binary: the `build` job's check step runs scripts/check-release-binary.py with the row's target,
+    and that script knows every row's target."""
+    errors: list[str] = []
+    build = _job_block(text, "build")
+    step = _step_block(build, BINARY_CHECK_STEP)
+    if not step:
+        errors.append(f"{workflow}: the build job has no step `{BINARY_CHECK_STEP}` (scripts/check-release-binary.py on every row)")
+    elif "scripts/check-release-binary.py" not in step or '--target "${{ matrix.settings.target }}"' not in step:
+        errors.append(f"{workflow}: step `{BINARY_CHECK_STEP}` must run scripts/check-release-binary.py --target \"${{{{ matrix.settings.target }}}}\"")
+    if re.search(r"^\s+if:", step, re.MULTILINE):
+        errors.append(f"{workflow}: step `{BINARY_CHECK_STEP}` must run on every row, with no `if:`")
+    known = set(re.findall(r'^    "([\w-]+)": \{"format"', checker_text, re.MULTILINE))
+    for row in rows:
+        if row.get("target") not in known:
+            errors.append(f"{workflow}: scripts/check-release-binary.py does not know the target {row.get('target')} of a build row")
+    if re.search(r"^\s+container:", build, re.MULTILINE):
+        errors.append(f"{workflow}: the build job must not run in a `container:`; the aarch64 musl row runs its image with `docker run` in a step, the other Linux rows link on the host")
+    return errors
+
+
+def launcher_errors(index_ts: str, rows: list[dict[str, str]], manifests: dict[str, dict]) -> list[str]:
+    """The launcher resolves linux/x64 and linux/arm64 whatever the host libc (no libc detection), exactly the
+    packages the matrix ships; the Linux packages carry no `libc` filter; every package declares its own os/cpu."""
+    errors: list[str] = []
+    for needle in ("CANON_LIBC", "detectLibcKind", "ldd --version", "glibc", "-linux-gnu"):
+        if needle in index_ts:
+            errors.append(f"packages/cli/src/index.ts: libc detection is gone from the launcher; `{needle}` is still there")
+    function = re.search(r"function resolveTargetPackageName\(\)[^{]*\{(.*?)\n\}\n", index_ts, re.DOTALL)
+    if not function:
+        errors.append("packages/cli/src/index.ts: no resolveTargetPackageName function")
+        return errors
+    resolved = set(re.findall(r'"(core-[\w-]+)"', function.group(1)))
+    shipped = {row["package_dir"] for row in rows if row.get("package_dir")}
+    for missing in sorted(shipped - resolved):
+        errors.append(f"packages/cli/src/index.ts: the launcher cannot resolve the matrix package {missing}")
+    for extra in sorted(resolved - shipped):
+        errors.append(f"packages/cli/src/index.ts: the launcher resolves {extra}, which no matrix row ships")
+    for directory, manifest in sorted(manifests.items()):
+        if "libc" in manifest:
+            errors.append(f"packages/{directory}/package.json: no `libc` filter (a static binary runs on any libc)")
+        match = re.fullmatch(r"core-(darwin|linux|win32)-(arm64|x64)", directory)
+        if match:
+            if manifest.get("os") != [match.group(1)] or manifest.get("cpu") != [match.group(2)]:
+                errors.append(
+                    f"packages/{directory}/package.json: os/cpu are {manifest.get('os')}/{manifest.get('cpu')}, "
+                    f"expected [{match.group(1)!r}]/[{match.group(2)!r}]"
+                )
+    return errors
+
+
+def _tokens(text: str, pattern: str) -> set[str]:
+    return set(re.findall(pattern, text, re.MULTILINE))
+
+
+def package_set_errors(
+    publish_text: str,
+    rows: list[dict[str, str]],
+    launcher_name: str,
+    bun_lock: str,
+    optional_keys: set[str],
+) -> list[str]:
+    """The platform packages are one set everywhere: build, download, checksum, executable bit, version, pack, the
+    pre-flight, the publish steps, `optionalDependencies`, bun.lock. A place that lacks one names it."""
+    errors: list[str] = []
+    dirs = {row["package_dir"] for row in rows if row.get("package_dir")}
+    names = {row["package_name"] for row in rows if row.get("package_name")}
+    package = _job_block(publish_text, "package")
+    publish = _job_block(publish_text, "publish")
+
+    def compare(place: str, got: set[str], want: set[str]) -> None:
+        if got != want:
+            errors.append(f"{place}: package set drift: missing {sorted(want - got)}, extra {sorted(got - want)}")
+
+    def step(job: str, name: str, place: str) -> str:
+        block = _step_block(job, name)
+        if not block:
+            errors.append(f"publish.yml: no step `{name}` ({place})")
+        return block
+
+    downloads = re.findall(r"name: canon-binary-([\w-]+)\s*\n\s*path: packages/([\w-]+)/bin", package)
+    compare("publish.yml package job: binary downloads", {d for _, d in downloads}, dirs)
+    by_dir = {row["package_dir"]: row.get("target") for row in rows if row.get("package_dir")}
+    for target, directory in downloads:
+        if by_dir.get(directory) != target:
+            errors.append(f"publish.yml package job: packages/{directory}/bin downloads canon-binary-{target}, the matrix builds {by_dir.get(directory)} for it")
+    block = step(package, "Verify binary checksum handoff", "checksum verification")
+    compare("publish.yml: checksum verification", _tokens(block, r"cd packages/([\w-]+)/bin && sha256sum -c"), dirs)
+    block = step(package, "Stage binaries executable", "executable bit")
+    compare("publish.yml: executable bit", _tokens(block, r"chmod \+x packages/([\w-]+)/bin/"), dirs)
+    block = step(package, "Apply the workspace version to every package.json", "version")
+    version_line = re.search(r"for pkg in (.*); do", block)
+    compare("publish.yml: version application", _tokens(version_line.group(1) if version_line else "", r"packages/([\w-]+)"), dirs | {"cli"})
+    block = step(package, "Pack every package into tarballs/", "pack")
+    pack_line = re.search(r"for pkg in (.*); do", block)
+    compare("publish.yml: npm pack", _tokens(pack_line.group(1) if pack_line else "", r"packages/([\w-]+)"), dirs | {"cli"})
+    block = _step_block(publish, "Pre-flight npm release state (fresh-release gate + recovery + first-publish token)")
+    if not block:
+        errors.append("publish.yml: no pre-flight step in the publish job")
+    preflight_line = re.search(r"for pkg_dir in (.*); do", block)
+    compare("publish.yml: pre-flight", set((preflight_line.group(1) if preflight_line else "").split()), dirs | {"cli"})
+    published: list[str] = []
+    for item in _steps(publish):
+        if "npm publish" in item:
+            package_env = re.search(r'^\s*PACKAGE:\s*"?([^"\s]+)"?\s*$', item, re.MULTILINE)
+            published.append(package_env.group(1) if package_env else "<no PACKAGE>")
+    compare("publish.yml: npm publish steps", set(published), names | {launcher_name})
+    if len(published) != len(set(published)):
+        errors.append(f"publish.yml: a package is published by two steps: {published}")
+    arm = next((row["package_name"] for row in rows if row.get("package_dir") == "core-linux-arm64"), None)
+    if published and (published[0] != arm or published[-1] != launcher_name):
+        errors.append(
+            f"publish.yml: publish order must put {arm} first (its first publish needs the token, so a failure stops before any other "
+            f"package goes out) and the launcher {launcher_name} last, found {published}"
+        )
+    compare("packages/cli optionalDependencies", optional_keys, names)
+    compare("bun.lock workspaces", _tokens(bun_lock, r'^    "packages/(core-[\w-]+)": \{'), dirs)
+    for name in sorted(dirs | {"cli"}):
+        if not (ROOT / "packages" / name / "package.json").is_file():
+            errors.append(f"packages/{name}/package.json is missing")
+    return errors
+
+
+IMAGE_KEY = re.compile(r"^\s*(?:-\s*)?((?:[\w-]*_)?(?:image|container|IMAGE|CONTAINER)):[ \t]*(\S+)")
+
+
+def image_digest_errors(text: str, workflow: str) -> list[str]:
+    """An image a workflow names (`image:`, `container:`, `POSTGRES_IMAGE:`) is pinned by digest: a tag moves."""
+    errors: list[str] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        match = IMAGE_KEY.match(_source_line(line))
+        if not match:
+            continue
+        value = match.group(2).strip("\"'")
+        if value.startswith("${{") or value in ("|", ">"):
+            continue
+        if not re.search(r"@sha256:[0-9a-fA-F]{64}$", value):
+            errors.append(f"{workflow}:{number}: image {value!r} must be pinned with an @sha256: digest")
+    return errors
+
+
+def _image_family(image: str) -> str:
+    name = image.split("@", 1)[0]
+    if name.startswith("debian:12") or name.endswith("-bookworm-slim"):
+        return "glibc"
+    if name.startswith("alpine:") or name.endswith("-alpine"):
+        return "musl"
+    return "other"
+
+
+def smoke_errors(publish_text: str, build_text: str, other_texts: dict[str, str]) -> list[str]:
+    """Three smokes run in publish.yml, on x64 and arm64 each in a glibc image (debian:12, glibc 2.36: the 0.41
+    floor killed it) and a musl one, and `publish` waits for all three; no other workflow has them."""
+    errors: list[str] = []
+    names = set(_job_names(publish_text))
+    publish = _job_block(publish_text, "publish")
+    needs = _needs(publish)
+    for job_name, mode in SMOKE_JOBS.items():
+        if job_name not in names:
+            errors.append(f"publish.yml: no `{job_name}` job (the pre-publish smoke of the {mode} path)")
+            continue
+        job = _job_block(publish_text, job_name)
+        if f"release-smoke.sh {mode} " not in job:
+            errors.append(f"publish.yml: `{job_name}` must run scripts/release-smoke.sh {mode}")
+        if job_name not in needs:
+            errors.append(f"publish.yml: the publish job must wait for `{job_name}` (needs: {sorted(needs)})")
+        rows = [row for row in _scan_rows(job) if "runner" in row]
+        for runner in ("ubuntu-26.04", "ubuntu-26.04-arm"):
+            families = {_image_family(row.get("image", "")) for row in rows if row["runner"] == runner}
+            if families != {"glibc", "musl"}:
+                errors.append(f"publish.yml: `{job_name}` must run on {runner} in a debian:12 (glibc) image and an alpine (musl) image, found {sorted(families)}")
+    if "package" not in needs:
+        errors.append("publish.yml: the publish job must wait for `package` (the tarballs it publishes)")
+    for name, text in {"build-native.yml": build_text, **other_texts}.items():
+        for job_name in _job_names(text):
+            if job_name in SMOKE_JOBS:
+                errors.append(f"{name}: the smoke job `{job_name}` belongs to publish.yml only (not on pull requests or every push)")
+        if "release-smoke" in text:
+            errors.append(f"{name}: scripts/release-smoke.sh runs from publish.yml only")
+    triggers = publish_text.split("\npermissions:", 1)[0]
+    if re.search(r"^  (?:pull_request|pull_request_target|schedule):|^    branches:", triggers, re.MULTILINE):
+        errors.append("publish.yml: runs on tags and by hand only; its smokes must not run on pull requests or every push")
+    for job_name in ("smoke-install", "publish"):
+        job = _job_block(publish_text, job_name)
+        if job and "name: npm-tarballs" not in job:
+            errors.append(f"publish.yml: `{job_name}` must download the `npm-tarballs` that `package` packed")
+    if re.search(r"\bnpm pack(?!\w)", "\n".join(_source_line(line) for line in publish.splitlines())):
+        errors.append("publish.yml: the publish job must not `npm pack` again; it publishes the tarballs the smoke installed")
+    for line in publish_text.splitlines():
+        if "npm publish" in _source_line(line) and 'npm publish "$TARBALL"' not in line:
+            errors.append(f"publish.yml: `{line.strip()}` must publish the packed tarball (npm publish \"$TARBALL\" ...)")
+    return errors
+
+
+# The GitHub Actions expression subset a publish step's `if:` may use, evaluated the way Actions does
+# (null, boolean, number, string; `==` on two different types compares them as numbers).
+_COND_TOKEN = re.compile(r"\s*(?:(?P<str>'(?:[^']|'')*')|(?P<num>\d+(?:\.\d+)?)|(?P<op>\|\||&&|==|!=|!|\(|\))|(?P<id>[A-Za-z_][\w.\-]*))")
+
+
+class _Cond:
+    def __init__(self, text: str, context: dict[str, object]) -> None:
+        self.context = context
+        self.tokens: list[tuple[str, str]] = []
+        position = 0
+        text = text.strip()
+        while position < len(text):
+            match = _COND_TOKEN.match(text, position)
+            if not match or match.end() == position:
+                raise ValueError(f"cannot read `{text[position:]}`")
+            kind = match.lastgroup or ""
+            self.tokens.append((kind, match.group(kind)))
+            position = match.end()
+        self.index = 0
+
+    def peek(self) -> tuple[str, str] | None:
+        return self.tokens[self.index] if self.index < len(self.tokens) else None
+
+    def take(self) -> tuple[str, str]:
+        token = self.peek()
+        if token is None:
+            raise ValueError("the condition ends early")
+        self.index += 1
+        return token
+
+    def parse(self) -> object:
+        value = self.or_expr()
+        leftover = self.peek()
+        if leftover is not None:
+            raise ValueError(f"unexpected `{leftover[1]}`")
+        return value
+
+    def or_expr(self) -> object:
+        value = self.and_expr()
+        while self.peek() == ("op", "||"):
+            self.take()
+            right = self.and_expr()
+            value = value if _truthy(value) else right
+        return value
+
+    def and_expr(self) -> object:
+        value = self.eq_expr()
+        while self.peek() == ("op", "&&"):
+            self.take()
+            right = self.eq_expr()
+            value = right if _truthy(value) else value
+        return value
+
+    def eq_expr(self) -> object:
+        value = self.unary()
+        while self.peek() in (("op", "=="), ("op", "!=")):
+            operator = self.take()[1]
+            right = self.unary()
+            equal = _loose_equal(value, right)
+            value = equal if operator == "==" else not equal
+        return value
+
+    def unary(self) -> object:
+        if self.peek() == ("op", "!"):
+            self.take()
+            return not _truthy(self.unary())
+        return self.primary()
+
+    def primary(self) -> object:
+        kind, text = self.take()
+        if (kind, text) == ("op", "("):
+            value = self.or_expr()
+            if self.take() != ("op", ")"):
+                raise ValueError("a `(` is not closed")
+            return value
+        if kind == "str":
+            return text[1:-1].replace("''", "'")
+        if kind == "num":
+            return float(text)
+        if kind == "id":
+            if text in ("true", "false"):
+                return text == "true"
+            if text == "null":
+                return None
+            if text not in self.context:
+                raise ValueError(f"`{text}` is not a context this check knows (github.event_name, inputs.dry_run, github.event.inputs.dry_run)")
+            return self.context[text]
+        raise ValueError(f"unexpected `{text}`")
+
+
+def _truthy(value: object) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        return value != 0 and value == value
+    return value != ""
+
+
+def _number(value: object) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, float):
+        return value
+    text = str(value).strip()
+    if text == "":
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        return float("nan")
+
+
+def _loose_equal(left: object, right: object) -> bool:
+    if type(left) is type(right):
+        if isinstance(left, str) and isinstance(right, str):
+            return left.lower() == right.lower()
+        return left == right
+    return _number(left) == _number(right)
+
+
+DRY_RUN_SCENARIOS = (
+    ("a tag push (no inputs)", {"github.event_name": "push", "inputs.dry_run": None, "github.event.inputs.dry_run": None}, True),
+    ("a manual run with dry_run=true", {"github.event_name": "workflow_dispatch", "inputs.dry_run": True, "github.event.inputs.dry_run": "true"}, False),
+    ("a manual run with dry_run=false", {"github.event_name": "workflow_dispatch", "inputs.dry_run": False, "github.event.inputs.dry_run": "false"}, True),
+)
+
+
+def _step_condition(step: str) -> str | None:
+    match = re.search(r"^ {8}if:[ \t]*(.*?)[ \t]*$", step, re.MULTILINE)
+    if not match:
+        return None
+    value = match.group(1)
+    wrapped = re.fullmatch(r"\$\{\{\s*(.*?)\s*\}\}", value)
+    return wrapped.group(1) if wrapped else value
+
+
+def dry_run_errors(text: str, workflow: str) -> list[str]:
+    """A manual run is a dry run unless told otherwise, and a dry run skips the five `npm publish` steps and nothing else.
+    The condition is read as Actions reads it: it must publish on a tag push (no inputs), skip on dry_run=true and publish on false."""
+    errors: list[str] = []
+    inputs = re.search(r"^      dry_run:\n((?:        .*\n)+)", text, re.MULTILINE)
+    if not inputs or not re.search(r"^        type: boolean$", inputs.group(1), re.MULTILINE) or not re.search(r"^        default: true$", inputs.group(1), re.MULTILINE):
+        errors.append(f"{workflow}: workflow_dispatch needs a boolean input `dry_run` whose default is true")
+    for name in _job_names(text):
+        job = _job_block(text, name)
+        job_if = _field(job, "if")
+        if job_if is not None and "dry_run" in job_if:
+            errors.append(f"{workflow}: job `{name}` has an `if:` on dry_run; only the `npm publish` steps may be skipped by it")
+        publishes = 0
+        for step in _steps(job):
+            title = step.splitlines()[0].strip()
+            condition = _step_condition(step)
+            if "npm publish" in step:
+                publishes += 1
+                if condition is None:
+                    errors.append(f"{workflow}: `{title}` has no `if:` that skips it on a dry run")
+                    continue
+                for label, context, want in DRY_RUN_SCENARIOS:
+                    try:
+                        got = _truthy(_Cond(condition, context).parse())
+                    except ValueError as error:
+                        errors.append(f"{workflow}: `{title}`: the condition `{condition}` cannot be read ({error})")
+                        break
+                    if got != want:
+                        verb = "publish" if want else "skip"
+                        note = " (a tag push has no inputs: it is always a real release)" if want and "tag" in label else ""
+                        errors.append(f"{workflow}: `{title}`: the condition `{condition}` must {verb} for {label}{note}")
+            elif condition is not None and "dry_run" in condition:
+                errors.append(f"{workflow}: `{title}` is not a publish step; an `if:` on dry_run belongs to the `npm publish` steps only")
+        if publishes and name != "publish":
+            errors.append(f"{workflow}: `npm publish` belongs to the `publish` job, found in `{name}`")
+    return errors
+
+
+def preflight_errors(text: str, workflow: str) -> list[str]:
+    """The pre-flight runs in a dry run too; `npm whoami` only while some package is not on npm; a recovery with
+    dry_run fails early; the already-published message names `recovery=true` and `dry_run=false`."""
+    errors: list[str] = []
+    publish = _job_block(text, "publish")
+    step = _step_block(publish, "Pre-flight npm release state (fresh-release gate + recovery + first-publish token)")
+    if not step:
+        return [f"{workflow}: the publish job has no pre-flight step"]
+    if _step_condition(step) is not None:
+        errors.append(f"{workflow}: the pre-flight is read-only and runs in a dry run: it has no `if:`")
+    if "npm view" not in step:
+        errors.append(f"{workflow}: the pre-flight must ask npm (`npm view`) whether each package exists")
+    stack: list[tuple[str, bool]] = []  # (condition, in its then-branch)
+    whoami = 0
+    unguarded = 0
+    for raw in step.splitlines():
+        line = raw.strip()
+        if line.startswith("#"):
+            continue
+        # Every call counts: bare, `if [!] npm whoami`, `$(npm whoami)`, `VAR=$(npm whoami)`, after `;`/`&&`/`||`/`then`.
+        # An `echo "...npm whoami..."` message is text, not a call.
+        if re.search(r"(?:^|[;&|(!`]|\bif|\bthen|\bdo|\belse)\s*npm whoami\b", line):
+            whoami += 1
+            if not any(cond == '[ -n "$ABSENT" ]' and then for cond, then in stack):
+                unguarded += 1
+        if re.match(r"^if .*; then$", line):
+            stack.append((line[3:-6].strip(), True))
+        elif line.startswith("elif ") or line == "else":
+            if stack:
+                stack[-1] = (stack[-1][0], False)
+        elif line == "fi" and stack:
+            stack.pop()
+    if whoami == 0:
+        errors.append(f"{workflow}: the pre-flight must run `npm whoami` while a package is missing from npm (a first publish needs the token)")
+    elif unguarded:
+        errors.append(f"{workflow}: every `npm whoami` in the pre-flight must run only under `if [ -n \"$ABSENT\" ]; then` (a package of the set is not on npm); once all are, trusted publishing needs no token ({unguarded} of {whoami} do not)")
+    if "recovery=true and dry_run=false" not in step:
+        errors.append(f"{workflow}: the already-published message must name `recovery=true and dry_run=false`")
+    read_version = _job_block(text, "read-version")
+    refuse = next((s for s in _steps(read_version) if "DRY_RUN" in s and "RECOVERY" in s), "")
+    if not refuse or "exit 1" not in refuse or '"${RECOVERY:-false}" = "true"' not in refuse or '"${DRY_RUN:-false}" = "true"' not in refuse:
+        errors.append(f"{workflow}: read-version must fail early on recovery=true with dry_run=true (a step reading RECOVERY and DRY_RUN and exiting 1)")
+    return errors
+
+
+def timeout_errors(text: str, workflow: str) -> list[str]:
+    """Every job has `timeout-minutes`, a positive multiple of 5 (three times the longest measured run, rounded up to 5)."""
+    errors: list[str] = []
+    for name in _job_names(text):
+        value = _field(_job_block(text, name), "timeout-minutes")
+        if value is None:
+            errors.append(f"{workflow}: job `{name}` has no `timeout-minutes` (the default holds a runner for 6 hours)")
+        elif not value.isdigit() or int(value) <= 0 or int(value) % 5 or int(value) > 360:
+            errors.append(f"{workflow}: job `{name}` has `timeout-minutes: {value}`; the rule is a positive multiple of 5")
     return errors
 
 
@@ -632,8 +1293,8 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     # 2. Matrix parity on the shared fields.
-    build_rows = matrix_rows(build_text)
-    publish_rows = matrix_rows(publish_text)
+    build_rows = matrix_rows(_job_block(build_text, "build"))
+    publish_rows = matrix_rows(_job_block(publish_text, "build"))
     check(len(build_rows) >= 1, "build-native.yml has no matrix rows")
     check(
         len(build_rows) == len(publish_rows),
@@ -685,32 +1346,10 @@ def main(argv: list[str] | None = None) -> int:
     else:
         ERRORS.append("packages/cli/package.json is missing")
 
-    # 5. Every platform package the publish matrix ships is actually
-    #    `npm publish`ed by a step in publish.yml (no built-but-unpublished
-    #    platform, and no publish of a package not in the matrix).
-    # A publish step is a `working-directory: packages/<dir>` whose step
-    # body (up to the next step / working-directory) contains an `npm
-    # publish` invocation — matches both a bare `run: npm publish` and a
-    # `run: |` multiline block with a guarded/idempotent `npm publish`.
-    published: set[str] = set()
-    pub_lines = publish_text.splitlines()
-    for i, line in enumerate(pub_lines):
-        m = re.match(r"\s*working-directory: packages/([\w./-]+)\s*$", line)
-        if not m:
-            continue
-        pkg_dir = m.group(1)
-        for follow in pub_lines[i + 1:]:
-            if re.match(r"\s*- name:", follow) or re.match(r"\s*working-directory:", follow):
-                break
-            if "npm publish" in follow:
-                published.add(pkg_dir)
-                break
-    expected_dirs = {r.get("package_dir") for r in publish_rows if r.get("package_dir")}
-    expected_dirs.add("cli")  # the wrapper is always published
-    check(
-        published == expected_dirs,
-        f"npm-publish step drift:\n  publishes={sorted(published)}\n  expected ={sorted(expected_dirs)}",
-    )
+    # 5. The platform packages are one set in every place a release names them
+    #    (download, checksum, executable bit, version, pack, pre-flight, the
+    #    publish steps in order, optionalDependencies, bun.lock); see
+    #    `package_set_errors`, run with the other 0.42 rules below.
 
     # 6. Every package.json in the repo carries the Cargo workspace version.
     #    publish.yml rewrites the three PUBLISHED manifests from
@@ -769,6 +1408,41 @@ def main(argv: list[str] | None = None) -> int:
     # 10. Every `npm publish` step splits stable from prerelease: a hyphenated
     #    version publishes `--tag next`, never `latest`.
     ERRORS.extend(prerelease_publish_errors(publish_text, "publish.yml"))
+
+    # 11. 0.42 release portability: the floor each binary declares and the
+    #     checks that keep it (see each function's docstring).
+    other_texts = {name: read(ROOT / ".github/workflows" / name) for name in ("test.yml", "pr-guard.yml")}
+    workflow_texts = {"build-native.yml": build_text, "publish.yml": publish_text, **other_texts}
+    for name, text in workflow_texts.items():
+        ERRORS.extend(timeout_errors(text, name))
+    for name in ("build-native.yml", "publish.yml"):
+        ERRORS.extend(runner_label_errors(workflow_texts[name], name))
+        ERRORS.extend(image_digest_errors(workflow_texts[name], name))
+        ERRORS.extend(macos_target_errors(top_level_env(workflow_texts[name]), name))
+    ERRORS.extend(build_row_errors(build_rows, "build-native.yml"))
+    ERRORS.extend(build_row_errors(publish_rows, "publish.yml"))
+    cargo_toml = read(ROOT / "crates/canon-cli/Cargo.toml")
+    main_rs = read(ROOT / "crates/canon-cli/src/main.rs")
+    binary_checker = read(ROOT / "scripts/check-release-binary.py")
+    for name in ("build-native.yml", "publish.yml"):
+        ERRORS.extend(jemalloc_errors(workflow_texts[name], name, cargo_toml, main_rs))
+    for name in ("build-native.yml", "publish.yml"):
+        ERRORS.extend(alpine_build_errors(workflow_texts[name], name))
+    ERRORS.extend(binary_check_errors(build_text, "build-native.yml", build_rows, binary_checker))
+    ERRORS.extend(binary_check_errors(publish_text, "publish.yml", publish_rows, binary_checker))
+    ERRORS.extend(crt_static_errors(read(ROOT / ".cargo/config.toml"), {"build-native.yml": build_text, "publish.yml": publish_text, **other_texts}))
+    platform_manifests = {
+        directory.name: json.loads((directory / "package.json").read_text(encoding="utf-8"))
+        for directory in sorted((ROOT / "packages").glob("core-*"))
+        if (directory / "package.json").is_file()
+    }
+    ERRORS.extend(launcher_errors(read(ROOT / "packages/cli/src/index.ts"), publish_rows, platform_manifests))
+    launcher_name = json.loads(cli_manifest.read_text(encoding="utf-8")).get("name", "") if cli_manifest.is_file() else ""
+    optional_keys = set(json.loads(cli_manifest.read_text(encoding="utf-8")).get("optionalDependencies", {})) if cli_manifest.is_file() else set()
+    ERRORS.extend(package_set_errors(publish_text, publish_rows, launcher_name, read(ROOT / "bun.lock"), optional_keys))
+    ERRORS.extend(smoke_errors(publish_text, build_text, other_texts))
+    ERRORS.extend(dry_run_errors(publish_text, "publish.yml"))
+    ERRORS.extend(preflight_errors(publish_text, "publish.yml"))
 
     # 7. Repo-root hygiene. An agent-authored patch fragment landed at the
     #    repo root in s43 round 7 and was committed by a `git add -A`: a file

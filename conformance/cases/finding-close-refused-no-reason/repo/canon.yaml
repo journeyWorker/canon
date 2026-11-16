@@ -4,3 +4,4 @@ tiers:
     root: .canon/ledger
 routing:
   finding: local
+  change_state: local

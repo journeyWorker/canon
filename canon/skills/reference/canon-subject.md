@@ -435,6 +435,46 @@ for a change whose brief carries an `Approved:` line, and while a scenario
 the subject owns carries a `@flow:<change>.*` tag (it would fall back to an
 older approval; remove or retag those scenarios first, the hint names them);
 an unlinked pair is a no-op.
+The refusal for an approved brief (`APPROVED_BRIEF`) is not a dead end: its
+hint names `canon change defer` and `canon change drop`, the human's way to take
+an approved change out of the work (next section).
+
+### Closing a change: `canon change defer`, `canon change drop`, `canon change reopen`
+
+Three leaves are the human's, with `brief approve`, `policy approve` and
+`divergence accept`: the human-only leaves are six, and each refuses every
+agent role (`ACTOR_DENIED`) unless it records the answer the human gave you
+(`--relayed-via`). When the human says a change is not wanted or not in this
+release, ask with the harness question tool, count only an explicit answer, then
+record it:
+
+```text
+canon change defer <change> --reason "<their words>" --ref <link or date> --approver <their name> --relayed-via <the question tool> --actor <your actor id>
+```
+
+`canon change drop <change>` takes the same options (`canon skills show
+role-planner` has the steps). **Defer** is for "not this release": `canon
+change reopen <change>` brings it back, and the reopened change needs a new
+`brief approve` (the earlier `Approved:` line no longer counts). **Drop** is the
+end: a dropped change cannot be reopened (`CHANGE_CONFLICT`, reason `DROPPED`).
+A shipped change cannot be closed (reason `SHIPPED`), a closed one cannot be
+closed again (`CLOSED`) and a change that is not deferred cannot be reopened
+(`NOT_DEFERRED`). The change's evidence, reviews and findings stay as they are
+(`CHANGE_RECORDS_KEPT`). `brief approve` and `scenario new --flow <F-id> --change
+<change>` on a closed change are refused (reason `CLOSED`).
+
+A closed change drops out of the requirements: the subject no longer answers
+for it and the scenarios only closed changes made are not asked for. A repo
+whose `canon.yaml` has no `change_state` line under `routing:` refuses the
+three leaves with `CONFIG_INVALID`; `canon migrate` adds the line.
+
+- `canon status --json`: `data.subjects[].setAsideChanges` (each `change`,
+  `state`, `reason`, `refs`, `approver`, `at`) and `setAsideScenarios` (each
+  `scenario`, `project`, `changes`), both omitted when empty.
+- `canon gate check`: the advisory `closed_change`, one line per closed change
+  and per set-aside scenario; it never fails the gate.
+- `canon query --kind change_state --change <change>` reads the current state;
+  `--history` adds the records before a reopen.
 
 ### Starting a new change: `canon change new`
 
@@ -811,6 +851,12 @@ only the pending drafts, and `flow` lists each flow step of every tagged
 change as `{ "id", "change", "scenarios": [{ id, title, failure, evidenced,
 review }], "gaps" }`.
 
+`setAsideChanges` and `setAsideScenarios` (0.42) are present only for a subject
+that has them: the changes a human closed with `canon change defer` or `canon
+change drop` that the subject adopted (`change`, `state` `deferred` or
+`dropped`, `reason`, `refs`, `approver`, `at`), and the scenarios only closed
+changes made (`scenario`, `project`, `changes`). No check asks for either.
+
 Each `meta.next` entry's `x-canon.actor` is `agent` or `human` (a step only the
 human takes; its `reason` says what to get from them).
 
@@ -822,6 +868,7 @@ in 0.16, when `next[].command` stopped always being a command line
 0.17, when `brief.proposal` was removed: the canon `brief.md` is
 `brief.brief`, with `briefExists` and `source`. It is `4` since 0.31, when the
 `brief` object became the `briefs` list.
+The two set-aside fields are additions: `statusVersion` stays `4`.
 
 `subject new`, `adopt`, `unadopt` and `move` write their records directly; the
 human-readable success line ends `— written directly; nothing to

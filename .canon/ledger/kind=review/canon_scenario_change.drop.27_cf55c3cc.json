@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T11:36:16.674882257Z",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "kind": "review",
+  "pin": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical",
+          "junit:change_drop_27_a_routing_section_that_cannot_take_a_line_is_refused_and_blocks_the_other_steps",
+          "junit:change_drop_27_a_stale_digest_is_plan_stale_and_the_file_is_untouched",
+          "junit:migrate_names::tests::change_drop_27_forms_that_cannot_take_a_line_are_refused_naming_the_line_to_add"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "24e27327906fc69360c82ea51f5060ae277b2ddbd73c89641d7ff8a51d8ef3b3",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-42-change-drop/brief.md"
+  },
+  "review_id": "01M7J29GH2G1Y507F3YRXH8TJT",
+  "reviewer": "rev-0-42-drop",
+  "reviewer_harness": "omp",
+  "scenario_id": "change.drop.27",
+  "schema": 2,
+  "worktree_dirty": false
+}

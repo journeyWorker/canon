@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T11:35:19.715967009Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/change_state.rs:675-707",
+  "introduced_by": "0f4e776025d1ae7ad151075fe40d42f56a8e694d",
+  "kind": "finding",
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-drop",
+  "round": 1,
+  "scenario_ids": [
+    "change.drop.07"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "P2 (spec fidelity): change.drop.07's Then 'the report says the dropped change is not brought back, only a new change is' is neither implemented nor tested. `canon change drop` prints only 'recorded change `add-login` as dropped ...', the subjects line and meta.next (status, gate check); --json data has no such line. change_drop_07 asserts only state == dropped and never drops an approved change (the Given names approved, deferred and draft). Fix: in say() add a drop line ('a dropped change is not brought back: write a new change with `canon change new` naming it in `Source:`') and assert it plus an approved-change drop in change_drop_07.",
+  "worktree_dirty": false
+}

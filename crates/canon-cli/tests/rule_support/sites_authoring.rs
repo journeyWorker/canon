@@ -11,6 +11,11 @@ pub const SITES: &[Site] = &[
     site("brief_approve.rs:verify_shown:USAGE#1", Kind::Precondition("a relayed approval of the repo's only live change (no operand names it) needs the digest the human was shown: the change is read from the repo first")),
     // change new
     site("change.rs:run_new:CHANGE_ARGUMENT_INVALID#1", Kind::Unreachable("the staged brief is canon's own template and no --title (blank, several lines, a markdown heading, a colon, a tab) was found to make the plan adapter reject it; what is left is a failure of the staging directory, not an argument")),
+    // change defer / drop / reopen: the human's own words are checked again by the leaf for a call that reaches it another way
+    site("change_state.rs:check_call:APPROVAL_INVALID#1", Kind::Domain { command: "change defer", argument: "approver" }),
+    site("change_state.rs:check_call:CHANGE_ARGUMENT_INVALID#1", Kind::Domain { command: "change defer", argument: "reason" }),
+    site("change_state.rs:check_call:CHANGE_ARGUMENT_INVALID#2", Kind::Unreachable("clap's `required` --ref answers first for `change defer` and `change drop`; `change reopen` takes none")),
+    site("change_state.rs:check_call:CHANGE_ARGUMENT_INVALID#3", Kind::Domain { command: "change defer", argument: "ref" }),
     // context packs
     site("context_pack.rs:pack_id_usage_error:USAGE#1", Kind::Domain { command: "context-pack show", argument: "pack" }),
     // task done

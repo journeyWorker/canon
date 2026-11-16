@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-0-42",
+    "role": "implementer",
+    "session_id": "s-0-42-impl"
+  },
+  "at": "2026-11-16T12:55:00.166327227Z",
+  "attachments": [
+    {
+      "case": "a_known_role_and_a_policy_named_role_do_not_warn",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "a_misspelt_role_runs_and_warns_with_the_closest_known_role",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "an_unknown_role_with_nothing_close_still_runs_and_warns_without_a_suggestion",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    }
+  ],
+  "code_tree": "7368ebf477da839ae134cccfc86b83aece897005",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "the scenario cases re-bound to the workspace nextest run (4162 passed, 2 skipped) from the clean tree at dc26292cd; they carry no scenario id in their names, so bound by --report-case, the same cases as the record before"
+  },
+  "evidence_sha": "dc26292cd2dab9113966d0b992ead0fdd2922484",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1732,
+  "scenario_id": "context.capability.43",
+  "schema": 1,
+  "staging_id": "1b5a3148",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

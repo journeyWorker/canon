@@ -1,4 +1,4 @@
 canon migrate: plan:
   left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
   left: .git stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
-planDigest sha256:a31b023ae3cbc92b5617c8454c19c2318c6226901ba0be43dfd4ab78b8a40428; nothing written. To act: canon migrate --commit --plan-digest=sha256:a31b023ae3cbc92b5617c8454c19c2318c6226901ba0be43dfd4ab78b8a40428
+planDigest sha256:5216486e573842d09a7674cd1b4dce4d5369a9455ecac2124d150ff9e5050e2d; nothing written. To act: canon migrate --commit --plan-digest=sha256:5216486e573842d09a7674cd1b4dce4d5369a9455ecac2124d150ff9e5050e2d

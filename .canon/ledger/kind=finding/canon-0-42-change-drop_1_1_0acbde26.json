@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T13:03:12.566294892Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/change_state.rs:334-379",
+  "introduced_by": "0f4e776025d1ae7ad151075fe40d42f56a8e694d",
+  "kind": "finding",
+  "resolution_code_tree": "20ab3236614d25c49bb01c96a25b84d972924acb",
+  "resolution_sha": "195b57b0ef34762bf2009f819378aeb277c5ac89",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-drop",
+  "round": 1,
+  "scenario_ids": [
+    "change.drop.06",
+    "change.drop.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "P1 (standards, probe): a change that was deferred when its subject shipped is refused later as SHIPPED, so a human cannot drop it. ship_moves/shipped count every version that moved to shipped with the change on change_ids, but a deferred change stays on that list (closed changes are read as absent only by the gate folds). Real binary, 24b8194a6: approved chore red -> change defer -> subject move --to shipped (ok, shipped without the chore) -> change drop bump-client = CHANGE_CONFLICT SHIPPED 'already shipped ... with it on its change list, after its brief was approved'; same after a reopen + defer. This blocks F2 (drop a deferred change) for any subject that ships while the change waits, which is the F7 first use (gate-trust-spine reopened and shipped again with canon-0-41-ci-nextest deferred). Fix: in ship_moves skip a version written while the change's latest change_state before version.at is deferred/dropped; add the defer -> ship -> drop case to change_drop_06. Blast radius: reopen is not gated by shipped, so a reopened change can no longer be deferred again either.",
+  "worktree_dirty": false
+}

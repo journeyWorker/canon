@@ -1,16 +1,27 @@
 name: Build Native (Test Only)
 
 # Adapted from the vendored upstream release pipeline's build workflow (design
-# D3): S0's acceptance bar (macOS arm64 + Linux x64 gnu) plus Windows x64
-# msvc, the same three rows the sibling `lute` monorepo ships. Every
-# matrix row builds on a host that natively matches the target triple
-# (macos-15 runners are Apple Silicon; ubuntu-latest and windows-latest
-# runners are x86_64), so no cross-compilation toolchain (zig /
-# cargo-zigbuild) is needed for any row — that machinery only becomes
-# necessary once a target is added whose triple doesn't match any
-# available runner's native arch. The Windows row needs CMake + NASM
-# (aws-lc-sys / ring build scripts); both ship on the windows-latest
-# image. `binary_ext` is the only per-row difference the steps see.
+# D3), and the same four rows publish.yml releases: macOS arm64 (deployment
+# target 15.0), Linux x64 and arm64 as static musl binaries (jemalloc is
+# their allocator; glibc is not a floor), Windows x64 msvc with a static C
+# runtime. Every row builds on a host that natively matches the target (the
+# runners are pinned images, never `-latest`: macos-26, ubuntu-26.04,
+# ubuntu-26.04-arm, windows-2025), so no cross-compilation toolchain (zig /
+# cargo-zigbuild) is needed for any row.
+# The x86_64 musl row links on the host with `musl-tools`
+# (.github/actions/setup-rust); the aarch64 musl row builds inside a
+# digest-pinned `rust:alpine` image (`alpine_image`, native arm64 on the arm
+# runner): Ubuntu's musl-gcc wrapper cannot compile jemalloc's atomics there
+# (tikv-jemalloc-sys: `atomic_memory_order_relaxed undeclared`), Alpine's
+# gcc on musl can. The host job keeps the JS actions (checkout, cache,
+# upload) and mounts the workspace into the container. The Windows row needs
+# CMake + NASM (aws-lc-sys / ring build scripts); both ship on the
+# windows-2025 image. `binary_ext` is the only per-row difference the steps
+# see besides `lg_page` and `alpine_image`, both on the aarch64 musl row
+# alone: it builds jemalloc for 64K pages. Each row reads its binary
+# with scripts/check-release-binary.py (static, jemalloc, minos 15.0, no VC
+# runtime DLL), and the smokes that run those binaries in containers belong to
+# publish.yml only.
 
 on:
   workflow_dispatch:
@@ -18,6 +29,7 @@ on:
     paths:
       - "crates/**"
       - "packages/dashboard/**"
+      - ".cargo/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -28,16 +40,24 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # The macOS binary's floor: its `minos` is exactly this (scripts/check-release-binary.py fails any other).
+  MACOSX_DEPLOYMENT_TARGET: "15.0"
 
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run before it (`workflow_dispatch` runs are their own group, the commit is in the name).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   safety:
     name: Release workflow safety check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Cross-workflow drift guard (the upstream release pipeline's lesson,
       # recommended action #1): fails the moment this workflow's build
       # matrix / env drifts from publish.yml's, or from the platform
@@ -52,12 +72,13 @@ jobs:
   dashboard:
     name: Build dashboard app
     needs: safety
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
 
@@ -68,7 +89,7 @@ jobs:
         run: bun run --cwd packages/dashboard build
 
       - name: Upload dashboard app
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dashboard-app
           path: packages/dashboard/dist
@@ -81,15 +102,16 @@ jobs:
   man:
     name: Generate man pages
     needs: safety
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
         uses: ./.github/actions/setup-rust
 
       - name: Cache cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
@@ -102,7 +124,7 @@ jobs:
         run: cargo run --locked --release -p canon-cli --features man --example canon-man -- man-pages
 
       - name: Upload man pages
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: man-pages
           path: man-pages
@@ -112,33 +134,41 @@ jobs:
     name: Build - ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
     needs: [safety, dashboard]
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-15
+          - host: macos-26
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             binary_ext: ""
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+          - host: ubuntu-26.04
+            target: x86_64-unknown-linux-musl
             package_dir: core-linux-x64
             binary_ext: ""
-          - host: windows-latest
+          - host: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-musl
+            package_dir: core-linux-arm64
+            binary_ext: ""
+            lg_page: "16"
+            alpine_image: rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383
+          - host: windows-2025
             target: x86_64-pc-windows-msvc
             package_dir: core-win32-x64
             binary_ext: ".exe"
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
+        if: matrix.settings.alpine_image == ''
         uses: ./.github/actions/setup-rust
         with:
           target: ${{ matrix.settings.target }}
 
       - name: Cache cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
@@ -148,19 +178,62 @@ jobs:
           key: canon-cli-${{ matrix.settings.target }}-cargo-${{ hashFiles('Cargo.lock') }}
 
       - name: Download dashboard app
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dashboard-app
           path: dashboard-app
 
       - name: Build canon-cli binary
+        shell: bash
         env:
           CANON_DASHBOARD_DIST: ${{ github.workspace }}/dashboard-app
-        run: cargo build --locked --release -p canon-cli --target ${{ matrix.settings.target }}
+          JEMALLOC_SYS_WITH_LG_PAGE: ${{ matrix.settings.lg_page }}
+          ALPINE_IMAGE: ${{ matrix.settings.alpine_image }}
+          TARGET: ${{ matrix.settings.target }}
+        run: |
+          set -euo pipefail
+          # Only the aarch64 musl row has a page size: an empty variable is no variable.
+          [ -n "$JEMALLOC_SYS_WITH_LG_PAGE" ] || unset JEMALLOC_SYS_WITH_LG_PAGE
+          if [ -z "$ALPINE_IMAGE" ]; then
+            cargo build --locked --release -p canon-cli --target "$TARGET"
+          else
+            # The workspace and the cargo caches are mounted at the paths the host
+            # steps see; the container runs as root and hands the files back.
+            mkdir -p "$HOME/.cargo/registry" "$HOME/.cargo/git"
+            docker run --rm -i \
+              -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
+              -v "$HOME/.cargo/registry:/usr/local/cargo/registry" \
+              -v "$HOME/.cargo/git:/usr/local/cargo/git" \
+              -e CANON_DASHBOARD_DIST -e JEMALLOC_SYS_WITH_LG_PAGE -e CARGO_TERM_COLOR -e CARGO_INCREMENTAL \
+              -e TARGET -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+              "$ALPINE_IMAGE" sh -s <<'ALPINE_BUILD'
+          set -eu
+          trap 'chown -R "$HOST_UID:$HOST_GID" target /usr/local/cargo/registry /usr/local/cargo/git' EXIT
+          apk add --no-cache make
+          want=$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' rust-toolchain.toml)
+          rustc --version
+          got=$(rustc --version | cut -d' ' -f2)
+          if [ -z "$want" ] || [ "$got" != "$want" ]; then
+            echo "::error::rustc is '$got', rust-toolchain.toml pins '$want'" >&2
+            exit 1
+          fi
+          cargo build --locked --release -p canon-cli --target "$TARGET"
+          ALPINE_BUILD
+          fi
 
       - name: Strip binary
         if: matrix.settings.binary_ext == ''
         run: strip "target/${{ matrix.settings.target }}/release/canon"
+
+      # The floor this row promises, read from the binary it just built (the
+      # evidence that the pins took: static + jemalloc + 64K pages, minos 15.0,
+      # no VC runtime DLL). The log of this step is the proof for a PR.
+      - name: Check the binary keeps the floor of its platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          PY=$(command -v python3 || command -v python)
+          "$PY" scripts/check-release-binary.py --target "${{ matrix.settings.target }}" "target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}"
 
       - name: Stage into platform package (local verification only — not committed)
         shell: bash
@@ -182,7 +255,7 @@ jobs:
           "packages/${{ matrix.settings.package_dir }}/bin/$BIN" --version
 
       - name: Upload artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: canon-binary-${{ matrix.settings.target }}
           path: |

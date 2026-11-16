@@ -79,28 +79,37 @@ pub(crate) fn latest_of<K: Ord>(stamps: &[Option<Stamp>], candidates: impl IntoI
 /// The latest generation of every scenario, and how to find one.
 #[derive(Debug)]
 pub(crate) struct ScenarioFold {
-    /// Positions in `ctx.scenarios`, ordered by `(project_id, scenario_id)`.
+    /// Positions in `ctx.scenarios` of the scenarios still required, ordered by `(project_id, scenario_id)`:
+    /// the latest generation of each, without the ones a closed change set aside (0.42).
     pub(crate) latest: Vec<usize>,
-    /// The same positions grouped by the subject the latest generation names,
+    /// Every latest generation, set aside or not.
+    pub(crate) all: Vec<usize>,
+    /// The required positions grouped by the subject the latest generation names,
     /// each group in `latest` order.
     pub(crate) by_subject: HashMap<SubjectId, Vec<usize>>,
+    /// Every latest generation by key, set aside or not.
     pub(crate) by_key: HashMap<(ProjectId, ScenarioId), usize>,
 }
 
 impl ScenarioFold {
     fn build(ctx: &GateContext) -> Self {
         let stamps = stamps_of(&ctx.scenarios);
-        let latest = latest_of(&stamps, 0..ctx.scenarios.len(), |i| (ctx.scenarios[i].project_id.clone(), ctx.scenarios[i].scenario_id.clone()));
+        let all = latest_of(&stamps, 0..ctx.scenarios.len(), |i| (ctx.scenarios[i].project_id.clone(), ctx.scenarios[i].scenario_id.clone()));
+        let mut latest = Vec::with_capacity(all.len());
         let mut by_subject: HashMap<SubjectId, Vec<usize>> = HashMap::new();
-        let mut by_key = HashMap::with_capacity(latest.len());
-        for &i in &latest {
+        let mut by_key = HashMap::with_capacity(all.len());
+        for &i in &all {
             let scenario = &ctx.scenarios[i];
+            by_key.insert((scenario.project_id.clone(), scenario.scenario_id.clone()), i);
+            if ctx.set_aside.is_set_aside(&scenario.project_id, &scenario.scenario_id) {
+                continue;
+            }
+            latest.push(i);
             if let Some(subject_id) = &scenario.subject_id {
                 by_subject.entry(subject_id.clone()).or_default().push(i);
             }
-            by_key.insert((scenario.project_id.clone(), scenario.scenario_id.clone()), i);
         }
-        Self { latest, by_subject, by_key }
+        Self { latest, all, by_subject, by_key }
     }
 }
 

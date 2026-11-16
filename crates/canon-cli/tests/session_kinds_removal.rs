@@ -503,7 +503,7 @@ fn tier_retired_08_purge_of_another_kind_is_refused_and_deletes_nothing() {
 fn tier_retired_09_the_readers_refuse_the_retired_kind_names() {
     let repo = Repo::init();
     let twelve = kinds();
-    assert_eq!(twelve.len(), 12);
+    assert_eq!(twelve.len(), 13, "the thirteen kinds that remain");
     assert!(!twelve.iter().any(|kind| kind == "session" || kind == "event"));
     for (args, name) in [
         (&["query", "--kind", "session"][..], "session"),
@@ -593,7 +593,7 @@ fn tier_retired_16_init_routes_the_twelve_kinds_and_no_retired_one() {
     }
     assert!(!text.contains("session/run/event"), "the header still names the retired kinds:\n{text}");
     let routes = routing(&text);
-    assert_eq!(routes.keys().cloned().collect::<BTreeSet<_>>(), kinds().into_iter().collect::<BTreeSet<_>>(), "every kind is routed, and only the twelve");
+    assert_eq!(routes.keys().cloned().collect::<BTreeSet<_>>(), kinds().into_iter().collect::<BTreeSet<_>>(), "every kind is routed, and only the thirteen");
     let hot: BTreeSet<&str> = routes.iter().filter(|(_, rung)| *rung == "hot").map(|(kind, _)| kind.as_str()).collect();
     assert_eq!(hot, BTreeSet::from(["task", "handoff", "run"]), "{routes:?}");
     assert!(routes.iter().filter(|(kind, _)| !hot.contains(kind.as_str())).all(|(_, rung)| rung == "local"), "{routes:?}");
@@ -625,7 +625,7 @@ fn tier_retired_11_context_and_the_schema_files_have_twelve_kinds_and_no_retired
     assert!(out.status.success(), "{doc}");
     let listed: BTreeSet<String> = doc["data"]["kinds"].as_object().unwrap().keys().cloned().collect();
     assert_eq!(listed, kinds().into_iter().collect::<BTreeSet<_>>(), "{doc}");
-    assert_eq!(listed.len(), 12);
+    assert_eq!(listed.len(), 13);
     assert!(!listed.contains("session") && !listed.contains("event"), "{listed:?}");
     let schemas = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../canon-model/schemas");
     for retired in ["session", "event"] {

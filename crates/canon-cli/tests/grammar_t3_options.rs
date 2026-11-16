@@ -46,8 +46,9 @@ const SHORTS: &[(char, Option<&str>)] = &[('h', None), ('V', None), ('o', Some("
 
 /// An option that is repeatable on one leaf and single on another, by the per-leaf table's own rows:
 /// `finding add --scenario <SCENARIO_ID>...` names every scenario a finding is about, `evidence add` takes one;
-/// `search --kind <KIND>...` keeps hits of several kinds, `query` reads one.
-const REPEATABLE_DIFFERS: &[&str] = &["scenario", "kind"];
+/// `search --kind <KIND>...` keeps hits of several kinds, `query` reads one. `--ref` (0.42): `change defer|drop|reopen` take one `--ref` per
+/// piece of evidence for the decision, `evidence add` and `evidence audit` one reference.
+const REPEATABLE_DIFFERS: &[&str] = &["scenario", "kind", "ref"];
 
 fn all_options() -> Vec<(String, &'static Value)> {
     let mut out = Vec::new();

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-ship",
+    "role": "reviewer",
+    "session_id": "s-0-42-ship-rev"
+  },
+  "at": "2026-11-16T11:39:58.436784162Z",
+  "change_id": "canon-0-42-release-portability",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": "scripts/release-smoke.sh:108",
+  "introduced_by": "7c25b54fe339146bdddbeb8dedddafe02817fd63",
+  "kind": "finding",
+  "resolution_code_tree": "74b412c71f78b6ffc0ca1d52bc6b1bf3527071dd",
+  "resolution_sha": "4d987de81f8272835a28441e75d791afb48f7692",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-ship",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "(spec fidelity pass) The brief's smoke check reads the glibc of the glibc image (2.36) from the log; the smoke prints only the image digest and /etc/os-release PRETTY_NAME, never the libc version. Fix: in setup.sh print `ldd --version 2>&1 | head -n 1` (or `getconf GNU_LIBC_VERSION`) when the image is not alpine.",
+  "worktree_dirty": false
+}

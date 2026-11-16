@@ -121,10 +121,10 @@ Feature: skills install
   @subject:skills-install
   @case:failure
   @skills.install.21
-  Scenario: Only three acts stop for a human and every other leaf stays open to the roles that call it
+  Scenario: Only six acts stop for a human and every other leaf stays open to the roles that call it
     Given canon's command listing
     When the leaves that name no agent role are collected
-    Then they are exactly brief approve, policy approve and divergence accept
+    Then they are exactly brief approve, policy approve, divergence accept, change drop, change defer and change reopen
     And every other leaf names at least one agent role, so no second human stop exists
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}

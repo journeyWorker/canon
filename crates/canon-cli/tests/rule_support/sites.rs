@@ -164,14 +164,14 @@ pub fn problems(found: &[(String, usize)], classified: &[Site], docs: &[&Value])
         match site.kind {
             Kind::Rule { command, rule, arguments } => {
                 let declared = doc(command).is_some_and(|doc| {
-                    super::constraints(doc).iter().any(|constraint| constraint.rule.as_str() == rule && arguments.iter().all(|argument| atip::constraint::members(constraint).iter().any(|member| member == argument)))
+                    super::search::constraints(doc).iter().any(|constraint| constraint.rule.as_str() == rule && arguments.iter().all(|argument| atip::constraint::members(constraint).iter().any(|member| member == argument)))
                 });
                 if !declared {
                     problems.push(format!("{}: `{command}` declares no `{rule}` rule over {arguments:?}", site.key));
                 }
             }
             Kind::Domain { command, argument } => {
-                if !doc(command).is_some_and(|doc| super::argument(doc, argument).is_some_and(|argument| argument.get("domain").is_some())) {
+                if !doc(command).is_some_and(|doc| super::search::argument(doc, argument).is_some_and(|argument| argument.get("domain").is_some())) {
                     problems.push(format!("{}: `{command}` declares no domain for `{argument}`", site.key));
                 }
             }

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T11:35:22.511778183Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/arg_rules/values.rs:65",
+  "introduced_by": "2890ca575196b03186d73ec70f1988d96b2c62bd",
+  "kind": "finding",
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-drop",
+  "round": 1,
+  "scenario_ids": [
+    "change.drop.04"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "P3 (deviation judged): `--ref` of the three leaves declares the domain NOT_BLANK (shared with evidence add --ref for atip.optionvalues.12), so the schema admits a multi-line value that check_call refuses (`--ref $'a\\nb'` = CHANGE_ARGUMENT_INVALID '--ref must be one non-empty line'). Accepted as a deviation: refusal is safe and the code matches; the schema under-declares the brief's 'one non-empty line'. Fix someday by narrowing both --ref domains to LINE_TEXT or naming the one-line rule in the option help.",
+  "worktree_dirty": false
+}

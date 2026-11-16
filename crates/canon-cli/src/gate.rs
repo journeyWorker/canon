@@ -238,6 +238,11 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
         };
         advisories.push(advisory("evidence_binding", format!("experimental evidence binding, requires {}", summary.required.as_str()), gaps));
     }
+    let closed_lines = crate::set_aside::lines(&gate_context);
+    if !closed_lines.is_empty() {
+        crate::say_raw!(json, "\nadvisory: {} closed change line(s) — not failing the gate:\n{}\n", closed_lines.len(), closed_lines.iter().map(|l| format!("  {l}")).collect::<Vec<_>>().join("\n"));
+        advisories.push(advisory("closed_change", format!("{} closed change line(s) — not failing the gate", closed_lines.len()), closed_lines));
+    }
     if let Some(review) = canon_gate::review_advisories(&gate_context) {
         crate::say_raw!(json, "{}", format_review_advisories(&review));
         if !review.is_empty() {

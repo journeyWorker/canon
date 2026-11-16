@@ -195,15 +195,15 @@ fn skills_install_07_an_unknown_provider_is_refused_before_anything_is_written()
     assert!(!repo.join(".canon/skills").exists());
 }
 
-/// skills.install.21: the leaves open to no agent role are exactly the three human-only acts.
+/// skills.install.21: the leaves open to no agent role are exactly the six human-only acts.
 #[test]
-fn skills_install_21_only_the_three_human_acts_name_no_agent_role() {
+fn skills_install_21_only_the_six_human_acts_name_no_agent_role() {
     let dir = repo();
     let listing = json(&ok(dir.path(), &["schema", "--json"]));
     let commands = listing["data"]["commands"].as_array().unwrap();
     assert!(commands.len() > 50, "the listing is the whole tree: {}", commands.len());
     let closed: Vec<&str> = commands.iter().filter(|c| c["x-canon"]["roles"].as_array().is_some_and(Vec::is_empty)).map(|c| c["command"].as_str().unwrap()).collect();
-    assert_eq!(closed, ["brief approve", "divergence accept", "policy approve"], "every other leaf names an agent role");
+    assert_eq!(closed, ["brief approve", "change defer", "change drop", "change reopen", "divergence accept", "policy approve"], "every other leaf names an agent role");
 }
 
 /// skills.install.22: the write commands do their own bookkeeping: no format, import, index or

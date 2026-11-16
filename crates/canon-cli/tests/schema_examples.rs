@@ -21,6 +21,7 @@ const NEEDS_STATE: &[(&str, &str)] = &[
     ("artifacts move", "a canon.yaml with an s3 tier named cold: the scratch repo has none, so the target is refused"),
     ("brief approve", "a brief with no blockers (the scaffolded one is a template to fill in)"),
     ("brief check", "a finished brief: the scaffolded one has blocker findings, which exit 2 by contract"),
+    ("change reopen", "a deferred change: the scratch repo's add-login was never closed, so the reopen is refused (CHANGE_CONFLICT, NOT_DEFERRED)"),
     ("context-pack add", "a context manifest file"),
     ("context-pack show", "a context pack made by `context-pack add`"),
     ("context-pack verify", "a context pack made by `context-pack add`"),

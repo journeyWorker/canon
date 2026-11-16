@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-atip",
+    "role": "reviewer",
+    "session_id": "Rev42_atip"
+  },
+  "at": "2026-11-16T13:04:02.256271965Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=atip/optionvalues.feature:31-35,53-57; crates/canon-cli/tests/atip_optionvalues.rs:306,334,352-393",
+  "introduced_by": "0f4e776025d1ae7ad151075fe40d42f56a8e694d",
+  "kind": "finding",
+  "resolution_code_tree": "da0f698480a31a072a930b1c4b2d1205f6fd1dad",
+  "resolution_sha": "c78a6b6324f579108a3feb2e7ce921c46405492d",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.optionvalues.03",
+    "atip.optionvalues.05"
+  ],
+  "schema": 2,
+  "seq": 43,
+  "severity": "should_fix",
+  "summary": "P2 (spec fidelity; the gate does not catch it): change-drop changed the bound tests of atip.optionvalues.03 and .05 but not their text. The .03 test asserts 55 declarations of the six options (43 before), and its Then still says 'the 43 declarations'. The .05 relayed-via check now runs seven commands (brief approve, policy approve, divergence accept, migrate, change defer, change drop, change reopen). Its title and Then still say 'the four commands that take --relayed-via', and so do the test name and its assert message. Both reviews stay current because neither the scenario digest nor a bound check name changed, so gate check asks for no re-review. Fix: make the .03 Then say 55; make .05 say seven and add the three change leaves to its Given; rename the test and its message to match (this stales their reviews, which is intended).",
+  "worktree_dirty": false
+}

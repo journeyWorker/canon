@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-0-42",
+    "role": "implementer",
+    "session_id": "s-0-42-impl"
+  },
+  "at": "2026-11-16T12:48:55.923933641Z",
+  "attachments": [
+    {
+      "case": "read_cause::tests::atip_reasons_05_a_canon_yaml_that_cannot_be_used_is_config_invalid_with_its_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "atip_reasons_05_a_wrong_specs_section_a_wrong_policy_and_a_wrong_canon_yaml_are_config_invalid_with_three_reasons",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    }
+  ],
+  "code_tree": "7368ebf477da839ae134cccfc86b83aece897005",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (4162 passed, 2 skipped) from the clean tree at dc26292cd, --rev dc26292cd"
+  },
+  "evidence_sha": "dc26292cd2dab9113966d0b992ead0fdd2922484",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 257,
+  "scenario_id": "atip.reasons.05",
+  "schema": 1,
+  "staging_id": "4ff673cc",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

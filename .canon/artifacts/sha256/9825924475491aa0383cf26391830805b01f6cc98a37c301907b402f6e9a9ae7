@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="37" skipped="0" failures="3" errors="0" uuid="43a1dbfe-8c8b-4f52-919c-8ba53ea9782e" timestamp="2026-11-16T11:49:27.847+00:00" time="13.797">
+    <testsuite name="canon-cli::change_state" tests="13" skipped="0" errors="0" failures="2">
+        <testcase name="change_drop_05_an_unknown_change_and_a_different_repeat_on_a_closed_change_are_refused" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="1.718"/>
+        <testcase name="change_drop_02_a_relayed_defer_records_the_relay_and_a_repeat_is_unchanged" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="1.852"/>
+        <testcase name="change_drop_07_a_human_drops_an_approved_change_a_deferred_change_and_a_draft" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="1.869">
+            <failure message="thread &apos;change_drop_07_a_human_drops_an_approved_change_a_deferred_change_and_a_draft&apos; (2109017) panicked at crates/canon-cli/tests/change_state.rs:429:5" type="test failure with exit code 101">thread &apos;change_drop_07_a_human_drops_an_approved_change_a_deferred_change_and_a_draft&apos; (2109017) panicked at crates/canon-cli/tests/change_state.rs:429:5:
+the report says it: canon change drop: recorded change `add-login` as dropped (decided by Ana: not building it) — written directly; nothing to promote
+  subjects it is on (no longer requires it): `demo`
+next: canon status — see where the repo stands now that change `add-login` is dropped: it is no longer a requirement (+1 more)
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test change_drop_07_a_human_drops_an_approved_change_a_deferred_change_and_a_draft ... FAILED
+
+failures:
+
+failures:
+    change_drop_07_a_human_drops_an_approved_change_a_deferred_change_and_a_draft
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 1.84s
+
+</system-out>
+            <system-err>
+thread &apos;change_drop_07_a_human_drops_an_approved_change_a_deferred_change_and_a_draft&apos; (2109017) panicked at crates/canon-cli/tests/change_state.rs:429:5:
+the report says it: canon change drop: recorded change `add-login` as dropped (decided by Ana: not building it) — written directly; nothing to promote
+  subjects it is on (no longer requires it): `demo`
+next: canon status — see where the repo stands now that change `add-login` is dropped: it is no longer a requirement (+1 more)
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="change_drop_04_an_agent_without_the_humans_answer_and_bad_relays_and_arguments_are_refused" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="2.052"/>
+        <testcase name="change_drop_08_a_dropped_change_takes_no_other_state_and_a_dry_run_writes_nothing" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="2.425"/>
+        <testcase name="change_drop_01_a_human_defers_an_approved_change_and_the_decision_is_recorded" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="3.425"/>
+        <testcase name="change_drop_20_unadopt_keeps_refusing_and_its_hint_names_change_defer_and_change_drop" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="3.553"/>
+        <testcase name="change_drop_29_input_dry_run_held_lock_and_repeat" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:29.570+00:00" time="2.922"/>
+        <testcase name="change_drop_21_writes_for_a_closed_change_are_refused" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="5.095"/>
+        <testcase name="change_drop_19_only_a_deferred_change_reopens_and_only_with_the_humans_answer" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="5.554"/>
+        <testcase name="change_drop_18_a_reopened_change_needs_a_new_approval_even_for_the_same_words" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="5.883"/>
+        <testcase name="change_drop_03_records_of_the_change_are_kept_and_counted_in_a_warning" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="10.640"/>
+        <testcase name="change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_closed" classname="canon-cli::change_state" timestamp="2026-11-16T11:49:27.848+00:00" time="13.182">
+            <failure message="thread &apos;change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_closed&apos; (2109037) panicked at crates/canon-cli/tests/change_state.rs:395:5" type="test failure with exit code 101">thread &apos;change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_closed&apos; (2109037) panicked at crates/canon-cli/tests/change_state.rs:395:5:
+assertion `left == right` failed: a change the subject shipped without is not a shipped change: {&quot;error&quot;:{&quot;code&quot;:&quot;CHANGE_CONFLICT&quot;,&quot;hint&quot;:&quot;a shipped change is not closed: write a new change that removes the behavior (`canon change new &lt;slug&gt; --subject &lt;id&gt; --title &lt;title&gt;`, naming `add-login` in its `Source:` line)&quot;,&quot;message&quot;:&quot;change `add-login` already shipped: subject `demo` moved to shipped at 2026-11-16T11:49:40Z with it on its change list, after its brief was approved&quot;,&quot;reason&quot;:&quot;SHIPPED&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;change drop&quot;,&quot;context&quot;:{&quot;repo&quot;:&quot;.&quot;},&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.6&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.41.0&quot;},&quot;ok&quot;:false}
+  left: (2, None)
+ right: (0, Some(&quot;dropped&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_closed ... FAILED
+
+failures:
+
+failures:
+    change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_closed
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 13.14s
+
+</system-out>
+            <system-err>
+thread &apos;change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_closed&apos; (2109037) panicked at crates/canon-cli/tests/change_state.rs:395:5:
+assertion `left == right` failed: a change the subject shipped without is not a shipped change: {&quot;error&quot;:{&quot;code&quot;:&quot;CHANGE_CONFLICT&quot;,&quot;hint&quot;:&quot;a shipped change is not closed: write a new change that removes the behavior (`canon change new &lt;slug&gt; --subject &lt;id&gt; --title &lt;title&gt;`, naming `add-login` in its `Source:` line)&quot;,&quot;message&quot;:&quot;change `add-login` already shipped: subject `demo` moved to shipped at 2026-11-16T11:49:40Z with it on its change list, after its brief was approved&quot;,&quot;reason&quot;:&quot;SHIPPED&quot;,&quot;retryable&quot;:false},&quot;meta&quot;:{&quot;command&quot;:&quot;change drop&quot;,&quot;context&quot;:{&quot;repo&quot;:&quot;.&quot;},&quot;contract&quot;:&quot;atip/1&quot;,&quot;contractVersion&quot;:&quot;1.6&quot;,&quot;schemaVersion&quot;:&quot;1.1&quot;,&quot;tool&quot;:&quot;canon&quot;,&quot;toolVersion&quot;:&quot;0.41.0&quot;},&quot;ok&quot;:false}
+  left: (2, None)
+ right: (0, Some(&quot;dropped&quot;))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="canon-cli::change_state_docs" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="change_drop_25_a_guide_line_off_the_schema_a_list_that_is_not_six_or_a_changelog_without_the_caller_note_fails" classname="canon-cli::change_state_docs" timestamp="2026-11-16T11:49:29.738+00:00" time="0.101"/>
+        <testcase name="change_drop_24_the_guides_help_and_spec_say_how_to_close_a_change_who_may_and_how_it_looks" classname="canon-cli::change_state_docs" timestamp="2026-11-16T11:49:29.703+00:00" time="4.122"/>
+    </testsuite>
+    <testsuite name="canon-cli::change_state_gate" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="change_drop_23_a_tree_without_the_change_and_an_agent_without_the_humans_answer_are_refused" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:33.751+00:00" time="0.804"/>
+        <testcase name="change_drop_10_the_scenarios_only_a_closed_change_made_are_set_aside_and_its_blocker_does_not_block" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:29.902+00:00" time="6.179"/>
+        <testcase name="change_drop_11_a_set_aside_scenarios_stale_evidence_and_divergent_verdict_do_not_turn_gate_check_red" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:30.289+00:00" time="6.336"/>
+        <testcase name="change_drop_12_what_another_change_requires_stays_required_and_the_readers_set_aside_the_same_scenarios" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:31.277+00:00" time="5.361"/>
+        <testcase name="change_drop_14_a_fresh_full_clone_sets_aside_the_same_scenarios" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:32.493+00:00" time="5.541"/>
+        <testcase name="change_drop_13_a_tag_on_a_scenario_outside_the_window_is_ignored_and_reported" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:31.404+00:00" time="6.882"/>
+        <testcase name="change_drop_15_a_shallow_clone_sets_nothing_aside_and_says_the_history_is_unavailable" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:32.945+00:00" time="5.769"/>
+        <testcase name="change_drop_09_a_closed_change_stops_turning_gate_check_red_and_stops_being_asked_for" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:29.841+00:00" time="10.973"/>
+        <testcase name="change_drop_22_a_deferred_chore_is_green_in_a_new_clone_and_red_again_after_a_reopen" classname="canon-cli::change_state_gate" timestamp="2026-11-16T11:49:33.406+00:00" time="7.669"/>
+    </testsuite>
+    <testsuite name="canon-cli::change_state_query" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="change_drop_16_search_finds_the_record_by_reason_and_refs_with_its_change_and_subject_as_neighbours" classname="canon-cli::change_state_query" timestamp="2026-11-16T11:49:34.560+00:00" time="2.041"/>
+        <testcase name="change_drop_16_query_reads_the_current_state_by_change_by_state_and_with_history" classname="canon-cli::change_state_query" timestamp="2026-11-16T11:49:33.827+00:00" time="3.403"/>
+        <testcase name="change_drop_17_without_the_routing_line_the_query_fails_naming_the_kind" classname="canon-cli::change_state_query" timestamp="2026-11-16T11:49:36.630+00:00" time="0.879"/>
+        <testcase name="change_drop_17_an_unknown_status_is_a_usage_error_listing_the_three_states" classname="canon-cli::change_state_query" timestamp="2026-11-16T11:49:36.605+00:00" time="1.199"/>
+        <testcase name="change_drop_17_a_change_never_closed_reads_as_an_empty_list" classname="canon-cli::change_state_query" timestamp="2026-11-16T11:49:36.084+00:00" time="1.723"/>
+    </testsuite>
+    <testsuite name="canon-cli::migrate" tests="8" skipped="0" errors="0" failures="1">
+        <testcase name="change_drop_26_an_existing_line_is_skipped_and_its_value_kept" classname="canon-cli::migrate" timestamp="2026-11-16T11:49:36.642+00:00" time="2.183"/>
+        <testcase name="change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical" classname="canon-cli::migrate" timestamp="2026-11-16T11:49:37.806+00:00" time="1.919">
+            <failure message="thread &apos;change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical&apos; (2111650) panicked at crates/canon-cli/tests/migrate.rs:1104:5" type="test failure with exit code 101">thread &apos;change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical&apos; (2111650) panicked at crates/canon-cli/tests/migrate.rs:1104:5:
+canon.yaml has no `change_state` line under `routing:` (canon 0.42 added the record kind): run `canon migrate` to preview the line it adds, then `canon migrate --commit --plan-digest &lt;PLAN_DIGEST&gt;`, then run this command again
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace</failure>
+            <system-out>
+running 1 test
+test change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical ... FAILED
+
+failures:
+
+failures:
+    change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 24 filtered out; finished in 1.87s
+
+</system-out>
+            <system-err>
+thread &apos;change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical&apos; (2111650) panicked at crates/canon-cli/tests/migrate.rs:1104:5:
+canon.yaml has no `change_state` line under `routing:` (canon 0.42 added the record kind): run `canon migrate` to preview the line it adds, then `canon migrate --commit --plan-digest &lt;PLAN_DIGEST&gt;`, then run this command again
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+</system-err>
+        </testcase>
+        <testcase name="change_drop_26_revert_restores_the_canon_yaml_bytes" classname="canon-cli::migrate" timestamp="2026-11-16T11:49:37.511+00:00" time="2.685"/>
+        <testcase name="change_drop_26_migrate_adds_the_change_state_route_line_and_the_next_plan_is_empty" classname="canon-cli::migrate" timestamp="2026-11-16T11:49:37.232+00:00" time="3.311"/>
+        <testcase name="change_drop_27_a_stale_digest_is_plan_stale_and_the_file_is_untouched" classname="canon-cli::migrate" timestamp="2026-11-16T11:49:38.037+00:00" time="2.729"/>
+        <testcase name="change_drop_27_a_routing_section_that_cannot_take_a_line_is_refused_and_blocks_the_other_steps" classname="canon-cli::migrate" timestamp="2026-11-16T11:49:37.826+00:00" time="2.992"/>
+        <testcase name="change_drop_28_a_plan_that_also_re_binds_an_approval_is_still_human_only" classname="canon-cli::migrate" timestamp="2026-11-16T11:49:38.289+00:00" time="2.774"/>
+        <testcase name="change_drop_28_an_agent_role_runs_the_route_step_without_a_human_answer" classname="canon-cli::migrate" timestamp="2026-11-16T11:49:38.490+00:00" time="3.153"/>
+    </testsuite>
+</testsuites>

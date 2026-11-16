@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-0-42",
+    "role": "implementer",
+    "session_id": "s-0-42-impl"
+  },
+  "at": "2026-11-16T12:48:55.923933641Z",
+  "attachments": [
+    {
+      "case": "legacy::tests::tier_durability_07_migrate_failures_read_as_before_and_keep_their_cause",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "tier_durability_07_a_canon_yaml_that_cannot_be_replaced_stops_the_migrate_incomplete_and_the_next_run_finishes",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    }
+  ],
+  "code_tree": "7368ebf477da839ae134cccfc86b83aece897005",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (4162 passed, 2 skipped) from the clean tree at dc26292cd, --rev dc26292cd"
+  },
+  "evidence_sha": "dc26292cd2dab9113966d0b992ead0fdd2922484",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 103,
+  "scenario_id": "tier.durability.07",
+  "schema": 1,
+  "staging_id": "f9af7d85",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

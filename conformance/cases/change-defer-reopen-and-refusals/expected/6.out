@@ -1,0 +1,4 @@
+canon change drop: recorded change `a` as dropped (decided by journey: not building it) — written directly; nothing to promote
+  subjects it is on (no longer requires it): `s`
+  a dropped change is not brought back, only a new change is: write one with `canon change new <slug> --subject <id> --title <title>` and name `a` in its `Source:` line
+next: canon status — see where the repo stands now that change `a` is dropped: it is no longer a requirement (+1 more)

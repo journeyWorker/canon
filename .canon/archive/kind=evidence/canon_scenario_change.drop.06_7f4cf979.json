@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-0-42",
+    "role": "implementer",
+    "session_id": "s-0-42-impl"
+  },
+  "at": "2026-11-16T11:49:54.843358820Z",
+  "attachments": [
+    {
+      "case": "change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_closed",
+      "format": "junit",
+      "outcome": "failed",
+      "path": "target/0-42-drop-r1-red-junit.xml",
+      "sha256": "9825924475491aa0383cf26391830805b01f6cc98a37c301907b402f6e9a9ae7"
+    }
+  ],
+  "code_tree": "98541315c6da69749ae8de61a0f1c7f69266049c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/0-42-drop-r1-red-junit.xml"
+  },
+  "evidence_note": {
+    "summary": "failing first (round 1 finding 1_1/1_2): the new cases of change_drop_06_a_shipped_change_is_refused_and_one_that_never_shipped_is_closed fail on 646416348, before the fix"
+  },
+  "evidence_sha": "646416348193f2794f41febf629497b05a348586",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 30,
+  "scenario_id": "change.drop.06",
+  "schema": 1,
+  "staging_id": "41d92c40",
+  "verdict": "divergent",
+  "worktree_dirty": false
+}

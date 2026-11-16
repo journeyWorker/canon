@@ -46,6 +46,10 @@ pub enum RecordKind {
     // than hand-counted into a git tag. The reviewed 14th kind. Plain
     // line comment, NOT a doc comment — see the `Subject` note above.
     Finding,
+    // One human decision about a change (0.42): defer, drop or reopen it. The
+    // reviewed 15th kind. Plain line comment, NOT a doc comment — see the
+    // `Subject` note above.
+    ChangeState,
 }
 
 impl RecordKind {
@@ -54,7 +58,7 @@ impl RecordKind {
     /// the fixture round-trip test (task 6.2) both walk, so "twelve
     /// kinds" is asserted structurally (`RecordKind::ALL.len() == 12`)
     /// rather than by a comment that can drift from the enum.
-    pub const ALL: [RecordKind; 12] = [
+    pub const ALL: [RecordKind; 13] = [
         RecordKind::Change,
         RecordKind::Task,
         RecordKind::Scenario,
@@ -67,6 +71,7 @@ impl RecordKind {
         RecordKind::Evidence,
         RecordKind::Subject,
         RecordKind::Finding,
+        RecordKind::ChangeState,
     ];
 
     /// The wire string this kind serializes to (the `kind` field's
@@ -87,6 +92,7 @@ impl RecordKind {
             RecordKind::Evidence => "evidence",
             RecordKind::Subject => "subject",
             RecordKind::Finding => "finding",
+            RecordKind::ChangeState => "change_state",
         }
     }
 
@@ -149,7 +155,8 @@ impl RecordKind {
             | RecordKind::Trajectory
             | RecordKind::StrategyItem
             | RecordKind::Evidence
-            | RecordKind::Subject => 1,
+            | RecordKind::Subject
+            | RecordKind::ChangeState => 1,
         }
     }
 
@@ -267,8 +274,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_twelve_kinds_present_exactly_once() {
-        assert_eq!(RecordKind::ALL.len(), 12);
+    fn all_thirteen_kinds_present_exactly_once() {
+        assert_eq!(RecordKind::ALL.len(), 13);
         let mut seen = std::collections::HashSet::new();
         for kind in RecordKind::ALL {
             assert!(seen.insert(kind), "{kind:?} listed twice in RecordKind::ALL");

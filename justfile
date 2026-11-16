@@ -50,14 +50,27 @@ gate:
 docs:
     CANON_BLESS_DOCS=1 cargo test -p canon-cli --test docs_generated
 
+# Make the stored rule calls again (tests/atip/rule_calls.jsonl): what the search for a call that breaks or meets a rule finds, kept as data that
+# `atip_check_order` and `arg_rules` read. Run it after a rule, an example, a value table or the searcher (tests/rule_support/search.rs) changes.
+rule-calls:
+    CANON_BLESS_RULE_CALLS=1 cargo test -p canon-cli --test arg_rules the_stored_rule_calls
+
+# Make them again and fail when the table in the repository differs (stage the table first). Run it once before a release, like `atip-deep`: CI does not
+# search on every push; the digest of each row and the re-evaluation of its call catch a changed input on every push.
+rule-calls-check:
+    just rule-calls
+    git diff --exit-code crates/canon-cli/tests/atip/rule_calls.jsonl
+
 # Rewrite the conformance expectations (review the diff before committing).
 conformance:
     conformance/regenerate.sh
 
-# The release-workflow safety check and its test.
+# The release-workflow safety check and its test, and the release binary check's test.
+# On a binary: `python3 scripts/check-release-binary.py --target <triple> <canon>` (see its header).
 release-check:
     python3 scripts/check-release-workflow-safety.py
     python3 scripts/test-release-workflow-safety.py
+    python3 scripts/test-check-release-binary.py
 
 # The npm launcher's tests (test.yml `launcher`).
 launcher:

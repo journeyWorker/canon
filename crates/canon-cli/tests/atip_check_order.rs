@@ -13,49 +13,31 @@ mod hermetic;
 mod harness;
 mod rule_support;
 
-use std::collections::BTreeMap;
-use std::sync::{LazyLock, Mutex};
+use std::sync::Mutex;
 
 use atip::constraint::violations;
-use rule_support::{constraints, declared_role, given_from, parse_call, run_empty_with, solve, Assignment, Found, Goal, Outcome};
+use rule_support::calls::{self, Source};
+use rule_support::search::{complete, constraints, parse_call, walk_pairs, Assignment, Found, Goal};
+use rule_support::{declared_role, given_from, run_empty_with, Outcome};
 use serde_json::Value;
 
-/// The call that breaks rule `at` of a command: the command's name and the rule's index, and what the search found.
-type Searched = BTreeMap<(String, usize), Option<Found>>;
-
-/// The call that breaks rule `at` of `doc` and, when it can, nothing else: searched once per rule (the search looks at every set of the
-/// arguments the rules name), and shared by the sweeps of this binary.
-fn violate(doc: &Value, rules: &[atip::doc::ConstraintDoc], at: usize) -> Option<Found> {
-    static FOUND: LazyLock<Mutex<Searched>> = LazyLock::new(|| Mutex::new(BTreeMap::new()));
-    let key = (doc["command"].as_str().unwrap_or_default().to_string(), at);
-    if let Some(found) = FOUND.lock().expect("the cache").get(&key) {
-        return found.clone();
-    }
-    let found = solve(doc, &example_of(doc), rules, Goal::Violate(at)).map(|found| completed(doc, found));
-    FOUND.lock().expect("the cache").insert(key, found.clone());
-    found
+/// The call that breaks rule `at` of `doc` and, when it can, nothing else: read from the stored table (`tests/atip/rule_calls.jsonl`), which
+/// holds what the search of every set of the arguments the rules name found, and shared by the sweeps of this binary.
+fn violate(doc: &Value, _rules: &[atip::doc::ConstraintDoc], at: usize) -> Option<Found> {
+    calls::read(doc, &example_of(doc), Source::Doc, Goal::Violate(at)).map(|found| completed(doc, found))
 }
 
 /// The call of a search with every required argument the search did not name, as the passing example gives it: the rules say which
 /// arguments break them, and a call must still be whole for the stateless stage to reach them.
-fn completed(doc: &Value, mut found: Found) -> Found {
-    for (name, values) in passing(doc) {
-        if required(doc).contains(&name) {
-            found.assignment.entry(name).or_insert(values);
-        }
-    }
-    found
+fn completed(doc: &Value, found: Found) -> Found {
+    complete(doc, &example_of(doc), found)
 }
 
 // -------------------------------------------------------------------------------------------------------------- the calls
 
 /// The example of a command: the invocation that passes (without `canon` and `--json`).
 fn example_of(doc: &Value) -> Vec<String> {
-    let line = doc["examples"][0].as_str().unwrap_or_else(|| panic!("`{}` has an example", doc["command"]));
-    let mut words = atip::split_argv(line);
-    assert_eq!(words.remove(0), "canon", "{line}");
-    words.retain(|word| word != "--json");
-    words
+    rule_support::search::doc_example(doc)
 }
 
 /// The arguments the example gives, by name.
@@ -75,7 +57,7 @@ fn is_operand(doc: &Value, name: &str) -> bool {
 /// The `field` an answer names for the argument `name` (spec 7.1.1): `--name` for an option, the value name for an operand.
 fn field_for(doc: &Value, name: &str) -> String {
     if is_operand(doc, name) {
-        rule_support::argument(doc, name).and_then(|operand| operand["valueName"].as_str()).unwrap_or(name).to_string()
+        rule_support::search::argument(doc, name).and_then(|operand| operand["valueName"].as_str()).unwrap_or(name).to_string()
     } else {
         format!("--{name}")
     }
@@ -442,29 +424,20 @@ fn atip_checkorder_07_the_first_constraint_the_document_lists_answers() {
         let mut problems = Vec::new();
         let path = doc["command"].as_str().unwrap_or_default();
         let rules = constraints(doc);
-        // Every rule against the later ones of another code, at most eight pairs for a command (a search for a call that breaks two rules
-        // looks at every set of the arguments the rules name).
-        let mut chosen = 0;
-        for first in 0..rules.len() {
-            for second in first + 1..rules.len() {
-                if chosen == 8 {
-                    break;
-                }
-                if rule_support::code_of(&rules[first]) == rule_support::code_of(&rules[second]) {
-                    continue;
-                }
-                let Some(found) = solve(doc, &example_of(doc), &rules, Goal::Both(first, second)).map(|found| completed(doc, found)) else { continue };
-                chosen += 1;
-                let given = given_from(doc, &found.assignment);
-                let Some((at, fault)) = violations(&rules, &given).into_iter().next() else { continue };
-                let expected = (Some(rule_support::code_of(&rules[at])), Some(field_for(doc, &fault)));
-                for reversed in [false, true] {
-                    let call = render(doc, &found.assignment, reversed);
-                    let outcome = run(doc, &found.assignment, &call);
-                    *pairs.lock().expect("count") += 1;
-                    if answer(&outcome) != expected {
-                        problems.push(format!("`{path}`: `{}` breaks {} and {}; answered {:?}, not {expected:?}", call.join(" "), rule_support::label(&rules[first]), rule_support::label(&rules[second]), answer(&outcome)));
-                    }
+        // Every rule against the later ones of another code, at most eight pairs for a command (the calls are read from the stored table: a search
+        // for a call that breaks two rules looks at every set of the arguments the rules name).
+        let visited = walk_pairs(&rules, |first, second| calls::read(doc, &example_of(doc), Source::Doc, Goal::Both(first, second)));
+        for ((first, second), found) in visited {
+            let Some(found) = found.map(|found| completed(doc, found)) else { continue };
+            let given = given_from(doc, &found.assignment);
+            let Some((at, fault)) = violations(&rules, &given).into_iter().next() else { continue };
+            let expected = (Some(rule_support::search::code_of(&rules[at])), Some(field_for(doc, &fault)));
+            for reversed in [false, true] {
+                let call = render(doc, &found.assignment, reversed);
+                let outcome = run(doc, &found.assignment, &call);
+                *pairs.lock().expect("count") += 1;
+                if answer(&outcome) != expected {
+                    problems.push(format!("`{path}`: `{}` breaks {} and {}; answered {:?}, not {expected:?}", call.join(" "), rule_support::label(&rules[first]), rule_support::label(&rules[second]), answer(&outcome)));
                 }
             }
         }
@@ -499,7 +472,7 @@ fn atip_checkorder_08_a_constraint_is_answered_before_a_validator() {
             }
             let own: Vec<&str> = validator["arguments"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
             for at in 0..rules.len() {
-                if rule_support::code_of(&rules[at]) == code {
+                if rule_support::search::code_of(&rules[at]) == code {
                     continue;
                 }
                 let Some(found) = violate(doc, &rules, at) else { continue };
@@ -511,10 +484,10 @@ fn atip_checkorder_08_a_constraint_is_answered_before_a_validator() {
                 }
                 let given = given_from(doc, &combined);
                 let Some((first, fault)) = violations(&rules, &given).into_iter().next() else { continue };
-                if rule_support::code_of(&rules[first]) == code {
+                if rule_support::search::code_of(&rules[first]) == code {
                     continue;
                 }
-                let expected = (Some(rule_support::code_of(&rules[first])), Some(field_for(doc, &fault)));
+                let expected = (Some(rule_support::search::code_of(&rules[first])), Some(field_for(doc, &fault)));
                 let call = render(doc, &combined, false);
                 let outcome = run_empty_with(&call, &[]);
                 *pairs.lock().expect("count") += 1;
@@ -637,7 +610,7 @@ fn atip_checkorder_12_every_rule_is_answered_with_the_field_of_the_first_argumen
             let Some(found) = violate(doc, &rules, at) else { continue };
             let given = given_from(doc, &found.assignment);
             let Some((first, fault)) = violations(&rules, &given).into_iter().next() else { continue };
-            let expected = (Some(rule_support::code_of(&rules[first])), Some(field_for(doc, &fault)));
+            let expected = (Some(rule_support::search::code_of(&rules[first])), Some(field_for(doc, &fault)));
             let call = render(doc, &found.assignment, false);
             let outcome = run(doc, &found.assignment, &call);
             *count.lock().expect("count") += 1;

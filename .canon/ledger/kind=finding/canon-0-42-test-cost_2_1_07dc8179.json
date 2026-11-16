@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-atip",
+    "role": "reviewer",
+    "session_id": "Rev42_atip"
+  },
+  "at": "2026-11-16T13:04:45.600476067Z",
+  "change_id": "canon-0-42-test-cost",
+  "code_tree": "7368ebf477da839ae134cccfc86b83aece897005",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/arg_rules.rs (the_drift_check_fails_on_each_planted_change)",
+  "introduced_by": "0fd20e2709226305794d792a835e6772f5d2d17d",
+  "kind": "finding",
+  "reviewed_sha": "f5ce5de4a1cf67353980659543e306b9b45cacdc",
+  "reviewer": "rev-0-42-atip",
+  "round": 2,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "P3: the_drift_check_fails_on_each_planted_change plants seven kinds of drift: a missing row, a wrong digest, an undeclared row, the atip header, a lost call, an added rule and the searcher text. It misses two kinds the brief lists. (1) A stored call that no longer breaks its rule: judge_call is never made to fail. (2) A change to an argument field the digest covers (possibleValues, valueName, valueType, required, a SAMPLES value or an example word). The added-rule case asserts only no row, and that would still hold if digest_of stopped hashing doc constraints. Fix: plant a violate row whose found.assignment breaks nothing and expect does not break; then change possibleValues or required of a rule-named argument in an in-memory document and expect made from other inputs.",
+  "worktree_dirty": false
+}

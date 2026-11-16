@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-ship",
+    "role": "reviewer",
+    "session_id": "s-0-42-ship-rev"
+  },
+  "at": "2026-11-16T11:32:17.490647249Z",
+  "change_id": "canon-0-42-release-portability",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "kind": "review",
+  "pin": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "18c5fa204184d318915735309c101d31e7d7164c77464c1022268b044304b17a",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-42-release-portability/brief.md"
+  },
+  "review_id": "01M7J226YJBB3SXMQPQB9KK8B2",
+  "reviewer": "rev-0-42-ship",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-opus",
+  "schema": 2,
+  "worktree_dirty": false
+}

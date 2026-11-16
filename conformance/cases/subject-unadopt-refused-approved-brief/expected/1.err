@@ -1,2 +1,2 @@
 canon: SUBJECT_CONFLICT: change `a` has an approved brief (.canon/changes/a/brief.md), so it is subject `s`'s approved scope and cannot be unadopted
-  hint: an approved change is the subject's approved scope and stays adopted; unadopt only a change nobody approved, or keep `a` and let its flow-tagged scenarios wait for a new approval
+  hint: an approved change is the subject's approved scope and stays adopted; to take it out of the plan a human decides with `canon change defer a` or `canon change drop a` (a reason, a reference and the approver; an agent relays the human's answer with --relayed-via); unadopt only a change nobody approved

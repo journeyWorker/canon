@@ -16,8 +16,9 @@ canon은 **npm 런처 뒤에 있는 하나의 Rust 코어**로 배포됩니다: 
 bunx @journeykit/canon --help
 ```
 
-**미리 빌드됨:** macOS arm64 · Linux x64 (glibc) · Windows x64. 그 외
-플랫폼(Intel Mac, musl/arm64 Linux, Windows arm64)은 로컬 Rust 툴체인으로
+**미리 빌드됨:** macOS arm64(macOS 15.0 이상) · Linux x64와 arm64(정적
+바이너리, libc 무관) · Windows x64(Visual C++ 재배포 패키지 불필요). 그 외
+플랫폼(Intel Mac, Windows arm64, macOS 11~14)은 로컬 Rust 툴체인으로
 소스에서 빌드합니다
 (`cargo build --release -p canon-cli`).
 

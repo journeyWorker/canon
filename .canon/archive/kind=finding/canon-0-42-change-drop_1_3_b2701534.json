@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T11:35:21.113390085Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "open",
+  "file_ref": "CHANGELOG.md:60",
+  "introduced_by": "0f4e776025d1ae7ad151075fe40d42f56a8e694d",
+  "kind": "finding",
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-drop",
+  "round": 1,
+  "scenario_ids": [
+    "change.drop.24"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "P2 (probe): the caller note's downgrade path 'run `canon migrate --revert` with 0.42 first (closed changes are then required again)' fails in both cases it is written for. A repo whose line came from 0.42 `canon init` has no backup: MIGRATION_INVALID 'no backup ... canon migrate --commit has not run here'. A migrated repo that closed a change refuses: MIGRATION_CONFLICT 'a file changed after canon migrate ran, and a revert would discard that change: .canon/ledger/kind=change_state/...'. Only an immediate revert (change_drop_26) works. Fix the note (and the brief's F8 caller note): delete the `change_state:` line under `routing:` by hand before running 0.41; `--revert` only right after the migrate.",
+  "worktree_dirty": false
+}

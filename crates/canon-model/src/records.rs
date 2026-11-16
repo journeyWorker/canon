@@ -2338,6 +2338,85 @@ impl CanonRecord for Finding {
     }
 }
 
+/// What a human decided about a change (0.42 `change-drop`): the three states
+/// a [`ChangeState`] record carries. `Deferred` and `Dropped` close the change
+/// (readers treat it as absent from its subjects' change lists and set aside
+/// the scenarios only it made); `Reopened` returns a deferred change to the
+/// subject. A change's current state is its latest record's; a change with no
+/// record was never closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChangeDecision {
+    Deferred,
+    Dropped,
+    Reopened,
+}
+
+impl ChangeDecision {
+    /// Every state, in the order `canon query --status` lists them.
+    pub const ALL: [ChangeDecision; 3] = [ChangeDecision::Deferred, ChangeDecision::Dropped, ChangeDecision::Reopened];
+
+    /// The wire spelling (`deferred`, `dropped`, `reopened`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ChangeDecision::Deferred => "deferred",
+            ChangeDecision::Dropped => "dropped",
+            ChangeDecision::Reopened => "reopened",
+        }
+    }
+
+    /// The state spelled `s`, `None` for any other text.
+    pub fn parse(s: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|state| state.as_str() == s)
+    }
+
+    /// Whether the change is closed in this state: deferred and dropped are, reopened is not.
+    pub fn is_closed(self) -> bool {
+        !matches!(self, ChangeDecision::Reopened)
+    }
+}
+
+/// One human decision about a change (0.42 `change-drop`): `canon change
+/// defer|drop|reopen` appends it. It is its own kind, not a field of
+/// [`Change`]: a `Change` record is rewritten by every import of its brief
+/// (its `at` is the brief file's modification time), so a decision kept there
+/// would be overwritten. The natural key is the change id, so the latest
+/// record is the current state and the versions it supersedes are the history
+/// (the archive, `canon query --history`). The time of the decision is
+/// [`Envelope::at`].
+///
+/// `reason` is the human's words as given; `refs` are what a reader can open
+/// (a link, a commit, a file, the date of a conversation), at least one for a
+/// deferral or a drop; `approver` is the human who decided. `relay` is
+/// present only when an agent recorded the human's answer for them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ChangeState {
+    #[serde(flatten)]
+    pub envelope: Envelope,
+    pub change_id: ChangeId,
+    pub state: ChangeDecision,
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refs: Vec<String>,
+    pub approver: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay: Option<ApprovalRelay>,
+}
+
+impl ChangeState {
+    pub fn new(envelope: Envelope, change_id: ChangeId, state: ChangeDecision, reason: impl Into<String>, refs: Vec<String>, approver: impl Into<String>) -> Self {
+        debug_assert_eq!(envelope.kind, RecordKind::ChangeState);
+        Self { envelope, change_id, state, reason: reason.into(), refs, approver: approver.into(), relay: None }
+    }
+}
+
+impl CanonRecord for ChangeState {
+    const KIND: RecordKind = RecordKind::ChangeState;
+    fn envelope(&self) -> &Envelope {
+        &self.envelope
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

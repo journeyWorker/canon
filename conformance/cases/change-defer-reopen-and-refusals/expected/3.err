@@ -1,0 +1,2 @@
+canon: CHANGE_CONFLICT: change `a` is already deferred (decided by journey: the offline job is too slow) and the call differs from that decision
+  hint: repeat the decision with the same --reason, --ref and --approver to leave it as it is, `canon change drop a` to give the change up, or `canon change reopen a` to bring it back

@@ -49,7 +49,7 @@ pub struct Removed {
     /// option the line can be corrected for as a whole; the hint shows it, and it runs as it stands.
     pub line: Option<String>,
     /// Set when the spelling is a record kind that no longer exists (`--kind session`), not a renamed one: the
-    /// refusal says so, lists the twelve kinds that remain, and points at `canon purge` for the rows already stored.
+    /// refusal says so, lists the thirteen kinds that remain, and points at `canon purge` for the rows already stored.
     pub retired_kind: bool,
 }
 
@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(kind_replacement("evidence"), None);
     }
 
-    /// 0.39: `--kind session|event` on the reading commands is refused with the twelve kinds that remain and a pointer to `purge`;
+    /// 0.39: `--kind session|event` on the reading commands is refused with the thirteen kinds that remain and a pointer to `purge`;
     /// `purge` still takes them for one release.
     #[test]
     fn tier_retired_09_a_retired_record_kind_is_refused_on_the_reading_commands_only() {
@@ -423,7 +423,7 @@ mod tests {
             let removed = find(&tree, &args(words)).unwrap_or_else(|| panic!("{words:?} is refused"));
             assert_eq!((removed.command.as_str(), removed.field.as_str(), removed.since), (command, "--kind", "0.39.0"));
             assert!(removed.message().contains(&format!("--kind {kind} was removed in 0.39.0")) && removed.message().contains("no longer exist"), "{}", removed.message());
-            assert_eq!(removed.expected_values(), RecordKind::ALL.iter().map(|k| k.as_str().to_string()).collect::<Vec<_>>(), "the twelve kinds that remain");
+            assert_eq!(removed.expected_values(), RecordKind::ALL.iter().map(|k| k.as_str().to_string()).collect::<Vec<_>>(), "the thirteen kinds that remain");
             assert!(removed.hint().contains(&format!("canon purge --kind {kind} --before <date>")), "{}", removed.hint());
             assert!(!removed.hint().starts_with("canon "), "a sentence, not a command line (spec 7.1.2)");
         }

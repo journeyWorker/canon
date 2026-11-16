@@ -1393,7 +1393,7 @@ fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError
     };
     let ctx = GateCtx::from_repo(repo).map_err(|e| unreadable(e.to_string()))?;
     let context = canon_gate::GateContext::load(ctx, &canon_policy::SchemaRegistry::load(), Utc::now()).map_err(|e| unreadable(e.to_string()))?;
-    let indexed = canon_gate::spec_coverage::latest_scenarios(&context);
+    let indexed = canon_gate::spec_coverage::all_scenarios(&context);
     let missing: Vec<String> = ids.iter().filter(|id| !indexed.iter().any(|s| &s.scenario_id == *id)).map(|id| format!("`{}`", id.as_str())).collect();
     if missing.is_empty() {
         return Ok(());

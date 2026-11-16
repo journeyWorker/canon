@@ -4,8 +4,9 @@ You turn a request into an approved scope: a subject, a change and a PRD
 brief the human answers once. You build nothing. Declare the role with
 `CANON_ROLE=planner` (or `--as planner`); `canon status` and `meta.next`
 then show your steps and count the rest under `waitingOn`. The approvals are
-the human's: `brief approve`, `policy approve`, `divergence accept` and the
-`migrate --commit` that re-binds `Approved:` lines refuse every agent role
+the human's: `brief approve`, `policy approve`, `divergence accept`, `change drop`,
+`change defer`, `change reopen` (six leaves) and the `migrate --commit` that
+re-binds `Approved:` lines refuse every agent role
 (`ACTOR_DENIED`, `retryable: false`) unless you record the answer the human gave
 you in the conversation, with `--relayed-via <tool>` (step 4). Without a human's
 explicit answer you never run them, and you never remove or unset your role
@@ -95,7 +96,7 @@ canon gate check --json
 ```
 ```text
 # Read stored records across every storage tier
-usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence --json
@@ -123,7 +124,7 @@ canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
-usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
 canon search timeout --kind finding --json
@@ -204,6 +205,9 @@ ids); the human step comes after it. A policy that no longer matches its approva
    To park a draft that should not gate a live subject, `subject unadopt`
    it and adopt it into a `proposed` subject. Inside an approved scope there is no new
    subject or change: a fix or follow-up stays in the existing change.
+   An approved change is not parked that way (`subject unadopt` is refused
+   with `APPROVED_BRIEF`): taking an approved change out of the work is the
+   human's `change defer` or `change drop` (below).
 2. **Write the brief.** Briefs outlive the code that exists today and are
    read by sessions that did not write them. Intent says what the product
    does today, in behavior words, and why that is not enough; Desired outcome
@@ -316,6 +320,43 @@ add-login` reports `state: ready`: show it to the human and ask (step 4). The sc
 when you have recorded their explicit approval (step 5) and the same command
 reports `state: approved`; read it in `data.state` of `canon brief show
 add-login --json`. Nothing else starts before that.
+
+## Closing a change is the human's call
+
+`change drop`, `change defer` and `change reopen` are human-only like `brief
+approve`: six leaves name no agent role, and each refuses every agent role
+(`ACTOR_DENIED`) unless it records the answer the human gave you. When the human
+says a change is not wanted, or not in this release, you do not stop it by
+editing files or by `subject unadopt`; you ask, then record their answer.
+
+1. **Ask** with the harness question tool (`ask` in omp, `AskUserQuestion` in
+   Claude Code, otherwise in the chat): defer it (not this release), drop it
+   (the end of it) or keep it. Count only an explicit answer; no answer closes
+   nothing.
+2. **Record it:** `canon change defer <slug> --reason "<their words>" --ref <link or date> --approver <their name> --relayed-via <the question tool> --actor <your actor id>`.
+   `canon change drop <slug>` takes the same options. `--ref` names where the
+   decision lives (an issue link or a date) and may repeat. Never remove or
+   unset your role to run it.
+
+- **Defer** is for "not this release": `canon change reopen <slug>` with the
+  human's answer brings it back, and the reopened change needs a new
+  `brief approve` (the earlier approval line no longer counts).
+- **Drop** is the end: a dropped change is never reopened (`CHANGE_CONFLICT`,
+  reason `DROPPED`); a new change is a new scope.
+- A shipped change cannot be closed (`CHANGE_CONFLICT`, reason `SHIPPED`), and
+  `brief approve` or `scenario new --flow <F-id> --change <slug>` on a closed
+  change is refused (reason `CLOSED`).
+- Evidence, reviews and findings stay as they are; the warning
+  `CHANGE_RECORDS_KEPT` lists what the closed change keeps.
+- A repo whose `canon.yaml` has no `change_state` line under `routing:` refuses
+  these leaves with `CONFIG_INVALID`; `canon migrate` previews and, committed
+  with its plan digest, adds the line.
+
+A closed change drops out of what the subject and the gate require. `canon
+status --json` lists it per subject in `setAsideChanges` and its scenarios in
+`setAsideScenarios` (omitted when empty), `canon gate check` prints the advisory
+`closed_change` for each, and `canon query --kind change_state --change <slug>`
+reads its state (`--history` adds the records before a reopen).
 
 ## Non-behavior work is a chore
 

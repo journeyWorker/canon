@@ -36,7 +36,7 @@ produced and decides what counts.
 ## Operating Context
 
 - Installed per repository from npm: `bunx @journeykit/canon …` (one Rust
-  binary behind a Bun launcher; macOS arm64, Linux x64, Windows x64).
+  binary behind a Bun launcher; macOS arm64, Linux x64 and arm64, Windows x64).
 - One user-facing agent skill, projected for Claude Code, Codex, OMP, and
   Pi by `canon skills install`.
 - Day-to-day loop: Gherkin scenarios with `@subject`/`@case` tags →

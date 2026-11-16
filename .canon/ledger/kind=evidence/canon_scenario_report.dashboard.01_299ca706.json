@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-0-42",
+    "role": "implementer",
+    "session_id": "s-0-42-impl"
+  },
+  "at": "2026-11-16T12:48:55.923933641Z",
+  "attachments": [
+    {
+      "case": "dashboard::tests::report_dashboard_01_resolve_app_serves_the_checkout_build_only_for_canons_own_dashboard_package",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "dashboard::tests::report_dashboard_01_an_embedded_app_is_served_gzip_to_a_browser_that_accepts_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "dashboard::tests::report_dashboard_01_an_embedded_app_is_served_decompressed_to_a_browser_that_does_not_accept_gzip",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    }
+  ],
+  "code_tree": "7368ebf477da839ae134cccfc86b83aece897005",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (4162 passed, 2 skipped) from the clean tree at dc26292cd, --rev dc26292cd"
+  },
+  "evidence_sha": "dc26292cd2dab9113966d0b992ead0fdd2922484",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 600,
+  "scenario_id": "report.dashboard.01",
+  "schema": 1,
+  "staging_id": "0d6db258",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

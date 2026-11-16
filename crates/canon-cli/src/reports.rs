@@ -146,6 +146,9 @@ fn build_rows() -> Vec<ReportRow> {
     use crate::{adapter, artifact_ingest, artifacts, artifacts_prune, brief_approve, brief_check, change, completion, context, context_pack, demo, dispatch, divergence, evidence, finding, gate, learn, ledger, migrate, plans, policy_approval, retention, retrieve, review, scaffold, selftest, status, subject, tier};
     let mut schemas: Vec<ReportRow> = vec![
         entry::<change::ChangeNewReport<'static>>("change new", "ChangeNewReport"),
+        entry::<crate::change_state::ChangeStateReport>("change defer", "ChangeDeferReport"),
+        entry::<crate::change_state::ChangeStateReport>("change drop", "ChangeDropReport"),
+        entry::<crate::change_state::ChangeStateReport>("change reopen", "ChangeReopenReport"),
         entry::<demo::DemoReviewReport>("demo review", "DemoReviewReport"),
         entry::<demo::DemoInitReport>("demo init", "DemoInitReport"),
         entry::<dispatch::DispatchBeginReport<'static>>("dispatch begin", "DispatchBeginReport"),
@@ -230,6 +233,9 @@ fn build_rows() -> Vec<ReportRow> {
         entry::<crate::skills::SkillsInstallReport<'static>>("skills install", "SkillsInstallReport"),
         entry::<crate::skills::SkillsShowReport>("skills show", "SkillsShowReport"),
         batch_entry::<change::ChangeNewReport<'static>>("change new", "BatchChangeNewReport"),
+        batch_entry::<crate::change_state::ChangeStateReport>("change defer", "BatchChangeDeferReport"),
+        batch_entry::<crate::change_state::ChangeStateReport>("change drop", "BatchChangeDropReport"),
+        batch_entry::<crate::change_state::ChangeStateReport>("change reopen", "BatchChangeReopenReport"),
         batch_entry::<demo::DemoReviewReport>("demo review", "BatchDemoReviewReport"),
         batch_entry::<demo::DemoInitReport>("demo init", "BatchDemoInitReport"),
         batch_entry::<dispatch::DispatchBeginReport<'static>>("dispatch begin", "BatchDispatchBeginReport"),

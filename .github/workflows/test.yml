@@ -24,6 +24,14 @@ name: Test
 # hard CI failure instead. `bench-shape` (0.29) holds the cost of `canon
 # gate check`, `canon status` and batch `canon evidence add` to the size of
 # the corpus: 10x the corpus may not cost more than 20x the CPU or memory.
+#
+# Caches (0.42): every cache job restores on every run, by `canon-test-<job>-deps-<hash of rust-toolchain.toml>-<hash of Cargo.lock>`, else the newest
+# `canon-test-<job>-deps-<same toolchain hash>-` one, else the newest `canon-test-<job>-cargo-` one (the whole `target/` of the time before this split; a bridge
+# for the first run, which the change that moves the toolchain deletes). Only a push to main saves one, and only when the restore was no exact match and the
+# job's build step succeeded: the dependencies' build alone, `scripts/ci-strip-workspace-build.sh` having taken the workspace crates' own output out. A pull
+# request run never saves, so it cannot fill the repository's cache quota with a copy of main's. Every job has a `timeout-minutes` (three times the longest run
+# measured, rounded up to 5) and a pull request run is cancelled by the next push to the same pull request. The runners are pinned to `ubuntu-26.04`, the image
+# every time and size measured here comes from (the floating label moves to it between 2026-10-19 and 2026-11-19).
 
 # `push` to main is included because canon's releases land as direct
 # pushes: a PR-only trigger never ran on them.
@@ -47,6 +55,7 @@ on:
       - "scripts/check_visibility.sh"
       - "scripts/check_git_boundary.py"
       - ".github/workflows/test.yml"
+      - "scripts/ci-strip-workspace-build.sh"
   pull_request:
     paths:
       - "crates/**"
@@ -65,6 +74,7 @@ on:
       - "scripts/check_visibility.sh"
       - "scripts/check_git_boundary.py"
       - ".github/workflows/test.yml"
+      - "scripts/ci-strip-workspace-build.sh"
   workflow_dispatch:
 
 env:
@@ -74,31 +84,59 @@ env:
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run before it. A push to main is its own group (the commit is in the name), so no run of main cancels another
+# and none is dropped from the queue; `workflow_dispatch` runs likewise.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   offline:
     name: cargo test --workspace (offline)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    # The longest run measured was 36.5 minutes; the limit is three times that, rounded up to 5.
+    timeout-minutes: 110
     steps:
       # Full history: `canon gate check` below reads each review written
       # before review pinning at the commit it pinned (0.16 D6). In a
       # shallow clone those commits are missing, so the gate can only count
       # such reviews as undecidable instead of checking them.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Install Rust
         uses: ./.github/actions/setup-rust
 
-      - name: Cache cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: canon-test-offline-cargo-${{ hashFiles('Cargo.lock') }}
+          key: canon-test-offline-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            canon-test-offline-deps-${{ hashFiles('rust-toolchain.toml') }}-
+            canon-test-offline-cargo-
+
+      # What the restore found, in the run summary: the key (an older one when the match is not exact), and the sizes the job starts from.
+      - name: What the cache restored
+        env:
+          MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+          EXACT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          size() { if [ -e "$1" ]; then du -sh "$1" | cut -f1; else echo none; fi; }
+          {
+            echo '### cargo cache (restored)'
+            echo "- key restored: \`${MATCHED_KEY:-none}\`"
+            echo "- exact match: \`${EXACT:-false}\`"
+            echo "- target/: $(size target)"
+            echo "- ~/.cargo: $(size "$HOME/.cargo")"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # `canon-report` shells out to the `duckdb` CLI, and the S14
       # capstone test `ingest_artifacts_drives_both_source_shapes_…`
@@ -133,6 +171,12 @@ jobs:
       # before a single test runs, so fetch the locked set first.
       - name: cargo fetch --locked
         run: cargo fetch --locked
+
+      # The build of every test of the workspace, apart from the run: what is saved to the cache (on main) waits for this step and not for the tests,
+      # so a failing test still leaves the dependencies' build behind. The run below finds everything built. A failed `cargo fetch` stops before it.
+      - name: cargo test --workspace --no-run (build the tests)
+        id: build
+        run: cargo test --workspace --locked --offline --no-run
 
       # `CANON_WITNESS_DIR`: a debug `canon` records each JSON document it prints there (T9),
       # and the next step holds the recording against the outputs the spec declares.
@@ -169,6 +213,25 @@ jobs:
           ./target/debug/canon inventory sync
           ./target/debug/canon gate check
 
+      # Main only, when no cache of this exact key was restored, and only after the build step succeeded: a failed test does not stop it, a failed
+      # `cargo fetch` (before the build) does (see the top of this file).
+      - name: Keep only the dependency build
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        env:
+          CACHE_KEY: canon-test-offline-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+        run: scripts/ci-strip-workspace-build.sh
+
+      - name: Save cargo cache
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-offline-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+
   # 0.30: the lint gate for rust-coding-rules.md. Every Rust job here runs the
   # toolchain `rust-toolchain.toml` pins (1.99.1); a floating stable adds lints
   # and would turn a clean tree red with no code change. Bumping the pin
@@ -179,22 +242,27 @@ jobs:
   # git boundary (0.39: no git call outside `canon_store::git`).
   clippy:
     name: clippy 1.99.1 and visibility rule
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
         uses: ./.github/actions/setup-rust
 
-      - name: Cache cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: canon-test-clippy-cargo-${{ hashFiles('Cargo.lock') }}
+          key: canon-test-clippy-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            canon-test-clippy-deps-${{ hashFiles('rust-toolchain.toml') }}-
+            canon-test-clippy-cargo-
 
       - name: cargo fetch --locked
         run: cargo fetch --locked
@@ -206,6 +274,7 @@ jobs:
         run: cargo clippy --workspace --lib --bins --locked -- -D warnings -D clippy::unwrap_used
 
       - name: clippy, canon-store live-tier tests
+        id: build
         run: cargo clippy -p canon-store --all-targets --features live-pg,live-r2 --locked -- -D warnings
 
       - name: no pub(super) or pub(in ..) in crate sources
@@ -213,6 +282,24 @@ jobs:
 
       - name: every git call goes through canon_store::git
         run: python3 scripts/check_git_boundary.py
+
+      # Main only, when no cache of this exact key was restored, and only after the last clippy run (the one that builds the most) succeeded (see the top of this file).
+      - name: Keep only the dependency build
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        env:
+          CACHE_KEY: canon-test-clippy-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+        run: scripts/ci-strip-workspace-build.sh
+
+      - name: Save cargo cache
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-clippy-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
 
   # canon claims atip/1 1.6 at L2 (0.41, `canon-0-41-atip-1-6`; 1.5 in 0.37, `canon-0-37-claim-1-5`; 1.4 in 0.36, `canon-0-36-claim-1-4`; L2 since 0.35, `canon-0-35-claim-l2`), and the shared checker holds it to that
   # (approaches/checker.md in https://github.com/journeyWorker/atip). The checker is not canon's since 0.36 (`canon-0-36-atip-dep`): it is built from the atip repo
@@ -228,27 +315,32 @@ jobs:
   # row in `findings[]`. The tree's `level` is `L2` and `meta.contractVersion` is `1.6`; this job is what proves that claim.
   atip:
     name: atip check --deep L2 (canon)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
         uses: ./.github/actions/setup-rust
 
-      - name: Cache cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: canon-test-atip-cargo-${{ hashFiles('Cargo.lock') }}
+          key: canon-test-atip-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            canon-test-atip-deps-${{ hashFiles('rust-toolchain.toml') }}-
+            canon-test-atip-cargo-
 
       # The installed checker is one file; the key names its tag and the toolchain that built it.
       - name: Cache the checker
         id: checker
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cargo/bin/atip
           key: canon-test-atip-check-v0.3.0-${{ hashFiles('rust-toolchain.toml') }}
@@ -261,37 +353,80 @@ jobs:
         run: cargo fetch --locked
 
       - name: build the canon binary
+        id: build
         run: cargo build --locked --offline -p canon-cli
 
       - name: atip check, canon at L2
         run: atip check --bin target/debug/canon --level L2 --contract 1.6 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
-  # T15: the grammar tests catch seeded violations (scripts/check-mutations.sh). Its own job:
-  # it builds a copy of the workspace, which would double the time of the job above.
-  grammar-mutation:
-    name: grammar tests catch seeded violations
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Main only, when no cache of this exact key was restored, and only after the build step succeeded: a failed check does not stop it (see the top of this file).
+      - name: Keep only the dependency build
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        env:
+          CACHE_KEY: canon-test-atip-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+        run: scripts/ci-strip-workspace-build.sh
 
-      - name: Install Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Cache cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      - name: Save cargo cache
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: canon-test-mutation-cargo-${{ hashFiles('Cargo.lock') }}
+          key: canon-test-atip-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+
+  # T15: the grammar tests catch seeded violations (scripts/check-mutations.sh). Its own job:
+  # it builds a copy of the workspace, which would double the time of the job above.
+  grammar-mutation:
+    name: grammar tests catch seeded violations
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        uses: ./.github/actions/setup-rust
+
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-mutation-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            canon-test-mutation-deps-${{ hashFiles('rust-toolchain.toml') }}-
+            canon-test-mutation-cargo-
 
       - name: cargo fetch --locked
         run: cargo fetch --locked
 
       - name: seeded violations each fail their test
+        id: build
         run: scripts/check-mutations.sh
+
+      # Main only, when no cache of this exact key was restored, and only after the one step that builds (the copy of the workspace, its tests) succeeded (see the top of this file).
+      - name: Keep only the dependency build
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        env:
+          CACHE_KEY: canon-test-mutation-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+        run: scripts/ci-strip-workspace-build.sh
+
+      - name: Save cargo cache
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-mutation-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
 
   # 0.29 D1: the corpus-size shape gate. Every other job here proves what canon
   # does; none noticed that `gate check` re-derived whole-corpus data once per
@@ -304,27 +439,33 @@ jobs:
   # judged: a shared runner's load moves wall time and leaves those alone.
   bench-shape:
     name: corpus-size cost shape (release binary)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
         uses: ./.github/actions/setup-rust
 
-      - name: Cache cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: canon-test-bench-shape-cargo-${{ hashFiles('Cargo.lock') }}
+          key: canon-test-bench-shape-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            canon-test-bench-shape-deps-${{ hashFiles('rust-toolchain.toml') }}-
+            canon-test-bench-shape-cargo-
 
       - name: cargo fetch --locked
         run: cargo fetch --locked
 
       - name: cargo build --release -p canon-cli --bin canon
+        id: build
         run: cargo build --release --locked --offline -p canon-cli --bin canon
 
       - name: measure the small grid
@@ -337,27 +478,47 @@ jobs:
 
       - name: Upload the measurements
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bench-shape-tsv
           path: ${{ runner.temp }}/bench.tsv
           if-no-files-found: ignore
 
+      # Main only, when no cache of this exact key was restored, and only after the release build succeeded: the measurements failing does not stop it
+      # (see the top of this file). The release profile is the one this job builds.
+      - name: Keep only the dependency build
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        env:
+          CACHE_KEY: canon-test-bench-shape-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+        run: scripts/ci-strip-workspace-build.sh --release
+
+      - name: Save cargo cache
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-bench-shape-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+
   launcher:
     name: "@journeykit/canon launcher (bun test)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
 
       # The launcher tests run it under node, as bin.js does for npm users;
       # Node 26.1+ is the runtime where it replaces itself (process.execve).
       - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "26"
 
@@ -372,12 +533,13 @@ jobs:
 
   platformer:
     name: examples/platformer (vitest, one test per scenario)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
 
@@ -396,22 +558,35 @@ jobs:
 
   live-tier:
     name: cargo test -p canon-store --features live-pg,live-r2 (docker-compose)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
         uses: ./.github/actions/setup-rust
 
-      - name: Cache cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: canon-test-live-tier-cargo-${{ hashFiles('Cargo.lock') }}
+          key: canon-test-live-tier-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            canon-test-live-tier-deps-${{ hashFiles('rust-toolchain.toml') }}-
+            canon-test-live-tier-cargo-
+
+      # The build of both test runs below, before the stack starts: the dependencies' build is what is saved to the cache (on main), so it must not wait for the services.
+      - name: build the live-tier tests
+        id: build
+        run: |
+          set -euo pipefail
+          cargo test -p canon-store --features live-pg,live-r2 --locked --no-run
+          cargo test -p canon-cli --test ledger_pg_live --locked --no-run
 
       - name: docker compose up (postgres + minio)
         run: docker compose up -d --wait postgres minio
@@ -442,3 +617,21 @@ jobs:
       - name: docker compose down
         if: always()
         run: docker compose down -v
+
+      # Main only, when no cache of this exact key was restored, and only after the build step succeeded: a failed test does not stop it (see the top of this file).
+      - name: Keep only the dependency build
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        env:
+          CACHE_KEY: canon-test-live-tier-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+        run: scripts/ci-strip-workspace-build.sh
+
+      - name: Save cargo cache
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-live-tier-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}

@@ -5,7 +5,7 @@ description: Use for every build, implement, add-a-feature, change-a-feature or 
 
 # Canon
 
-This repo is managed with canon (canon 0.41.0). Canon records the work as evidence and a gate grades it. This file is a stub: the full guide is built into the `canon` binary, so it always matches the version you run.
+This repo is managed with canon (canon 0.42.0). Canon records the work as evidence and a gate grades it. This file is a stub: the full guide is built into the `canon` binary, so it always matches the version you run.
 
 ## The loop
 
@@ -20,4 +20,4 @@ This repo is managed with canon (canon 0.41.0). Canon records the work as eviden
 - Run `canon skills show canon` for the full guide (`--full` appends every reference).
 - Run `canon skills show role-implementer` for your role (also `role-planner`, `role-reviewer`, `role-orchestrator`).
 - Never guess a flag: your role guide's Commands block lists every option of every leaf the role uses; ask `canon schema <command>` only for a leaf it does not list, or after a `USAGE` refusal.
-- Human-only acts (`canon brief approve`, `canon policy approve`, `canon divergence accept`, a `canon migrate --commit` that re-binds `Approved:` lines): show the human what they approve (`canon brief show <slug> --body`, to their own view, never retyped), ask with the harness question tool (`ask` in omp, `AskUserQuestion` in Claude Code, otherwise in the chat), count only an explicit approval, then record it with `--relayed-via <tool>`; never remove your role to get past the refusal (`canon skills show role-planner` has the steps).
+- Human-only acts (`canon brief approve`, `canon policy approve`, `canon divergence accept`, `canon change drop`, `canon change defer`, `canon change reopen`, a `canon migrate --commit` that re-binds `Approved:` lines): show the human what they approve (`canon brief show <slug> --body`, to their own view, never retyped), ask with the harness question tool (`ask` in omp, `AskUserQuestion` in Claude Code, otherwise in the chat), count only an explicit approval, then record it with `--relayed-via <tool>`; never remove your role to get past the refusal (`canon skills show role-planner` has the steps).

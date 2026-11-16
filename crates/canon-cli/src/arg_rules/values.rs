@@ -13,7 +13,7 @@
 
 use atip::domain::Domain;
 
-use super::{DomainRow, Scope, Tables, KEBAB, LINE_TEXT, REGIME_KEY};
+use super::{DomainRow, Scope, Tables, KEBAB, LINE_TEXT, NOT_BLANK, REGIME_KEY};
 
 /// Values the one-line text domain takes: the white space around is the parser's to trim, the middle keeps its spaces and its no-break
 /// spaces, and any script is text.
@@ -39,7 +39,7 @@ pub(crate) static TABLES: Tables = Tables {
     domains: &[
         // ---------------------------------------------------------------------------------------------- a name: --actor
         // The relay's actor is also one word: that is the validator of the four relayed commands, not this domain, so its inside values are one word.
-        DomainRow::new(Scope::Arguments(&["brief approve", "policy approve", "migrate"], "actor"), Domain::matching(LINE_TEXT), "USAGE").inside(&["impl", " impl ", "impl\n", "\timpl"]).outside(TEXT_OUTSIDE),
+        DomainRow::new(Scope::Arguments(&["brief approve", "policy approve", "migrate", "change defer", "change drop", "change reopen"], "actor"), Domain::matching(LINE_TEXT), "USAGE").inside(&["impl", " impl ", "impl\n", "\timpl"]).outside(TEXT_OUTSIDE),
         name(&["dispatch begin"], "actor", "DISPATCH_ARGUMENT_INVALID"),
         name(&["divergence add", "divergence defer", "divergence resolve", "divergence accept"], "actor", "DIVERGENCE_ARGUMENT_INVALID"),
         name(&["evidence add", "evidence audit"], "actor", "EVIDENCE_ARGUMENT_INVALID"),
@@ -49,7 +49,7 @@ pub(crate) static TABLES: Tables = Tables {
         name(&["strategy rollback"], "actor", "STRATEGY_ARGUMENT_INVALID"),
         name(&["subject move", "subject new"], "actor", "SUBJECT_ARGUMENT_INVALID"),
         // ------------------------------------------------------------------------------------------- a name: --approver
-        name(&["brief approve", "policy approve"], "approver", "APPROVAL_INVALID"),
+        name(&["brief approve", "policy approve", "change defer", "change drop", "change reopen"], "approver", "APPROVAL_INVALID"),
         name(&["divergence accept"], "approver", "DIVERGENCE_ARGUMENT_INVALID"),
         name(&["migrate"], "approver", "USAGE"),
         name(&["evidence approval-payload"], "approver", "EVIDENCE_ARGUMENT_INVALID"),
@@ -57,9 +57,12 @@ pub(crate) static TABLES: Tables = Tables {
         name(&["evidence add"], "approver", "EVIDENCE_APPROVAL_INVALID").reason("MALFORMED"),
         // --------------------------------------------------------------------------------------- a name: --relayed-via
         // That it is one word (no white space, parenthesis or quote) is the validator of the four commands.
-        DomainRow::new(Scope::Arguments(&["brief approve", "policy approve", "divergence accept", "migrate"], "relayed-via"), Domain::matching(LINE_TEXT), "USAGE").inside(&["ask", "AskUserQuestion", " chat "]).outside(TEXT_OUTSIDE),
+        DomainRow::new(Scope::Arguments(&["brief approve", "policy approve", "divergence accept", "migrate", "change defer", "change drop", "change reopen"], "relayed-via"), Domain::matching(LINE_TEXT), "USAGE").inside(&["ask", "AskUserQuestion", " chat "]).outside(TEXT_OUTSIDE),
         // ------------------------------------------------------------------------------------------ a sentence: --reason
         sentence(&["divergence add", "divergence defer", "divergence accept"], "reason", "DIVERGENCE_ARGUMENT_INVALID"),
+        sentence(&["change defer", "change drop", "change reopen"], "reason", "CHANGE_ARGUMENT_INVALID"),
+        // A reference is what a reader can open (a link, a commit, a file, the date of a conversation): the domain `evidence add --ref` has (one domain per option name, atip.optionvalues.12).
+        DomainRow::new(Scope::Arguments(&["change defer", "change drop", "change reopen"], "ref"), Domain::matching(NOT_BLANK), "CHANGE_ARGUMENT_INVALID").inside(&["https://example.com/pr/147", " a "]).outside(&["", " ", "\t"]),
         sentence(&["finding close"], "reason", "FINDING_REASON_REQUIRED"),
         sentence(&["strategy rollback"], "reason", "STRATEGY_ARGUMENT_INVALID"),
         sentence(&["subject move"], "reason", "SUBJECT_ARGUMENT_INVALID"),

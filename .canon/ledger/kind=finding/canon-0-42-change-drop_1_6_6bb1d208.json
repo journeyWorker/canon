@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T13:03:14.868525605Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/change_state_gate.rs:273-297",
+  "introduced_by": "0f4e776025d1ae7ad151075fe40d42f56a8e694d",
+  "kind": "finding",
+  "resolution_code_tree": "98541315c6da69749ae8de61a0f1c7f69266049c",
+  "resolution_sha": "646416348193f2794f41febf629497b05a348586",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-drop",
+  "round": 1,
+  "scenario_ids": [
+    "change.drop.03",
+    "change.drop.09",
+    "change.drop.11",
+    "change.drop.13",
+    "change.drop.19",
+    "change.drop.20"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "P3 (standards; behavior confirmed by probes on the real binary): bound tests skip Then steps. 11: the divergent half is vacuous, world.gone.01 is asserted absent from violations before the close as well (probe: an open divergence is red while open, green once set aside). 13: no `no_creation_time` case (probe: reported; such a file also fails inventory sync). 19: no relay-deny reopen (probe: ACTOR_DENIED). 20: FLOW_TAGGED hint not asserted (probe: names defer/drop). 09: ship and reopen guards not exercised (probe: ship refused then allowed after the defer; shipped -> verifying ok). 03: only a finding counted (probe: evidence 1, review 1, finding 1). Add those asserts.",
+  "worktree_dirty": false
+}

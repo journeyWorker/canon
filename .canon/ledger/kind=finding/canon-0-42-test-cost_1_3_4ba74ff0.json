@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-atip",
+    "role": "reviewer",
+    "session_id": "Rev42_atip"
+  },
+  "at": "2026-11-16T13:04:35.818864964Z",
+  "change_id": "canon-0-42-test-cost",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": "CHANGELOG.md:13",
+  "introduced_by": "7527e2fa82e1bb0d4ad7ddc96054988af8bb11d7",
+  "kind": "finding",
+  "resolution_code_tree": "20ab3236614d25c49bb01c96a25b84d972924acb",
+  "resolution_sha": "b038b039f310732fb3cecefbd89755a0cc0b8841",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-atip",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "P3: the Unreleased entry says atip_validate asks '29 for the 202 declared'. After the merge with change-drop, the test at 24b8194a6 prints '220 arguments declare a domain, 196 of them a pattern; 29 distinct domains; 49212 values asked'. Fix: say '29 for the 220 declared', or drop the count.",
+  "worktree_dirty": false
+}

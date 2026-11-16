@@ -42,6 +42,7 @@ fn round_trip_well_formed(kind: RecordKind, json: &serde_json::Value) {
         RecordKind::Evidence => check!(EvidenceRecord),
         RecordKind::Subject => check!(Subject),
         RecordKind::Finding => check!(Finding),
+        RecordKind::ChangeState => check!(ChangeState),
     }
 }
 
@@ -82,7 +83,7 @@ fn round_trip_all() {
     let well_formed_dir = fixtures_dir().join("well-formed");
     let mut seen_kinds = std::collections::HashSet::new();
     let entries: Vec<_> = std::fs::read_dir(&well_formed_dir).unwrap().map(|e| e.unwrap()).collect();
-    assert_eq!(entries.len(), 12, "expected exactly one well-formed fixture per record kind");
+    assert_eq!(entries.len(), 13, "expected exactly one well-formed fixture per record kind");
 
     for entry in entries {
         let text = std::fs::read_to_string(entry.path()).unwrap();

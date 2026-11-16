@@ -1,5 +1,5 @@
-//! Human-only acts (0.28 D10): `brief approve`, `policy approve` and
-//! `divergence accept` refuse every agent role, however it is declared, and no
+//! Human-only acts (0.28 D10, 0.42): `brief approve`, `policy approve`, `divergence accept`, `change defer`,
+//! `change drop` and `change reopen` refuse every agent role, however it is declared, and no
 //! flag grants them. Against the built `canon` binary.
 
 #[path = "support/hermetic.rs"]
@@ -11,10 +11,13 @@ use serde_json::Value;
 
 const ROLES: [&str; 4] = ["planner", "implementer", "reviewer", "orchestrator"];
 
-const LEAVES: [(&str, &[&str]); 3] = [
+const LEAVES: [(&str, &[&str]); 6] = [
     ("brief approve", &["brief", "approve", "--approver", "alice", "--note", "approved as written"]),
     ("policy approve", &["policy", "approve", "--approver", "alice", "--note", "reviewed"]),
     ("divergence accept", &["divergence", "accept", "auth.login.01", "--actor", "alice", "--reason", "known gap", "--tracking", "https://example.com/issues/1", "--role", "reviewer"]),
+    ("change defer", &["change", "defer", "add-login", "--reason", "not now", "--ref", "chat 2026-11-16", "--approver", "alice"]),
+    ("change drop", &["change", "drop", "add-login", "--reason", "not building it", "--ref", "chat 2026-11-16", "--approver", "alice"]),
+    ("change reopen", &["change", "reopen", "add-login", "--reason", "the vendor answered", "--approver", "alice"]),
 ];
 
 fn run(repo: &Path, args: &[&str], role_flag: Option<&str>, role_env: Option<&str>) -> Output {
@@ -77,8 +80,8 @@ fn without_a_declared_role_the_leaf_runs() {
     let out = run(dir.path(), LEAVES[1].1, None, None);
     assert_eq!(out.status.code(), Some(0), "{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     assert!(dir.path().join(".canon/policy.approval.json").exists());
-    // The other two reach their own checks (no change, no scenario) rather than the role refusal.
-    for (leaf, args) in [LEAVES[0], LEAVES[2]] {
+    // The others reach their own checks (no change, no scenario) rather than the role refusal.
+    for (leaf, args) in [LEAVES[0], LEAVES[2], LEAVES[3], LEAVES[4], LEAVES[5]] {
         let out = run(dir.path(), args, None, None);
         assert_ne!(code_of(&out), "ACTOR_DENIED", "{leaf} refused a human");
     }

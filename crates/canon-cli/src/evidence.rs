@@ -906,7 +906,7 @@ fn ensure_scenario_indexed(repo: &Path, args: &ApprovalPayloadArgs) -> Result<()
         return Ok(());
     };
     let context = load_gate_context(repo).map_err(|e| ApprovalRefusal::Refused(crate::read_cause::repo_error(e.clone())))?;
-    if canon_gate::spec_coverage::latest_scenarios(&context).iter().any(|s| &s.project_id == project && &s.scenario_id == scenario) {
+    if canon_gate::spec_coverage::all_scenarios(&context).iter().any(|s| &s.project_id == project && &s.scenario_id == scenario) {
         return Ok(());
     }
     Err(ApprovalRefusal::Refused(

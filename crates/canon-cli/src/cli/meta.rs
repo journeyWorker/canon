@@ -49,6 +49,9 @@ pub fn path(cmd: &Command) -> &'static str {
         },
         Command::Change { action } => match action {
             ChangeCommand::New(_) => "change new",
+            ChangeCommand::Defer(_) => "change defer",
+            ChangeCommand::Drop(_) => "change drop",
+            ChangeCommand::Reopen(_) => "change reopen",
         },
         Command::Brief { action } => match action {
             BriefCommand::Show(_) => "brief show",

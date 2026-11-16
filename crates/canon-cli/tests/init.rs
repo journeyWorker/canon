@@ -67,7 +67,7 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
     for retired in ["session", "event"] {
         assert!(!text.lines().any(|l| l.trim_start().starts_with(&format!("{retired}:"))), "the retired kind `{retired}` is not routed: {text}");
     }
-    for kind in ["change", "scenario", "review", "divergence", "trajectory", "strategy_item", "evidence"] {
+    for kind in ["change", "scenario", "review", "divergence", "trajectory", "strategy_item", "evidence", "subject", "finding", "change_state"] {
         assert!(text.contains(&format!("{kind}: local")), "missing local-routing line for `{kind}`: {text}");
     }
     assert!(text.contains("specs:"), "{text}");
@@ -864,4 +864,83 @@ fn authoring_init_100_a_scenario_edit_and_a_reader_run_leave_only_the_feature_mo
     assert!(second.status.success(), "{}{}", stdout(&second), stderr(&second));
     assert!(repo.join(".canon/archive/kind=scenario").exists(), "the rewrite archived the superseded version, or this test proves nothing");
     assert_eq!(git(repo, &["status", "--porcelain", "-uall"]), format!(" M {path}\n"));
+}
+
+// ── change.drop.24 / change.drop.23: the skeleton routes `change_state`; its records are not ignored ──
+
+/// change.drop.24 (F8): `canon init` writes one `routing:` line per record kind, all thirteen, `change_state: local` among them, and the config it
+/// wrote is the one `init --check` and `change defer` (which needs the line) accept.
+#[test]
+fn change_drop_24_init_routes_every_record_kind_and_change_state_to_local() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = run_canon(&["init", "--repo", ".", "--no-harness"], dir.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    let text = std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap();
+    let doc: serde_yaml::Value = serde_yaml::from_str(&text).unwrap();
+    let routing = doc.get("routing").and_then(serde_yaml::Value::as_mapping).expect("a routing section");
+    assert_eq!(routing.len(), canon_model::RecordKind::ALL.len(), "one line per kind: {text}");
+    for kind in canon_model::RecordKind::ALL {
+        assert!(routing.contains_key(kind.as_str()), "no routing line for `{}`: {text}", kind.as_str());
+    }
+    assert_eq!(routing.get("change_state").and_then(serde_yaml::Value::as_str), Some("local"), "{text}");
+    assert!(text.contains("\n  change_state: local\n"), "{text}");
+
+    // A repo `init` made has nothing for `canon migrate` to add.
+    let check = run_canon(&["init", "--check", "--repo", "."], dir.path());
+    assert!(check.status.success(), "{}{}", stdout(&check), stderr(&check));
+}
+
+/// `git check-ignore -q <path>` in `repo`: `true` when git ignores the path (exit 0), `false` when it does not (exit 1).
+fn ignored(repo: &Path, path: &str) -> bool {
+    let out = Command::new("git")
+        .args(["-c", "core.excludesFile=/dev/null", "check-ignore", "-q", path])
+        .current_dir(repo)
+        .output()
+        .expect("spawn git");
+    match out.status.code() {
+        Some(0) => true,
+        Some(1) => false,
+        other => panic!("git check-ignore {path}: {other:?}: {}", String::from_utf8_lossy(&out.stderr)),
+    }
+}
+
+const CHANGE_STATE_RECORD: &str = ".canon/ledger/kind=change_state/demo__0123abcd.json";
+
+/// change.drop.23 (F7, the `.gitignore` half): this repository's `.gitignore` ignores `.canon/ledger/*` and re-includes the kinds it tracks; the
+/// `change_state` records are among them (a decision left local would leave CI and every other clone requiring the closed change), while a staged
+/// record and the derived kinds stay ignored.
+#[test]
+fn change_drop_23_this_repos_gitignore_does_not_ignore_change_state_records() {
+    let dir = tempfile::tempdir().unwrap();
+    let own = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.gitignore")).expect("the repository's .gitignore");
+    assert!(own.lines().any(|line| line.trim() == ".canon/ledger/*"), "this repository ignores the ledger and re-includes per kind");
+    assert!(Command::new("git").args(["init", "-q"]).current_dir(dir.path()).status().unwrap().success());
+    write(dir.path(), ".gitignore", &own);
+
+    assert!(!ignored(dir.path(), CHANGE_STATE_RECORD), "a change_state record is tracked: `!.canon/ledger/kind=change_state/`");
+    assert!(own.lines().any(|line| line.trim() == "!.canon/ledger/kind=change_state/"));
+    assert!(ignored(dir.path(), ".canon/ledger/_staging/kind=change_state/demo__0123abcd.json"), "a staged record stays local");
+    assert!(ignored(dir.path(), ".canon/ledger/kind=run/demo__0123abcd.json"), "a kind that is not re-included stays ignored");
+    assert!(!ignored(dir.path(), ".canon/ledger/kind=finding/demo__0123abcd.json"), "the kinds re-included before are unchanged");
+}
+
+/// change.drop.23 (failure path): a `.gitignore` that ignores `.canon/ledger/*` without re-including `change_state` hides its records; that is why the
+/// release notes tell such a repository to add the one line. A repository `canon init` made ignores no ledger directory, so its records are committed.
+#[test]
+fn change_drop_23_a_gitignore_without_the_reinclude_ignores_the_records_and_init_made_repos_do_not() {
+    let hand = tempfile::tempdir().unwrap();
+    assert!(Command::new("git").args(["init", "-q"]).current_dir(hand.path()).status().unwrap().success());
+    write(hand.path(), ".gitignore", ".canon/ledger/*\n!.canon/ledger/kind=evidence/\n!.canon/ledger/kind=subject/\n");
+    assert!(ignored(hand.path(), CHANGE_STATE_RECORD), "no re-include: the record is ignored");
+    write(hand.path(), ".gitignore", ".canon/ledger/*\n!.canon/ledger/kind=evidence/\n!.canon/ledger/kind=change_state/\n");
+    assert!(!ignored(hand.path(), CHANGE_STATE_RECORD), "the one line the notes name re-includes it");
+
+    let made = tempfile::tempdir().unwrap();
+    assert!(Command::new("git").args(["init", "-q"]).current_dir(made.path()).status().unwrap().success());
+    let out = run_canon(&["init", "--repo", ".", "--no-harness"], made.path());
+    assert!(out.status.success(), "{}", stderr(&out));
+    let gitignore = std::fs::read_to_string(made.path().join(".gitignore")).unwrap();
+    assert!(!gitignore.contains("change_state"), "`canon init`'s .gitignore does not change: {gitignore}");
+    assert!(!gitignore.lines().any(|line| line.trim() == ".canon/ledger/*"), "init ignores no whole ledger: {gitignore}");
+    assert!(!ignored(made.path(), CHANGE_STATE_RECORD), "a change_state record of a repo init made is not ignored: {gitignore}");
 }

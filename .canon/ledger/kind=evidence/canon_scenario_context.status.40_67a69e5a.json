@@ -1,0 +1,69 @@
+{
+  "actor": {
+    "agent_id": "impl-0-42",
+    "role": "implementer",
+    "session_id": "s-0-42-impl"
+  },
+  "at": "2026-11-16T12:55:33.922159248Z",
+  "attachments": [
+    {
+      "case": "approve_refuses_a_repo_with_no_policy",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "a_repo_without_a_policy_gets_no_approval_advisory",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "approve_refuses_an_empty_approver",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "the_approval_file_is_never_ignored",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "approve_records_the_policy_digest_the_approver_the_time_and_the_note",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    },
+    {
+      "case": "gate_check_and_status_advise_until_the_current_policy_is_approved",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "e572c2d5778721bb6cf3039dd7160ac9ff2ab96ee2db2da6404feb2820a89614"
+    }
+  ],
+  "code_tree": "7368ebf477da839ae134cccfc86b83aece897005",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "the scenario cases re-bound to the workspace nextest run (4162 passed, 2 skipped) from the clean tree at dc26292cd; they carry no scenario id in their names, so bound by --report-case, the same cases as the record before"
+  },
+  "evidence_sha": "dc26292cd2dab9113966d0b992ead0fdd2922484",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 992,
+  "scenario_id": "context.status.40",
+  "schema": 1,
+  "staging_id": "3b8478f3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

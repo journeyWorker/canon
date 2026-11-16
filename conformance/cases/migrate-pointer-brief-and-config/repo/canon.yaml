@@ -10,6 +10,7 @@ routing:
   review: local
   evidence: local
   finding: local
+  change_state: local
 specs:
   roots:
     - id: root

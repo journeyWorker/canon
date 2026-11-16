@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T11:36:16.674882257Z",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "kind": "review",
+  "pin": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:change_drop_23_a_gitignore_without_the_reinclude_ignores_the_records_and_init_made_repos_do_not",
+          "junit:change_drop_23_a_tree_without_the_change_and_an_agent_without_the_humans_answer_are_refused",
+          "junit:change_drop_23_this_repos_gitignore_does_not_ignore_change_state_records"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "7c0d0f5eb0fed9512f7220849203128d46834e8b1a9cd9471725646c76239b12",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-42-change-drop/brief.md"
+  },
+  "review_id": "01M7J29GH2G1Y507F3YRXH8TJT",
+  "reviewer": "rev-0-42-drop",
+  "reviewer_harness": "omp",
+  "scenario_id": "change.drop.23",
+  "schema": 2,
+  "worktree_dirty": false
+}

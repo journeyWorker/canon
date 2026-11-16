@@ -93,7 +93,10 @@ const REFUSALS: &[Row] = &[
     lit("artifacts prune", &["artifacts", "prune", "--commit", "--plan-digest", "bogus"], "PLAN_STALE"),
     lit("artifacts store", &["artifacts", "store"], "CONFIG_INVALID").setup(BROKEN_CONFIG),
     lit("brief approve", &["brief", "approve", "no-such-change", "--approver", "alice", "--note", "ok"], "BRIEF_NOT_FOUND"),
+    lit("change defer", &["change", "defer", "no-such-change", "--reason", "later", "--ref", "chat", "--approver", "alice"], "CHANGE_NOT_FOUND"),
+    lit("change drop", &["change", "drop", "no-such-change", "--reason", "never", "--ref", "chat", "--approver", "alice"], "CHANGE_NOT_FOUND"),
     lit("change new", &["change", "new", "add-login", "--subject", "demo", "--title", "Again"], "CHANGE_EXISTS"),
+    lit("change reopen", &["change", "reopen", "no-such-change", "--reason", "now", "--approver", "alice"], "CHANGE_NOT_FOUND"),
     lit("context-pack add", &["context-pack", "add", "--manifest", "missing.json"], "CONTEXT_INPUT_NOT_FOUND"),
     lit("dashboard", &["dashboard", "--repo", "@missing"], "REPO_INVALID"),
     lit("demo init", &["demo", "init", "--repo", "canon.yaml"], "WRITE_INVALID"),
@@ -147,10 +150,13 @@ const KNOWN_BUGS: &[(&str, &str, &str)] = &[];
 
 /// Replay-safe, content-keyed or once leaves whose example cannot run to
 /// success in the fixture, and the state they need.
-const IDEMPOTENCY_NEEDS_STATE: &[(&str, &str)] = &[(
-    "strategy rollback",
-    "a human's signed approval: an ssh key pinned as an allowed signer in .canon/policy.yaml, and a signature over the rollback payload, which needs ssh-keygen",
-)];
+const IDEMPOTENCY_NEEDS_STATE: &[(&str, &str)] = &[
+    ("change reopen", "a deferred change: the scratch repo's add-login was never closed, so the reopen is refused (CHANGE_CONFLICT, NOT_DEFERRED)"),
+    (
+        "strategy rollback",
+        "a human's signed approval: an ssh key pinned as an allowed signer in .canon/policy.yaml, and a signature over the rollback payload, which needs ssh-keygen",
+    ),
+];
 
 /// Declared-idempotent leaves not run twice at all.
 const IDEMPOTENCY_EXCLUDED: &[(&str, &str)] = &[("dashboard", "binds a port and serves until the process is stopped")];

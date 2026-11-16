@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-ship",
+    "role": "reviewer",
+    "session_id": "s-0-42-ship-rev"
+  },
+  "at": "2026-11-16T11:39:59.413178886Z",
+  "change_id": "canon-0-42-release-portability",
+  "code_tree": "74b412c71f78b6ffc0ca1d52bc6b1bf3527071dd",
+  "disposition": "open",
+  "file_ref": "scripts/check-release-workflow-safety.py:866",
+  "introduced_by": "bda55ea3058c1f7c11626db78764b1b3bfce8161",
+  "kind": "finding",
+  "reviewed_sha": "4d987de81f8272835a28441e75d791afb48f7692",
+  "reviewer": "rev-0-42-ship",
+  "round": 2,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "(standards pass, r2 re-check of 1_1) The new call pattern still misses two shell forms of the same call: npm with an option before the subcommand (npm --loglevel=error whoami) and a command prefix (env FOO=1 npm whoami). Added before the ABSENT block of publish.yml at 4d987de81, both leave the checker at exit 0. Every form 1_1 named (bare, VAR=$(...), backticks, || true, && chain, if !) is now refused. Fix: match npm followed by any options and then whoami (npm(\\s+-\\S+)*\\s+whoami), or treat any source line containing the word whoami outside an echo or printf as a call.",
+  "worktree_dirty": false
+}
