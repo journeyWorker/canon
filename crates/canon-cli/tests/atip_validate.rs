@@ -54,30 +54,101 @@ fn candidates(domain: &Value, seed: &mut Seed) -> Vec<Value> {
     values
 }
 
-#[test]
-fn admits_answers_as_the_validator_does_for_every_domain_canon_declares() {
-    let mut seed = Seed(0x2545_F491_4F6C_DD1D);
-    let (mut domains, mut pairs, mut patterns) = (0, 0, 0);
+/// A domain as a key: its whole value in one canonical text (members sorted by name), so two domains are one only when every keyword is equal
+/// (the same pattern with another `maxLength` is another domain).
+fn key(domain: &Value) -> String {
+    match domain {
+        Value::Object(members) => {
+            let mut names: Vec<&String> = members.keys().collect();
+            names.sort();
+            format!("{{{}}}", names.iter().map(|name| format!("{}:{}", json!(name), key(&members[*name]))).collect::<Vec<_>>().join(","))
+        }
+        Value::Array(items) => format!("[{}]", items.iter().map(key).collect::<Vec<_>>().join(",")),
+        other => other.to_string(),
+    }
+}
+
+/// Every argument canon declares a domain for: the command, the argument, its domain and its default values.
+struct Declared {
+    label: String,
+    domain: Value,
+    defaults: Vec<Value>,
+}
+
+fn declared() -> Vec<Declared> {
+    let mut all = Vec::new();
     for doc in leaves() {
         for argument in options(doc).iter().chain(doc["operands"].as_array().into_iter().flatten()) {
             let Some(domain) = argument.get("domain") else { continue };
-            domains += 1;
-            patterns += usize::from(domain.get("pattern").is_some());
-            let compiled = atip::domain::compile(domain).unwrap_or_else(|why| panic!("`{}` {}: {why}", doc["command"], argument["name"]));
-            let defaults: Vec<Value> = match &argument["default"] {
+            let defaults = match &argument["default"] {
                 Value::Null => Vec::new(),
                 Value::Array(items) => items.clone(),
                 one => vec![one.clone()],
             };
-            for value in candidates(domain, &mut seed).into_iter().chain(defaults) {
-                let native = atip::domain::admits(domain, &value).unwrap_or_else(|why| panic!("`{}` {}: {why}", doc["command"], argument["name"]));
-                assert_eq!(native, compiled.admits(&value), "`{}` {}: {domain} against {value}", doc["command"], argument["name"]);
-                pairs += 1;
-            }
+            all.push(Declared { label: format!("`{}` {}", doc["command"], argument["name"]), domain: domain.clone(), defaults });
         }
     }
-    assert!(domains > 40 && patterns > 10, "canon declares {domains} domains, {patterns} of them patterns");
+    all
+}
+
+/// The distinct domains of `declared`, each with the first argument that declares it, in the order they first appear.
+fn distinct(declared: &[Declared]) -> Vec<(String, &Declared)> {
+    let mut seen = std::collections::BTreeSet::new();
+    declared.iter().filter_map(|one| seen.insert(key(&one.domain)).then(|| (key(&one.domain), one))).collect()
+}
+
+#[test]
+fn admits_answers_as_the_validator_does_for_every_domain_canon_declares() {
+    let mut seed = Seed(0x2545_F491_4F6C_DD1D);
+    let declared = declared();
+    let patterns = declared.iter().filter(|one| one.domain.get("pattern").is_some()).count();
+    let mut compiled = std::collections::BTreeMap::new();
+    let mut asked: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut pairs = 0;
+    // Every distinct domain is asked once, the values it is always asked (its bounds, lengths, samples) and the random strings of one seed.
+    for (domain_key, one) in distinct(&declared) {
+        let domain = &one.domain;
+        let validator = atip::domain::compile(domain).unwrap_or_else(|why| panic!("{}: {why}", one.label));
+        for value in candidates(domain, &mut seed) {
+            let native = atip::domain::admits(domain, &value).unwrap_or_else(|why| panic!("{}: {why}", one.label));
+            assert_eq!(native, validator.admits(&value), "{}: {domain} against {value}", one.label);
+            pairs += 1;
+        }
+        asked.insert(domain_key.clone());
+        compiled.insert(domain_key, validator);
+    }
+    // The default of every argument is asked of its own domain.
+    for one in &declared {
+        let validator = &compiled[&key(&one.domain)];
+        for value in &one.defaults {
+            let native = atip::domain::admits(&one.domain, value).unwrap_or_else(|why| panic!("{}: {why}", one.label));
+            assert_eq!(native, validator.admits(value), "{}: {} against {value}", one.label, one.domain);
+            pairs += 1;
+        }
+    }
+    // The distinct domains, found again another way (a list searched by equality), are the ones asked; every argument's domain is among them.
+    let mut again: Vec<&Value> = Vec::new();
+    for one in &declared {
+        if !again.contains(&&one.domain) {
+            again.push(&one.domain);
+        }
+    }
+    assert_eq!(again.len(), asked.len(), "the distinct domains asked");
+    assert!(again.iter().all(|domain| asked.contains(&key(domain))), "a domain was not asked");
+    assert!(declared.iter().all(|one| asked.contains(&key(&one.domain))), "an argument's domain was not asked");
+    println!("{} arguments declare a domain, {patterns} of them a pattern; {} distinct domains; {pairs} values asked", declared.len(), asked.len());
+    assert!(declared.len() > 40 && patterns > 10, "canon declares {} domains, {patterns} of them patterns", declared.len());
     assert!(pairs > 10_000, "{pairs} values asked");
+}
+
+/// Two arguments with the same pattern and another length bound are two domains; the same domain written with its members in another order is one.
+#[test]
+fn a_domain_is_keyed_by_its_whole_value() {
+    let one = |domain: Value| Declared { label: String::new(), domain, defaults: Vec::new() };
+    let all = [one(json!({ "type": "string", "pattern": "^a$", "maxLength": 10 })), one(json!({ "type": "string", "pattern": "^a$", "maxLength": 20 })), one(json!({ "maxLength": 10, "pattern": "^a$", "type": "string" }))];
+    assert_eq!(distinct(&all).len(), 2);
+    assert_ne!(key(&all[0].domain), key(&all[1].domain));
+    assert_eq!(key(&all[0].domain), key(&all[2].domain));
 }
 
 #[test]
