@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T13:03:15.442558145Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-report/src/digest.rs:14-17",
+  "introduced_by": "0f4e776025d1ae7ad151075fe40d42f56a8e694d",
+  "kind": "finding",
+  "resolution_code_tree": "d09bfae19ba2d0c4c2e5b8773290887af1aaec4e",
+  "resolution_sha": "a76e78db6a06fa44479cea88fe9cb8e2fb65c373",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-drop",
+  "round": 1,
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "P3 (deviation judged): ChangeState on the corpus digest side is right (a git-tracked declaration of what is still required, not a verdict); the module doc still lists the corpus as change/task/scenario/subject only. CHANGE_HISTORY_MISSING (a status warning the brief did not name) is accepted: registered, in CHANGELOG Added, message says shallow clone and `git fetch --unshallow`.",
+  "worktree_dirty": false
+}
