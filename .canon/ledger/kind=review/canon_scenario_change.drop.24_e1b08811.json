@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T11:36:16.674882257Z",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "kind": "review",
+  "pin": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:change_drop_24_init_routes_every_record_kind_and_change_state_to_local",
+          "junit:change_drop_24_the_guides_help_and_spec_say_how_to_close_a_change_who_may_and_how_it_looks"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "fff3c6ae5baf44d2ff72b2109ae2957dcc1843c8169df68896e96a77f6010be3",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-42-change-drop/brief.md"
+  },
+  "review_id": "01M7J29GH2G1Y507F3YRXH8TJT",
+  "reviewer": "rev-0-42-drop",
+  "reviewer_harness": "omp",
+  "scenario_id": "change.drop.24",
+  "schema": 2,
+  "worktree_dirty": false
+}

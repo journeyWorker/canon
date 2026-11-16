@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-drop",
+    "role": "reviewer",
+    "session_id": "Rev42_drop"
+  },
+  "at": "2026-11-16T11:36:39.206246488Z",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "kind": "review",
+  "pin": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:skills_install_21_only_the_six_human_acts_name_no_agent_role"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "f11d11278d9fc571c6adb713da08fb25fee496be45f4553a834fe3a3f25ec127",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/specs/kind=feature/area=skills/install.feature"
+  },
+  "review_id": "01M7J2A6H6FD074DRH07DD6RTH",
+  "reviewer": "rev-0-42-drop",
+  "reviewer_harness": "omp",
+  "scenario_id": "skills.install.21",
+  "schema": 2,
+  "worktree_dirty": false
+}
