@@ -653,7 +653,7 @@ fn unadopt_change(
                     subject_id.as_str()
                 ),
                 format!(
-                    "an approved change is the subject's approved scope and stays adopted; unadopt only a change nobody approved, or keep `{}` and let its flow-tagged scenarios wait for a new approval",
+                    "an approved change is the subject's approved scope and stays adopted; to take it out of the plan a human decides with `canon change defer {0}` or `canon change drop {0}` (a reason, a reference and the approver; an agent relays the human's answer with --relayed-via); unadopt only a change nobody approved",
                     change_id.as_str()
                 ),
             ));
@@ -669,7 +669,7 @@ fn unadopt_change(
                 subject_id.as_str(),
                 change_id.as_str()
             ),
-            format!("remove or retag the `@flow:{}.*` tags on those scenarios first, then run `canon subject unadopt` again", change_id.as_str()),
+            format!("remove or retag the `@flow:{0}.*` tags on those scenarios first, then run `canon subject unadopt` again; to take the whole change out of the plan instead, a human decides with `canon change defer {0}` or `canon change drop {0}`", change_id.as_str()),
         ));
     }
     let canon_yaml_path = resolve_canon_yaml(&resolved);
@@ -1384,11 +1384,13 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
 
     let owned = subject_scenarios(gate_context, subject_id);
     if owned.is_empty() {
-        return vec![Violation::new(
-            FailureClass::UncoveredCell,
-            subject,
-            format!("verifying → shipped: no scenario is tagged `@subject:{subject}` — tag its scenarios and run `canon inventory sync`; shipping needs evidence, not an empty set"),
-        )];
+        let set_aside = canon_gate::spec_coverage::all_scenarios(gate_context).into_iter().filter(|s| s.subject_id.as_ref() == Some(subject_id)).count();
+        let why = if set_aside > 0 {
+            format!("every scenario tagged `@subject:{subject}` ({set_aside}) was set aside by a closed change — shipping needs evidence, not an empty set; tag the scenarios of a change that is still planned")
+        } else {
+            format!("no scenario is tagged `@subject:{subject}` — tag its scenarios and run `canon inventory sync`; shipping needs evidence, not an empty set")
+        };
+        return vec![Violation::new(FailureClass::UncoveredCell, subject, format!("verifying → shipped: {why}"))];
     }
 
     let verdicts = latest_verdicts(gate_context);

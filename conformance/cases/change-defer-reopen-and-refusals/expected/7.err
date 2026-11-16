@@ -1,0 +1,2 @@
+canon: CHANGE_CONFLICT: change `a` was dropped, and a dropped change is not brought back
+  hint: write a new change with `canon change new <slug> --subject <id> --title <title>` and name `a` in its `Source:` line

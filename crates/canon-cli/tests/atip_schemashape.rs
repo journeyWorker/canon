@@ -33,7 +33,7 @@ const OPTIONS: [(&str, &str, &str); 3] = [("dispatch begin", "skill", "SKILL_ID"
 const ALL_ROLES: [&str; 13] = ["completion", "context", "divergence list", "finding list", "format", "gate check", "query", "retrieve", "schema", "search", "skills show", "status", "trace"];
 
 /// The commands only a human runs: the empty array of roles.
-const HUMAN_ONLY: [&str; 3] = ["brief approve", "divergence accept", "policy approve"];
+const HUMAN_ONLY: [&str; 6] = ["brief approve", "change defer", "change drop", "change reopen", "divergence accept", "policy approve"];
 
 const ROLES: [&str; 4] = ["planner", "implementer", "reviewer", "orchestrator"];
 

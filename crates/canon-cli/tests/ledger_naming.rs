@@ -110,12 +110,12 @@ const RUN_LOWER: &str = "01j0z9z9z9z9z9z9z9z9z9z9z9";
 
 // ── ledger.naming.01 ─────────────────────────────────────────────────────
 
-/// ledger.naming.01: each of the twelve core kinds is written under
+/// ledger.naming.01: each of the thirteen core kinds is written under
 /// `kind=<kind>/<components>_<digest8>.json` with the table's components in
 /// table order, one directory level and no `area=`; so is a plugin overlay.
 #[test]
 fn ledger_naming_01_every_kind_is_stored_under_the_one_name_rule() {
-    let expected: [(&str, &str); 12] = [
+    let expected: [(&str, &str); 13] = [
         ("change", "s1-state-model-join-spine"),
         ("task", "s1-state-model-join-spine+236.2"),
         ("scenario", "root_world.firstbuy-hotdeal.26"),
@@ -128,6 +128,7 @@ fn ledger_naming_01_every_kind_is_stored_under_the_one_name_rule() {
         ("evidence", "-_task_s1-state-model-join-spine+236.2"),
         ("subject", "subject-domain-loop"),
         ("finding", "s42-close-the-open-loops_11_4"),
+        ("change_state", "canon-0-41-ci-nextest"),
     ];
     let dir = tempfile::tempdir().unwrap();
     let git = GitTier::new(dir.path());
@@ -144,7 +145,7 @@ fn ledger_naming_01_every_kind_is_stored_under_the_one_name_rule() {
     assert_eq!(receipt.location, format!("kind=porting.coverage/root_world.place-lock.01_{}.json", d8(&overlay)));
     // One directory level: every directory under the root is `kind=<kind>` itself, no `area=`.
     let dirs = dirs_below(dir.path());
-    assert_eq!(dirs.len(), 13, "twelve core kinds and one overlay, one level each: {dirs:?}");
+    assert_eq!(dirs.len(), 14, "thirteen core kinds and one overlay, one level each: {dirs:?}");
     assert!(dirs.iter().all(|d| d.components().count() == 1 && d.to_string_lossy().starts_with("kind=")), "{dirs:?}");
     assert!(!dirs.iter().any(|d| d.to_string_lossy().contains("area=")), "{dirs:?}");
 }

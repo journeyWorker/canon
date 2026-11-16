@@ -151,10 +151,10 @@ pub struct QueryArgs {
     /// Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records
     #[arg(long)]
     pub history: bool,
-    /// Scope --kind change/task to one ChangeId (other kinds exit 2)
+    /// Scope --kind change/task/change_state to one ChangeId (other kinds exit 2)
     #[arg(long = "change", value_parser = crate::query::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: Option<ChangeId>,
-    /// Scope --kind change/task by status field (other kinds exit 2)
+    /// Scope --kind change/task/subject by status field; for --kind change_state one of deferred, dropped, reopened (other kinds exit 2)
     #[arg(long, value_name = "STATUS")]
     pub status: Option<String>,
     /// Scope --kind subject by domain (other kinds exit 2)

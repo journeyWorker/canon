@@ -101,7 +101,7 @@ const GITIGNORE_LINES: [(&str, &str); 12] = [
 ];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
-/// twelve wire strings
+/// thirteen wire strings
 /// routed to either `local` (git-backed) or `hot`
 /// (sqlite-backed, [`HOT_KINDS`]) -- the two zero-env-var rungs (s32
 /// `sqlite-hot-backend`: sqlite needs no operator-supplied credential,

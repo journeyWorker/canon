@@ -3,8 +3,8 @@
 You are the independent second look. Declare the role with
 `CANON_ROLE=reviewer` (or `--as reviewer`); `--role` on `review scenario`,
 `review change` and `finding add` then defaults to `reviewer`. The human's
-acts refuse you (`ACTOR_DENIED`): `brief approve`, `policy approve` and
-`divergence accept`, unless you record the answer the human gave you in the
+acts refuse you (`ACTOR_DENIED`): `brief approve`, `policy approve`,
+`divergence accept`, `change drop`, `change defer` and `change reopen`, unless you record the answer the human gave you in the
 conversation with `--relayed-via <tool>` (the divergence acceptance below).
 Name what the human has to decide; never look for another flag that grants it.
 You never run them without that answer, and never remove or unset your role
@@ -115,7 +115,7 @@ canon gate check --json
 ```
 ```text
 # Read stored records across every storage tier
-usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence --json
@@ -150,7 +150,7 @@ canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
-usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
 canon search timeout --kind finding --json

@@ -65,7 +65,8 @@ a feature, a one-line request included. A human is needed once per scope:
   change on a live subject waits on its own scenarios; an untagged scenario
   answers to every change with an `Approved:` line (an edited one refuses); `change new` and
   `subject adopt` warn when the subject is live. `canon subject unadopt <subject-id> --change <change>`
-  takes a draft change back off (refused once approved). The subject
+  takes a draft change back off (refused once approved: the human's
+  `change defer` or `change drop` takes an approved one out). The subject
   answers for every adopted change that is tagged (a scenario of the subject
   is tagged `@flow:<change>.*`), has an `Approved:` line, or is a chore:
   reopen and ship pass only when all of them are approved now, whatever the
@@ -301,11 +302,21 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
 - `--override-reason <text>` is the only way to proceed past a waivable
   refusal; it is recorded, echoed in `data.overrides[]` and listed by `status`
   for the human. There is no `--force`. `brief approve`, `policy approve`,
-  `divergence accept` and the `migrate --commit` that re-binds `Approved:`
+  `divergence accept`, `change drop`, `change defer`, `change reopen` (six
+  leaves) and the `migrate --commit` that re-binds `Approved:`
   lines record a human's decision and refuse every agent role (`ACTOR_DENIED`)
   unless they record the explicit answer the human gave you, with
   `--relayed-via <tool>` (show, ask, record, as for the brief; `canon skills
   show role-planner`); never unset your role to run one.
+  To close a change the human no longer wants, ask with the question tool, then
+  record their answer with `canon change defer <slug> --reason "<their words>" --ref <link or date> --approver <their name> --relayed-via <the question tool> --actor <your actor id>`
+  (defer is "not this release", `canon change drop` is the end and takes the
+  same options, a deferred change comes back with `canon change reopen` and a
+  new `brief approve`; a shipped change cannot be closed; evidence, reviews and
+  findings stay). A closed change drops out of the requirements: `canon status`
+  lists it in `setAsideChanges` and `setAsideScenarios`, `canon gate check`
+  prints the advisory `closed_change`, `canon query --kind change_state` reads
+  its state.
 
 ### Many records at once: `--input`
 

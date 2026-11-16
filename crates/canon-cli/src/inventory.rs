@@ -1000,6 +1000,12 @@ fn sync_one_root(
 /// wrote). A root the refresh would refuse is left as it is: the readers
 /// fail closed on it ([`unrefreshable_roots`]).
 pub fn overlay_stale_index(ctx: &mut GateContext) {
+    overlay_index_only(ctx);
+    // The same read serves every command that grades requirements: what a closed change sets aside (0.42).
+    crate::set_aside::attach(ctx);
+}
+
+fn overlay_index_only(ctx: &mut GateContext) {
     let repo = ctx.ctx.repo.clone();
     let Ok(sync) = SyncCtx::from_repo(&repo) else { return };
     let Ok(roots) = sync.spec_roots(None) else { return };

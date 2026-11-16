@@ -30,7 +30,7 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
   @flow:canon-0-41-atip-1-6.F2
   @atip.claim16.03
   Scenario: No document has commaList or pathShape, and no generated spec or conformance expectation prints one
-    Given the tree, the 78 command documents, the registry and schemas answers, the generated spec and the conformance expectations of canon at 1.6
+    Given the tree, the 81 command documents, the registry and schemas answers, the generated spec and the conformance expectations of canon at 1.6
     When each is scanned for the members commaList and pathShape
     Then none holds either member, so a 1.5 caller reads the documents as it read them and they differ from 0.40.0 in the declaration strings alone
 
@@ -96,7 +96,7 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
   @flow:canon-0-41-atip-1-6.F5
   @atip.claim16.09
   Scenario: Every option name has one value name and one value kind in every command document
-    Given the shared options of the tree and the options of the 78 command documents
+    Given the shared options of the tree and the options of the 81 command documents
     When each name is grouped with the value names and value kinds it carries
     Then no name has two value names or two value kinds, and --kind keeps the one value name KIND in gate promote and purge
 

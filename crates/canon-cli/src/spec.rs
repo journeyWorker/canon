@@ -186,7 +186,7 @@ fn declared_env(command: &str, option: &str) -> Option<&'static str> {
         (_, "as" | "role") => Some(crate::role::ENV),
         ("skills install" | "skills check" | "skills doctor", "skills-source") => Some(crate::skills::CANONICAL_SOURCE_ENV),
         // The relayed human acts (`--relayed-via`) take the agent's actor id from the variable when `--actor` is not given.
-        ("brief approve" | "migrate" | "policy approve", "actor") => Some(crate::relay::ACTOR_ENV),
+        ("brief approve" | "migrate" | "policy approve" | "change defer" | "change drop" | "change reopen", "actor") => Some(crate::relay::ACTOR_ENV),
         _ => None,
     }
 }

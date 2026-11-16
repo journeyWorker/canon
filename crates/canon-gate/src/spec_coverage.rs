@@ -364,6 +364,12 @@ pub fn latest_scenarios(ctx: &GateContext) -> Vec<&Scenario> {
     ctx.scenario_fold().latest.iter().map(|&i| &ctx.scenarios[i]).collect()
 }
 
+/// [`latest_scenarios`] with the scenarios a closed change set aside (0.42) kept: for a reader that asks whether a
+/// scenario exists (an evidence, review or divergence record may still name it), never what is required.
+pub fn all_scenarios(ctx: &GateContext) -> Vec<&Scenario> {
+    ctx.scenario_fold().all.iter().map(|&i| &ctx.scenarios[i]).collect()
+}
+
 /// The LATEST generation of one `(project_id, scenario_id)`: the row
 /// [`latest_scenarios`] holds for that key, by lookup.
 pub fn latest_scenario<'a>(ctx: &'a GateContext, project: &ProjectId, scenario: &ScenarioId) -> Option<&'a Scenario> {
@@ -390,6 +396,15 @@ pub fn latest_changes(ctx: &GateContext) -> Vec<&Change> {
 /// status` and the brief read it, so a change shared by two subjects
 /// gates both whichever record carries the link.
 pub fn subject_change_ids(ctx: &GateContext, subject: &Subject) -> Vec<ChangeId> {
+    let mut ids = adopted_change_ids(ctx, subject);
+    // A closed change reads as absent from the list (0.42).
+    ids.retain(|change| !ctx.set_aside.is_closed(change));
+    ids
+}
+
+/// [`subject_change_ids`] with the closed changes kept: every change the subject adopted, for a reader that
+/// reports what was set aside.
+pub fn adopted_change_ids(ctx: &GateContext, subject: &Subject) -> Vec<ChangeId> {
     let mut ids = subject.change_ids.clone();
     let mut named: Vec<&Change> = ctx
         .change_fold()
@@ -585,6 +600,8 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: corpus.unreadable,
             tombstoned_scenarios: Default::default(),
+            change_states: Vec::new(),
+            set_aside: Default::default(),
             code_tree: None,
             derived: Default::default(),
             now: Utc::now(),

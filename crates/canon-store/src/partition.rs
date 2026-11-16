@@ -193,7 +193,7 @@ pub fn old_layout(actual_path: &std::path::Path) -> EvidenceViolation {
 /// `canon_model::fixtures::round_trip_well_formed`'s per-kind dispatch
 /// (S1), reused here as the git-tier read path's content-malformed gate.
 pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceViolation> {
-    use canon_model::records::{Change, Task, Scenario, Run, Review, Divergence, Trajectory, StrategyItem, Subject, Finding};
+    use canon_model::records::{Change, ChangeState, Task, Scenario, Run, Review, Divergence, Trajectory, StrategyItem, Subject, Finding};
     use canon_model::{Handoff};
 
     macro_rules! try_deserialize {
@@ -231,6 +231,7 @@ pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceVi
         // generic deserialize-failed string, and never a fix nobody can
         // name a closing commit for.
         RecordKind::Finding => Finding::from_body(&raw.0).map(|_| ()),
+        RecordKind::ChangeState => try_deserialize!(ChangeState),
     }
 }
 

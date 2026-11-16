@@ -406,6 +406,7 @@
         "BRIEF_REQUIRED",
         "BRIEF_UNAVAILABLE",
         "BRIEF_WRITE_FAILED",
+        "CHANGE_CONFLICT",
         "CHANGE_REQUIRED",
         "CONFIG_DENIED",
         "CONFIG_INVALID",
@@ -470,24 +471,8 @@
           "required": true,
           "valueName": "TEXT"
         },
-        {
-          "domain": {
-            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
-          },
-          "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it",
-          "name": "relayed-via",
-          "valueName": "NAME"
-        },
-        {
-          "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
-          "domain": {
-            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
-          },
-          "env": "CANON_ACTOR",
-          "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
-          "name": "actor",
-          "valueName": "ACTOR_ID"
-        },
+        "relayed-via",
+        "actor",
         {
           "domain": {
             "pattern": "^[^=]+=sha256:[^\u0000]*$"
@@ -694,11 +679,240 @@
       }
     },
     {
+      "command": "change defer",
+      "constraints": [
+        {
+          "if": {
+            "name": "actor"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        }
+      ],
+      "effect": "write",
+      "errors": [
+        "ACTOR_DENIED",
+        "CHANGE_CONFLICT",
+        "CHANGE_NOT_FOUND",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
+        "CONFIG_REQUIRED",
+        "CONFIG_UNAVAILABLE",
+        "LAYOUT_MIGRATION_REQUIRED",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
+        "REPO_UNAVAILABLE",
+        "ROLE_INVALID",
+        "WRITE_DENIED",
+        "WRITE_INVALID"
+      ],
+      "examples": [
+        "canon change defer add-login --reason \"waiting on the vendor\" --ref \"chat 2026-11-16\" --approver alice --json"
+      ],
+      "idempotency": "replay-safe",
+      "input": {
+        "argumentsRef": "#/schemas/ChangeDeferArguments",
+        "batch": true,
+        "example": {
+          "approver": "alice",
+          "operands": [
+            "add-login"
+          ],
+          "reason": "waiting on the vendor",
+          "ref": [
+            "chat 2026-11-16"
+          ]
+        },
+        "maxBytes": 8388608,
+        "maxItems": 10000
+      },
+      "kind": "command",
+      "operands": [
+        {
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "help": "The change to close (it must have a record)",
+          "name": "change",
+          "required": true,
+          "valueName": "CHANGE_ID"
+        }
+      ],
+      "options": [
+        "reason",
+        "ref",
+        "approver",
+        "relayed-via",
+        "actor",
+        "repo",
+        "dry-run",
+        "as"
+      ],
+      "outputs": [
+        {
+          "schemaRef": "#/schemas/ChangeDeferReport",
+          "schemaVersion": "1.1"
+        },
+        {
+          "batch": true,
+          "schemaRef": "#/schemas/BatchChangeDeferReport",
+          "schemaVersion": "1.1",
+          "when": "--input is an array or NDJSON"
+        }
+      ],
+      "summary": "Set an approved change aside for now (a human's decision: needs a reason, a reference and the approver); `canon change reopen` brings it back",
+      "validators": [
+        {
+          "arguments": [
+            "relayed-via",
+            "as"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable."
+        },
+        {
+          "arguments": [
+            "relayed-via"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`)."
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "actor"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word."
+        }
+      ],
+      "x-canon": {
+        "roles": []
+      }
+    },
+    {
+      "command": "change drop",
+      "constraints": [
+        {
+          "if": {
+            "name": "actor"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        }
+      ],
+      "effect": "write",
+      "errors": [
+        "ACTOR_DENIED",
+        "CHANGE_CONFLICT",
+        "CHANGE_NOT_FOUND",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
+        "CONFIG_REQUIRED",
+        "CONFIG_UNAVAILABLE",
+        "LAYOUT_MIGRATION_REQUIRED",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
+        "REPO_UNAVAILABLE",
+        "ROLE_INVALID",
+        "WRITE_DENIED",
+        "WRITE_INVALID"
+      ],
+      "examples": [
+        "canon change drop add-login --reason \"not building it\" --ref \"chat 2026-11-16\" --approver alice --json"
+      ],
+      "idempotency": "replay-safe",
+      "input": {
+        "argumentsRef": "#/schemas/ChangeDropArguments",
+        "batch": true,
+        "example": {
+          "approver": "alice",
+          "operands": [
+            "add-login"
+          ],
+          "reason": "not building it",
+          "ref": [
+            "chat 2026-11-16"
+          ]
+        },
+        "maxBytes": 8388608,
+        "maxItems": 10000
+      },
+      "kind": "command",
+      "operands": [
+        {
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "help": "The change to close (it must have a record)",
+          "name": "change",
+          "required": true,
+          "valueName": "CHANGE_ID"
+        }
+      ],
+      "options": [
+        "reason",
+        "ref",
+        "approver",
+        "relayed-via",
+        "actor",
+        "repo",
+        "dry-run",
+        "as"
+      ],
+      "outputs": [
+        {
+          "schemaRef": "#/schemas/ChangeDropReport",
+          "schemaVersion": "1.1"
+        },
+        {
+          "batch": true,
+          "schemaRef": "#/schemas/BatchChangeDropReport",
+          "schemaVersion": "1.1",
+          "when": "--input is an array or NDJSON"
+        }
+      ],
+      "summary": "Give up an approved change for good (a human's decision: needs a reason, a reference and the approver); it is never brought back",
+      "validators": [
+        {
+          "arguments": [
+            "relayed-via",
+            "as"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable."
+        },
+        {
+          "arguments": [
+            "relayed-via"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`)."
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "actor"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word."
+        }
+      ],
+      "x-canon": {
+        "roles": []
+      }
+    },
+    {
       "command": "change new",
       "effect": "write",
       "errors": [
         "CHANGE_ADOPTION_INCOMPLETE",
-        "CHANGE_ARGUMENT_INVALID",
         "CHANGE_EXISTS",
         "CONFIG_DENIED",
         "CONFIG_INVALID",
@@ -790,6 +1004,126 @@
         "roles": [
           "planner"
         ]
+      }
+    },
+    {
+      "command": "change reopen",
+      "constraints": [
+        {
+          "if": {
+            "name": "actor"
+          },
+          "rule": "requires",
+          "then": [
+            "relayed-via"
+          ]
+        }
+      ],
+      "effect": "write",
+      "errors": [
+        "ACTOR_DENIED",
+        "CHANGE_CONFLICT",
+        "CHANGE_NOT_FOUND",
+        "CONFIG_DENIED",
+        "CONFIG_INVALID",
+        "CONFIG_REQUIRED",
+        "CONFIG_UNAVAILABLE",
+        "LAYOUT_MIGRATION_REQUIRED",
+        "REPO_DENIED",
+        "REPO_INVALID",
+        "REPO_LOCK_UNAVAILABLE",
+        "REPO_UNAVAILABLE",
+        "ROLE_INVALID",
+        "WRITE_DENIED",
+        "WRITE_INVALID"
+      ],
+      "examples": [
+        "canon change reopen add-login --reason \"the vendor answered\" --approver alice --json"
+      ],
+      "idempotency": "once",
+      "input": {
+        "argumentsRef": "#/schemas/ChangeReopenArguments",
+        "batch": true,
+        "example": {
+          "approver": "alice",
+          "operands": [
+            "add-login"
+          ],
+          "reason": "the vendor answered"
+        },
+        "maxBytes": 8388608,
+        "maxItems": 10000
+      },
+      "kind": "command",
+      "operands": [
+        {
+          "domain": {
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "help": "The deferred change to bring back",
+          "name": "change",
+          "required": true,
+          "valueName": "CHANGE_ID"
+        }
+      ],
+      "options": [
+        "reason",
+        {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
+          "help": "What a reader can open to see why: a link, a commit, a file, the date of a conversation (one line; once per reference)",
+          "name": "ref",
+          "repeatable": true,
+          "valueName": "TEXT"
+        },
+        "approver",
+        "relayed-via",
+        "actor",
+        "repo",
+        "dry-run",
+        "as"
+      ],
+      "outputs": [
+        {
+          "schemaRef": "#/schemas/ChangeReopenReport",
+          "schemaVersion": "1.1"
+        },
+        {
+          "batch": true,
+          "schemaRef": "#/schemas/BatchChangeReopenReport",
+          "schemaVersion": "1.1",
+          "when": "--input is an array or NDJSON"
+        }
+      ],
+      "summary": "Bring a deferred change back (a human's decision); the old approval is void and the brief needs a new one",
+      "validators": [
+        {
+          "arguments": [
+            "relayed-via",
+            "as"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` records a human's answer on behalf of an agent: a role is declared, with `--as` or the `CANON_ROLE` variable."
+        },
+        {
+          "arguments": [
+            "relayed-via"
+          ],
+          "code": "USAGE",
+          "description": "`--relayed-via` names the tool the human was asked with as one word: no white space, parenthesis or quote (the `Approved:` line writes it as `via <tool>`)."
+        },
+        {
+          "arguments": [
+            "relayed-via",
+            "actor"
+          ],
+          "code": "USAGE",
+          "description": "A relayed approval names the agent that recorded it: `--actor`, else the `CANON_ACTOR` variable, is given and is one word."
+        }
+      ],
+      "x-canon": {
+        "roles": []
       }
     },
     {
@@ -1041,6 +1375,7 @@
         "BRIEF_INVALID",
         "BRIEF_NOT_FOUND",
         "BRIEF_PAGE_STALE",
+        "CHANGE_CONFLICT",
         "CONFIG_INVALID",
         "DASHBOARD_FAILED",
         "DASHBOARD_PORT_UNAVAILABLE",
@@ -1574,7 +1909,15 @@
           "name": "expiry",
           "valueName": "TIMESTAMP"
         },
-        "actor",
+        {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
+          "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
+          "name": "actor",
+          "required": true,
+          "valueName": "ACTOR_ID"
+        },
         {
           "defaultNote": "the role declared with --as or CANON_ROLE",
           "domain": {
@@ -1600,7 +1943,14 @@
           "name": "relayed-via",
           "valueName": "NAME"
         },
-        "approver",
+        {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
+          "help": "With --relayed-via, who the human is",
+          "name": "approver",
+          "valueName": "NAME"
+        },
         "note",
         "repo",
         "as"
@@ -1775,7 +2125,15 @@
           "valueName": "TIMESTAMP"
         },
         "round",
-        "actor",
+        {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
+          "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
+          "name": "actor",
+          "required": true,
+          "valueName": "ACTOR_ID"
+        },
         "session",
         "detail",
         "role",
@@ -1875,7 +2233,15 @@
         },
         "rev",
         "round",
-        "actor",
+        {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
+          "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
+          "name": "actor",
+          "required": true,
+          "valueName": "ACTOR_ID"
+        },
         "session",
         {
           "domain": {
@@ -2064,7 +2430,15 @@
         },
         "rev",
         "round",
-        "actor",
+        {
+          "domain": {
+            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          },
+          "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
+          "name": "actor",
+          "required": true,
+          "valueName": "ACTOR_ID"
+        },
         "session",
         "detail",
         "role",
@@ -2972,7 +3346,8 @@
             "strategy_item",
             "evidence",
             "subject",
-            "finding"
+            "finding",
+            "change_state"
           ],
           "required": true,
           "valueType": "enum"
@@ -4514,17 +4889,15 @@
           "name": "relayed-via",
           "valueName": "NAME"
         },
+        "actor",
         {
-          "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
           "domain": {
             "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
           },
-          "env": "CANON_ACTOR",
-          "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
-          "name": "actor",
-          "valueName": "ACTOR_ID"
+          "help": "With --relayed-via, who the human is",
+          "name": "approver",
+          "valueName": "NAME"
         },
-        "approver",
         "note",
         "as"
       ],
@@ -4721,16 +5094,7 @@
           "name": "relayed-via",
           "valueName": "NAME"
         },
-        {
-          "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
-          "domain": {
-            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
-          },
-          "env": "CANON_ACTOR",
-          "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
-          "name": "actor",
-          "valueName": "ACTOR_ID"
-        },
+        "actor",
         "repo",
         "as"
       ],
@@ -5057,7 +5421,7 @@
         },
         {
           "code": "QUERY_ARGUMENT_INVALID",
-          "help": "`--change` applies only to `--kind change` and `--kind task`.",
+          "help": "`--change` applies only to `--kind change`, `--kind task` and `--kind change_state`.",
           "if": {
             "in": [
               "scenario",
@@ -5080,7 +5444,7 @@
         },
         {
           "code": "QUERY_ARGUMENT_INVALID",
-          "help": "`--status` applies only to `--kind change`, `--kind task` and `--kind subject`.",
+          "help": "`--status` applies only to `--kind change`, `--kind task`, `--kind subject` and `--kind change_state`.",
           "if": {
             "in": [
               "scenario",
@@ -5115,7 +5479,8 @@
               "trajectory",
               "strategy_item",
               "evidence",
-              "finding"
+              "finding",
+              "change_state"
             ],
             "name": "kind"
           },
@@ -5156,7 +5521,8 @@
             "strategy_item",
             "evidence",
             "subject",
-            "finding"
+            "finding",
+            "change_state"
           ],
           "required": true,
           "valueType": "enum"
@@ -5185,12 +5551,12 @@
           "domain": {
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
-          "help": "Scope --kind change/task to one ChangeId (other kinds exit 2)",
+          "help": "Scope --kind change/task/change_state to one ChangeId (other kinds exit 2)",
           "name": "change",
           "valueName": "CHANGE_ID"
         },
         {
-          "help": "Scope --kind change/task by status field (other kinds exit 2)",
+          "help": "Scope --kind change/task/subject by status field; for --kind change_state one of deferred, dropped, reopened (other kinds exit 2)",
           "name": "status"
         },
         {
@@ -5218,6 +5584,7 @@
               "abandoned_at",
               "actor",
               "approval",
+              "approver",
               "artifacts",
               "at",
               "attachments",
@@ -5265,7 +5632,9 @@
               "project_id",
               "provenance_ref",
               "reason",
+              "refs",
               "regime_key",
+              "relay",
               "removed",
               "reopen",
               "research_vendor_slug",
@@ -5325,6 +5694,14 @@
           ],
           "code": "QUERY_ARGUMENT_INVALID",
           "description": "`--status` is one of the statuses of the queried kind: `open`, `done` for `task`; `proposed`, `in_progress`, `completed`, `archived` for `change`; `proposed`, `specced`, `building`, `verifying`, `shipped`, `retired` for `subject`."
+        },
+        {
+          "arguments": [
+            "kind",
+            "status"
+          ],
+          "code": "USAGE",
+          "description": "`--status` of `--kind change_state` is one of `deferred`, `dropped`, `reopened`."
         },
         {
           "arguments": [
@@ -5924,6 +6301,7 @@
       "effect": "write",
       "errors": [
         "BRIEF_MIGRATION_REQUIRED",
+        "CHANGE_CONFLICT",
         "CONFIG_DENIED",
         "CONFIG_INVALID",
         "CONFIG_REQUIRED",
@@ -6210,6 +6588,7 @@
             "evidence",
             "subject",
             "finding",
+            "change_state",
             "brief"
           ],
           "repeatable": true,
@@ -7594,8 +7973,8 @@
     {
       "code": "ACTOR_DENIED",
       "exit": 2,
-      "fix": "Show the human what they approve (`canon brief show <change> --body` for a brief), ask with the harness question tool, and only on their explicit approval run the call again with --relayed-via <tool>, --actor, --approver and --note (a brief also takes --digest <change>=<shown digest>). Where canon.yaml says `approval: { relay: deny }`, the human runs the call in their own shell (or on the dashboard for a brief). Never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself.",
-      "meaning": "this leaf records a human's decision (`brief approve`, `policy approve`, `divergence accept`, a `migrate --commit` that re-binds `Approved:` lines), so an agent role (planner, implementer, reviewer, orchestrator declared with --as or CANON_ROLE) is refused unless it relays the human's explicit answer with --relayed-via, and a repo whose canon.yaml says `approval: { relay: deny }` refuses that too",
+      "fix": "Show the human what they approve (`canon brief show <change> --body` for a brief), ask with the harness question tool, and only on their explicit approval run the call again with --relayed-via <tool>, --actor, --approver and --note (a brief also takes --digest <change>=<shown digest>; `change defer`, `change drop` and `change reopen` take --reason, the human's words, in place of --note). Where canon.yaml says `approval: { relay: deny }`, the human runs the call in their own shell (or on the dashboard for a brief). Never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself.",
+      "meaning": "this leaf records a human's decision (`brief approve`, `policy approve`, `divergence accept`, `change defer`, `change drop`, `change reopen`, a `migrate --commit` that re-binds `Approved:` lines), so an agent role (planner, implementer, reviewer, orchestrator declared with --as or CANON_ROLE) is refused unless it relays the human's explicit answer with --relayed-via, and a repo whose canon.yaml says `approval: { relay: deny }` refuses that too",
       "retryable": false
     },
     {
@@ -7643,8 +8022,8 @@
     {
       "code": "APPROVAL_INVALID",
       "exit": 2,
-      "fix": "Pass the human's own answer, each one non-empty line: --approver and --note to `canon brief approve`, --approver to `canon policy approve`.",
-      "meaning": "the human's answer an approval records is blank or not one line: `brief approve` got an empty or multi-line --approver or --note, or `policy approve` got a blank --approver",
+      "fix": "Pass the human's own answer, each one non-empty line: --approver and --note to `canon brief approve`, --approver to `canon policy approve`, --approver and --reason to `canon change defer|drop|reopen`.",
+      "meaning": "the human's answer an approval records is blank or not one line: `brief approve` got an empty or multi-line --approver or --note, `policy approve` got a blank --approver, or `change defer`, `change drop` or `change reopen` got a blank or multi-line --approver",
       "retryable": false
     },
     {
@@ -7914,8 +8293,37 @@
     {
       "code": "CHANGE_ARGUMENT_INVALID",
       "exit": 2,
-      "fix": "Correct the arguments to `canon change new` so a brief can be built from them.",
-      "meaning": "`change new` could not build a brief from the given arguments",
+      "fix": "Correct the arguments to `canon change new`, `canon change defer`, `canon change drop` or `canon change reopen` (`canon schema change <leaf>` lists them): `--reason` and each `--ref` are one non-blank line.",
+      "meaning": "a `change` argument is wrong: `change new` could not build a brief from its arguments, or `change defer`, `change drop` or `change reopen` was given a blank or multi-line `--reason` or `--ref`",
+      "retryable": false
+    },
+    {
+      "code": "CHANGE_CONFLICT",
+      "exit": 2,
+      "fix": "Read the reason: a shipped change is not closed (write a new change that removes the behavior), a closed change is reopened by a human with `canon change reopen` (a dropped one is replaced by a new change), and only a deferred change reopens.",
+      "meaning": "the change's state does not allow the call: it already shipped, it is already deferred or dropped, it was dropped (final), or it is not deferred; nothing was written (the reason, `SHIPPED`, `CLOSED`, `DROPPED` or `NOT_DEFERRED`, names which)",
+      "reasons": [
+        {
+          "fix": "Leave the closed change alone; a human reopens a deferred change with `canon change reopen`, and a dropped change is replaced by a new change (`canon change new`, naming the dropped one in its `Source:`).",
+          "meaning": "the change is already deferred or dropped: a repeat of the same decision is `unchanged`, any other `change defer`, `change drop`, `brief approve` or `scenario new --flow --change` is refused and nothing is written",
+          "reason": "CLOSED"
+        },
+        {
+          "fix": "Write a new change with `canon change new` and name the dropped change in its `Source:`.",
+          "meaning": "the change was dropped, which is final: `canon change reopen` does not bring it back",
+          "reason": "DROPPED"
+        },
+        {
+          "fix": "Reopen only a change `canon query --kind change_state --status deferred` lists.",
+          "meaning": "`canon change reopen` was asked for a change that is not deferred (it was never closed, or it was reopened already)",
+          "reason": "NOT_DEFERRED"
+        },
+        {
+          "fix": "Write a new change that removes the behavior (`canon change new`, naming this change in its `Source:`); a shipped change is not closed. On a shallow clone, fetch the full history (`git fetch --unshallow`) and run the command again.",
+          "meaning": "the change already shipped (a subject moved to shipped with it on its change list after its brief was approved), or canon cannot read the move or approval history to rule that out, so it cannot be deferred or dropped",
+          "reason": "SHIPPED"
+        }
+      ],
       "retryable": false
     },
     {
@@ -7928,7 +8336,7 @@
     {
       "code": "CHANGE_NOT_FOUND",
       "exit": 2,
-      "fix": "Pass the id of a change that exists; `canon ingest plans` imports a change from its plan document.",
+      "fix": "Pass the id of a change that exists; `canon ingest plans` imports a change from its plan document, then `canon subject adopt` links it to its subject.",
       "meaning": "the named change has no record",
       "retryable": false
     },
@@ -9479,7 +9887,7 @@
       "meaning": "the requested change conflicts with the subject's state: a status transition that is not allowed, an unadopt of an approved or flow-tagged change",
       "reasons": [
         {
-          "fix": "Leave the change adopted, or unadopt only a change nobody approved.",
+          "fix": "Leave the change adopted, unadopt only a change nobody approved, or, to take an approved change out of the plan, have a human decide with `canon change defer` or `canon change drop`.",
           "meaning": "the change carries an approved brief, which is the subject's approved scope, so it stays adopted",
           "reason": "APPROVED_BRIEF"
         },
@@ -9815,6 +10223,12 @@
         "partition": "kind=finding/{change_id}_{round}_{seq}_{digest8}.json",
         "schema": "crates/canon-model/schemas/finding.schema.json",
         "schemaVersion": 2
+      },
+      {
+        "kind": "change_state",
+        "partition": "kind=change_state/{change_id}_{digest8}.json",
+        "schema": "crates/canon-model/schemas/change_state.schema.json",
+        "schemaVersion": 1
       }
     ]
   },
@@ -13166,6 +13580,1198 @@
         }
       }
     },
+    "change defer": {
+      "command": "change defer",
+      "kind": "schemas",
+      "rejects": [
+        [
+          "canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via ask --actor impl"
+        ],
+        [
+          "canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via \"a b\" --as implementer --actor impl",
+          "canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via \"a(b\" --as implementer --actor impl"
+        ],
+        [
+          "canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via ask --as implementer",
+          "canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via ask --as implementer --actor \"a b\""
+        ]
+      ],
+      "schemas": {
+        "ApprovalRelay": {
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "properties": {
+            "actor": {
+              "description": "The agent's actor id.",
+              "type": "string"
+            },
+            "answer": {
+              "description": "The human's answer as given, when the record holds it nowhere else.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "approver": {
+              "description": "The human's name, when the record holds it nowhere else.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "role": {
+              "description": "The role the recording agent declared (`--as` / `CANON_ROLE`).",
+              "type": "string"
+            },
+            "tool": {
+              "description": "The tool the human was asked with (`ask`, `AskUserQuestion`, `chat`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "actor",
+            "tool"
+          ],
+          "type": "object"
+        },
+        "BatchChangeDeferReport": {
+          "description": "`Batch<Name>Report`: the `data` of a leaf run with a JSON array or NDJSON as `--input`.\n`R` is the leaf's ordinary report; the binary itself carries each element's report as JSON.",
+          "properties": {
+            "items": {
+              "items": {
+                "$ref": "#/schemas/BatchItem"
+              },
+              "type": "array"
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "title": "BatchReport",
+          "type": "object"
+        },
+        "BatchItem": {
+          "description": "One element of a batch, in input order.",
+          "properties": {
+            "data": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ChangeStateReport"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ErrorBody"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
+            },
+            "index": {
+              "description": "0-based position in the input.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "$ref": "#/schemas/ItemStatus"
+            }
+          },
+          "required": [
+            "index",
+            "status"
+          ],
+          "type": "object"
+        },
+        "ChangeDeferArguments": {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "description": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
+              "type": "string"
+            },
+            "approver": {
+              "description": "Who decided (the human, not the agent)",
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "Validate fully and report what would be written, without writing anything",
+              "type": "boolean"
+            },
+            "operands": {
+              "description": "The change to close (it must have a record)",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "reason": {
+              "description": "Why, in the human's words (one line)",
+              "type": "string"
+            },
+            "ref": {
+              "description": "What a reader can open to see why: a link, a commit, a file, the date of a conversation (one line; once per reference, at least one)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relayedVia": {
+              "description": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it",
+              "type": "string"
+            }
+          },
+          "required": [
+            "operands",
+            "reason",
+            "ref",
+            "approver"
+          ],
+          "title": "`canon change defer` arguments after the --input document is merged with the command line",
+          "type": "object"
+        },
+        "ChangeDeferReport": {
+          "description": "`canon change defer | drop | reopen`: the decision recorded (or, for a repeat, found already recorded).",
+          "properties": {
+            "approver": {
+              "type": "string"
+            },
+            "at": {
+              "description": "When the decision was recorded: UTC, RFC 3339, to the second.",
+              "type": "string"
+            },
+            "changeId": {
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "A `--dry-run`: nothing was written.",
+              "type": "boolean"
+            },
+            "hotStore": {
+              "description": "Where the record went, when that is the hot store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "reason": {
+              "description": "The human's words.",
+              "type": "string"
+            },
+            "recordsKept": {
+              "$ref": "#/schemas/RecordsKept",
+              "description": "The evidence, review and finding records of the change and of its set-aside scenarios, none of them removed."
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relay": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ApprovalRelay"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set when an agent recorded the decision for the human: the relaying role, actor and tool."
+            },
+            "returnedScenarios": {
+              "description": "The scenarios a reopening requires again.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "setAsideScenarios": {
+              "description": "The scenarios only this change made, which the closing sets aside.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "description": "`deferred`, `dropped` or `reopened`.",
+              "type": "string"
+            },
+            "subjects": {
+              "description": "The subjects the change is on: they stop requiring it on a closing, and require it again on a reopening.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "changeId",
+            "state",
+            "reason",
+            "refs",
+            "approver",
+            "at",
+            "subjects",
+            "setAsideScenarios",
+            "returnedScenarios",
+            "recordsKept"
+          ],
+          "title": "ChangeStateReport",
+          "type": "object"
+        },
+        "ChangeStateReport": {
+          "description": "`canon change defer | drop | reopen`: the decision recorded (or, for a repeat, found already recorded).",
+          "properties": {
+            "approver": {
+              "type": "string"
+            },
+            "at": {
+              "description": "When the decision was recorded: UTC, RFC 3339, to the second.",
+              "type": "string"
+            },
+            "changeId": {
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "A `--dry-run`: nothing was written.",
+              "type": "boolean"
+            },
+            "hotStore": {
+              "description": "Where the record went, when that is the hot store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "description": "The human's words.",
+              "type": "string"
+            },
+            "recordsKept": {
+              "$ref": "#/schemas/RecordsKept",
+              "description": "The evidence, review and finding records of the change and of its set-aside scenarios, none of them removed."
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relay": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ApprovalRelay"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set when an agent recorded the decision for the human: the relaying role, actor and tool."
+            },
+            "returnedScenarios": {
+              "description": "The scenarios a reopening requires again.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "setAsideScenarios": {
+              "description": "The scenarios only this change made, which the closing sets aside.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "description": "`deferred`, `dropped` or `reopened`.",
+              "type": "string"
+            },
+            "subjects": {
+              "description": "The subjects the change is on: they stop requiring it on a closing, and require it again on a reopening.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "changeId",
+            "state",
+            "reason",
+            "refs",
+            "approver",
+            "at",
+            "subjects",
+            "setAsideScenarios",
+            "returnedScenarios",
+            "recordsKept"
+          ],
+          "type": "object"
+        },
+        "ErrorBody": {
+          "description": "The `error` member of a failure envelope. Field order is the document\norder: `code` first. An optional member with no value is left out of the\ndocument, so the body validates against the contract's error schema.",
+          "properties": {
+            "code": {
+              "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
+              "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "expected": {
+              "description": "The valid values of `field`, when it takes a closed set.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "description": "A working invocation or the next step.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "retryable": {
+              "description": "True only where running the same command again can succeed; equal to the registry row's.",
+              "type": "boolean"
+            },
+            "suggestions": {
+              "description": "The nearest valid commands, options or values.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
+        "Input": {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "type": "string"
+            },
+            "approver": {
+              "type": "string"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "operands": {
+              "items": false,
+              "maxItems": 1,
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "ref": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relayedVia": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "ItemStatus": {
+          "description": "What happened to one element of a batch.",
+          "oneOf": [
+            {
+              "const": "written",
+              "description": "The element ran and wrote.",
+              "type": "string"
+            },
+            {
+              "const": "unchanged",
+              "description": "The element ran and found its record already present with identical content.",
+              "type": "string"
+            },
+            {
+              "const": "failed",
+              "description": "The element ran and failed; `error` says why.",
+              "type": "string"
+            },
+            {
+              "const": "skipped",
+              "description": "An earlier element failed, so this one never ran.",
+              "type": "string"
+            }
+          ]
+        },
+        "RecordsKept": {
+          "description": "How many records of each kind a closing leaves in place.",
+          "properties": {
+            "evidence": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "findings": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reviews": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "evidence",
+            "reviews",
+            "findings"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    "change drop": {
+      "command": "change drop",
+      "kind": "schemas",
+      "rejects": [
+        [
+          "canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via ask --actor impl"
+        ],
+        [
+          "canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via \"a b\" --as implementer --actor impl",
+          "canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via \"a(b\" --as implementer --actor impl"
+        ],
+        [
+          "canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via ask --as implementer",
+          "canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via ask --as implementer --actor \"a b\""
+        ]
+      ],
+      "schemas": {
+        "ApprovalRelay": {
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "properties": {
+            "actor": {
+              "description": "The agent's actor id.",
+              "type": "string"
+            },
+            "answer": {
+              "description": "The human's answer as given, when the record holds it nowhere else.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "approver": {
+              "description": "The human's name, when the record holds it nowhere else.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "role": {
+              "description": "The role the recording agent declared (`--as` / `CANON_ROLE`).",
+              "type": "string"
+            },
+            "tool": {
+              "description": "The tool the human was asked with (`ask`, `AskUserQuestion`, `chat`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "actor",
+            "tool"
+          ],
+          "type": "object"
+        },
+        "BatchChangeDropReport": {
+          "description": "`Batch<Name>Report`: the `data` of a leaf run with a JSON array or NDJSON as `--input`.\n`R` is the leaf's ordinary report; the binary itself carries each element's report as JSON.",
+          "properties": {
+            "items": {
+              "items": {
+                "$ref": "#/schemas/BatchItem"
+              },
+              "type": "array"
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "title": "BatchReport",
+          "type": "object"
+        },
+        "BatchItem": {
+          "description": "One element of a batch, in input order.",
+          "properties": {
+            "data": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ChangeStateReport"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ErrorBody"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
+            },
+            "index": {
+              "description": "0-based position in the input.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "$ref": "#/schemas/ItemStatus"
+            }
+          },
+          "required": [
+            "index",
+            "status"
+          ],
+          "type": "object"
+        },
+        "ChangeDropArguments": {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "description": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
+              "type": "string"
+            },
+            "approver": {
+              "description": "Who decided (the human, not the agent)",
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "Validate fully and report what would be written, without writing anything",
+              "type": "boolean"
+            },
+            "operands": {
+              "description": "The change to close (it must have a record)",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "reason": {
+              "description": "Why, in the human's words (one line)",
+              "type": "string"
+            },
+            "ref": {
+              "description": "What a reader can open to see why: a link, a commit, a file, the date of a conversation (one line; once per reference, at least one)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relayedVia": {
+              "description": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it",
+              "type": "string"
+            }
+          },
+          "required": [
+            "operands",
+            "reason",
+            "ref",
+            "approver"
+          ],
+          "title": "`canon change drop` arguments after the --input document is merged with the command line",
+          "type": "object"
+        },
+        "ChangeDropReport": {
+          "description": "`canon change defer | drop | reopen`: the decision recorded (or, for a repeat, found already recorded).",
+          "properties": {
+            "approver": {
+              "type": "string"
+            },
+            "at": {
+              "description": "When the decision was recorded: UTC, RFC 3339, to the second.",
+              "type": "string"
+            },
+            "changeId": {
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "A `--dry-run`: nothing was written.",
+              "type": "boolean"
+            },
+            "hotStore": {
+              "description": "Where the record went, when that is the hot store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "reason": {
+              "description": "The human's words.",
+              "type": "string"
+            },
+            "recordsKept": {
+              "$ref": "#/schemas/RecordsKept",
+              "description": "The evidence, review and finding records of the change and of its set-aside scenarios, none of them removed."
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relay": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ApprovalRelay"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set when an agent recorded the decision for the human: the relaying role, actor and tool."
+            },
+            "returnedScenarios": {
+              "description": "The scenarios a reopening requires again.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "setAsideScenarios": {
+              "description": "The scenarios only this change made, which the closing sets aside.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "description": "`deferred`, `dropped` or `reopened`.",
+              "type": "string"
+            },
+            "subjects": {
+              "description": "The subjects the change is on: they stop requiring it on a closing, and require it again on a reopening.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "changeId",
+            "state",
+            "reason",
+            "refs",
+            "approver",
+            "at",
+            "subjects",
+            "setAsideScenarios",
+            "returnedScenarios",
+            "recordsKept"
+          ],
+          "title": "ChangeStateReport",
+          "type": "object"
+        },
+        "ChangeStateReport": {
+          "description": "`canon change defer | drop | reopen`: the decision recorded (or, for a repeat, found already recorded).",
+          "properties": {
+            "approver": {
+              "type": "string"
+            },
+            "at": {
+              "description": "When the decision was recorded: UTC, RFC 3339, to the second.",
+              "type": "string"
+            },
+            "changeId": {
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "A `--dry-run`: nothing was written.",
+              "type": "boolean"
+            },
+            "hotStore": {
+              "description": "Where the record went, when that is the hot store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "description": "The human's words.",
+              "type": "string"
+            },
+            "recordsKept": {
+              "$ref": "#/schemas/RecordsKept",
+              "description": "The evidence, review and finding records of the change and of its set-aside scenarios, none of them removed."
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relay": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ApprovalRelay"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set when an agent recorded the decision for the human: the relaying role, actor and tool."
+            },
+            "returnedScenarios": {
+              "description": "The scenarios a reopening requires again.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "setAsideScenarios": {
+              "description": "The scenarios only this change made, which the closing sets aside.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "description": "`deferred`, `dropped` or `reopened`.",
+              "type": "string"
+            },
+            "subjects": {
+              "description": "The subjects the change is on: they stop requiring it on a closing, and require it again on a reopening.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "changeId",
+            "state",
+            "reason",
+            "refs",
+            "approver",
+            "at",
+            "subjects",
+            "setAsideScenarios",
+            "returnedScenarios",
+            "recordsKept"
+          ],
+          "type": "object"
+        },
+        "ErrorBody": {
+          "description": "The `error` member of a failure envelope. Field order is the document\norder: `code` first. An optional member with no value is left out of the\ndocument, so the body validates against the contract's error schema.",
+          "properties": {
+            "code": {
+              "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
+              "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "expected": {
+              "description": "The valid values of `field`, when it takes a closed set.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "description": "A working invocation or the next step.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "retryable": {
+              "description": "True only where running the same command again can succeed; equal to the registry row's.",
+              "type": "boolean"
+            },
+            "suggestions": {
+              "description": "The nearest valid commands, options or values.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
+        "Input": {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "type": "string"
+            },
+            "approver": {
+              "type": "string"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "operands": {
+              "items": false,
+              "maxItems": 1,
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "ref": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relayedVia": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "ItemStatus": {
+          "description": "What happened to one element of a batch.",
+          "oneOf": [
+            {
+              "const": "written",
+              "description": "The element ran and wrote.",
+              "type": "string"
+            },
+            {
+              "const": "unchanged",
+              "description": "The element ran and found its record already present with identical content.",
+              "type": "string"
+            },
+            {
+              "const": "failed",
+              "description": "The element ran and failed; `error` says why.",
+              "type": "string"
+            },
+            {
+              "const": "skipped",
+              "description": "An earlier element failed, so this one never ran.",
+              "type": "string"
+            }
+          ]
+        },
+        "RecordsKept": {
+          "description": "How many records of each kind a closing leaves in place.",
+          "properties": {
+            "evidence": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "findings": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reviews": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "evidence",
+            "reviews",
+            "findings"
+          ],
+          "type": "object"
+        }
+      }
+    },
     "change new": {
       "command": "change new",
       "kind": "schemas",
@@ -13539,6 +15145,601 @@
               "type": "string"
             }
           ]
+        }
+      }
+    },
+    "change reopen": {
+      "command": "change reopen",
+      "kind": "schemas",
+      "rejects": [
+        [
+          "canon change reopen add-login --reason ok --approver alice --relayed-via ask --actor impl"
+        ],
+        [
+          "canon change reopen add-login --reason ok --approver alice --relayed-via \"a b\" --as implementer --actor impl",
+          "canon change reopen add-login --reason ok --approver alice --relayed-via \"a(b\" --as implementer --actor impl"
+        ],
+        [
+          "canon change reopen add-login --reason ok --approver alice --relayed-via ask --as implementer",
+          "canon change reopen add-login --reason ok --approver alice --relayed-via ask --as implementer --actor \"a b\""
+        ]
+      ],
+      "schemas": {
+        "ApprovalRelay": {
+          "description": "How an approval reached canon when an agent recorded it for a human\n(0.32): the agent's declared role and actor, the tool the human was asked\nwith, and, where the record has no field of its own for them, the human's\nname and answer. Written only for a relayed approval; a record without it\nis the human's own.",
+          "properties": {
+            "actor": {
+              "description": "The agent's actor id.",
+              "type": "string"
+            },
+            "answer": {
+              "description": "The human's answer as given, when the record holds it nowhere else.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "approver": {
+              "description": "The human's name, when the record holds it nowhere else.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "role": {
+              "description": "The role the recording agent declared (`--as` / `CANON_ROLE`).",
+              "type": "string"
+            },
+            "tool": {
+              "description": "The tool the human was asked with (`ask`, `AskUserQuestion`, `chat`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "actor",
+            "tool"
+          ],
+          "type": "object"
+        },
+        "BatchChangeReopenReport": {
+          "description": "`Batch<Name>Report`: the `data` of a leaf run with a JSON array or NDJSON as `--input`.\n`R` is the leaf's ordinary report; the binary itself carries each element's report as JSON.",
+          "properties": {
+            "items": {
+              "items": {
+                "$ref": "#/schemas/BatchItem"
+              },
+              "type": "array"
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "title": "BatchReport",
+          "type": "object"
+        },
+        "BatchItem": {
+          "description": "One element of a batch, in input order.",
+          "properties": {
+            "data": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ChangeStateReport"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The element's ordinary report: a `written` or `unchanged` element has one, a `failed` or `skipped` one has none."
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ErrorBody"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The element's ordinary error, its `field` a pointer into the batch (`/2/scenario`)."
+            },
+            "index": {
+              "description": "0-based position in the input.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "$ref": "#/schemas/ItemStatus"
+            }
+          },
+          "required": [
+            "index",
+            "status"
+          ],
+          "type": "object"
+        },
+        "ChangeReopenArguments": {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "description": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
+              "type": "string"
+            },
+            "approver": {
+              "description": "Who decided (the human, not the agent)",
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "Validate fully and report what would be written, without writing anything",
+              "type": "boolean"
+            },
+            "operands": {
+              "description": "The deferred change to bring back",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "reason": {
+              "description": "Why, in the human's words (one line)",
+              "type": "string"
+            },
+            "ref": {
+              "description": "What a reader can open to see why: a link, a commit, a file, the date of a conversation (one line; once per reference)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relayedVia": {
+              "description": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it",
+              "type": "string"
+            }
+          },
+          "required": [
+            "operands",
+            "reason",
+            "approver"
+          ],
+          "title": "`canon change reopen` arguments after the --input document is merged with the command line",
+          "type": "object"
+        },
+        "ChangeReopenReport": {
+          "description": "`canon change defer | drop | reopen`: the decision recorded (or, for a repeat, found already recorded).",
+          "properties": {
+            "approver": {
+              "type": "string"
+            },
+            "at": {
+              "description": "When the decision was recorded: UTC, RFC 3339, to the second.",
+              "type": "string"
+            },
+            "changeId": {
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "A `--dry-run`: nothing was written.",
+              "type": "boolean"
+            },
+            "hotStore": {
+              "description": "Where the record went, when that is the hot store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "nextOmitted": {
+              "description": "How many further `meta.next` steps were left out past the limit",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "reason": {
+              "description": "The human's words.",
+              "type": "string"
+            },
+            "recordsKept": {
+              "$ref": "#/schemas/RecordsKept",
+              "description": "The evidence, review and finding records of the change and of its set-aside scenarios, none of them removed."
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relay": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ApprovalRelay"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set when an agent recorded the decision for the human: the relaying role, actor and tool."
+            },
+            "returnedScenarios": {
+              "description": "The scenarios a reopening requires again.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "setAsideScenarios": {
+              "description": "The scenarios only this change made, which the closing sets aside.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "description": "`deferred`, `dropped` or `reopened`.",
+              "type": "string"
+            },
+            "subjects": {
+              "description": "The subjects the change is on: they stop requiring it on a closing, and require it again on a reopening.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "unchanged": {
+              "description": "true when a repeat found its work already done with identical content and wrote nothing; absent otherwise",
+              "type": "boolean"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds (`human` for the steps only the human takes)",
+              "type": "object"
+            }
+          },
+          "required": [
+            "changeId",
+            "state",
+            "reason",
+            "refs",
+            "approver",
+            "at",
+            "subjects",
+            "setAsideScenarios",
+            "returnedScenarios",
+            "recordsKept"
+          ],
+          "title": "ChangeStateReport",
+          "type": "object"
+        },
+        "ChangeStateReport": {
+          "description": "`canon change defer | drop | reopen`: the decision recorded (or, for a repeat, found already recorded).",
+          "properties": {
+            "approver": {
+              "type": "string"
+            },
+            "at": {
+              "description": "When the decision was recorded: UTC, RFC 3339, to the second.",
+              "type": "string"
+            },
+            "changeId": {
+              "type": "string"
+            },
+            "dryRun": {
+              "description": "A `--dry-run`: nothing was written.",
+              "type": "boolean"
+            },
+            "hotStore": {
+              "description": "Where the record went, when that is the hot store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "description": "The human's words.",
+              "type": "string"
+            },
+            "recordsKept": {
+              "$ref": "#/schemas/RecordsKept",
+              "description": "The evidence, review and finding records of the change and of its set-aside scenarios, none of them removed."
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relay": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/ApprovalRelay"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set when an agent recorded the decision for the human: the relaying role, actor and tool."
+            },
+            "returnedScenarios": {
+              "description": "The scenarios a reopening requires again.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "setAsideScenarios": {
+              "description": "The scenarios only this change made, which the closing sets aside.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "description": "`deferred`, `dropped` or `reopened`.",
+              "type": "string"
+            },
+            "subjects": {
+              "description": "The subjects the change is on: they stop requiring it on a closing, and require it again on a reopening.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "changeId",
+            "state",
+            "reason",
+            "refs",
+            "approver",
+            "at",
+            "subjects",
+            "setAsideScenarios",
+            "returnedScenarios",
+            "recordsKept"
+          ],
+          "type": "object"
+        },
+        "ErrorBody": {
+          "description": "The `error` member of a failure envelope. Field order is the document\norder: `code` first. An optional member with no value is left out of the\ndocument, so the body validates against the contract's error schema.",
+          "properties": {
+            "code": {
+              "description": "Stable SCREAMING_SNAKE code a caller branches on, registered in the tool's error registry.",
+              "type": "string"
+            },
+            "details": {
+              "description": "Every error of an input that yields several, in the order the tool found them (spec 7.1.1); absent for one error.",
+              "items": {
+                "$ref": "#/schemas/ErrorDetailBody"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "expected": {
+              "description": "The valid values of `field`, when it takes a closed set.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "description": "A working invocation or the next step.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "description": "Which of the situations registered under `code` this is (since 1.1); registered in the code's row.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "description": "The value that was refused, with secrets redacted; `\"\"` for an empty value the caller sent (1.1).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "retryable": {
+              "description": "True only where running the same command again can succeed; equal to the registry row's.",
+              "type": "boolean"
+            },
+            "suggestions": {
+              "description": "The nearest valid commands, options or values.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "retryable"
+          ],
+          "type": "object"
+        },
+        "ErrorDetailBody": {
+          "description": "One item of `details` (spec 7.1.1): the members of [`ErrorBody`] except `retryable` and `details`.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "expected": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "received": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "suggestions": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        },
+        "Input": {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "type": "string"
+            },
+            "approver": {
+              "type": "string"
+            },
+            "dryRun": {
+              "type": "boolean"
+            },
+            "operands": {
+              "items": false,
+              "maxItems": 1,
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "ref": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "relayedVia": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "ItemStatus": {
+          "description": "What happened to one element of a batch.",
+          "oneOf": [
+            {
+              "const": "written",
+              "description": "The element ran and wrote.",
+              "type": "string"
+            },
+            {
+              "const": "unchanged",
+              "description": "The element ran and found its record already present with identical content.",
+              "type": "string"
+            },
+            {
+              "const": "failed",
+              "description": "The element ran and failed; `error` says why.",
+              "type": "string"
+            },
+            {
+              "const": "skipped",
+              "description": "An earlier element failed, so this one never ran.",
+              "type": "string"
+            }
+          ]
+        },
+        "RecordsKept": {
+          "description": "How many records of each kind a closing leaves in place.",
+          "properties": {
+            "evidence": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "findings": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reviews": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "evidence",
+            "reviews",
+            "findings"
+          ],
+          "type": "object"
         }
       }
     },
@@ -21024,7 +23225,8 @@
                 "strategy_item",
                 "evidence",
                 "subject",
-                "finding"
+                "finding",
+                "change_state"
               ]
             },
             "output": {
@@ -21403,7 +23605,8 @@
                 "strategy_item",
                 "evidence",
                 "subject",
-                "finding"
+                "finding",
+                "change_state"
               ]
             },
             "output": {
@@ -24508,7 +26711,8 @@
             "strategy_item",
             "evidence",
             "subject",
-            "finding"
+            "finding",
+            "change_state"
           ],
           "type": "string"
         },
@@ -28284,6 +30488,9 @@
           "canon query --kind task --status proposed --json"
         ],
         [
+          "canon query --kind change_state --status open --json"
+        ],
+        [
           "canon query --kind evidence --since 2026-02-30 --json"
         ]
       ],
@@ -28359,16 +30566,19 @@
               "description": "a member of the records of: handoff"
             },
             "actor": {
-              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding, change_state"
             },
             "approval": {
               "description": "a member of the records of: evidence"
+            },
+            "approver": {
+              "description": "a member of the records of: change_state"
             },
             "artifacts": {
               "description": "a member of the records of: review"
             },
             "at": {
-              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding, change_state"
             },
             "attachments": {
               "description": "a member of the records of: evidence"
@@ -28389,7 +30599,7 @@
               "description": "a member of the records of: handoff"
             },
             "change_id": {
-              "description": "a member of the records of: change, review, finding"
+              "description": "a member of the records of: change, review, finding, change_state"
             },
             "change_ids": {
               "description": "a member of the records of: subject"
@@ -28458,7 +30668,7 @@
               "description": "a member of the records of: finding"
             },
             "kind": {
-              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding, change_state"
             },
             "lane": {
               "description": "a member of the records of: scenario"
@@ -28503,10 +30713,16 @@
               "description": "a member of the records of: review"
             },
             "reason": {
-              "description": "a member of the records of: finding"
+              "description": "a member of the records of: finding, change_state"
+            },
+            "refs": {
+              "description": "a member of the records of: change_state"
             },
             "regime_key": {
               "description": "a member of the records of: strategy_item"
+            },
+            "relay": {
+              "description": "a member of the records of: change_state"
             },
             "removed": {
               "description": "a member of the records of: scenario"
@@ -28572,7 +30788,7 @@
               "description": "a member of the records of: task"
             },
             "schema": {
-              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding"
+              "description": "a member of the records of: change, task, scenario, run, handoff, review, divergence, trajectory, strategy_item, evidence, subject, finding, change_state"
             },
             "seq": {
               "description": "a member of the records of: handoff, finding"
@@ -28596,7 +30812,7 @@
               "description": "a member of the records of: run"
             },
             "state": {
-              "description": "a member of the records of: handoff"
+              "description": "a member of the records of: handoff, change_state"
             },
             "status": {
               "description": "a member of the records of: change, task, run, divergence, subject"
@@ -28661,7 +30877,7 @@
                   "type": "null"
                 }
               ],
-              "description": "`--kind finding|evidence|subject` (0.30): the references to a source nothing committed holds."
+              "description": "`--kind finding|evidence|subject|change_state` (0.30, 0.42): the references to a source nothing committed holds."
             },
             "kind": {
               "type": "string"
@@ -33146,6 +35362,13 @@
               ],
               "description": "Set when an agent recorded the approval for the human (0.32): the\n`(relayed by …)` marker of the approval line, read back."
             },
+            "reopened": {
+              "description": "When the change was reopened (UTC, RFC 3339) while its `Approved:` line is older: the approval is stale, not\nabsent (`canon change reopen` voids it), and `canon brief approve` writes a new line.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scopeExempt": {
               "anyOf": [
                 {
@@ -33456,6 +35679,67 @@
           ],
           "type": "object"
         },
+        "SetAsideChange": {
+          "description": "One closed change of a subject ([`SubjectSummary::set_aside_changes`]).",
+          "properties": {
+            "approver": {
+              "type": "string"
+            },
+            "at": {
+              "description": "When the decision was recorded (UTC, seconds).",
+              "type": "string"
+            },
+            "change": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "description": "`deferred` or `dropped`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "change",
+            "state",
+            "reason",
+            "refs",
+            "approver",
+            "at"
+          ],
+          "type": "object"
+        },
+        "SetAsideScenario": {
+          "description": "One set-aside scenario of a subject ([`SubjectSummary::set_aside_scenarios`]).",
+          "properties": {
+            "changes": {
+              "description": "The closed changes that made it.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "project": {
+              "type": "string"
+            },
+            "scenario": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenario",
+            "project",
+            "changes"
+          ],
+          "type": "object"
+        },
         "SpecCoverageSurface": {
           "anyOf": [
             {
@@ -33727,6 +36011,20 @@
               "format": "uint",
               "minimum": 0,
               "type": "integer"
+            },
+            "setAsideChanges": {
+              "description": "The changes a human closed (0.42 `change-drop`) that this subject adopted: they read as absent from the\nsubject's change list. Omitted when empty.",
+              "items": {
+                "$ref": "#/schemas/SetAsideChange"
+              },
+              "type": "array"
+            },
+            "setAsideScenarios": {
+              "description": "The scenarios this subject owns that only closed changes made: no check asks for them. Omitted when empty.",
+              "items": {
+                "$ref": "#/schemas/SetAsideScenario"
+              },
+              "type": "array"
             },
             "staleReviews": {
               "description": "Counted scenarios whose only signed reviews are stale: pinned to a\nspec or evidence that has since changed (0.15 D1).",
@@ -34936,7 +37234,8 @@
             "strategy_item",
             "evidence",
             "subject",
-            "finding"
+            "finding",
+            "change_state"
           ],
           "type": "string"
         },
@@ -35536,7 +37835,8 @@
             "strategy_item",
             "evidence",
             "subject",
-            "finding"
+            "finding",
+            "change_state"
           ],
           "type": "string"
         },
@@ -36245,7 +38545,8 @@
             "strategy_item",
             "evidence",
             "subject",
-            "finding"
+            "finding",
+            "change_state"
           ],
           "type": "string"
         },
@@ -36574,7 +38875,8 @@
             "strategy_item",
             "evidence",
             "subject",
-            "finding"
+            "finding",
+            "change_state"
           ],
           "type": "string"
         },
@@ -37108,7 +39410,8 @@
             "strategy_item",
             "evidence",
             "subject",
-            "finding"
+            "finding",
+            "change_state"
           ],
           "type": "string"
         },
@@ -38145,7 +40448,23 @@
       {
         "command": "change",
         "kind": "group",
-        "summary": "Write a plan change (.canon/changes/<slug>/brief.md) and adopt it into a subject"
+        "summary": "Write a plan change (.canon/changes/<slug>/brief.md) and adopt it into a subject; a human can defer, drop or reopen it"
+      },
+      {
+        "command": "change defer",
+        "effect": "write",
+        "summary": "Set an approved change aside for now (a human's decision: needs a reason, a reference and the approver); `canon change reopen` brings it back",
+        "x-canon": {
+          "roles": []
+        }
+      },
+      {
+        "command": "change drop",
+        "effect": "write",
+        "summary": "Give up an approved change for good (a human's decision: needs a reason, a reference and the approver); it is never brought back",
+        "x-canon": {
+          "roles": []
+        }
       },
       {
         "command": "change new",
@@ -38155,6 +40474,14 @@
           "roles": [
             "planner"
           ]
+        }
+      },
+      {
+        "command": "change reopen",
+        "effect": "write",
+        "summary": "Bring a deferred change back (a human's decision); the old approval is void and the brief needs a new one",
+        "x-canon": {
+          "roles": []
         }
       },
       {
@@ -38989,6 +41316,52 @@
         "valueType": "switch"
       },
       {
+        "domain": {
+          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+        },
+        "help": "Record the human's answer on their behalf: the tool they were asked with (`ask`, `AskUserQuestion`, `chat`); an agent role may run the call only with it",
+        "name": "relayed-via",
+        "valueName": "NAME"
+      },
+      {
+        "defaultNote": "the CANON_ACTOR environment variable, with --relayed-via",
+        "domain": {
+          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+        },
+        "env": "CANON_ACTOR",
+        "help": "With --relayed-via, the agent's actor id (default: the CANON_ACTOR environment variable)",
+        "name": "actor",
+        "valueName": "ACTOR_ID"
+      },
+      {
+        "domain": {
+          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+        },
+        "help": "Why, in the human's words (one line)",
+        "name": "reason",
+        "required": true,
+        "valueName": "TEXT"
+      },
+      {
+        "domain": {
+          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+        },
+        "help": "What a reader can open to see why: a link, a commit, a file, the date of a conversation (one line; once per reference, at least one)",
+        "name": "ref",
+        "repeatable": true,
+        "required": true,
+        "valueName": "TEXT"
+      },
+      {
+        "domain": {
+          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+        },
+        "help": "Who decided (the human, not the agent)",
+        "name": "approver",
+        "required": true,
+        "valueName": "NAME"
+      },
+      {
         "help": "Repository-relative input manifest",
         "name": "manifest",
         "required": true,
@@ -39010,23 +41383,6 @@
         "help": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
         "name": "project",
         "valueName": "PROJECT_ID"
-      },
-      {
-        "domain": {
-          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
-        },
-        "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
-        "name": "actor",
-        "required": true,
-        "valueName": "ACTOR_ID"
-      },
-      {
-        "domain": {
-          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
-        },
-        "help": "With --relayed-via, who the human is",
-        "name": "approver",
-        "valueName": "NAME"
       },
       {
         "help": "With --relayed-via, the human's answer as they gave it",
@@ -39230,6 +41586,16 @@
       "code": "BRIEF_UNAPPROVED_NOT_ENFORCED",
       "fix": "Give the change a brief with `canon change new`, or fix the `plans:` section of canon.yaml, then have the human approve the brief.",
       "meaning": "a subject moved past a brief that is not approved but cannot be enforced (the change has no brief canon reads, or the `plans:` section is unreadable)"
+    },
+    {
+      "code": "CHANGE_HISTORY_MISSING",
+      "fix": "Fetch the full history (`git fetch --unshallow`), then run the command again.",
+      "meaning": "git history is too short to read when a closed change's brief was first committed (a shallow clone), so the scenarios that change made stay required"
+    },
+    {
+      "code": "CHANGE_RECORDS_KEPT",
+      "fix": "Nothing to do: the records stay as history. `canon change reopen` brings a deferred change and its scenarios back as requirements.",
+      "meaning": "a change was deferred or dropped while evidence, review or finding records exist for the change or for the scenarios only it made; none was removed and `canon query` still lists them (the warning counts them by kind)"
     },
     {
       "code": "CODE_SCOPES_UNMATCHED",

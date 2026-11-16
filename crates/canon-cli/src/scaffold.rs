@@ -359,6 +359,10 @@ impl Planner {
         let flow_tag = match &spec.flow {
             None => None,
             Some(flow) => {
+                // A deferred or dropped change (`canon change defer|drop`) takes no new flow-tagged scenario (0.42).
+                if let Some(error) = spec.change.as_ref().and_then(|change| crate::change_state::closed_refusal(&self.repo_root, change)) {
+                    return Err(error.field("--change"));
+                }
                 let key = (spec.subject.as_ref().map(|s| s.as_str().to_string()), spec.change.as_ref().map(|c| c.as_str().to_string()), flow.clone());
                 let repo_root = &self.repo_root;
                 let found = self.flows.entry(key).or_insert_with(|| crate::brief_check::flow_tag_value(repo_root, spec.subject.as_ref(), spec.change.as_ref(), flow).map_err(|e| (matches!(e, crate::brief_check::FlowError::OldFormat { .. }), e.to_string()))).clone();

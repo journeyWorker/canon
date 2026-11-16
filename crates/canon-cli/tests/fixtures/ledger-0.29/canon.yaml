@@ -41,6 +41,7 @@ routing:
   evidence_record: local
   subject: local
   finding: local
+  change_state: local
 specs:
   # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.
   roots:

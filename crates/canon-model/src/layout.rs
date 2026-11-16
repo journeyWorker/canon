@@ -253,6 +253,7 @@ pub fn components(kind: RecordKind, json: &Value) -> Result<Vec<Component>, Evid
         }
         RecordKind::Subject => vec![id(json, "subject_id")?],
         RecordKind::Finding => vec![id(json, "change_id")?, Component::Int(int(json, "round")?), Component::Int(int(json, "seq")?)],
+        RecordKind::ChangeState => vec![id(json, "change_id")?],
     })
 }
 
@@ -270,6 +271,7 @@ pub fn template(kind: RecordKind) -> String {
         RecordKind::Evidence => "{project_id|-}_(task_{task_id}|scenario_{scenario_id}|run_{run_id})",
         RecordKind::Subject => "{subject_id}",
         RecordKind::Finding => "{change_id}_{round}_{seq}",
+        RecordKind::ChangeState => "{change_id}",
     };
     format!("kind={}/{parts}_{{digest8}}.json", kind.as_str())
 }

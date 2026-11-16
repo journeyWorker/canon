@@ -10,3 +10,4 @@ routing:
   scenario: local
   evidence: local
   subject: local
+  change_state: local

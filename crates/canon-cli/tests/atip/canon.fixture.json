@@ -922,6 +922,17 @@
       "retryable": false
     },
     {
+      "code": "CHANGE_CONFLICT",
+      "exit": 2,
+      "reasons": [
+        "CLOSED",
+        "DROPPED",
+        "NOT_DEFERRED",
+        "SHIPPED"
+      ],
+      "retryable": false
+    },
+    {
       "code": "CHANGE_EXISTS",
       "exit": 2,
       "retryable": false
@@ -2169,6 +2180,8 @@
     "BRIEF_DRAFT_PENDING",
     "BRIEF_OVERRIDE_ON_RECORD",
     "BRIEF_UNAPPROVED_NOT_ENFORCED",
+    "CHANGE_HISTORY_MISSING",
+    "CHANGE_RECORDS_KEPT",
     "CODE_SCOPES_UNMATCHED",
     "CONFIG_MISSING",
     "CONFIG_UNREADABLE",

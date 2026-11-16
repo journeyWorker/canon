@@ -82,7 +82,7 @@ pub struct Unresolved {
 
 /// Whether `canon query --kind <kind>` and `canon status` check this kind's references.
 pub fn is_checked(kind: RecordKind) -> bool {
-    matches!(kind, RecordKind::Finding | RecordKind::Evidence | RecordKind::Subject)
+    matches!(kind, RecordKind::Finding | RecordKind::Evidence | RecordKind::Subject | RecordKind::ChangeState)
 }
 
 /// What is committed, as the module doc defines it, read once.
@@ -136,6 +136,11 @@ impl Sources {
                 }
                 if let Some(id) = text("review_id") {
                     check("review_id", Target::Review, id);
+                }
+            }
+            RecordKind::ChangeState => {
+                if let Some(id) = text("change_id") {
+                    check("change_id", Target::Change, id);
                 }
             }
             RecordKind::Evidence => {

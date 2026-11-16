@@ -452,7 +452,7 @@ fn atip_schemadoc_01_the_tree_lists_every_group_and_command_once_and_claims_l2()
     let entries = first["data"]["commands"].as_array().expect("commands");
     let kinds: Vec<&str> = entries.iter().map(|entry| if entry["kind"] == "group" { "group" } else { "command" }).collect();
     assert!(entries.iter().all(|entry| entry["kind"] != "command" && entry.get("path").is_none()), "a 1.4 tree entry has no `kind: command` and no `path`");
-    assert_eq!((kinds.iter().filter(|kind| **kind == "group").count(), kinds.iter().filter(|kind| **kind == "command").count()), (27, 78));
+    assert_eq!((kinds.iter().filter(|kind| **kind == "group").count(), kinds.iter().filter(|kind| **kind == "command").count()), (27, 81));
     let ids: Vec<&str> = entries.iter().map(|entry| entry["command"].as_str().expect("command")).collect();
     assert_eq!(ids.iter().collect::<BTreeSet<_>>().len(), ids.len(), "every id once");
     for (at, entry) in entries.iter().enumerate() {
@@ -639,7 +639,7 @@ fn atip_schemadoc_05_an_option_that_an_environment_variable_fills_declares_it() 
                 ("schema", _) => None,
                 (_, "as" | "role") => Some("CANON_ROLE"),
                 ("skills install" | "skills check" | "skills doctor", "skills-source") => Some("CANON_SKILLS_SOURCE"),
-                ("feature new" | "scenario new" | "brief approve" | "migrate" | "policy approve", "actor") => Some("CANON_ACTOR"),
+                ("feature new" | "scenario new" | "brief approve" | "migrate" | "policy approve" | "change defer" | "change drop" | "change reopen", "actor") => Some("CANON_ACTOR"),
                 _ => None,
             };
             if env != expected {
@@ -904,12 +904,12 @@ fn atip_schemadoc_08_a_dangling_ref_and_a_schema_that_does_not_compile_are_found
 // ----------------------------------------------------------------------------------------------------------
 // atip.schemadoc.09 / 10 — F5: input and examples
 
-/// atip.schemadoc.09: 47 commands carry `input`; each fragment has no `required` and no flag-only key, the example
+/// atip.schemadoc.09: 50 commands carry `input`; each fragment has no `required` and no flag-only key, the example
 /// passes it, and every example of every command parses with the real parser.
 #[test]
 fn atip_schemadoc_09_the_input_fragment_and_every_example_hold() {
     let with_input: Vec<&Value> = COMMANDS.iter().filter(|doc| doc["input"].is_object()).collect();
-    assert_eq!(with_input.len(), 47);
+    assert_eq!(with_input.len(), 50);
     let mut problems = Vec::new();
     for doc in &with_input {
         problems.extend(example_problems(doc));
@@ -921,9 +921,9 @@ fn atip_schemadoc_09_the_input_fragment_and_every_example_hold() {
         assert!(doc["schemas"][name].get("required").is_none());
         assert!(input["argumentsRef"].is_string(), "the arguments schema is published: {}", doc["command"]);
     }
-    // The 30 commands whose old document schema had `required` now publish it as the arguments schema.
+    // The 33 commands whose old document schema had `required` now publish it as the arguments schema (0.42: `change defer`, `change drop`, `change reopen` each have required options).
     let with_required = with_input.iter().filter(|doc| ref_name(doc["input"]["argumentsRef"].as_str().expect("ref")).is_some_and(|name| doc["schemas"][name].get("required").is_some())).count();
-    assert_eq!(with_required, 30);
+    assert_eq!(with_required, 33);
     for doc in COMMANDS.iter() {
         let examples = names(doc, "examples");
         assert!(!examples.is_empty(), "`{}` has no example", doc["command"]);
@@ -1028,7 +1028,7 @@ fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command(
     assert_eq!(file["contractVersion"], "1.6");
     // The file is the 1.4 form: the tree and the command documents hold no `path`, and the schemas live in their own map.
     let commands = file["commands"].as_array().expect("commands");
-    assert_eq!(commands.len(), 78);
+    assert_eq!(commands.len(), 81);
     let dir = tempfile::tempdir().expect("tempdir");
     let mut problems = form_problems(&file["tree"], commands, &file["schemas"]);
     for doc in commands {

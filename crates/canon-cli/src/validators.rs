@@ -11,6 +11,7 @@ use std::process::ExitCode;
 
 use crate::cli::{Cli, Command};
 use crate::cli::brief::BriefCommand;
+use crate::cli::change::ChangeCommand;
 use crate::cli::DivergenceCliCommand;
 use crate::cli::evidence::EvidenceCommand;
 use crate::cli::finding::FindingCommand;
@@ -67,6 +68,12 @@ pub fn refusal(cli: &Cli, root: &clap::Command, matches: &clap::ArgMatches) -> O
             crate::divergence::check_role(args.role.as_ref()).and_then(|()| crate::relay::check_arguments("canon divergence accept", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: Some(&args.actor_id), approver: args.approver.as_deref(), note: args.note.as_deref() })),
         ),
         Command::Migrate(args) => ("canon migrate", crate::relay::check_arguments("canon migrate", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: args.approver.as_deref(), note: args.note.as_deref() })),
+        Command::Change { action } => match action {
+            ChangeCommand::Defer(args) => ("canon change defer", crate::relay::check_arguments("canon change defer", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: Some(&args.reason) })),
+            ChangeCommand::Drop(args) => ("canon change drop", crate::relay::check_arguments("canon change drop", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: Some(&args.reason) })),
+            ChangeCommand::Reopen(args) => ("canon change reopen", crate::relay::check_arguments("canon change reopen", &crate::relay::Call { via: args.relayed_via.as_deref(), actor: args.actor.as_deref(), approver: Some(&args.approver), note: Some(&args.reason) })),
+            ChangeCommand::New(_) => return None,
+        },
         Command::Evidence { action } => match &**action {
             EvidenceCommand::Add(args) => ("canon evidence add", crate::evidence::check_add(args)),
             EvidenceCommand::Audit(args) => ("canon evidence audit", crate::evidence::check_audit(args)),

@@ -12,6 +12,7 @@ pub const SITES: &[Site] = &[
     site("fields.rs:refusal:USAGE#1", Kind::Other("the paging change's: `--fields` takes the paths a command declares under `outputs[].fields.paths` (spec 10.9.1), a closed set that belongs to the output, not a domain, a constraint or a validator of the argument")),
     site("query.rs:to_cli_error:QUERY_ARGUMENT_INVALID#1", Kind::Rule { command: "query", rule: "forbids", arguments: &["kind", "change"] }),
     site("query.rs:to_cli_error:QUERY_ARGUMENT_INVALID#2", Kind::Validator { command: "query", arguments: &["kind", "status"] }),
+    site("query.rs:to_cli_error:USAGE#1", Kind::Validator { command: "query", arguments: &["kind", "status"] }),
     site("retention.rs:check_window:USAGE#1", Kind::Validator { command: "export", arguments: &["after", "before"] }),
     site("run/entry.rs:usage_error:USAGE#1", Kind::Other("the refusal of a removed spelling of an option: it maps a fault, it does not check an argument of a command")),
     site("run/entry.rs:help_json_refusal:USAGE#1", Kind::Other("the refusal of `--help` or `--version` with `--json` (spec 4.4.1): it maps a request for text to the envelope, it does not check an argument of a command")),

@@ -28,6 +28,7 @@ routing:
   evidence: local
   divergence: local
   finding: local
+  change_state: local
 ";
 
 const SCENARIO: &str = "world.demo.01";

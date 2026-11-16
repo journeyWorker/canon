@@ -236,11 +236,14 @@ fn effects(repo: &Path, plan: &Plan, names: &migrate_names::Plan, config_changes
     }
     if config_changes {
         let rewrite = Effect::path("rewrite", "canon.yaml");
-        out.push(if names.retired_keys.is_empty() {
-            rewrite
-        } else {
-            rewrite.detail(format!("delete {}", names.retired_keys.iter().map(|key| format!("{} (`{}`)", key.lines(), key.key)).collect::<Vec<_>>().join(", ")))
-        });
+        let mut details = Vec::new();
+        if !names.retired_keys.is_empty() {
+            details.push(format!("delete {}", names.retired_keys.iter().map(|key| format!("{} (`{}`)", key.lines(), key.key)).collect::<Vec<_>>().join(", ")));
+        }
+        if let Some(added) = &names.added_route {
+            details.push(format!("add line {} `{}` to `routing:`", added.line, added.text));
+        }
+        out.push(if details.is_empty() { rewrite } else { rewrite.detail(details.join("; ")) });
     }
     if !plan.gitignore.is_empty() {
         out.push(Effect::path("rewrite", ".gitignore").detail(format!("add {}", plan.gitignore.join(", "))));
@@ -1196,6 +1199,12 @@ fn print_names(names: &migrate_names::Plan, log: &mut crate::json_out::Log) {
         let each = names.retired_keys.iter().map(|key| format!("{} (`{}`)", key.lines(), key.key)).collect::<Vec<_>>().join(", ");
         log.line(format!("canon migrate: plan: canon.yaml: delete {each}; canon 0.39 has no `session` or `event` record kind (stored rows stay; `canon purge --kind session|event` deletes them)"));
     }
+    if let Some(added) = &names.added_route {
+        log.line(format!(
+            "canon migrate: plan: canon.yaml: add line {} `{}` as the last entry of `routing:`; canon 0.42 routes the `change_state` record kind (`local` keeps the decisions in git; change the value by hand afterwards if you want another rung)",
+            added.line, added.text
+        ));
+    }
     if !names.gitignore_lines.is_empty() {
         log.line("canon migrate: plan: .gitignore: `kind=evidence_record` becomes `kind=evidence`".to_string());
     }
@@ -1209,7 +1218,7 @@ fn print_plan(repo: &Path, plan: &Plan, names: &migrate_names::Plan, briefs: &mi
         log.line(line);
     }
     print_names(names, log);
-    let names_work = names.renames() || !names.config_keys.is_empty() || !names.retired_keys.is_empty() || !names.gitignore_lines.is_empty();
+    let names_work = names.renames() || !names.config_keys.is_empty() || !names.retired_keys.is_empty() || names.added_route.is_some() || !names.gitignore_lines.is_empty();
     if !plan.changes_files() && plan.left.is_empty() {
         if !names_work && briefs.is_empty() {
             log.line("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names");

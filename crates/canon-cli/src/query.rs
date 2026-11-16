@@ -147,11 +147,16 @@ const CHANGE_STATUSES: [&str; 4] = ["proposed", "in_progress", "completed", "arc
 /// same snake_case wire strings the model serializes.
 const SUBJECT_STATUSES: [&str; 6] = ["proposed", "specced", "building", "verifying", "shipped", "retired"];
 
+/// 0.42 `change-drop`: the closed [`canon_model::ChangeDecision`] vocabulary, `--status`'s domain for `--kind change_state`
+/// (the record's `state` member).
+const CHANGE_STATE_STATUSES: [&str; 3] = ["deferred", "dropped", "reopened"];
+
 fn status_domain(kind: RecordKind) -> &'static [&'static str] {
     match kind {
         RecordKind::Task => &TASK_STATUSES,
         RecordKind::Change => &CHANGE_STATUSES,
         RecordKind::Subject => &SUBJECT_STATUSES,
+        RecordKind::ChangeState => &CHANGE_STATE_STATUSES,
         _ => &[],
     }
 }
@@ -174,6 +179,8 @@ impl ScopeError {
     pub fn to_cli_error(&self) -> CliError {
         match self {
             ScopeError::UnsupportedKind { flag, .. } => CliError::refused("QUERY_ARGUMENT_INVALID", self.to_string()).hint("`canon schema query` lists the accepted filters and their values").field(*flag),
+            // A change_state's states are a closed set of the kind (the brief's F4): a value outside it is a usage fault that lists the three.
+            ScopeError::InvalidStatus { kind: RecordKind::ChangeState, valid, .. } => CliError::refused("USAGE", self.to_string()).hint("`canon schema query` lists the accepted filters and their values").field("--status").expected(valid.iter().cloned()),
             ScopeError::InvalidStatus { valid, .. } => CliError::refused("QUERY_ARGUMENT_INVALID", self.to_string()).hint("`canon schema query` lists the accepted filters and their values").field("--status").expected(valid.iter().cloned()),
         }
     }
@@ -186,11 +193,11 @@ impl ScopeError {
 /// `change`/`task`; `--status` to `change`/`task`/`subject` (s36);
 /// `--domain` to `subject` only (s36).
 pub fn validate_scope(kind: RecordKind, change_id: Option<&ChangeId>, status: Option<&str>, domain: Option<&str>) -> Result<(), ScopeError> {
-    if change_id.is_some() && !matches!(kind, RecordKind::Change | RecordKind::Task) {
-        return Err(ScopeError::UnsupportedKind { flag: "--change", supported: "`--kind change`/`--kind task`", kind });
+    if change_id.is_some() && !matches!(kind, RecordKind::Change | RecordKind::Task | RecordKind::ChangeState) {
+        return Err(ScopeError::UnsupportedKind { flag: "--change", supported: "`--kind change`/`--kind task`/`--kind change_state`", kind });
     }
-    if status.is_some() && !matches!(kind, RecordKind::Change | RecordKind::Task | RecordKind::Subject) {
-        return Err(ScopeError::UnsupportedKind { flag: "--status", supported: "`--kind change`/`--kind task`/`--kind subject`", kind });
+    if status.is_some() && !matches!(kind, RecordKind::Change | RecordKind::Task | RecordKind::Subject | RecordKind::ChangeState) {
+        return Err(ScopeError::UnsupportedKind { flag: "--status", supported: "`--kind change`/`--kind task`/`--kind subject`/`--kind change_state`", kind });
     }
     if domain.is_some() && kind != RecordKind::Subject {
         return Err(ScopeError::UnsupportedKind { flag: "--domain", supported: "`--kind subject`", kind });
@@ -219,14 +226,16 @@ fn record_task_id(raw: &RawRecord) -> Option<TaskId> {
 /// parsing of the task id string.
 fn matches_change_id(kind: RecordKind, raw: &RawRecord, change_id: &ChangeId) -> bool {
     match kind {
-        RecordKind::Change => record_change_id(raw).as_ref() == Some(change_id),
+        RecordKind::Change | RecordKind::ChangeState => record_change_id(raw).as_ref() == Some(change_id),
         RecordKind::Task => record_task_id(raw).map(|t| t.change_id()).as_ref() == Some(change_id),
         _ => true,
     }
 }
 
-fn matches_status(raw: &RawRecord, status: &str) -> bool {
-    raw.0.get("status").and_then(Value::as_str) == Some(status)
+/// `--status <s>`'s per-record match: the record's `status` member, or for a `change_state` its `state` member.
+fn matches_status(kind: RecordKind, raw: &RawRecord, status: &str) -> bool {
+    let member = if kind == RecordKind::ChangeState { "state" } else { "status" };
+    raw.0.get(member).and_then(Value::as_str) == Some(status)
 }
 
 /// `--domain <d>`'s per-record match (s36 `subject-domain-loop`):
@@ -339,6 +348,9 @@ pub(crate) fn current_of(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRe
 ///   re-import appends another, so a change adopted by two subjects
 ///   would otherwise read as one row per version. Folded, it reads as
 ///   its one current version listing every subject, as the gate reads it.
+/// - `change_state` (0.42): each `canon change defer|drop|reopen` appends a
+///   version for the change (natural key: the change id); the latest is the
+///   change's current state and the earlier ones are `--history`.
 ///
 /// KIND-gated for [`fold_pg_routed_kind`]'s stated reason, and by the
 /// same trade-off: a kind that gains a re-writing verb must be added
@@ -350,7 +362,7 @@ pub(crate) fn current_of(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRe
 /// both are history to read, not versions of one. Folding by key would
 /// silently drop every attestation but the newest.
 fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
-    if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario | RecordKind::Change) {
+    if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario | RecordKind::Change | RecordKind::ChangeState) {
         return records;
     }
     let folded = fold_latest_by_natural_key(kind, records);
@@ -414,6 +426,7 @@ fn is_key_ordered(kind: RecordKind) -> bool {
             | RecordKind::Run
             | RecordKind::Subject
             | RecordKind::Finding
+            | RecordKind::ChangeState
             | RecordKind::Scenario
             | RecordKind::Change
     )
@@ -464,7 +477,7 @@ fn apply_scope(kind: RecordKind, records: Vec<RawRecord>, change_id: Option<&Cha
     let mut records: Vec<RawRecord> = records
         .into_iter()
         .filter(|r| change_id.is_none_or(|c| matches_change_id(kind, r, c)))
-        .filter(|r| status.is_none_or(|s| matches_status(r, s)))
+        .filter(|r| status.is_none_or(|s| matches_status(kind, r, s)))
         .filter(|r| domain.is_none_or(|d| matches_domain(r, d)))
         .collect();
     if matches!(kind, RecordKind::Change | RecordKind::Task) {
@@ -480,7 +493,7 @@ fn rollup_for(kind: RecordKind, records: &[RawRecord]) -> Option<(usize, usize)>
     if kind != RecordKind::Task {
         return None;
     }
-    let done = records.iter().filter(|r| matches_status(r, "done")).count();
+    let done = records.iter().filter(|r| matches_status(kind, r, "done")).count();
     Some((done, records.len()))
 }
 
@@ -670,7 +683,7 @@ pub struct QueryReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overlays: Option<Vec<String>>,
     pub records: Vec<QueryRecord>,
-    /// `--kind finding|evidence|subject` (0.30): the references to a source nothing committed holds.
+    /// `--kind finding|evidence|subject|change_state` (0.30, 0.42): the references to a source nothing committed holds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dangling: Option<QueryDangling>,
     /// `--kind task`: tasks done of tasks listed.

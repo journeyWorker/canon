@@ -66,7 +66,7 @@ const LEDGER_DIR_NAME: &str = "ledger";
 /// kinds (`task`, `handoff`, `session`, `run`, `event`, `trajectory`)
 /// route to the hot and cold rungs by default and are not archived;
 /// `strategy_item` has no folding reader.
-pub const ARCHIVED_KINDS: [RecordKind; 7] = [
+pub const ARCHIVED_KINDS: [RecordKind; 8] = [
     RecordKind::Change,
     RecordKind::Subject,
     RecordKind::Scenario,
@@ -74,6 +74,7 @@ pub const ARCHIVED_KINDS: [RecordKind; 7] = [
     RecordKind::Evidence,
     RecordKind::Review,
     RecordKind::Divergence,
+    RecordKind::ChangeState,
 ];
 
 /// Whether versions of `kind` move to the archive.
@@ -132,7 +133,7 @@ fn unjudged() -> Judged {
 
 fn classify(kind: RecordKind, raw: &RawRecord) -> Judged {
     match kind {
-        RecordKind::Change | RecordKind::Subject | RecordKind::Scenario | RecordKind::Finding => match resolve_partition(kind, &raw.0) {
+        RecordKind::Change | RecordKind::Subject | RecordKind::Scenario | RecordKind::Finding | RecordKind::ChangeState => match resolve_partition(kind, &raw.0) {
             Ok(key) => Judged { groups: vec![(format!("key|{}", key.natural_key), latest_rank(raw))], pinned: false, approval: None },
             Err(_) => unjudged(),
         },
@@ -407,7 +408,7 @@ fn scope_of(kind: RecordKind, raw: &RawRecord) -> Option<Scope> {
     let name = crate::partition::resolve_name(kind, &raw.0).ok()?;
     let dir = PathBuf::from(format!("kind={}", kind.as_str()));
     match kind {
-        RecordKind::Change | RecordKind::Subject | RecordKind::Scenario | RecordKind::Finding | RecordKind::Review => {
+        RecordKind::Change | RecordKind::Subject | RecordKind::Scenario | RecordKind::Finding | RecordKind::Review | RecordKind::ChangeState => {
             // One group per key: the files whose stem key is this record's.
             let key = name.key;
             Some((dir, Box::new(move |file| stem_key(file) == Some(key.as_str()))))

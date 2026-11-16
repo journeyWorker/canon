@@ -33,6 +33,11 @@
 //! 0.39 adds one step to 4: the `routing`/`aging` keys naming the retired record kinds (`session`, `event`) are
 //! deleted line by line ([`rewrite_config`]); stored rows and files of those kinds are left alone (`canon purge`
 //! deletes them) and every step that walks the ledger or the databases skips the two kinds.
+//!
+//! 0.42 adds another: a `canon.yaml` whose `routing:` section lacks a `change_state` key gets `  change_state: local` as the
+//! section's last entry, in the indentation of the entry before it ([`add_change_state_route`]; the preview says the line
+//! number). A repo without a `routing:` section, or whose `routing:` has the key (any value), is left byte-identical; a
+//! `routing:` written as a flow mapping or with an anchor, an alias or a tag is refused, naming the line to add by hand.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -162,6 +167,15 @@ impl RetiredKeyLines {
     }
 }
 
+/// The line the 0.42 step adds at the end of `routing:` (module doc).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AddedRoute {
+    /// The 1-based line the new line has in the rewritten `canon.yaml`.
+    pub line: usize,
+    /// The new line as written, without its line ending: `  change_state: local`.
+    pub text: String,
+}
+
 /// Everything the renaming would do.
 #[derive(Debug, Default)]
 pub struct Plan {
@@ -172,6 +186,8 @@ pub struct Plan {
     pub config_keys: Vec<String>,
     /// The `canon.yaml` lines that name a retired record kind, which the migrate deletes.
     pub retired_keys: Vec<RetiredKeyLines>,
+    /// The `routing:` line the 0.42 step adds (a `routing:` section without a `change_state` key).
+    pub added_route: Option<AddedRoute>,
     /// The sqlite file and its re-keyed rows.
     pub sqlite: Option<(PathBuf, RowPlan)>,
     pub postgres: Option<(String, String, RowPlan)>,
@@ -188,6 +204,7 @@ impl Plan {
             && self.gitignore_lines.is_empty()
             && self.config_keys.is_empty()
             && self.retired_keys.is_empty()
+            && self.added_route.is_none()
             && self.sqlite.is_none()
             && self.postgres.is_none()
             && self.s3.is_none()
@@ -336,7 +353,7 @@ fn core_kind(dir: &str) -> Option<RecordKind> {
 pub fn plan(repo: &Path, text: &str) -> Result<Plan, String> {
     let policy = TierPolicy::from_yaml_at(text, repo).map_err(|e| format!("canon.yaml cannot be read: {e}"))?;
     let ledger = canon_gate::GateCtx::from_repo(repo).map_err(|e| e.to_string())?.ledger_root;
-    let mut plan = Plan { config_keys: policy.legacy_kind_keys.clone(), retired_keys: retired_key_lines(text), ..Plan::default() };
+    let mut plan = Plan { config_keys: policy.legacy_kind_keys.clone(), retired_keys: retired_key_lines(text), added_route: change_state_route(text), ..Plan::default() };
     plan_files(repo, &ledger, &mut plan)?;
     plan.gitignore_lines = std::fs::read_to_string(repo.join(".gitignore"))
         .map(|t| t.lines().enumerate().filter(|(_, l)| !l.trim_start().starts_with('#') && l.contains(canon_store::partition::LEGACY_KIND_DIR)).map(|(i, _)| i + 1).collect())
@@ -561,7 +578,89 @@ fn plan_databases(repo: &Path, policy: &TierPolicy, plan: &mut Plan) -> Result<(
 /// deleted. Only those lines change: comments and layout stay, and the result is refused unless it parses to
 /// the old document with exactly those keys renamed or removed and nothing else different.
 pub fn rewrite_config(text: &str) -> Result<String, String> {
+    Ok(add_change_state_route(&rewrite_before_routes(text)?)?.0)
+}
+
+/// [`rewrite_config`] without the 0.42 step: the 0.30 spelling and the 0.39 deletions.
+fn rewrite_before_routes(text: &str) -> Result<String, String> {
     remove_retired_keys(&rename_evidence_key(text)?)
+}
+
+/// The line [`rewrite_config`] adds to `text`'s `routing:` section, with the number it has in the rewritten file; `None` when it
+/// adds none, or cannot (the refusal is [`rewrite_config`]'s).
+pub fn change_state_route(text: &str) -> Option<AddedRoute> {
+    add_change_state_route(&rewrite_before_routes(text).ok()?).ok()?.1
+}
+
+/// `text` with `  change_state: local` as the last entry of its `routing:` section, in the indentation of the entry before it,
+/// and the line it added. Only that line is new: the result is refused unless it parses to the old document plus that one key.
+/// No `routing:` section (or one that is empty), or one that has the key whatever its value: `text` as it is.
+fn add_change_state_route(text: &str) -> Result<(String, Option<AddedRoute>), String> {
+    const KEY: &str = "change_state";
+    const RUNG: &str = "local";
+    let before: serde_yaml::Value = serde_yaml::from_str(text).map_err(|e| format!("canon.yaml is not valid YAML: {e}"))?;
+    let Some(routing) = before.get("routing").and_then(serde_yaml::Value::as_mapping) else { return Ok((text.to_string(), None)) };
+    if routing.is_empty() || routing.contains_key(KEY) {
+        return Ok((text.to_string(), None));
+    }
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let header = lines.iter().position(|line| line.starts_with("routing:"));
+    let hand = |why: &str| {
+        let at = header.map_or_else(String::new, |at| format!(" (line {})", at + 1));
+        format!("canon.yaml `routing:`{at} is written as {why}, so canon cannot add a line to it safely; add the line `{KEY}: {RUNG}` as the last entry of `routing:` by hand, then run `canon migrate` again")
+    };
+    let Some(header) = header else { return Err(hand("a form canon cannot read by line")) };
+    let after_colon = lines[header]["routing:".len()..].trim_end_matches(['\r', '\n']);
+    let inline = after_colon.split(" #").next().unwrap_or_default().trim();
+    if !inline.is_empty() {
+        return Err(hand("a flow mapping, an anchor, an alias or a tag"));
+    }
+    let mut first_child: Option<&str> = None;
+    let mut last = None;
+    for (at, line) in lines.iter().enumerate().skip(header + 1) {
+        let trimmed = line.trim_start();
+        if !line.starts_with([' ', '\t', '#', '\n', '\r']) && !trimmed.is_empty() {
+            break;
+        }
+        if trimmed.trim().is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let own = &line[..line.len() - trimmed.len()];
+        let first = *first_child.get_or_insert(own);
+        if own == first {
+            let (key, value) = trimmed.split_once(':').unwrap_or((trimmed, ""));
+            if key.trim() == "<<" || key.starts_with(['&', '*', '!']) || value.trim_start().starts_with(['&', '*', '!']) {
+                return Err(hand("a form with an anchor, an alias or a tag"));
+            }
+        }
+        last = Some(at);
+    }
+    let (Some(last), Some(child)) = (last, first_child) else { return Err(hand("a form canon cannot add a line to")) };
+    let newline = if lines[last].ends_with("\r\n") { "\r\n" } else { "\n" };
+    let added = format!("{child}{KEY}: {RUNG}");
+    let mut out = String::with_capacity(text.len() + added.len() + 2);
+    for line in &lines[..=last] {
+        out.push_str(line);
+    }
+    if lines[last].ends_with('\n') {
+        out.push_str(&added);
+        out.push_str(newline);
+        for line in &lines[last + 1..] {
+            out.push_str(line);
+        }
+    } else {
+        out.push_str(newline);
+        out.push_str(&added);
+    }
+    let parsed: serde_yaml::Value = serde_yaml::from_str(&out).map_err(|e| format!("canon.yaml with the `{KEY}` line would not parse: {e}"))?;
+    let mut expected = before;
+    if let Some(map) = expected.get_mut("routing").and_then(serde_yaml::Value::as_mapping_mut) {
+        map.insert(KEY.into(), RUNG.into());
+    }
+    if parsed != expected {
+        return Err(hand("a form canon cannot add a line to (a flow mapping, a shared anchor or a merge key)"));
+    }
+    Ok((out, Some(AddedRoute { line: last + 2, text: added })))
 }
 
 fn rename_evidence_key(text: &str) -> Result<String, String> {
@@ -1563,7 +1662,7 @@ mod tests {
         let found = retired_key_lines(OLD);
         assert_eq!(found.iter().map(|k| (k.key.as_str(), k.first, k.last)).collect::<Vec<_>>(), [("routing.session", 4, 4), ("routing.event", 6, 6), ("aging.event", 11, 11)]);
         let rewritten = rewrite_config(OLD).unwrap();
-        assert_eq!(rewritten, "routing:\n  # hot\n  task: hot\n  run: hot\n  trajectory: cold\n\naging:\n  handoff: { after: 30d, to: cold }\n\nplans:\n  sources: []\n");
+        assert_eq!(rewritten, "routing:\n  # hot\n  task: hot\n  run: hot\n  trajectory: cold\n  change_state: local\n\naging:\n  handoff: { after: 30d, to: cold }\n\nplans:\n  sources: []\n");
         assert!(retired_key_lines(&rewritten).is_empty(), "a second run finds nothing");
         assert_eq!(rewrite_config(&rewritten).unwrap(), rewritten);
     }
@@ -1578,12 +1677,12 @@ mod tests {
     #[test]
     fn tier_retired_04_the_legacy_evidence_key_is_renamed_in_the_same_pass() {
         let text = "routing:\n  evidence_record: local\n  session: hot\n";
-        assert_eq!(rewrite_config(text).unwrap(), "routing:\n  evidence: local\n");
+        assert_eq!(rewrite_config(text).unwrap(), "routing:\n  evidence: local\n  change_state: local\n");
     }
 
     #[test]
     fn tier_retired_04_a_config_without_the_keys_is_returned_byte_for_byte() {
-        let text = "# comment\nrouting:\n    task:   hot # kept\n";
+        let text = "# comment\nrouting:\n    task:   hot # kept\n    change_state: cold\n";
         assert_eq!(rewrite_config(text).unwrap(), text);
     }
 
@@ -1601,8 +1700,43 @@ mod tests {
 
     #[test]
     fn tier_retired_04_only_the_direct_keys_of_routing_and_aging_count() {
-        let text = "tiers:\n  hot: { backend: sqlite, path: .canon/hot.db }\nspecs:\n  session: kept\nrouting:\n  task: hot\n";
+        let text = "tiers:\n  hot: { backend: sqlite, path: .canon/hot.db }\nspecs:\n  session: kept\nrouting:\n  task: hot\n  change_state: local\n";
         assert!(retired_key_lines(text).is_empty());
         assert_eq!(rewrite_config(text).unwrap(), text);
+    }
+
+    #[test]
+    fn change_drop_26_the_route_line_is_added_last_in_the_indentation_of_the_entry_before_it() {
+        let text = "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n    task: hot # kept\n    finding: local\n\n# next\naging: {}\n";
+        let (out, added) = add_change_state_route(text).unwrap();
+        assert_eq!(out, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n    task: hot # kept\n    finding: local\n    change_state: local\n\n# next\naging: {}\n");
+        assert_eq!(added, Some(AddedRoute { line: 6, text: "    change_state: local".to_string() }));
+        assert_eq!(add_change_state_route(&out).unwrap(), (out.clone(), None), "a second run adds nothing");
+        assert_eq!(change_state_route(text), added);
+        // the last section, no final newline, CRLF
+        assert_eq!(add_change_state_route("routing:\n  task: hot").unwrap().0, "routing:\n  task: hot\n  change_state: local");
+        assert_eq!(add_change_state_route("routing:\r\n  task: hot\r\nplans: {}\r\n").unwrap().0, "routing:\r\n  task: hot\r\n  change_state: local\r\nplans: {}\r\n");
+    }
+
+    #[test]
+    fn change_drop_26_a_key_with_any_value_or_no_routing_section_is_left_byte_identical() {
+        for text in ["routing:\n  task: hot\n  change_state: cold\n", "tiers: {}\nplans:\n  sources: []\n", "routing: {}\n", "routing:\n", ""] {
+            assert_eq!(add_change_state_route(text).unwrap(), (text.to_string(), None), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn change_drop_27_forms_that_cannot_take_a_line_are_refused_naming_the_line_to_add() {
+        for text in [
+            "routing: { task: hot }\n",
+            "routing: &r\n  task: hot\n",
+            "routing:\n  task: &shared hot\n  run: *shared\n",
+            "routing:\n  <<: &base\n    run: hot\n  task: hot\n",
+            "routing:\n  task: !!str hot\n",
+        ] {
+            let err = add_change_state_route(text).unwrap_err();
+            assert!(err.contains("`change_state: local`") && err.contains("canon migrate"), "{text:?}: {err}");
+            assert!(change_state_route(text).is_none());
+        }
     }
 }

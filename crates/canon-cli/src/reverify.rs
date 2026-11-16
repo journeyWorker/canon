@@ -207,7 +207,7 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Cho
         .into_iter()
         .filter_map(|change| {
             let text = std::fs::read_to_string(crate::brief::canon_brief(repo, &change)?).ok()?;
-            if !crate::brief_check::is_chore(&text) || !crate::brief::approval_of(&text).approved() {
+            if !crate::brief_check::is_chore(&text) || !crate::brief::approval_in(repo, &change, &text).approved() {
                 return None;
             }
             let line = canon_ingest::markdown::field(&text, "Approved:")?;
@@ -305,7 +305,7 @@ impl CodeTreeMemo {
 /// line. The tree is computed only for an approval that recorded one.
 pub fn tree_unchanged(repo: &Path, code_tree: &CodeTreeMemo, change: &ChangeId) -> bool {
     let Some(text) = crate::brief::canon_brief(repo, change).and_then(|path| std::fs::read_to_string(path).ok()) else { return false };
-    if !crate::brief_check::is_chore(&text) || !crate::brief::approval_of(&text).approved() {
+    if !crate::brief_check::is_chore(&text) || !crate::brief::approval_in(repo, change, &text).approved() {
         return false;
     }
     let Some(recorded) = canon_ingest::markdown::field(&text, "Approved:").and_then(crate::brief::approval_tree) else { return false };

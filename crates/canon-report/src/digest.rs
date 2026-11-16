@@ -118,7 +118,9 @@ const fn digest_side(kind: RecordKind) -> DigestSide {
         // verified. `Subject` is the product/management unit the rest
         // of the corpus hangs off, authored and diffable exactly like
         // a `Change` — it belongs here and was simply missed.
-        RecordKind::Change | RecordKind::Task | RecordKind::Scenario | RecordKind::Subject => DigestSide::Corpus,
+        // `ChangeState` (0.42) is a human decision about a change, authored and diffable like the `Change` it
+        // names; a snapshot that ignored it could not tell a corpus whose change is closed from one whose is not.
+        RecordKind::Change | RecordKind::Task | RecordKind::Scenario | RecordKind::Subject | RecordKind::ChangeState => DigestSide::Corpus,
         // Verdict/attestation over that corpus. `Finding` is review
         // evidence committed alongside the code it judges (canon.yaml
         // routes it `local`, beside `review`/`divergence`/
@@ -417,7 +419,7 @@ mod tests {
         let neither: Vec<RecordKind> = kinds_on(DigestSide::Neither);
         assert_eq!(corpus.len() + ledger.len() + neither.len(), RecordKind::ALL.len(), "the three sides must partition RecordKind::ALL");
 
-        assert_eq!(corpus, vec![RecordKind::Change, RecordKind::Task, RecordKind::Scenario, RecordKind::Subject]);
+        assert_eq!(corpus, vec![RecordKind::Change, RecordKind::Task, RecordKind::Scenario, RecordKind::Subject, RecordKind::ChangeState]);
         assert_eq!(ledger, vec![RecordKind::Review, RecordKind::Divergence, RecordKind::Evidence, RecordKind::Finding]);
         assert_eq!(
             neither,

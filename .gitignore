@@ -45,6 +45,11 @@ man-pages/
 # the policy on, a fresh checkout without them reads every scenario as
 # unreviewed — CI included.
 #
+# Change-state records join them in 0.42 (`canon change defer|drop|reopen`):
+# a human's decision to set a change aside, which no source regenerates.
+# Left local, a fresh checkout (CI included) would require the closed
+# change again.
+#
 # Written as `ledger/*` + re-includes because a negation cannot
 # resurrect a path whose PARENT directory is excluded. `_staging/` is
 # still matched by the `*` line, so a STAGED (unpromoted) record stays
@@ -54,6 +59,7 @@ man-pages/
 !.canon/ledger/kind=finding/
 !.canon/ledger/kind=review/
 !.canon/ledger/kind=subject/
+!.canon/ledger/kind=change_state/
 # The evidence artifact store (0.14): the bytes `canon evidence add
 # --artifact/--report` bound, one file per sha256. Authored on the same
 # argument as the ledger re-includes above -- no source regenerates a

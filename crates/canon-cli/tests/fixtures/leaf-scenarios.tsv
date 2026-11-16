@@ -11,7 +11,10 @@ artifacts verify	evidence.add.116	evidence.add.117
 brief approve	skills.install.20,report.dashboard.06	skills.install.68
 brief check	authoring.brief-check.01,authoring.brief-check.05	authoring.brief-check.06,authoring.brief-check.16
 brief show	authoring.brief-check.01	context.capability.45
+change defer	change.drop.01,change.drop.02,change.drop.03,change.drop.29	change.drop.04,change.drop.05,change.drop.06,change.drop.28
+change drop	change.drop.07	change.drop.08
 change new	authoring.change.01	authoring.change.02,authoring.change.03
+change reopen	change.drop.18	change.drop.19
 completion	context.capability.41	context.capability.42
 context	context.capability.38,context.capability.39	context.capability.40
 context-pack add	dispatch.manifest.14	dispatch.manifest.15

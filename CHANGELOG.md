@@ -4,6 +4,33 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+canon 0.42 lets a human set a change aside: `canon change defer` for "not this release", `canon change drop` for the end, `canon change reopen` to bring a deferred change back. A closed change drops out of what the subject and the gate require; its evidence, reviews and findings stay. It is a change for callers with a repo: `canon.yaml` needs one more `routing:` line, and the caller note below says what each caller does.
+
+### Added
+
+- **`canon change defer`, `canon change drop` and `canon change reopen`** (`canon-0-42-change-drop`, scenarios `change.drop.*`): the three leaves a human decides, so the human-only leaves are now six (`brief approve`, `policy approve`, `divergence accept`, `change drop`, `change defer`, `change reopen`). Each takes `--reason`, `--ref` (repeatable), `--approver`, `--relayed-via`, `--actor`, `--dry-run` and `--input`. An agent role is refused with `ACTOR_DENIED` unless it relays the human's answer with `--relayed-via <the question tool>` and `--actor`, and a repo with `approval: { relay: deny }` refuses that too. Defer is for "not this release", drop is the end (a dropped change is never reopened), a deferred change is reopened with `canon change reopen`, and a shipped change cannot be closed. The guides `role-planner`, `role-orchestrator` and `canon-subject`, `--help`, the generated spec `docs/cli/canon.cli.json` and the conformance expectations say how to ask the human and record the answer.
+- **A record kind, `change_state`** (the thirteenth), written by the three leaves in the ledger: `canon query --kind change_state` reads it (`--change <slug>`, `--status deferred|dropped|reopened`, `--history` adds the records before a reopen) and `canon search --kind change_state` finds it by the words of the reason.
+- **`CHANGE_CONFLICT`** (exit 2, nothing written), with the reasons `SHIPPED` (the change shipped), `CLOSED` (already closed; also `brief approve` and `scenario new --flow <F-id> --change <change>` on a closed change), `DROPPED` (a dropped change is not reopened) and `NOT_DEFERRED` (reopen of a change that is not deferred).
+- **`CHANGE_RECORDS_KEPT`**, a warning of the three leaves: the evidence, reviews and findings of the change stay and are listed.
+- **`CHANGE_HISTORY_MISSING`**, a warning of `canon status`: git history is too short to read when a closed change's brief was first committed (a shallow clone), so the scenarios that change made stay required; `git fetch --unshallow` reads it.
+- **The advisory `closed_change` of `canon gate check`**: one line per closed change and per scenario it set aside; it never fails the gate.
+- **`setAsideChanges` and `setAsideScenarios` in `canon status --json`** (`data.subjects[]`, omitted when empty): the changes a human closed that the subject adopted, and the scenarios only closed changes made. `statusVersion` stays 4.
+- **A new `canon migrate` step**: for a `canon.yaml` whose `routing:` has no `change_state` line the preview says the line `change_state: local` and its line number; `canon migrate --commit --plan-digest <digest>` adds that line only, and `canon migrate --revert` restores the file. The step is open to every role.
+
+### Changed
+
+- **`canon.yaml`'s `routing:` needs one more line, `change_state`**: `canon migrate` adds `change_state: local` and `canon init` writes it (the skeleton writes all thirteen record kinds). Without it the three leaves and `canon query --kind change_state` are refused (`CONFIG_INVALID`, reason `TIERS`, hint `canon migrate`).
+- **The `APPROVED_BRIEF` hint** of `canon subject unadopt` names the human's `canon change defer` and `canon change drop` for taking an approved change out of the work.
+- **`CHANGE_ARGUMENT_INVALID`** describes and hints four leaves (`change new`, `change defer`, `change drop`, `change reopen`).
+- **`brief approve` after a reopen writes a new line**: the `Approved:` line from before the reopen is not read as an approval, so a reopened change needs a new answer.
+
+**Callers:**
+
+- A closed change drops out of the requirements.
+- A repo without the `change_state` line under `routing:` runs `canon migrate` before the closing commands.
+- `canon migrate` or the 0.42 `canon init` adding `change_state` makes canon 0.41 and older refuse the `canon.yaml` with `CONFIG_INVALID`; to go back, run `canon migrate --revert` with 0.42 first (closed changes are then required again).
+- A repo that wrote `.canon/ledger/*` into `.gitignore` by hand adds `!.canon/ledger/kind=change_state/`, or a new clone requires the closed change again; the `.gitignore` of `canon init` does not ignore the ledger whole.
+
 ## 0.41.0 — 2026-11-14
 
 canon 0.41 declares atip/1 1.6 (the `atip` crate and the checker at 0.3.0, CI and the `atip` recipes at `--contract 1.6`) and fixes a flaky pre-dispatch hook test. It is not BREAKING for callers: a 1.5 caller has nothing to change (ATIP 15.10), the documents keep the shape they had, and only the declaration strings (`meta.contractVersion`, `meta.schemaVersion`) read `1.6` where they read `1.5`. The test fix: the pre-dispatch hook test takes a closed pipe (EPIPE) when the hook exits before reading stdin.

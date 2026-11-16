@@ -65,6 +65,10 @@ pub struct FeatureScan {
     /// Only scenario-id tags that pair with a following Scenario header
     /// carry a titled scan entry.
     pub scenarios: Vec<ScenarioScan>,
+    /// The `at` of the `# canon: {...}` provenance line that belongs to each scenario header (the nearest one
+    /// in the comment block above its tags, else the first line after the header), by scenario id: when
+    /// `canon scenario new` wrote it (0.42). A scenario with no readable provenance time has no entry.
+    pub created_at: BTreeMap<String, chrono::DateTime<chrono::Utc>>,
 }
 
 impl FeatureScan {
@@ -110,6 +114,7 @@ pub fn scan(text: &str) -> FeatureScan {
                 .map(|offset| i + 1 + offset)
                 .filter(|&j| FeatureProvenance::parse_comment_line(lines[j]).is_some());
             let mut leading_provenance = false;
+            let mut leading_at: Option<chrono::DateTime<chrono::Utc>> = None;
             for j in (0..i).rev() {
                 if Some(j) == claimed_trailing {
                     break;
@@ -118,15 +123,21 @@ pub fn scan(text: &str) -> FeatureScan {
                 if above.is_empty() || !(above.starts_with('@') || above.starts_with('#')) {
                     break;
                 }
-                if FeatureProvenance::parse_comment_line(above).is_some() {
+                if let Some(provenance) = FeatureProvenance::parse_comment_line(above) {
                     leading_provenance = true;
+                    leading_at.get_or_insert(provenance.at);
                 }
             }
+            let trailing_at = trailing_provenance.and_then(|j| FeatureProvenance::parse_comment_line(lines[j])).map(|p| p.at);
+            let header_at = leading_at.or(trailing_at);
             let has_provenance = trailing_provenance.is_some() || leading_provenance;
             claimed_trailing = trailing_provenance;
             result.headers.push(HeaderScan { line_no: i + 1, label: label.clone(), has_provenance });
             if is_scenario_header(trimmed) {
                 for scenario_id in pending_scenario_ids.drain(..) {
+                    if let Some(at) = header_at {
+                        result.created_at.insert(scenario_id.clone(), at);
+                    }
                     result.scenarios.push(ScenarioScan {
                         scenario_id,
                         title: label.clone(),
@@ -636,6 +647,24 @@ mod tests {
         vec![ScenarioScan { scenario_id: "a.b.01".to_string(), title: "One".to_string(), subject_tags: vec!["payments-core".to_string()], lane_tags: vec![], case_tags: vec![], flow_tags: vec![], unknown_namespace_tags: vec![] }],
             "the raw @subject: value is paired with its scenario, unvalidated"
         );
+    }
+
+    /// change.drop.13: the creation time of a scenario is the `at` of the provenance line above its tags (else the line
+    /// after its header); a scenario with no readable provenance time has none, and one scenario's time never goes to another.
+    #[test]
+    fn a_scenarios_creation_time_is_the_at_of_its_own_provenance_line() {
+        let prov = |at: &str| format!("# canon: {{\"schema\":1,\"at\":\"{at}\",\"actor\":{{\"agent_id\":\"canon\"}}}}");
+        let text = format!(
+            "Feature: X\n  {f}\n\n  {a}\n  @a.b.01\n  Scenario: One\n    Given a\n\n  @a.b.02\n  Scenario: Two\n  {b}\n    Given a\n\n  # canon: {{not json\n  @a.b.03\n  Scenario: Three\n    Given a\n",
+            f = prov("2026-01-01T00:00:00Z"),
+            a = prov("2026-02-01T00:00:00Z"),
+            b = prov("2026-03-01T00:00:00Z")
+        );
+        let scan = scan(&text);
+        let at = |id: &str| scan.created_at.get(id).map(|t| t.to_rfc3339());
+        assert_eq!(at("a.b.01").as_deref(), Some("2026-02-01T00:00:00+00:00"));
+        assert_eq!(at("a.b.02").as_deref(), Some("2026-03-01T00:00:00+00:00"));
+        assert_eq!(at("a.b.03"), None, "an unreadable provenance line gives no time");
     }
 
     #[test]

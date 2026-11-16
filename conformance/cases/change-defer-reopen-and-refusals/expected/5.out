@@ -1,0 +1,4 @@
+canon change reopen: recorded change `a` as reopened (decided by journey: the owner chose the smaller scope) — written directly; nothing to promote
+  subjects it is on (requires it again): `s`
+  the old approval no longer counts: have the human approve the brief again (`canon brief approve a ...`)
+next: canon status — see where the repo stands now that change `a` is reopened: it is a requirement again (+1 more)

@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "codex-cli",
+    "role": "implementer"
+  },
+  "approver": "journey",
+  "at": "2026-11-14T09:30:00Z",
+  "change_id": "canon-0-41-ci-nextest",
+  "kind": "change_state",
+  "reason": "the offline job takes 33 minutes 32 seconds, longer than the 30 minutes 1 second it replaces",
+  "refs": [
+    "https://github.com/journeyWorker/canon/pull/147"
+  ],
+  "relay": {
+    "actor": "codex-cli",
+    "role": "planner",
+    "tool": "ask"
+  },
+  "schema": 1,
+  "state": "deferred"
+}

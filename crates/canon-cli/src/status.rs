@@ -328,6 +328,37 @@ pub struct SubjectSummary {
     pub reverify: Vec<crate::reverify::Gap>,
     /// Approved chore changes with no qualifying change-level review (0.23 D5).
     pub chore_reviews: Vec<(canon_model::ChangeId, String)>,
+    /// The changes a human closed (0.42 `change-drop`) that this subject adopted: they read as absent from the
+    /// subject's change list. Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub set_aside_changes: Vec<SetAsideChange>,
+    /// The scenarios this subject owns that only closed changes made: no check asks for them. Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub set_aside_scenarios: Vec<SetAsideScenario>,
+}
+
+/// One closed change of a subject ([`SubjectSummary::set_aside_changes`]).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SetAsideChange {
+    pub change: String,
+    /// `deferred` or `dropped`.
+    pub state: String,
+    pub reason: String,
+    pub refs: Vec<String>,
+    pub approver: String,
+    /// When the decision was recorded (UTC, seconds).
+    pub at: String,
+}
+
+/// One set-aside scenario of a subject ([`SubjectSummary::set_aside_scenarios`]).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SetAsideScenario {
+    pub scenario: String,
+    pub project: String,
+    /// The closed changes that made it.
+    pub changes: Vec<String>,
 }
 
 /// One flow step of the brief and what covers it.
@@ -561,13 +592,21 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
 
     if pending_index {
         crate::inventory::overlay_stale_index(&mut ctx);
+    } else {
+        crate::set_aside::attach(&mut ctx);
+    }
+    if ctx.set_aside.history_unavailable() {
+        warnings.push(Warning::new(
+            "CHANGE_HISTORY_MISSING",
+            "git history is too short to read when a closed change's brief was first committed (a shallow clone), so the scenarios that change made stay required (reason `history_unavailable`); run `git fetch --unshallow` to read it".to_string(),
+        ));
     }
     warnings.extend(policy_diagnosis(&ctx.policy));
     warnings.extend(crate::policy_approval::advisory(repo));
     let routed_away: Vec<&str> = ctx
         .unreadable_kinds
         .iter()
-        .filter(|kind| matches!(kind, RecordKind::Scenario | RecordKind::Subject | RecordKind::Review | RecordKind::Finding))
+        .filter(|kind| matches!(kind, RecordKind::Scenario | RecordKind::Subject | RecordKind::Review | RecordKind::Finding | RecordKind::ChangeState))
         .map(|kind| kind.as_str())
         .collect();
     for kind in &routed_away {
@@ -1043,6 +1082,24 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         flow,
         reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, &derived.code_tree, subject) } else { Vec::new() },
         chore_reviews: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::chore_review_gaps(repo, ctx, &derived.code_tree, subject) } else { Vec::new() },
+        set_aside_changes: canon_gate::spec_coverage::adopted_change_ids(ctx, subject)
+            .iter()
+            .filter_map(|change| ctx.set_aside.closed.get(change))
+            .map(|closed| SetAsideChange {
+                change: closed.change_id.as_str().to_string(),
+                state: closed.state.as_str().to_string(),
+                reason: closed.reason.clone(),
+                refs: closed.refs.clone(),
+                approver: closed.approver.clone(),
+                at: closed.at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            })
+            .collect(),
+        set_aside_scenarios: canon_gate::spec_coverage::all_scenarios(ctx)
+            .into_iter()
+            .filter(|s| s.subject_id.as_ref() == Some(&subject.subject_id))
+            .filter_map(|s| ctx.set_aside.scenarios.get(&(s.project_id.clone(), s.scenario_id.clone())).map(|by| (s, by)))
+            .map(|(s, by)| SetAsideScenario { scenario: s.scenario_id.as_str().to_string(), project: s.project_id.as_str().to_string(), changes: by.iter().map(|c| c.as_str().to_string()).collect() })
+            .collect(),
     }
 }
 
@@ -1651,6 +1708,17 @@ pub fn render(report: &StatusReport) -> String {
                 let names = s.pending_drafts.iter().map(|d| format!("`{d}`")).collect::<Vec<_>>().join(", ");
                 let verb = if s.pending_drafts.len() == 1 { "is a pending draft" } else { "are pending drafts" };
                 let _ = writeln!(out, "      {names} {verb}: not yet part of the subject's scope (never approved, not a chore, no scenario tagged `@flow:<change>.*`); reopen, evidence and ship do not read {}", if s.pending_drafts.len() == 1 { "it" } else { "them" });
+            }
+            for closed in &s.set_aside_changes {
+                let refs = if closed.refs.is_empty() { String::new() } else { format!(" (refs: {})", closed.refs.join(", ")) };
+                let _ = writeln!(out, "      `{}` is {} by {} at {}: {}{refs}; no check asks for it", closed.change, closed.state, closed.approver, closed.at, closed.reason);
+                if closed.state == "deferred" {
+                    let _ = writeln!(out, "      bring it back with `canon change reopen {} --reason \"<why>\" --approver <name>` (a human decides; the brief then needs a new approval)", closed.change);
+                }
+            }
+            if !s.set_aside_scenarios.is_empty() {
+                let names = s.set_aside_scenarios.iter().map(|x| format!("`{}`", x.scenario)).collect::<Vec<_>>().join(", ");
+                let _ = writeln!(out, "      {} scenario(s) set aside, made only by closed changes: {names}", s.set_aside_scenarios.len());
             }
             for brief in &s.briefs {
                 if let Some(counts) = brief.findings {
