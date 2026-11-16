@@ -163,6 +163,12 @@ pub struct GateContext {
     /// as `scenarios`; a caller that rewrites `scenarios` must rewrite this set with it. Not a derived value
     /// (`invalidate_derived` leaves it alone).
     pub tombstoned_scenarios: BTreeSet<(canon_model::ProjectId, canon_model::ScenarioId)>,
+    /// Every `change_state` record, unfolded (0.42): a human's decisions to defer, drop or reopen a change.
+    pub change_states: Vec<canon_model::ChangeState>,
+    /// What the closed changes take out of the requirements ([`crate::set_aside`]). `closed` is filled by
+    /// [`GateContext::load`]; the caller that reads the `.feature` files and git fills the scenario part
+    /// and calls [`GateContext::invalidate_derived`].
+    pub set_aside: crate::set_aside::SetAside,
     /// Divergence lifecycle events, unfolded. `crate::spec_coverage`
     /// folds them through `canon_model::fold` rather than reading
     /// `status` off individual rows, so the gate and
@@ -265,6 +271,8 @@ impl GateContext {
         let changes = read_corpus_kind(&tier, RecordKind::Change, &mut corpus_violations)?;
         let reviews = read_corpus_kind(&tier, RecordKind::Review, &mut corpus_violations)?;
         let findings = read_corpus_kind(&tier, RecordKind::Finding, &mut corpus_violations)?;
+        let change_states: Vec<canon_model::ChangeState> = read_corpus_kind(&tier, RecordKind::ChangeState, &mut corpus_violations)?;
+        let set_aside = crate::set_aside::SetAside::from_states(&change_states);
         let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo)?;
 
         // A file named by the 0.29 rule is reported whatever kind it is (F2): it is never used for a
@@ -281,6 +289,8 @@ impl GateContext {
             audits,
             scenarios,
             tombstoned_scenarios,
+            change_states,
+            set_aside,
             divergences,
             subjects,
             changes,

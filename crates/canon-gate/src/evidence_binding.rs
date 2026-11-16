@@ -327,6 +327,8 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
             tombstoned_scenarios: Default::default(),
+            change_states: Vec::new(),
+            set_aside: Default::default(),
             code_tree: None,
             derived: Default::default(),
             now: Utc::now(),

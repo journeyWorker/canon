@@ -68,7 +68,6 @@
 use std::path::{Path, PathBuf};
 
 use canon_gate::freshness::current_pins;
-use canon_gate::spec_coverage::latest_scenarios;
 use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::JoinKeyError;
 use canon_model::{Actor, ChangeId, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewId, ReviewPins, ReviewOutcome, RoleId, ScenarioId, SessionId};
@@ -273,7 +272,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
         },
         None => None,
     };
-    let indexed = latest_scenarios(&gate_context);
+    let indexed = canon_gate::spec_coverage::all_scenarios(&gate_context);
     let (found, missing): (Vec<_>, Vec<_>) =
         scenario_ids.iter().map(|id| (id, indexed.iter().find(|s| s.project_id == args.project_id && &s.scenario_id == id))).partition(|(_, s)| s.is_some());
     if !missing.is_empty() {

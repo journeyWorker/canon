@@ -1,0 +1,3 @@
+canon: ACTOR_DENIED: `canon change drop` records a human's decision and is not available to the implementer role without the relay option
+  field: --as
+  hint: to record an answer the human gave you in this conversation: show them what they approve (`canon brief show <change> --body` for a brief), ask with the harness question tool, and only on an explicit approval run `canon change drop a --reason "<their words>" --ref <link> --approver <their name> --relayed-via <the question tool> --actor <your actor id>`; otherwise the human runs `canon change drop a --reason "<their words>" --ref <link> --approver <their name>` in their own shell; never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself

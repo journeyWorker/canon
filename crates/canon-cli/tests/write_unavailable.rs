@@ -11,6 +11,7 @@
 //! |---|---|
 //! | `subject new`, `subject move`, `subject adopt`, `subject unadopt` | `.canon/ledger/kind=subject` |
 //! | `change new` | `.canon/ledger/kind=change` |
+//! | `change defer`, `change drop`, `change reopen` | `.canon/ledger` |
 //! | `inventory sync` | `.canon/ledger/kind=scenario` |
 //! | `ingest plans` | `.canon/ledger/kind=change` |
 //! | `ingest records` | `.canon/learn` (the trajectory store) |
@@ -323,6 +324,24 @@ fn atip_l0_24_divergence_resolve_and_defer_into_a_read_only_ledger_are_refused()
         WRITE_DENIED,
         ".canon/ledger",
     );
+}
+
+/// change.drop.29: the three closing leaves refuse a read-only ledger before they write the decision. A `reopen` of a change that was
+/// never deferred is refused for its state first, so the ledger is made read-only after the deferral that makes it reopenable.
+#[test]
+fn atip_l0_24_change_defer_and_drop_into_a_read_only_ledger_are_refused() {
+    let dir = scratch_repo();
+    let ledger = dir.path().join(".canon/ledger");
+    assert_refused(dir.path(), &[&ledger], &["change", "defer", "add-login", "--reason", "later", "--ref", "chat", "--approver", "ana"], WRITE_DENIED, ".canon/ledger");
+    assert_refused(dir.path(), &[&ledger], &["change", "drop", "add-login", "--reason", "never", "--ref", "chat", "--approver", "ana"], WRITE_DENIED, ".canon/ledger");
+}
+
+#[test]
+fn atip_l0_24_change_reopen_into_a_read_only_ledger_is_refused() {
+    let dir = scratch_repo();
+    ok(dir.path(), &["change", "defer", "add-login", "--reason", "later", "--ref", "chat", "--approver", "ana"]);
+    let ledger = dir.path().join(".canon/ledger/kind=change_state");
+    assert_refused(dir.path(), &[&ledger], &["change", "reopen", "add-login", "--reason", "now", "--approver", "ana"], WRITE_DENIED, "kind=change_state");
 }
 
 #[test]

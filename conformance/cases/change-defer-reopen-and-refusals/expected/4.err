@@ -1,0 +1,2 @@
+canon: CHANGE_NOT_FOUND: change `no-such-change` does not exist (it has no change record, so there is nothing to defer)
+  hint: import the change first: `canon ingest plans` reads `.canon/changes/no-such-change/brief.md` into a change record and `canon subject adopt <subject> --change no-such-change` links it to its subject; check the id against the changes `canon status` lists

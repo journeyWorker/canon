@@ -59,6 +59,7 @@ routing:
   # cold (bulk archive, shared, s3-backed): raw, reward-eligible
   # trajectories — cold from birth, no hot phase.
   trajectory: cold
+  change_state: local
 
 aging:
   # D3's own worked example values, verbatim (rung-renamed).

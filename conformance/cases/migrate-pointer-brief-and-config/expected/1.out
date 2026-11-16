@@ -5,4 +5,4 @@ canon migrate: plan:
   canon.yaml: every other byte kept
   rebuild the scenario index (full sync)
   left: 1 openspec change(s) not written by `canon change new` stay where they are, read as an external plan: c-checkout
-planDigest sha256:4367c829a1d44329b96cc1e9eaf2500f944f2e694401b57f85073fa26c89f6ee; nothing written. To act: canon migrate --commit --plan-digest=sha256:4367c829a1d44329b96cc1e9eaf2500f944f2e694401b57f85073fa26c89f6ee
+planDigest sha256:75efee46742a343a9592bbc19393bc7eb5bf6454141572302a6f5cf95ee54cec; nothing written. To act: canon migrate --commit --plan-digest=sha256:75efee46742a343a9592bbc19393bc7eb5bf6454141572302a6f5cf95ee54cec

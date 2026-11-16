@@ -530,7 +530,7 @@ pub fn run_call(provision: &Provision, home: &Path, words: &[String], role: Opti
 /// (`ACTOR_DENIED`) unless the call relays the human's answer.
 pub fn declared_role(path: &str, assignment: &Assignment) -> Option<&'static str> {
     match path {
-        "brief approve" | "policy approve" | "divergence accept" | "migrate" if !assignment.contains_key("relayed-via") => None,
+        "brief approve" | "policy approve" | "divergence accept" | "migrate" | "change defer" | "change drop" | "change reopen" if !assignment.contains_key("relayed-via") => None,
         _ => Some("implementer"),
     }
 }

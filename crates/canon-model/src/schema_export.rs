@@ -15,7 +15,7 @@ use crate::family::policy::PolicyFile;
 use crate::family::FamilyKind;
 use crate::handoff::Handoff;
 use crate::records::{
-    Change, Divergence, EvidenceRecord, Finding, Review, Run, Scenario, StrategyItem, Subject, Task, Trajectory,
+    Change, ChangeState, Divergence, EvidenceRecord, Finding, Review, Run, Scenario, StrategyItem, Subject, Task, Trajectory,
 };
 
 /// One `(kind, schema)` pair per one of the twelve closed record kinds
@@ -38,6 +38,7 @@ pub fn record_schemas() -> Vec<(RecordKind, schemars::Schema)> {
         (RecordKind::Evidence, schema_for!(EvidenceRecord)),
         (RecordKind::Subject, schema_for!(Subject)),
         (RecordKind::Finding, schema_for!(Finding)),
+        (RecordKind::ChangeState, schema_for!(ChangeState)),
     ]
 }
 
@@ -112,7 +113,7 @@ mod tests {
     #[test]
     fn tier_retired_12_emits_exactly_one_schema_per_record_kind() {
         let schemas = record_schemas();
-        assert_eq!(schemas.len(), 12);
+        assert_eq!(schemas.len(), 13);
         let mut seen = std::collections::HashSet::new();
         for (kind, _) in &schemas {
             assert!(seen.insert(*kind), "{kind:?} emitted twice");

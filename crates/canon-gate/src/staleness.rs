@@ -141,6 +141,14 @@ impl Candidate<'_> {
             _ => false,
         }
     }
+
+    /// The cell is a scenario's and a closed change set that scenario aside (0.42): its old evidence is not judged.
+    fn of_a_set_aside_scenario(&self, ctx: &GateContext) -> bool {
+        match (self.scenario, &self.record.project_id, &self.record.scenario_id) {
+            (true, Some(project), Some(scenario)) => ctx.set_aside.is_set_aside(project, scenario),
+            _ => false,
+        }
+    }
 }
 
 /// Folds `ctx.evidence` to the LATEST record per (subject, role) cell
@@ -183,7 +191,7 @@ fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
     fold_latest_by_key(candidates, |c| (c.subject.clone(), c.role.clone()), |c| c.at, |c| c.schema, |c| c.digest.as_str())
         .into_values()
         .filter(|c| matches!(c.record.verdict, EvidenceVerdict::Faithful))
-        .filter(|c| !c.of_an_undeclared_scenario(ctx))
+        .filter(|c| !c.of_an_undeclared_scenario(ctx) && !c.of_a_set_aside_scenario(ctx))
         .map(|c| GreenCell {
             subject: c.subject,
             evidence_sha: c.record.evidence_sha.clone(),
@@ -697,6 +705,8 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
             tombstoned_scenarios: Default::default(),
+            change_states: Vec::new(),
+            set_aside: Default::default(),
             code_tree: None,
             derived: Default::default(),
             now,

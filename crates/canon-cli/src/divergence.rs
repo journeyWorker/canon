@@ -430,7 +430,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
         Ok(context) => context,
         Err(e) => return crate::read_cause::config_error(e).hint("fix canon.yaml (`canon init --check` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
     };
-    let indexed = canon_gate::spec_coverage::latest_scenarios(&context);
+    let indexed = canon_gate::spec_coverage::all_scenarios(&context);
     let mut scenarios = Vec::new();
     let mut missing = Vec::new();
     for id in &scenario_ids {

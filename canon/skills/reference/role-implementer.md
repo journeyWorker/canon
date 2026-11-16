@@ -9,8 +9,8 @@ build nothing meanwhile. The only waiver is `--override-reason
 "<why>"`, for the case where you were told to attest while the brief waits for
 the human's answer: canon records it on the evidence, echoes it in
 `data.overrides[]` and lists it in `status` for the human. Never use it to
-skip the wait yourself. `brief approve`, `policy approve` and `divergence
-accept` are the human's; they refuse you (`ACTOR_DENIED`) unless they record an
+skip the wait yourself. `brief approve`, `policy approve`, `divergence accept`,
+`change drop`, `change defer` and `change reopen` are the human's; they refuse you (`ACTOR_DENIED`) unless they record an
 answer the human gave in the conversation (`--relayed-via`, the planner's
 procedure: `canon skills show role-planner`). You never run them without that
 answer, and never remove or unset your role (`env -u CANON_ROLE`, dropping
@@ -156,7 +156,7 @@ canon inventory sync --json
 ```
 ```text
 # Read stored records across every storage tier
-usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence --json
@@ -184,7 +184,7 @@ canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
-usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
 canon search timeout --kind finding --json

@@ -5,4 +5,4 @@ canon migrate: plan:
   .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/repo-write.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/
   left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
   left: .git stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
-planDigest sha256:7ae41b8d91fe6ee733775c0c6be3bed2b601ffa54a43357f24df3e421f1e7b77; nothing written. To act: canon migrate --commit --plan-digest=sha256:7ae41b8d91fe6ee733775c0c6be3bed2b601ffa54a43357f24df3e421f1e7b77
+planDigest sha256:1902eda77602ede2bec763d225e27c1c218b375d004ffb0bf91f01edaf929676; nothing written. To act: canon migrate --commit --plan-digest=sha256:1902eda77602ede2bec763d225e27c1c218b375d004ffb0bf91f01edaf929676

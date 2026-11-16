@@ -303,7 +303,7 @@ fn atip_optionvalues_03_every_name_and_sentence_option_declares_one_domain_in_ev
         }
     }
     assert_eq!(patterns.len(), 1, "one pattern for the six options: {patterns:?}");
-    assert_eq!(read, 43, "the 43 declarations of the six options were read");
+    assert_eq!(read, 55, "the 55 declarations of the six options were read");
     let pattern = patterns.into_iter().next().expect("one");
     assert!(pattern.contains("[^\\p{Cc}\\p{Zl}\\p{Zp}]"), "the class of a name and a sentence is written `[^\\p{{Cc}}\\p{{Zl}}\\p{{Zp}}]`: {pattern}");
     assert_eq!(atip::domain::pattern_problem(&pattern, atip::Minor::parse("1.5").expect("1.5")), None);
@@ -331,7 +331,7 @@ fn atip_optionvalues_04_a_blank_name_or_one_with_a_control_character_or_a_line_b
             cells += 1;
         }
     }
-    assert_eq!(cells, 43, "the 43 declarations of the six options");
+    assert_eq!(cells, 55, "the 55 declarations of the six options");
     // Through the binary, in four commands that took everything or nearly: nothing is written and the command's own code answers.
     for (value, label) in [("a\nb", "a line break"), ("a\tb", "a tab"), ("a\u{1b}b", "an escape"), (" ", "white space only")] {
         let actor = format!("--actor={value}");
@@ -354,6 +354,9 @@ const RELAYED: &[(&str, &[&str])] = &[
     ("policy approve", &["policy", "approve", "--approver", "Ana", "--note", "ok", "--actor", "impl"]),
     ("divergence accept", &["divergence", "accept", "auth.login.01", "--actor", "alice", "--reason", "r", "--tracking", "T-1", "--role", "reviewer", "--approver", "Ana", "--note", "ok"]),
     ("migrate", &["migrate", "--commit", "--plan-digest", "abc", "--actor", "impl", "--approver", "Ana", "--note", "ok"]),
+    ("change defer", &["change", "defer", "add-login", "--reason", "ok", "--ref", "r1", "--approver", "Ana", "--actor", "impl"]),
+    ("change drop", &["change", "drop", "add-login", "--reason", "ok", "--ref", "r1", "--approver", "Ana", "--actor", "impl"]),
+    ("change reopen", &["change", "reopen", "add-login", "--reason", "ok", "--approver", "Ana", "--actor", "impl"]),
 ];
 
 #[test]
@@ -423,6 +426,9 @@ fn atip_optionvalues_07_a_blank_sentence_or_one_with_a_control_character_or_a_li
     let cases: &[(&str, &[&str], &str, &str)] = &[
         ("divergence add --reason", &["divergence", "add", "auth.login.01", "--actor", "alice", "--role", "reviewer", "--state", "deferred", "--expiry", "2030-01-01T00:00:00Z"], "--reason", "DIVERGENCE_ARGUMENT_INVALID"),
         ("divergence defer --reason", &["divergence", "defer", "auth.login.01", "--actor", "alice", "--role", "reviewer", "--expiry", "2030-01-01T00:00:00Z"], "--reason", "DIVERGENCE_ARGUMENT_INVALID"),
+        ("change defer --reason", &["change", "defer", "add-login", "--ref", "r1", "--approver", "Ana"], "--reason", "CHANGE_ARGUMENT_INVALID"),
+        ("change drop --reason", &["change", "drop", "add-login", "--ref", "r1", "--approver", "Ana"], "--reason", "CHANGE_ARGUMENT_INVALID"),
+        ("change reopen --reason", &["change", "reopen", "add-login", "--approver", "Ana"], "--reason", "CHANGE_ARGUMENT_INVALID"),
         ("divergence accept --reason", &["divergence", "accept", "auth.login.01", "--actor", "alice", "--tracking", "T-1", "--role", "reviewer"], "--reason", "DIVERGENCE_ARGUMENT_INVALID"),
         ("finding close --reason", &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "rejected"], "--reason", "FINDING_REASON_REQUIRED"),
         ("subject move --reason", &["subject", "move", "demo", "--to", "specced"], "--reason", "SUBJECT_ARGUMENT_INVALID"),
@@ -445,6 +451,26 @@ fn atip_optionvalues_07_a_blank_sentence_or_one_with_a_control_character_or_a_li
     // The signed reason: a blank or a multi-line reason never reaches the hash.
     let got = call(&["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason=a\nb", "--actor", "alice", "--signature-file", "s.sig", "--approval-at", "2030-01-01T00:00:00Z"]);
     assert_eq!((got.exit, got.code(), got.field()), (2, "STRATEGY_ARGUMENT_INVALID", "--reason"), "{}", got.envelope);
+}
+
+/// change.drop.04 (failure path): a reference of the three closing leaves is not blank (the domain `evidence add --ref` has); a blank one is refused with the command's own code and writes nothing.
+#[test]
+fn atip_optionvalues_07_a_blank_reference_of_a_closing_leaf_is_refused_with_the_commands_own_code() {
+    let cases: &[(&str, &[&str])] = &[
+        ("change defer --ref", &["change", "defer", "add-login", "--reason", "ok", "--approver", "Ana"]),
+        ("change drop --ref", &["change", "drop", "add-login", "--reason", "ok", "--approver", "Ana"]),
+        ("change reopen --ref", &["change", "reopen", "add-login", "--reason", "ok", "--approver", "Ana"]),
+    ];
+    for (label, args) in cases {
+        for value in ["   ", ""] {
+            let given = format!("--ref={value}");
+            let mut argv: Vec<&str> = args.to_vec();
+            argv.push(&given);
+            let got = call(&argv);
+            assert_eq!((got.exit, got.code(), got.field()), (2, "CHANGE_ARGUMENT_INVALID", "--ref"), "`{label}` {value:?}: {}", got.envelope);
+            assert!(got.changed.is_empty(), "`{label}` {value:?} was refused and wrote {:?}", got.changed);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

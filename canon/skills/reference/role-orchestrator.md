@@ -3,7 +3,8 @@
 You run the loop across agents and move the subject. You write no brief,
 code or review yourself. Declare the role with `CANON_ROLE=orchestrator` (or
 `--as orchestrator`); your `canon status` also lists the human's steps. The
-human's acts (`brief approve`, `policy approve`, `divergence accept`) refuse
+human's acts (`brief approve`, `policy approve`, `divergence accept`, `change drop`,
+`change defer`, `change reopen`: six leaves) refuse
 every agent role, you included (`ACTOR_DENIED`), unless you record the answer the
 human gave you in the conversation with `--relayed-via <tool>` (below). You never
 run them without that answer, and never remove or unset your role (`env -u CANON_ROLE`,
@@ -158,7 +159,7 @@ canon evidence approval-payload --scenario auth.login.01 --project root --approv
 ```
 ```text
 # Export a redacted retention manifest without deleting records
-usage: canon export --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--before <TIMESTAMP>] [--after <TIMESTAMP>] [--output <FILE>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>] [--dry-run] [--input]
+usage: canon export --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state> [--before <TIMESTAMP>] [--after <TIMESTAMP>] [--output <FILE>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>] [--dry-run] [--input]
 ```
 ```bash
 canon export --kind evidence --output evidence.json --json
@@ -273,7 +274,7 @@ canon purge --kind run --before 2020-01-01T00:00:00Z --json
 ```
 ```text
 # Read stored records across every storage tier
-usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+usage: canon query --kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence --json
@@ -322,7 +323,7 @@ canon schema evidence add --json
 ```
 ```text
 # Search records, brief sections and scenario text, with each hit's neighbors in the record graph
-usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+usage: canon search <TEXT> [--kind <change|task|scenario|run|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|change_state|brief>]* [--expand <N>] [--limit <N>]
 ```
 ```bash
 canon search timeout --kind finding --json
@@ -547,6 +548,21 @@ approved scope never stop for a human: fixes, follow-ups and re-reviews go
 straight to the implementer and reviewer in the same change. A known gap the
 reviewer reports as tracked outside the change is accepted by the human with
 `canon divergence accept`; relay it the same way.
+
+When the human says a change is not wanted, or not in this release, you are
+the session that asks and records it; closing is theirs, never yours. Ask with
+the harness question tool, count only an explicit answer, then record it:
+`canon change defer <slug> --reason "<their words>" --ref <link or date> --approver <their name> --relayed-via <the question tool> --actor <your actor id>`.
+`canon change drop <slug>` takes the same options; defer is for "not this
+release", drop is the end, and `canon change reopen <slug>` (the human's answer
+again) brings a deferred change back and needs a new `brief approve`. A shipped
+change cannot be closed (`CHANGE_CONFLICT`, reason `SHIPPED`); its evidence,
+reviews and findings stay (`CHANGE_RECORDS_KEPT`). A closed change drops out of
+what the subject and the gate require: `canon status --json` lists it in
+`setAsideChanges` and its scenarios in `setAsideScenarios`, `canon gate check`
+prints the advisory `closed_change`, and `canon query --kind change_state
+--change <slug>` reads its state. Do not start the implementer or the reviewer
+for a closed change. `canon skills show role-planner` has the full steps.
 
 ## Hand off a note, not a copy
 

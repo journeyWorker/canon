@@ -190,8 +190,8 @@ pub enum Command {
         #[command(subcommand)]
         action: SubjectCommand,
     },
-    /// Write a plan change (.canon/changes/<slug>/brief.md) and adopt it into a subject
-    #[command(after_help = "Examples:\n  canon change new add-login --subject auth --title 'Add login'")]
+    /// Write a plan change (.canon/changes/<slug>/brief.md) and adopt it into a subject; a human can defer, drop or reopen it
+    #[command(after_help = "Examples:\n  canon change new add-login --subject auth --title 'Add login'\n  canon change defer add-login --reason 'waiting on the vendor' --ref 'chat 2026-11-16' --approver Ana\n  canon change drop add-login --reason 'not building it' --ref 'chat 2026-11-16' --approver Ana\n  canon change reopen add-login --reason 'the vendor answered' --approver Ana\n\n`defer`, `drop` and `reopen` record a human's decision (`change_state`), like `brief approve`: an agent\nrole is refused (ACTOR_DENIED) unless it relays the human's explicit answer with --relayed-via. A closed\n(deferred or dropped) change is no longer required by `gate check`, `status` or the ship guard, and the\nscenarios only it made are set aside; nothing is deleted. A shipped change cannot be closed.")]
     Change {
         #[command(subcommand)]
         action: ChangeCommand,

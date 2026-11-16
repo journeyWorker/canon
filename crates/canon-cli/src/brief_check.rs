@@ -1821,7 +1821,13 @@ pub fn check_text(repo: &Path, change: ChangeId, path: &Path, text: &str) -> Res
         Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| flow_refusal(&e))?),
         _ => None,
     };
-    let evaluation = evaluate(text, &resolved, flows.as_ref());
+    let mut evaluation = evaluate(text, &resolved, flows.as_ref());
+    // 0.42: an approval written no later than the change's reopening is void (`canon change reopen`).
+    let approval = crate::brief::approval_in(repo, &change, text);
+    if matches!(approval, crate::brief::Approval::Reopened { .. }) {
+        evaluation.approved = false;
+        evaluation.approval = approval;
+    }
     Ok(Checked { change, brief: rel(repo, path), language: resolved.language, language_source: resolved.source, language_note: resolved.note, phase, evaluation })
 }
 
@@ -2182,7 +2188,7 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     if json {
         let relay = match &ev.approval {
             crate::brief::Approval::Bound { line } | crate::brief::Approval::Unbound { line } | crate::brief::Approval::Changed { line, .. } => crate::relay::parse_marker(line),
-            crate::brief::Approval::Missing => None,
+            crate::brief::Approval::Missing | crate::brief::Approval::Reopened { .. } => None,
         };
         let body = BriefShowReport { change: checked.change.as_str(), brief: &checked.brief, state, counts, empty_sections, next, relay };
         crate::json_out::data("brief show", &body);

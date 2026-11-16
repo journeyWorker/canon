@@ -74,6 +74,8 @@ const CALL_SITES: &[(&str, &[&str], &[&str])] = &[
     ("read_cause::unavailable_before_work(", &["REPO_UNAVAILABLE"], &["query"]),
     // `query_failure`: a tier the caller configured wrongly (`policy: …`) is refused as the configuration, the same way every read of the repository is.
     ("return crate::read_cause::repo_error(message);", &["CONFIG_INVALID", "REPO_DENIED", "REPO_INVALID", "REPO_UNAVAILABLE"], &["query"]),
+    // `change_state::closed_refusal`: a deferred or dropped change takes no approval and no new flow-tagged scenario (`CHANGE_CONFLICT`, reason `CLOSED`).
+    ("change_state::closed_refusal(", &["CHANGE_CONFLICT"], &["brief approve", "scenario new", "dashboard"]),
 ];
 
 /// Whether `line` calls a helper that can answer `code`.
@@ -99,6 +101,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `check` is shared by `brief check` and `brief approve`.
     ("brief_check.rs", &["brief check", "brief approve", "brief show"]),
     ("change.rs", &["change new"]),
+    // The three decisions share one file: `CHANGE_CONFLICT`, `CHANGE_NOT_FOUND` and the refusals of a repo the file cannot read.
+    ("change_state.rs", &["change defer", "change drop", "change reopen"]),
     // `missing`: `CI_ENV_REQUIRED`, built here and emitted by `evidence add --from-ci`.
     ("ci_env.rs", &["evidence add"]),
     // `unverifiable_error`: the failure of a check that examined nothing, emitted by each check.
@@ -125,7 +129,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("learn.rs", &["strategy"]),
     ("ledger.rs", &["ledger compact"]),
     // `relay::authorize`: the refusals of a relayed approval, made for the human-only leaf that calls it.
-    ("relay.rs", &["brief approve", "policy approve", "divergence accept", "migrate"]),
+    ("relay.rs", &["brief approve", "policy approve", "divergence accept", "migrate", "change defer", "change drop", "change reopen"]),
     // Every code is next to its emit.
     ("main.rs", &[]),
     ("run/mod.rs", &[]),
@@ -164,9 +168,9 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     (
         "write_lock.rs",
         &[
-            "artifacts move", "artifacts prune", "artifacts store", "brief approve", "change new", "context-pack add", "dashboard", "dispatch begin", "dispatch end", "divergence accept", "divergence add", "divergence defer",
-            "divergence resolve", "evidence add", "evidence audit", "feature new", "finding add", "finding close", "gate install-hooks", "gate promote", "ingest plans", "ingest records", "init",
-            "inventory sync", "ledger compact", "migrate", "plugin sync", "policy approve", "prompt add", "purge", "review change", "review scenario", "scenario new", "skills install", "strategy promote",
+            "artifacts move", "artifacts prune", "artifacts store", "brief approve", "change defer", "change drop", "change new", "change reopen", "context-pack add", "dashboard", "dispatch begin", "dispatch end", "divergence accept",
+            "divergence add", "divergence defer", "divergence resolve", "evidence add", "evidence audit", "feature new", "finding add", "finding close", "gate install-hooks", "gate promote", "ingest plans", "ingest records",
+            "init", "inventory sync", "ledger compact", "migrate", "plugin sync", "policy approve", "prompt add", "purge", "review change", "review scenario", "scenario new", "skills install", "strategy promote",
             "strategy rollback", "subject adopt", "subject move", "subject new", "subject unadopt", "task done", "tier age",
         ],
     ),
@@ -178,7 +182,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("status.rs", &["status"]),
     ("subject.rs", &["subject"]),
     // `unavailable`: the up-front refusal of a target that cannot be written, made by every command that checks it before its first write.
-    ("write_mode.rs", &["change new", "feature new", "scenario new", "demo", "divergence", "evidence add", "evidence audit", "finding", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "artifacts prune", "brief approve", "policy approve", "export", "review scenario", "review change"]),
+    ("write_mode.rs", &["change new", "change defer", "change drop", "change reopen", "feature new", "scenario new", "demo", "divergence", "evidence add", "evidence audit", "finding", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "artifacts prune", "brief approve", "policy approve", "export", "review scenario", "review change"]),
 ];
 
 /// An `emit(&format!("canon <prefix> {verb}"), …)` shared by several commands:
@@ -199,11 +203,11 @@ const CALLER_LEAVES: &[(&str, &[&str])] = &[
     ("run/top.rs", &["report build", "report check", "report snapshot"]),
     ("search/mod.rs", &["search", "trace"]),
     // `write_mode::refuse_unwritable`: the up-front refusal of a target that cannot be written, made for the command that checks it.
-    ("write_mode.rs", &["change new", "feature new", "scenario new", "demo init", "demo review", "divergence add", "divergence accept", "evidence add", "evidence audit", "finding add", "finding close", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "artifacts prune", "brief approve", "policy approve", "export", "review scenario", "review change"]),
+    ("write_mode.rs", &["change new", "change defer", "change drop", "change reopen", "feature new", "scenario new", "demo init", "demo review", "divergence add", "divergence accept", "evidence add", "evidence audit", "finding add", "finding close", "task done", "gate install-hooks", "init", "migrate", "artifacts move", "artifacts prune", "brief approve", "policy approve", "export", "review scenario", "review change"]),
 ];
 
 /// The leaves that record a human's decision and refuse every agent role.
-const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept", "migrate"];
+const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept", "migrate", "change defer", "change drop", "change reopen"];
 
 /// A code on one of these lines is a warning (`meta.warnings`), not an error a command ends with: it is
 /// in the registry but belongs to no command's error list.

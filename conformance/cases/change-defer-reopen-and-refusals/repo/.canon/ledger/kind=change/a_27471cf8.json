@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-plan-import-canon"
+  },
+  "at": "2026-10-21T11:55:37.524464016Z",
+  "change_id": "a",
+  "kind": "change",
+  "schema": 2,
+  "status": "proposed",
+  "subject_ids": [
+    "s"
+  ],
+  "summary": "A",
+  "title": "a"
+}

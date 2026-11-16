@@ -1,0 +1,19 @@
+description: "0.42 change-drop: `canon change defer` records the human's decision on an approved change (exit 0), a repeat with the same values is unchanged, another reason on a closed change is CHANGE_CONFLICT (CLOSED, exit 2), an unknown change is CHANGE_NOT_FOUND (exit 2), `canon change reopen` brings the deferred change back and `canon change drop` then closes it for good; an agent role that does not relay a human's answer is ACTOR_DENIED (exit 2)"
+env: { CANON_ACTOR: canon }
+steps:
+  - args: [change, defer, a, --reason, "the offline job is too slow", --ref, "chat 2026-11-16", --approver, journey]
+    exit: 0
+  - args: [change, defer, a, --reason, "the offline job is too slow", --ref, "chat 2026-11-16", --approver, journey, --json]
+    exit: 0
+  - args: [change, defer, a, --reason, "another reason", --ref, "chat 2026-11-16", --approver, journey]
+    exit: 2
+  - args: [change, defer, no-such-change, --reason, "slow", --ref, "chat 2026-11-16", --approver, journey]
+    exit: 2
+  - args: [change, reopen, a, --reason, "the owner chose the smaller scope", --approver, journey]
+    exit: 0
+  - args: [change, drop, a, --reason, "not building it", --ref, "chat 2026-11-17", --approver, journey]
+    exit: 0
+  - args: [change, reopen, a, --reason, "changed my mind", --approver, journey]
+    exit: 2
+  - args: [--as, implementer, change, drop, a, --reason, "not building it", --ref, "chat 2026-11-17", --approver, journey]
+    exit: 2

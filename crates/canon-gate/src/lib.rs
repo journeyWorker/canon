@@ -65,6 +65,7 @@ pub mod policy_keys;
 pub mod promote;
 pub mod report;
 pub mod review_gate;
+pub mod set_aside;
 pub mod selftest;
 pub mod spec_coverage;
 pub mod risk;

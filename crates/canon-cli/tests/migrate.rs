@@ -264,6 +264,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
             .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
             .replace("  session: hot\n", "")
             .replace("  event: hot\n", "")
+            .replace("  trajectory: local\n", "  trajectory: local\n  change_state: local\n")
             + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.\nskills:\n  providers: [claude, codex]\n",
         "every other byte of canon.yaml is kept"
     );
@@ -504,6 +505,7 @@ fn migrated_yaml() -> String {
         .replace("  sources:\n    - dialect: openspec\n      root: .\n", "  sources: []\n")
         .replace("  session: hot\n", "")
         .replace("  event: hot\n", "")
+        .replace("  trajectory: local\n", "  trajectory: local\n  change_state: local\n")
         + "\n# Harnesses the canon skill is installed for: any of claude, codex, omp, pi\n# (`[]` for none). `canon skills install|check|doctor` follow this list;\n# `canon skills install --harness <name>` (once per name) or `--no-harness` rewrites it.\nskills:\n  providers: [claude, codex]\n"
 }
 
@@ -617,7 +619,7 @@ fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_a
     assert_eq!(out.status.code(), Some(1), "{}", text(&out));
     assert!(text(&out).contains("canon: MIGRATION_INCOMPLETE: failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
     // The retired kind keys come first in the migration, so they are already deleted when the run stops.
-    assert_eq!(read(repo, "canon.yaml"), yaml.replace("  session: hot\n", "").replace("  event: hot\n", ""), "the source canon init wrote stays while the approval is not copied");
+    assert_eq!(read(repo, "canon.yaml"), yaml.replace("  session: hot\n", "").replace("  event: hot\n", "").replace("  trajectory: local\n", "  trajectory: local\n  change_state: local\n"), "the source canon init wrote stays while the approval is not copied");
     assert!(repo.join("openspec/changes/.gitkeep").is_file());
 
     let out = ok_commit(repo);
@@ -894,4 +896,271 @@ fn atip_incomplete_10_a_migrate_that_stopped_after_it_began_is_incomplete_with_t
         repo.join(".canon/specs").is_dir(),
         "the files moved and stay moved"
     );
+}
+
+// ───────────── 0.42 `change-drop` F9: the `change_state` routing step ─────────────
+
+const ROUTE_LINE: &str = "  change_state: local\n";
+
+fn json_of(out: &Output) -> serde_json::Value {
+    serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("one JSON document ({e}): {}", text(out)))
+}
+
+/// `canon` as an agent that declared `role` (no human answer).
+fn canon_role(repo: &Path, role: &str, args: &[&str]) -> Output {
+    hermetic::canon().args(args).env("CANON_ACTOR", "agent-1").env("CANON_ROLE", role).current_dir(repo).output().expect("spawn canon")
+}
+
+/// The plan digest of `canon migrate --json` in `repo`.
+fn plan_digest(repo: &Path) -> String {
+    let preview = canon(repo, &["migrate", "--json"]);
+    assert!(preview.status.success(), "{}", text(&preview));
+    json_of(&preview)["data"]["planDigest"].as_str().expect("a planDigest").to_string()
+}
+
+/// A git repo made by `canon init` whose `canon.yaml` is as canon 0.41 wrote it (no `change_state` routing line), with subject `demo` and
+/// change `add-login`, committed; and that `canon.yaml`.
+fn without_route_repo() -> (tempfile::TempDir, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q", "-b", "main"]);
+    ok(repo, &["init", "--repo", ".", "--no-harness", "--no-agents-md", "--no-policy"]);
+    let fresh = read(repo, "canon.yaml");
+    assert!(fresh.contains(ROUTE_LINE), "0.42 `canon init` routes change_state: {fresh}");
+    let old = fresh.replacen(ROUTE_LINE, "", 1);
+    write(repo, "canon.yaml", &old);
+    commit_all(repo, "a canon.yaml of canon 0.41");
+    ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
+    commit_all(repo, "a subject and a change");
+    (dir, old)
+}
+
+/// The 1-based line of the last entry of `routing:` in `yaml`.
+fn last_route_line(yaml: &str) -> usize {
+    yaml.lines().enumerate().skip_while(|(_, line)| *line != "routing:").skip(1).take_while(|(_, line)| line.starts_with("  ")).last().expect("routing entries").0 + 1
+}
+
+/// `yaml` with the route line after the last entry of `routing:`: the old document and that one key.
+fn with_route_line(yaml: &str) -> String {
+    let at = last_route_line(yaml);
+    let mut lines: Vec<&str> = yaml.split_inclusive('\n').collect();
+    lines.insert(at, ROUTE_LINE);
+    lines.concat()
+}
+
+/// Every file of the repo but `.git`, the backups and the write lock, with its bytes.
+fn snapshot(repo: &Path) -> Vec<(String, Vec<u8>)> {
+    files(repo, "")
+        .into_iter()
+        .filter(|f| !f.starts_with(".git/") && !f.starts_with(".canon/migrate-backup/") && !f.ends_with("repo-write.lock"))
+        .map(|f| {
+            let bytes = std::fs::read(repo.join(&f)).unwrap();
+            (f, bytes)
+        })
+        .collect()
+}
+
+fn yaml_value(text: &str) -> serde_yaml::Value {
+    serde_yaml::from_str(text).unwrap()
+}
+
+/// change.drop.26 (F9): without the `change_state` routing line the closing command is refused (`CONFIG_INVALID`, reason `TIERS`, the hint names
+/// `canon migrate`); the preview says the line and where it goes; the commit adds that line and no other, the result is the old document plus the
+/// key, `change defer` then runs, and the next plan is empty.
+#[test]
+fn change_drop_26_migrate_adds_the_change_state_route_line_and_the_next_plan_is_empty() {
+    let (dir, old) = without_route_repo();
+    let repo = dir.path();
+    let (line, want) = (last_route_line(&old) + 1, with_route_line(&old));
+
+    let refused = canon(repo, &["change", "defer", "add-login", "--reason", "not this release", "--ref", "chat 2026-11-16", "--approver", "Ana", "--json"]);
+    let refused_doc = json_of(&refused);
+    assert_eq!((refused.status.code(), refused_doc["error"]["code"].as_str(), refused_doc["error"]["reason"].as_str()), (Some(2), Some("CONFIG_INVALID"), Some("TIERS")), "{refused_doc}");
+    assert!(refused_doc["error"]["hint"].as_str().unwrap().contains("canon migrate"), "the hint names the step: {refused_doc}");
+
+    let dry = ok(repo, &["migrate"]);
+    let said = format!("canon migrate: plan: canon.yaml: add line {line} `  change_state: local` as the last entry of `routing:`");
+    assert!(dry.contains(&said), "the preview names the line number and the text:\n{dry}");
+    assert!(!dry.contains("delete line") && !dry.contains(".gitignore: add"), "only the route line is planned:\n{dry}");
+    assert_eq!(read(repo, "canon.yaml"), old, "a preview writes nothing");
+    let doc = json_of(&canon(repo, &["migrate", "--json"]));
+    assert!(doc.to_string().contains(&format!("add line {line} `  change_state: local` to `routing:`")), "the rewrite effect carries the line: {doc}");
+
+    let out = ok_commit(repo);
+    assert!(out.contains("canon migrate: rewrote canon.yaml\n"), "{out}");
+    let after = read(repo, "canon.yaml");
+    assert_eq!(after, want, "exactly one line was added, after the last entry, in its indentation");
+    assert_eq!(after.lines().nth(line - 1), Some("  change_state: local"));
+    let mut expected = yaml_value(&old);
+    expected["routing"]["change_state"] = "local".into();
+    assert_eq!(yaml_value(&after), expected, "the result is the old document plus the key");
+
+    let again = ok(repo, &["migrate"]);
+    assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"), "the next plan is empty: {again}");
+    commit_all(repo, "the route line");
+    let deferred = canon(repo, &["change", "defer", "add-login", "--reason", "not this release", "--ref", "chat 2026-11-16", "--approver", "Ana", "--json"]);
+    assert!(deferred.status.success(), "`change defer` runs once the line is there: {}", text(&deferred));
+    let again = ok(repo, &["migrate"]);
+    assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"), "still empty with the record written: {again}");
+    assert_eq!(read(repo, "canon.yaml"), want);
+}
+
+/// change.drop.26: `canon migrate --revert` restores the `canon.yaml` bytes the step rewrote.
+#[test]
+fn change_drop_26_revert_restores_the_canon_yaml_bytes() {
+    let (dir, old) = without_route_repo();
+    let repo = dir.path();
+    let before = snapshot(repo);
+    ok_commit(repo);
+    assert_eq!(read(repo, "canon.yaml"), with_route_line(&old));
+
+    let preview = canon(repo, &["migrate", "--revert", "--json"]);
+    assert!(preview.status.success(), "{}", text(&preview));
+    let digest = json_of(&preview)["data"]["planDigest"].as_str().expect("a planDigest").to_string();
+    assert_eq!(read(repo, "canon.yaml"), with_route_line(&old), "the revert preview writes nothing");
+    let reverted = canon(repo, &["migrate", "--revert", "--commit", "--plan-digest", &digest, "--json"]);
+    assert!(reverted.status.success(), "{}", text(&reverted));
+    assert_eq!(read(repo, "canon.yaml"), old, "the file is back, byte for byte");
+    assert_eq!(snapshot(repo), before, "and so is everything else");
+}
+
+/// change.drop.26: a repo that has the line already, whatever its value, has an empty plan and keeps the value.
+#[test]
+fn change_drop_26_an_existing_line_is_skipped_and_its_value_kept() {
+    let (dir, old) = without_route_repo();
+    let repo = dir.path();
+    // The line in the middle of the section, with a value that is not `local` (`hot` is the rung every init repo has besides `local`).
+    let own = old.replacen("  finding: local\n", "  change_state: hot\n  finding: local\n", 1);
+    assert_ne!(own, old);
+    write(repo, "canon.yaml", &own);
+    commit_all(repo, "change_state routed to hot");
+    let dry = ok(repo, &["migrate"]);
+    assert!(dry.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"), "{dry}");
+    assert!(!dry.contains("change_state"), "{dry}");
+    let out = ok_commit(repo);
+    assert!(out.starts_with("canon migrate: nothing to migrate"), "{out}");
+    assert_eq!(read(repo, "canon.yaml"), own, "the value is not changed and no second line is added");
+    assert_eq!(read(repo, "canon.yaml").matches("change_state").count(), 1);
+}
+
+/// change.drop.27 (failure path): a `routing:` that is a flow mapping or has an anchor cannot take a line: `CONFIG_INVALID` (reason `CANON_YAML`), the
+/// message names the line to add by hand, the hint says to rerun `canon migrate`, and nothing is written, not even by the run's other steps.
+#[test]
+fn change_drop_27_a_routing_section_that_cannot_take_a_line_is_refused_and_blocks_the_other_steps() {
+    let (dir, old) = without_route_repo();
+    let repo = dir.path();
+    let lines: Vec<&str> = old.split_inclusive('\n').collect();
+    let header = lines.iter().position(|l| *l == "routing:\n").unwrap();
+    let last = last_route_line(&old);
+    let entries: Vec<String> = lines[header + 1..last].iter().map(|l| l.trim().to_string()).collect();
+    let flow = format!("{}routing: {{ {} }}\n{}", lines[..header].concat(), entries.join(", "), lines[last..].concat());
+    let anchored = old.replacen("routing:\n", "routing: &route\n", 1);
+    // Other steps would act on this repo: its .gitignore lacks canon's lines.
+    write(repo, ".gitignore", "target/\n");
+    for (form, yaml) in [("flow mapping", flow), ("anchor", anchored)] {
+        write(repo, "canon.yaml", &yaml);
+        commit_all(repo, form);
+        let before = snapshot(repo);
+        let preview = canon(repo, &["migrate", "--json"]);
+        let doc = json_of(&preview);
+        assert_eq!((preview.status.code(), doc["error"]["code"].as_str(), doc["error"]["reason"].as_str()), (Some(2), Some("CONFIG_INVALID"), Some("CANON_YAML")), "{form}: {doc}");
+        assert!(doc["error"]["message"].as_str().unwrap().contains("`change_state: local`"), "{form}: the message names the line to add: {doc}");
+        assert!(doc["error"]["hint"].as_str().unwrap().contains("canon migrate"), "{form}: the hint says to rerun: {doc}");
+        let commit = canon(repo, &["migrate", "--commit", "--plan-digest", &format!("sha256:{}", "0".repeat(64)), "--json"]);
+        let commit_doc = json_of(&commit);
+        assert_eq!((commit.status.code(), commit_doc["error"]["code"].as_str(), commit_doc["error"]["reason"].as_str()), (Some(2), Some("CONFIG_INVALID"), Some("CANON_YAML")), "{form}: {commit_doc}");
+        assert_eq!(snapshot(repo), before, "{form}: canon.yaml, .gitignore and everything else are untouched");
+    }
+    // Added by hand, the rerun proceeds (the other steps run too).
+    write(repo, "canon.yaml", &old);
+    ok_commit(repo);
+    assert_eq!(read(repo, "canon.yaml"), with_route_line(&old));
+    assert!(read(repo, ".gitignore").contains(".canon/audit/"), "the other steps ran once the refusal was gone");
+}
+
+/// change.drop.27: a `canon.yaml` without a `routing:` section is skipped, byte for byte (see also authoring.migrate.02), and the next migrate has
+/// nothing to do.
+#[test]
+fn change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    let yaml = "# a game repo\r\nspecs:\r\n  roots:\r\n    - id: game # the only root\r\n      root: game/specs\r\nplans:\r\n  sources: []\r\nskills:\r\n  providers: []\r\n";
+    write(repo, "canon.yaml", yaml);
+    write(repo, "game/specs/kind=feature/area=cart/add.feature", CART);
+    let dry = ok(repo, &["migrate"]);
+    assert!(!dry.contains("change_state"), "no routing section, nothing to add: {dry}");
+    ok_commit(repo);
+    assert_eq!(read(repo, "canon.yaml"), yaml);
+    let again = ok_commit(repo);
+    assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"), "{again}");
+    assert_eq!(read(repo, "canon.yaml"), yaml);
+}
+
+/// change.drop.27 (failure path): a `canon.yaml` changed after the preview makes the old digest `PLAN_STALE`, and the file stays as it was.
+#[test]
+fn change_drop_27_a_stale_digest_is_plan_stale_and_the_file_is_untouched() {
+    let (dir, old) = without_route_repo();
+    let repo = dir.path();
+    let digest = plan_digest(repo);
+    let edited = format!("{old}# edited after the preview\n");
+    write(repo, "canon.yaml", &edited);
+    commit_all(repo, "canon.yaml edited");
+    let before = snapshot(repo);
+    let out = canon(repo, &["migrate", "--commit", "--plan-digest", &digest, "--json"]);
+    let doc = json_of(&out);
+    assert_eq!((out.status.code(), doc["error"]["code"].as_str()), (Some(2), Some("PLAN_STALE")), "{doc}");
+    assert_eq!(read(repo, "canon.yaml"), edited);
+    assert_eq!(snapshot(repo), before, "nothing was written");
+    // The plan of the file as it is now applies.
+    ok_commit(repo);
+    assert_eq!(read(repo, "canon.yaml"), with_route_line(&old) + "# edited after the preview\n");
+}
+
+/// change.drop.28 (failure path, no new human-only rule): an agent that declared a role runs the migrate confirm of this step without a human's
+/// answer; the closing command stays human-only for it (`ACTOR_DENIED`, nothing written) and passes with the human's answer relayed.
+#[test]
+fn change_drop_28_an_agent_role_runs_the_route_step_without_a_human_answer() {
+    for role in ["planner", "orchestrator"] {
+        let (dir, old) = without_route_repo();
+        let repo = dir.path();
+        let digest = plan_digest(repo);
+        let out = canon_role(repo, role, &["migrate", "--commit", "--plan-digest", &digest, "--json"]);
+        assert_eq!(out.status.code(), Some(0), "{role}: {}", text(&out));
+        assert_eq!(read(repo, "canon.yaml"), with_route_line(&old), "{role}");
+        assert!(!json_of(&out).to_string().contains("ACTOR_DENIED"), "{role}");
+        commit_all(repo, "the route line");
+
+        // The migrate confirm opened nothing else: closing a change is still the human's.
+        let args = ["change", "defer", "add-login", "--reason", "not this release", "--ref", "chat 2026-11-16", "--approver", "Ana"];
+        let denied = canon_role(repo, role, &[&args[..], &["--json"][..]].concat());
+        let denied_doc = json_of(&denied);
+        assert_eq!((denied.status.code(), denied_doc["error"]["code"].as_str()), (Some(2), Some("ACTOR_DENIED")), "{role}: {denied_doc}");
+        assert!(!repo.join(".canon/ledger/kind=change_state").exists(), "{role}: nothing was written");
+        let relayed = canon_role(repo, role, &[&args[..], &["--relayed-via", "ask", "--actor", "agent-1", "--json"][..]].concat());
+        assert!(relayed.status.success(), "{role}: the human's answer relayed passes: {}", text(&relayed));
+    }
+}
+
+/// change.drop.28 (failure path): a plan whose other step re-binds an `Approved:` line stays the human's to commit, whether or not it adds the route
+/// line too; the agent is refused (`ACTOR_DENIED`) and `canon.yaml` is untouched; the human's own commit adds the line.
+#[test]
+fn change_drop_28_a_plan_that_also_re_binds_an_approval_is_still_human_only() {
+    let (dir, old) = without_route_repo();
+    let repo = dir.path();
+    ok(repo, &["change", "new", "c", "--subject", "demo", "--title", "C"]);
+    let body = "# C\n\n<!-- canon:kind chore -->\n\n<!-- canon:section intent role=context -->\n## Intent\n\nC\n\nThe client has a security fix.\n\n<!-- canon:section category role=context -->\n## Category\n\nci\n\n<!-- canon:section invariants role=normative -->\n## Invariants\n\n- Requests and responses stay byte-identical. ==**No behavior changes.**==\n\n<!-- canon:section checks role=normative -->\n## Checks\n\n- The suite runs again at the chore commit. ==**The suite is the check.**==\n\n<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nNone.\n";
+    write(repo, ".canon/changes/c/brief.md", &format!("{body}Approved: Ana Kim 2026-10-12T09:00:00Z — \"ship it\" (brief {})\n", canon_cli::brief::brief_digest(body)));
+    commit_all(repo, "an approved chore in the 0.30 format");
+    let digest = plan_digest(repo);
+    let before = snapshot(repo);
+    let out = canon_role(repo, "planner", &["migrate", "--commit", "--plan-digest", &digest, "--json"]);
+    let doc = json_of(&out);
+    assert_eq!((out.status.code(), doc["error"]["code"].as_str()), (Some(2), Some("ACTOR_DENIED")), "{doc}");
+    assert_eq!(read(repo, "canon.yaml"), old, "the route line was not added either");
+    assert_eq!(snapshot(repo), before, "nothing was written");
+
+    let own = canon(repo, &["migrate", "--commit", "--plan-digest", &digest, "--json"]);
+    assert!(own.status.success(), "the human's own commit runs: {}", text(&own));
+    assert_eq!(read(repo, "canon.yaml"), with_route_line(&old));
 }

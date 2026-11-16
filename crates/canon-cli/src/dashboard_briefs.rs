@@ -3,7 +3,9 @@
 //!
 //! `GET /api/briefs` ([`list`]) lists every live change
 //! (`.canon/changes/<id>/brief.md`, never the archive) whose brief is not
-//! approved: no `Approved:` line, or one the brief changed after. Each
+//! approved: no `Approved:` line, one the brief changed after, or one older
+//! than the change's reopening (`canon change reopen`). A deferred or dropped
+//! change is not listed: it needs no approval (0.42). Each
 //! entry carries the brief's raw text, the sha256 of the file's bytes the
 //! text came from, the sections and the findings read from that same text
 //! by `canon brief check`'s own parser ([`crate::brief_check`]), and
@@ -25,7 +27,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::brief::approval_of;
+use crate::brief::approval_in;
 use crate::brief_approve::{approval_blockers, sha256_hex};
 use crate::brief_check::{check_text, parse_sections};
 use crate::cli_error::{CliError, CliErrorExt as _};
@@ -68,7 +70,7 @@ fn status_of(code: &str) -> u16 {
     match code {
         "APPROVAL_INVALID" => 400,
         "BRIEF_NOT_FOUND" => 404,
-        "BRIEF_INVALID" | CHANGED_SINCE_PAGE_LOAD => 409,
+        "BRIEF_INVALID" | CHANGED_SINCE_PAGE_LOAD | "CHANGE_CONFLICT" => 409,
         // Another canon process holds the repository write lock: the page may ask again.
         "REPO_LOCK_UNAVAILABLE" => 503,
         _ => 500,
@@ -108,6 +110,10 @@ pub fn list(repo: &Path) -> Reply {
     let mut relayed = Vec::new();
     let mut unreadable = Vec::new();
     for (change, path) in live {
+        // A closed change needs no approval, and the page would be offering one the approval core refuses.
+        if crate::change_state::closed_refusal(repo, &change).is_some() {
+            continue;
+        }
         let bytes = match std::fs::read(&path) {
             Ok(bytes) => bytes,
             Err(e) => {
@@ -119,9 +125,9 @@ pub fn list(repo: &Path) -> Reply {
             unreadable.push(UnreadableBrief { change_id: change.as_str().to_string(), message: "the brief is not UTF-8 text".to_string() });
             continue;
         };
-        let approval = approval_of(&text);
+        let approval = approval_in(repo, &change, &text);
         let line = match &approval {
-            crate::brief::Approval::Bound { line } | crate::brief::Approval::Unbound { line } | crate::brief::Approval::Changed { line, .. } => Some(line.as_str()),
+            crate::brief::Approval::Bound { line } | crate::brief::Approval::Unbound { line } | crate::brief::Approval::Changed { line, .. } | crate::brief::Approval::Reopened { line, .. } => Some(line.as_str()),
             crate::brief::Approval::Missing => None,
         };
         let relay = line.and_then(crate::relay::parse_marker);

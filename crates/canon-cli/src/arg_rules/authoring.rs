@@ -20,6 +20,9 @@ const DIGEST: &str = "^[^=]+=sha256:[^\u{0}]*$";
 pub(crate) static TABLES: Tables = Tables {
     rules: &[
         ("brief approve", &[Rule::requires("actor", &["relayed-via"]), Rule::requires("digest", &["relayed-via"])]),
+        ("change defer", &[Rule::requires("actor", &["relayed-via"])]),
+        ("change drop", &[Rule::requires("actor", &["relayed-via"])]),
+        ("change reopen", &[Rule::requires("actor", &["relayed-via"])]),
         ("policy approve", &[Rule::requires("actor", &["relayed-via"]), Rule::requires("relayed-via", &["note"])]),
         ("scenario new", &[Rule::requires("change", &["flow"])]),
         ("strategy promote", &[Rule::requires("evaluation", &["approval"]), Rule::requires("approval", &["evaluation"]), Rule::requires("signature-file", &["approval"])]),
@@ -101,6 +104,75 @@ pub(crate) static TABLES: Tables = Tables {
                     code: "USAGE",
                     description: ANSWER_RELAYED,
                     rejects: &["canon policy approve --approver alice --relayed-via ask --as implementer --actor impl --note \" \""],
+                },
+            ],
+        ),
+        (
+            "change defer",
+            &[
+                Validator {
+                    arguments: &["relayed-via", "as"],
+                    code: "USAGE",
+                    description: ROLE_DESCRIPTION,
+                    rejects: &["canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via ask --actor impl"],
+                },
+                Validator {
+                    arguments: &["relayed-via"],
+                    code: "USAGE",
+                    description: VIA_DESCRIPTION,
+                    rejects: &["canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via \"a b\" --as implementer --actor impl", "canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via \"a(b\" --as implementer --actor impl"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "actor"],
+                    code: "USAGE",
+                    description: ACTOR_DESCRIPTION,
+                    rejects: &["canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via ask --as implementer", "canon change defer add-login --reason ok --ref r1 --approver alice --relayed-via ask --as implementer --actor \"a b\""],
+                },
+            ],
+        ),
+        (
+            "change drop",
+            &[
+                Validator {
+                    arguments: &["relayed-via", "as"],
+                    code: "USAGE",
+                    description: ROLE_DESCRIPTION,
+                    rejects: &["canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via ask --actor impl"],
+                },
+                Validator {
+                    arguments: &["relayed-via"],
+                    code: "USAGE",
+                    description: VIA_DESCRIPTION,
+                    rejects: &["canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via \"a b\" --as implementer --actor impl", "canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via \"a(b\" --as implementer --actor impl"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "actor"],
+                    code: "USAGE",
+                    description: ACTOR_DESCRIPTION,
+                    rejects: &["canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via ask --as implementer", "canon change drop add-login --reason ok --ref r1 --approver alice --relayed-via ask --as implementer --actor \"a b\""],
+                },
+            ],
+        ),
+        (
+            "change reopen",
+            &[
+                Validator {
+                    arguments: &["relayed-via", "as"],
+                    code: "USAGE",
+                    description: ROLE_DESCRIPTION,
+                    rejects: &["canon change reopen add-login --reason ok --approver alice --relayed-via ask --actor impl"],
+                },
+                Validator {
+                    arguments: &["relayed-via"],
+                    code: "USAGE",
+                    description: VIA_DESCRIPTION,
+                    rejects: &["canon change reopen add-login --reason ok --approver alice --relayed-via \"a b\" --as implementer --actor impl", "canon change reopen add-login --reason ok --approver alice --relayed-via \"a(b\" --as implementer --actor impl"],
+                },
+                Validator {
+                    arguments: &["relayed-via", "actor"],
+                    code: "USAGE",
+                    description: ACTOR_DESCRIPTION,
+                    rejects: &["canon change reopen add-login --reason ok --approver alice --relayed-via ask --as implementer", "canon change reopen add-login --reason ok --approver alice --relayed-via ask --as implementer --actor \"a b\""],
                 },
             ],
         ),

@@ -23,7 +23,7 @@ const TRACE_OPERAND: &str = concat!("^", white_space!(), "*([0-9A-HJKMNP-TV-Za-h
 
 const NOT_CHANGE_KINDS: &[&str] = &["scenario", "run", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "subject", "finding"];
 const NOT_STATUS_KINDS: &[&str] = &["scenario", "run", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
-const NOT_DOMAIN_KINDS: &[&str] = &["change", "task", "scenario", "run", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding"];
+const NOT_DOMAIN_KINDS: &[&str] = &["change", "task", "scenario", "run", "handoff", "review", "divergence", "trajectory", "strategy_item", "evidence", "finding", "change_state"];
 
 pub(crate) static TABLES: Tables = Tables {
     rules: &[
@@ -32,8 +32,8 @@ pub(crate) static TABLES: Tables = Tables {
         (
             "query",
             &[
-                Rule::forbids_in("kind", NOT_CHANGE_KINDS, &["change"]).code("QUERY_ARGUMENT_INVALID").help("`--change` applies only to `--kind change` and `--kind task`."),
-                Rule::forbids_in("kind", NOT_STATUS_KINDS, &["status"]).code("QUERY_ARGUMENT_INVALID").help("`--status` applies only to `--kind change`, `--kind task` and `--kind subject`."),
+                Rule::forbids_in("kind", NOT_CHANGE_KINDS, &["change"]).code("QUERY_ARGUMENT_INVALID").help("`--change` applies only to `--kind change`, `--kind task` and `--kind change_state`."),
+                Rule::forbids_in("kind", NOT_STATUS_KINDS, &["status"]).code("QUERY_ARGUMENT_INVALID").help("`--status` applies only to `--kind change`, `--kind task`, `--kind subject` and `--kind change_state`."),
                 Rule::forbids_in("kind", NOT_DOMAIN_KINDS, &["domain"]).code("QUERY_ARGUMENT_INVALID").help("`--domain` applies only to `--kind subject`."),
             ],
         ),
@@ -51,6 +51,12 @@ pub(crate) static TABLES: Tables = Tables {
                     code: "QUERY_ARGUMENT_INVALID",
                     description: "`--status` is one of the statuses of the queried kind: `open`, `done` for `task`; `proposed`, `in_progress`, `completed`, `archived` for `change`; `proposed`, `specced`, `building`, `verifying`, `shipped`, `retired` for `subject`.",
                     rejects: &["canon query --kind task --status proposed --json"],
+                },
+                Validator {
+                    arguments: &["kind", "status"],
+                    code: "USAGE",
+                    description: "`--status` of `--kind change_state` is one of `deferred`, `dropped`, `reopened`.",
+                    rejects: &["canon query --kind change_state --status open --json"],
                 },
                 Validator { arguments: &["since"], code: "USAGE", description: CALENDAR, rejects: &["canon query --kind evidence --since 2026-02-30 --json"] },
             ],

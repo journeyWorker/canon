@@ -121,6 +121,7 @@ fn record_title(version: &Version) -> String {
     let pick = |field: &str| text(body, field);
     match version.kind {
         RecordKind::Finding => pick("summary"),
+        RecordKind::ChangeState => pick("reason"),
         RecordKind::Review => {
             let target = pick("scenario_id").or_else(|| pick("change_id")).unwrap_or_default();
             Some(format!("{} reviewed {target}", pick("reviewer").unwrap_or_default()).trim().to_string())
@@ -196,6 +197,7 @@ fn references_of(kind: RecordKind, body: &Value) -> Vec<Reference> {
             one("change_id", Target::Change, None);
             one("review_id", Target::Review, None);
         }
+        RecordKind::ChangeState => one("change_id", Target::Change, None),
         RecordKind::Handoff => {
             one("parent_handoff_id", Target::Handoff, None);
             one("openspec_change_slug", Target::Change, None);
@@ -317,6 +319,19 @@ pub fn build(corpus: &Corpus) -> Graph {
             for to in targets {
                 if to != *id && nodes.contains_key(&to) {
                     edges.insert(Edge { from: id.clone(), to, rel: reference.field.to_string() });
+                }
+            }
+        }
+    }
+
+    // A change_state also reaches the subjects of its change: the closing says which subjects stop requiring the change.
+    for (id, version) in current.iter().filter(|(_, v)| v.kind == RecordKind::ChangeState) {
+        let Some(change) = text(&version.body, "change_id") else { continue };
+        let subjects: Vec<String> = current.iter().filter(|(_, v)| v.kind == RecordKind::Change && v.key == change).flat_map(|(_, v)| strings(&v.body, "subject_ids")).collect();
+        for subject in subjects {
+            for to in by_key.get(&(Target::Subject, subject)).into_iter().flatten() {
+                if nodes.contains_key(to) {
+                    edges.insert(Edge { from: id.clone(), to: to.clone(), rel: "subject_ids".to_string() });
                 }
             }
         }

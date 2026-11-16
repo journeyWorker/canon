@@ -883,6 +883,9 @@ const GROWN_SINCE_0_36: &[(&str, usize)] = &[
     ("schema finding list", 10),
     // canon-0-40-ci-evidence: `evidence add --from-ci`, its two rules and the codes CI_ENV_REQUIRED and CI_WORKTREE_CONFLICT.
     ("schema evidence add", 7),
+    // canon-0-42-change-drop: the tree gained `change defer`, `change drop` and `change reopen` and the error and warning registries gained codes.
+    ("schema (tree) + finding close", 2),
+    ("schema (tree) + evidence add", 3),
 ];
 
 fn changelog_problems(text: &str, live: &BTreeMap<String, Vec<usize>>) -> Vec<String> {

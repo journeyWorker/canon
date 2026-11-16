@@ -148,7 +148,8 @@
         "strategy_item",
         "evidence",
         "subject",
-        "finding"
+        "finding",
+        "change_state"
       ]
     },
     "Reopen": {

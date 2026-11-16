@@ -4,7 +4,7 @@ steps:
     exit: 1
   - args: [migrate]
     exit: 0
-  - args: [migrate, --commit, --plan-digest, "sha256:7ae41b8d91fe6ee733775c0c6be3bed2b601ffa54a43357f24df3e421f1e7b77"]
+  - args: [migrate, --commit, --plan-digest, "sha256:1902eda77602ede2bec763d225e27c1c218b375d004ffb0bf91f01edaf929676"]
     exit: 0
   - args: [brief, check]
     exit: 0
