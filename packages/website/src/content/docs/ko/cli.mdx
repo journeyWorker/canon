@@ -87,11 +87,14 @@ Check a change's brief (PRD format) and see the next steps; never edits.
 ### `canon change`
 
 {/* canon:generated cli-change begin */}
-Write a plan change (.canon/changes/&lt;slug&gt;/brief.md) and adopt it into a subject.
+Write a plan change (.canon/changes/&lt;slug&gt;/brief.md) and adopt it into a subject; a human can defer, drop or reopen it.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
+| `canon change defer` | `<change-id>` | `--reason <TEXT>`, `--ref <TEXT>`, `--approver <NAME>` | 쓰기: Set an approved change aside for now (a human's decision | `canon change defer add-login --reason "waiting on the vendor" --ref "chat 2026-11-16" --approver alice --json` |
+| `canon change drop` | `<change-id>` | `--reason <TEXT>`, `--ref <TEXT>`, `--approver <NAME>` | 쓰기: Give up an approved change for good (a human's decision | `canon change drop add-login --reason "not building it" --ref "chat 2026-11-16" --approver alice --json` |
 | `canon change new` | `<change-id>` | `--subject <SUBJECT_ID>`, `--title <TEXT>` | 쓰기: Write .canon/changes/&lt;slug&gt;/brief.md, import it, and adopt it into a subject | `canon change new add-search --subject demo --title "Add search" --json` |
+| `canon change reopen` | `<change-id>` | `--reason <TEXT>`, `--approver <NAME>` | 쓰기: Bring a deferred change back (a human's decision); the old approval is void and the brief needs a new one | `canon change reopen add-login --reason "the vendor answered" --approver alice --json` |
 {/* canon:generated cli-change end */}
 
 ### `canon context-pack`

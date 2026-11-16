@@ -20,6 +20,15 @@
 {"command":"brief approve","digest":"55772c9da79c170d","found":{"alsoBreaks":[],"assignment":{"digest":["add-login=sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]}},"goal":"violate","rules":[1],"source":"story"}
 {"command":"brief approve","digest":"55772c9da79c170d","found":{"alsoBreaks":[],"assignment":{"actor":["alice"],"relayed-via":["text"]}},"goal":"satisfy","rules":[0],"source":"story"}
 {"command":"brief approve","digest":"55772c9da79c170d","found":{"alsoBreaks":[],"assignment":{"digest":["add-login=sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"],"relayed-via":["text"]}},"goal":"satisfy","rules":[1],"source":"story"}
+{"command":"change defer","digest":"649ba841097a66e3","found":{"alsoBreaks":[],"assignment":{"actor":["alice"]}},"goal":"violate","rules":[0],"source":"doc"}
+{"command":"change defer","digest":"649ba841097a66e3","found":{"alsoBreaks":[],"assignment":{"actor":["alice"]}},"goal":"violate","rules":[0],"source":"story"}
+{"command":"change defer","digest":"649ba841097a66e3","found":{"alsoBreaks":[],"assignment":{"actor":["alice"],"relayed-via":["text"]}},"goal":"satisfy","rules":[0],"source":"story"}
+{"command":"change drop","digest":"4890f07373946d7b","found":{"alsoBreaks":[],"assignment":{"actor":["alice"]}},"goal":"violate","rules":[0],"source":"doc"}
+{"command":"change drop","digest":"4890f07373946d7b","found":{"alsoBreaks":[],"assignment":{"actor":["alice"]}},"goal":"violate","rules":[0],"source":"story"}
+{"command":"change drop","digest":"4890f07373946d7b","found":{"alsoBreaks":[],"assignment":{"actor":["alice"],"relayed-via":["text"]}},"goal":"satisfy","rules":[0],"source":"story"}
+{"command":"change reopen","digest":"df788aca26a96124","found":{"alsoBreaks":[],"assignment":{"actor":["alice"]}},"goal":"violate","rules":[0],"source":"doc"}
+{"command":"change reopen","digest":"df788aca26a96124","found":{"alsoBreaks":[],"assignment":{"actor":["alice"]}},"goal":"violate","rules":[0],"source":"story"}
+{"command":"change reopen","digest":"df788aca26a96124","found":{"alsoBreaks":[],"assignment":{"actor":["alice"],"relayed-via":["text"]}},"goal":"satisfy","rules":[0],"source":"story"}
 {"command":"dispatch begin","digest":"0d450a754883b082","found":{"alsoBreaks":[],"assignment":{"skill-digest":["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]}},"goal":"violate","rules":[0],"source":"doc"}
 {"command":"dispatch begin","digest":"0d450a754883b082","found":{"alsoBreaks":[],"assignment":{"skill-digest":["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]}},"goal":"violate","rules":[0],"source":"story"}
 {"command":"dispatch begin","digest":"0d450a754883b082","found":{"alsoBreaks":[],"assignment":{"skill":["text"],"skill-digest":["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]}},"goal":"satisfy","rules":[0],"source":"story"}
@@ -201,27 +210,27 @@
 {"command":"purge","digest":"e0cef097f77fbf35","found":{"alsoBreaks":[],"assignment":{"plan-digest":["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]}},"goal":"violate","rules":[1],"source":"story"}
 {"command":"purge","digest":"e0cef097f77fbf35","found":{"alsoBreaks":[],"assignment":{"commit":["true"],"plan-digest":["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]}},"goal":"satisfy","rules":[0],"source":"story"}
 {"command":"purge","digest":"e0cef097f77fbf35","found":{"alsoBreaks":[],"assignment":{"commit":["true"],"plan-digest":["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]}},"goal":"satisfy","rules":[1],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"history":["true"],"kind":["change"],"plugin":["text"]}},"goal":"violate","rules":[0],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"all":["true"],"kind":["change"],"limit":["2"]}},"goal":"violate","rules":[1],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"change":["add-login"],"kind":["divergence"]}},"goal":"violate","rules":[2],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"kind":["divergence"],"status":["text"]}},"goal":"violate","rules":[3],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"domain":["text"],"kind":["change"]}},"goal":"violate","rules":[4],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"change":["add-login"],"history":["true"],"kind":["divergence"],"plugin":["text"]}},"goal":"both","rules":[0,2],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"history":["true"],"kind":["divergence"],"plugin":["text"],"status":["text"]}},"goal":"both","rules":[0,3],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"domain":["text"],"history":["true"],"kind":["change"],"plugin":["text"]}},"goal":"both","rules":[0,4],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"all":["true"],"change":["add-login"],"kind":["divergence"],"limit":["2"]}},"goal":"both","rules":[1,2],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"all":["true"],"kind":["divergence"],"limit":["2"],"status":["text"]}},"goal":"both","rules":[1,3],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"all":["true"],"domain":["text"],"kind":["change"],"limit":["2"]}},"goal":"both","rules":[1,4],"source":"doc"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"history":["true"],"kind":["change"],"plugin":["text"]}},"goal":"violate","rules":[0],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"all":["true"],"kind":["change"],"limit":["2"]}},"goal":"violate","rules":[1],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"change":["add-login"],"kind":["divergence"]}},"goal":"violate","rules":[2],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"kind":["divergence"],"status":["text"]}},"goal":"violate","rules":[3],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"domain":["text"],"kind":["change"]}},"goal":"violate","rules":[4],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"history":["true"],"kind":["change"]}},"goal":"satisfy","rules":[0],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"all":["true"],"kind":["change"]}},"goal":"satisfy","rules":[1],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"kind":["divergence"]}},"goal":"satisfy","rules":[2],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"kind":["divergence"]}},"goal":"satisfy","rules":[3],"source":"story"}
-{"command":"query","digest":"a50d89127d27ad10","found":{"alsoBreaks":[],"assignment":{"kind":["change"]}},"goal":"satisfy","rules":[4],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"history":["true"],"kind":["change"],"plugin":["text"]}},"goal":"violate","rules":[0],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"all":["true"],"kind":["change"],"limit":["2"]}},"goal":"violate","rules":[1],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"change":["add-login"],"kind":["divergence"]}},"goal":"violate","rules":[2],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"kind":["divergence"],"status":["text"]}},"goal":"violate","rules":[3],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"domain":["text"],"kind":["change"]}},"goal":"violate","rules":[4],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"change":["add-login"],"history":["true"],"kind":["divergence"],"plugin":["text"]}},"goal":"both","rules":[0,2],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"history":["true"],"kind":["divergence"],"plugin":["text"],"status":["text"]}},"goal":"both","rules":[0,3],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"domain":["text"],"history":["true"],"kind":["change"],"plugin":["text"]}},"goal":"both","rules":[0,4],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"all":["true"],"change":["add-login"],"kind":["divergence"],"limit":["2"]}},"goal":"both","rules":[1,2],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"all":["true"],"kind":["divergence"],"limit":["2"],"status":["text"]}},"goal":"both","rules":[1,3],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"all":["true"],"domain":["text"],"kind":["change"],"limit":["2"]}},"goal":"both","rules":[1,4],"source":"doc"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"history":["true"],"kind":["change"],"plugin":["text"]}},"goal":"violate","rules":[0],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"all":["true"],"kind":["change"],"limit":["2"]}},"goal":"violate","rules":[1],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"change":["add-login"],"kind":["divergence"]}},"goal":"violate","rules":[2],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"kind":["divergence"],"status":["text"]}},"goal":"violate","rules":[3],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"domain":["text"],"kind":["change"]}},"goal":"violate","rules":[4],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"history":["true"],"kind":["change"]}},"goal":"satisfy","rules":[0],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"all":["true"],"kind":["change"]}},"goal":"satisfy","rules":[1],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"kind":["divergence"]}},"goal":"satisfy","rules":[2],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"kind":["divergence"]}},"goal":"satisfy","rules":[3],"source":"story"}
+{"command":"query","digest":"9c84a4fcf2f7e0df","found":{"alsoBreaks":[],"assignment":{"kind":["change"]}},"goal":"satisfy","rules":[4],"source":"story"}
 {"command":"retrieve","digest":"b6e844ba77ce270d","found":{"alsoBreaks":[],"assignment":{}},"goal":"violate","rules":[0],"source":"doc"}
 {"command":"retrieve","digest":"b6e844ba77ce270d","found":{"alsoBreaks":[],"assignment":{"regime":["reviewer/canon/join-spine/9c93d024b1a2"],"subject":["demo"]}},"goal":"violate","rules":[1],"source":"doc"}
 {"command":"retrieve","digest":"b6e844ba77ce270d","found":{"alsoBreaks":[],"assignment":{}},"goal":"violate","rules":[0],"source":"story"}

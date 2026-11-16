@@ -150,10 +150,13 @@ const KNOWN_BUGS: &[(&str, &str, &str)] = &[];
 
 /// Replay-safe, content-keyed or once leaves whose example cannot run to
 /// success in the fixture, and the state they need.
-const IDEMPOTENCY_NEEDS_STATE: &[(&str, &str)] = &[(
-    "strategy rollback",
-    "a human's signed approval: an ssh key pinned as an allowed signer in .canon/policy.yaml, and a signature over the rollback payload, which needs ssh-keygen",
-)];
+const IDEMPOTENCY_NEEDS_STATE: &[(&str, &str)] = &[
+    ("change reopen", "a deferred change: the scratch repo's add-login was never closed, so the reopen is refused (CHANGE_CONFLICT, NOT_DEFERRED)"),
+    (
+        "strategy rollback",
+        "a human's signed approval: an ssh key pinned as an allowed signer in .canon/policy.yaml, and a signature over the rollback payload, which needs ssh-keygen",
+    ),
+];
 
 /// Declared-idempotent leaves not run twice at all.
 const IDEMPOTENCY_EXCLUDED: &[(&str, &str)] = &[("dashboard", "binds a port and serves until the process is stopped")];
