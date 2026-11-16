@@ -4,6 +4,27 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Changed
+
+**Six heavy test binaries stop searching and re-scanning during the test** (`canon-0-42-test-cost`, a chore: only test code changed; `src/`, `Cargo.lock`, the generated spec and `conformance/` are untouched, and canon's behaviour, output and exit values are the same).
+
+- The sweeps of `atip_check_order` and `arg_rules` read the calls that break or meet a rule from `crates/canon-cli/tests/atip/rule_calls.jsonl` instead of searching every set of the arguments a rule names (`evidence add` alone has 262,144). Every row carries a digest of what the search read (the rules, the arguments they name, the example words, the text of the searcher in `tests/rule_support/search.rs`, the `atip` revision in `Cargo.lock`); a row made from other inputs, a missing row, an extra row or a call that no longer breaks its rule fails the test and says how to make the table again. A test never falls back to searching; `atip_constraints_13` still searches, for its seeded document.
+- Make the table with `just rule-calls` (`CANON_BLESS_RULE_CALLS=1`); `just rule-calls-check` makes it again and fails when it differs from the repository's (run it once before a release, like `just atip-deep`).
+- `atip_validate` asks each distinct domain once (29 for the 202 declared; the key is the whole domain value) and prints its counts; `schema_codes` scans the sources once for its four tests and reads the command documents in process; `input` and `schema_doc` read declarations in process where they only read them, and `schema_doc` runs the two tests that check the printed bytes on six threads.
+- Measured on the shared sandbox box (12 cores, load 4-6 from other jobs; CPU = user + system, median of three `cargo test -p canon-cli --test <binary>`, debug profile, same build):
+
+| binary | CPU before | CPU after | finished in, before | after |
+|---|---:|---:|---:|---:|
+| `atip_check_order` | 433 s | 126 s | 90 s | 18 s |
+| `arg_rules` | 541 s | 252 s | 101 s | 102 s |
+| `atip_validate` | 115 s | 19 s | 115 s | 19 s |
+| `schema_codes` | 88 s | 1.3 s | 23 s | 1.1 s |
+| `schema_doc` | 50 s | 93 s | 35 s | 13 s |
+| `input` | 109 s | 53 s | 37 s | 16 s |
+| sum | 1,335 s | 543 s | | |
+
+`schema_doc` has no CPU saving: its two byte-level tests still start the binary, and on six threads on a loaded box the CPU time rose while the time to finish fell. `arg_rules` finishes in the same time because `atip_constraints_19` (about 1,450 starts of `evidence`) is serial and out of this change. Under nextest (one process per test, one test at a time) the five searching tests of `atip_check_order` and `atip_constraints_03` took 118, 73, 120 and 107 s (`atip_checkorder_05`, `07`, `08`, `12`) and 55 s before, and 13, 1.1, 2.8, 1.4 and 8.5 s after; the sum over `atip_check_order` went from 432 s to 37 s.
+
 ## 0.41.0 — 2026-11-14
 
 canon 0.41 declares atip/1 1.6 (the `atip` crate and the checker at 0.3.0, CI and the `atip` recipes at `--contract 1.6`) and fixes a flaky pre-dispatch hook test. It is not BREAKING for callers: a 1.5 caller has nothing to change (ATIP 15.10), the documents keep the shape they had, and only the declaration strings (`meta.contractVersion`, `meta.schemaVersion`) read `1.6` where they read `1.5`. The test fix: the pre-dispatch hook test takes a closed pipe (EPIPE) when the hook exits before reading stdin.
