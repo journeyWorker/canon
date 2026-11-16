@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-atip",
+    "role": "reviewer",
+    "session_id": "Rev42_atip"
+  },
+  "at": "2026-11-16T11:43:00.896482554Z",
+  "change_id": "canon-0-42-change-drop",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=atip/schema.feature:89-92; crates/canon-cli/tests/schema_doc.rs:941-960",
+  "introduced_by": "0f4e776025d1ae7ad151075fe40d42f56a8e694d",
+  "kind": "finding",
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-atip",
+  "round": 1,
+  "scenario_ids": [
+    "atip.schemadoc.09"
+  ],
+  "schema": 2,
+  "seq": 41,
+  "severity": "should_fix",
+  "summary": "P2 (spec fidelity): atip.schemadoc.09 still says 'The 47 input declarations' in its title and 'the 30 that had required publish it as argumentsRef' in its Then. change-drop updated only its Given to 50. The bound test atip_schemadoc_09 asserts 50 commands with input and 33 whose arguments schema has required. The binary at 24b8194a6 answers the same: 50 and 33, probed with canon schema <command> --json and --schemas. Fix: retitle it 'The 50 input declarations ...' and change the Then to 'the 33 that have required publish it as argumentsRef'. Also fix the test comment, which calls the 3 new leaves commands 'whose old document schema had required'. Blast radius: no code reads the text, but the signed review pins it.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-atip",
+    "role": "reviewer",
+    "session_id": "Rev42_atip"
+  },
+  "at": "2026-11-16T11:44:51.547613199Z",
+  "change_id": "canon-0-42-test-cost",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "kind": "review",
+  "pin": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "08d18426d39c6871f43b13e143a370bb58826ce1a3c5691b05e09c3ac1297dd9",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-42-test-cost/brief.md"
+  },
+  "review_id": "01M7J2S7AV32V3F4NGR8844XW8",
+  "reviewer": "rev-0-42-atip",
+  "schema": 2,
+  "worktree_dirty": false
+}

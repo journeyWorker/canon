@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-42-atip",
+    "role": "reviewer",
+    "session_id": "Rev42_atip"
+  },
+  "at": "2026-11-16T11:44:07.498335463Z",
+  "change_id": "canon-0-42-test-cost",
+  "code_tree": "8e260a40a05df5371d4977ae015b3e95c25aaafd",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/schema_doc.rs:39-40",
+  "introduced_by": "a2e2f108e08e574893b2fbc708cc032bb0bd01ba",
+  "kind": "finding",
+  "reviewed_sha": "24b8194a65d9b1bb5eb1ca5d04f6212bd9b4e0ea",
+  "reviewer": "rev-0-42-atip",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "P3: the doc comment of `pooled` says the pool 'costs the same CPU time'. That is wrong. On forca-canon-595ded99 (14 vCPU, load 4-6), I alternated three runs of the schema_doc binary at d7518d159 and at 24b8194a6. Median wall fell 38.4 -> 13.3 s. Median CPU rose 54.0 -> 92.7 s: user 48 -> 76 s, sys 6 -> 18 s. The work is the same, about 270 to 276 canon schema starts; each start costs more while six run at once. Keep the pool: cargo test runs the binaries one after another, CI pays for wall time, and the CHANGELOG already says there is no CPU saving. Fix: say that the pool shortens the wall time and costs more CPU time when cores are busy.",
+  "worktree_dirty": false
+}
