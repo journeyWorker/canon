@@ -1070,7 +1070,7 @@
         "reason",
         {
           "domain": {
-            "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+            "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
           },
           "help": "What a reader can open to see why: a link, a commit, a file, the date of a conversation (one line; once per reference)",
           "name": "ref",
@@ -41344,7 +41344,7 @@
       },
       {
         "domain": {
-          "pattern": "^\\p{White_Space}*([^\\p{Cc}\\p{Zl}\\p{Zp}]*[^\\p{Cc}\\p{White_Space}])\\p{White_Space}*$"
+          "pattern": "^[^\u0000]*\\P{White_Space}[^\u0000]*$"
         },
         "help": "What a reader can open to see why: a link, a commit, a file, the date of a conversation (one line; once per reference, at least one)",
         "name": "ref",

@@ -61,8 +61,8 @@ pub(crate) static TABLES: Tables = Tables {
         // ------------------------------------------------------------------------------------------ a sentence: --reason
         sentence(&["divergence add", "divergence defer", "divergence accept"], "reason", "DIVERGENCE_ARGUMENT_INVALID"),
         sentence(&["change defer", "change drop", "change reopen"], "reason", "CHANGE_ARGUMENT_INVALID"),
-        // A reference is what a reader can open (a link, a commit, a file, the date of a conversation): one line of text, like the reason.
-        sentence(&["change defer", "change drop", "change reopen"], "ref", "CHANGE_ARGUMENT_INVALID"),
+        // A reference is what a reader can open (a link, a commit, a file, the date of a conversation): the domain `evidence add --ref` has (one domain per option name, atip.optionvalues.12).
+        DomainRow::new(Scope::Arguments(&["change defer", "change drop", "change reopen"], "ref"), Domain::matching(NOT_BLANK), "CHANGE_ARGUMENT_INVALID").inside(&["https://example.com/pr/147", " a "]).outside(&["", " ", "\t"]),
         sentence(&["finding close"], "reason", "FINDING_REASON_REQUIRED"),
         sentence(&["strategy rollback"], "reason", "STRATEGY_ARGUMENT_INVALID"),
         sentence(&["subject move"], "reason", "SUBJECT_ARGUMENT_INVALID"),

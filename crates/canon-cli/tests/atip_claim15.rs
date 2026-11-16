@@ -203,7 +203,12 @@ fn changed_by_037(place: &str) -> bool {
 
 /// The places that had no pattern with white space in 0.36.0 and have the text pattern or the regime key now.
 fn new_in_option_values(place: &str) -> bool {
-    changed_by_option_values(place) || place == "dispatch begin --regime"
+    changed_by_option_values(place) || place == "dispatch begin --regime" || new_in_change_drop(place)
+}
+
+/// The places of the three closing leaves of 0.42 (`canon-0-42-change-drop`) that take `--ref`, the one evidence reference domain (not blank), and the tree's union of the same option.
+fn new_in_change_drop(place: &str) -> bool {
+    matches!(place, "change defer --ref" | "change drop --ref" | "change reopen --ref" | "tree --ref")
 }
 
 fn assert_found(what: &str, problems: &[String], needle: &str) {

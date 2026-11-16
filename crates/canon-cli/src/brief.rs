@@ -210,9 +210,8 @@ pub fn approval_of(text: &str) -> Approval {
 /// brief's approval that knows the change's decisions; a caller with no repo or change reads [`approval_of`].
 pub fn approval_in(repo: &Path, change: &ChangeId, text: &str) -> Approval {
     let verdict = approval_of(text);
-    let line = match &verdict {
-        Approval::Bound { line } | Approval::Unbound { line } => line,
-        _ => return verdict,
+    let (Approval::Bound { line } | Approval::Unbound { line }) = &verdict else {
+        return verdict;
     };
     match crate::change_state::reopened_since(repo, change, line) {
         Some(reopened) => Approval::Reopened { line: line.clone(), reopened },

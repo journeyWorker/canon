@@ -661,7 +661,7 @@ mod tests {
             b = prov("2026-03-01T00:00:00Z")
         );
         let scan = scan(&text);
-        let at = |id: &str| scan.created_at.get(id).map(|t| t.to_rfc3339());
+        let at = |id: &str| scan.created_at.get(id).map(chrono::DateTime::to_rfc3339);
         assert_eq!(at("a.b.01").as_deref(), Some("2026-02-01T00:00:00+00:00"));
         assert_eq!(at("a.b.02").as_deref(), Some("2026-03-01T00:00:00+00:00"));
         assert_eq!(at("a.b.03"), None, "an unreadable provenance line gives no time");
