@@ -165,7 +165,7 @@ fn release_problems(changelog: &str) -> Vec<String> {
     let facts: [(&str, &[&str]); 4] = [
         ("a closed change drops out of the requirements", &["closed change drops out of the requirements"]),
         ("a repo without the routing line runs `canon migrate` before the closing commands", &["`change_state` line under `routing:`", "`canon migrate` before the closing commands"]),
-        ("canon 0.41 and older refuse the canon.yaml with CONFIG_INVALID and `canon migrate --revert` with 0.42 goes back", &["0.41 and older", "`CONFIG_INVALID`", "`canon migrate --revert`", "with 0.42 first", "required again"]),
+        ("canon 0.41 and older refuse the canon.yaml with CONFIG_INVALID and deleting the `change_state:` line by hand goes back", &["0.41 and older", "`CONFIG_INVALID`", "`canon migrate --revert`", "by hand", "required again"]),
         ("a hand-written .gitignore adds `!.canon/ledger/kind=change_state/`", &["`.canon/ledger/*`", "`!.canon/ledger/kind=change_state/`"]),
     ];
     for (fact, needles) in facts {
@@ -285,7 +285,7 @@ fn change_drop_25_a_guide_line_off_the_schema_a_list_that_is_not_six_or_a_change
     let facts = [
         ("- A closed change drops out of the requirements.", "the callers note lacks the fact: a closed change drops out of the requirements"),
         ("`canon migrate` before the closing commands", "the callers note lacks the fact: a repo without the routing line runs `canon migrate` before the closing commands"),
-        ("with 0.42 first", "the callers note lacks the fact: canon 0.41 and older refuse the canon.yaml with CONFIG_INVALID and `canon migrate --revert` with 0.42 goes back"),
+        ("by hand", "the callers note lacks the fact: canon 0.41 and older refuse the canon.yaml with CONFIG_INVALID and deleting the `change_state:` line by hand goes back"),
         ("`!.canon/ledger/kind=change_state/`", "the callers note lacks the fact: a hand-written .gitignore adds `!.canon/ledger/kind=change_state/`"),
     ];
     for (needle, problem) in facts {
