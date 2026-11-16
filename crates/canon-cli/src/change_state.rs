@@ -834,7 +834,7 @@ mod tests {
 
     fn state(decision: ChangeDecision, reason: &str, refs: &[&str], approver: &str) -> ChangeState {
         let envelope = Envelope::current(RecordKind::ChangeState, at(1000), Actor::new_unattributed(approver));
-        ChangeState::new(envelope, change("c"), decision, reason, refs.iter().map(|r| r.to_string()).collect(), approver)
+        ChangeState::new(envelope, change("c"), decision, reason, refs.iter().map(ToString::to_string).collect(), approver)
     }
 
     fn call<'a>(id: &'a ChangeId, reason: &'a str, refs: &'a [String], approver: &'a str) -> Call<'a> {

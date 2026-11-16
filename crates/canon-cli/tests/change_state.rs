@@ -103,7 +103,7 @@ fn closing<'a>(leaf: &'a str, change: &'a str, reason: &'a str) -> Vec<&'a str> 
     vec!["change", leaf, change, "--reason", reason, "--ref", "chat 2026-11-16", "--approver", "Ana"]
 }
 
-fn reopening<'a>(change: &'a str) -> Vec<&'a str> {
+fn reopening(change: &str) -> Vec<&str> {
     vec!["change", "reopen", change, "--reason", "the vendor answered", "--approver", "Ana"]
 }
 
@@ -540,16 +540,15 @@ fn change_drop_29_input_dry_run_held_lock_and_repeat() {
     assert!(states(repo).is_empty());
 
     // A held lock is a refusal that writes nothing.
-    {
-        let _held = FileLock::acquire(&repo.join(".canon/repo-write.lock"), StdDuration::ZERO).unwrap();
-        let before = tree(repo);
-        let mut command = hermetic::canon();
-        command.args(closing("defer", CHANGE, REASON)).arg("--json").current_dir(repo).env("CANON_TEST_REPO_LOCK_WAIT_MS", "200");
-        let out = command.output().unwrap();
-        let body: Value = serde_json::from_slice(&out.stdout).unwrap();
-        assert_eq!((out.status.code(), code(&body).0), (Some(2), "REPO_LOCK_UNAVAILABLE"), "{body}");
-        assert_eq!(tree(repo), before);
-    }
+    let held = FileLock::acquire(&repo.join(".canon/repo-write.lock"), StdDuration::ZERO).unwrap();
+    let before = tree(repo);
+    let mut command = hermetic::canon();
+    command.args(closing("defer", CHANGE, REASON)).arg("--json").current_dir(repo).env("CANON_TEST_REPO_LOCK_WAIT_MS", "200");
+    let out = command.output().unwrap();
+    let body: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!((out.status.code(), code(&body).0), (Some(2), "REPO_LOCK_UNAVAILABLE"), "{body}");
+    assert_eq!(tree(repo), before);
+    drop(held);
 
     // One JSON document is read.
     let input = json!({"operands": [CHANGE], "reason": REASON, "ref": ["chat 2026-11-16"], "approver": "Ana"}).to_string();
