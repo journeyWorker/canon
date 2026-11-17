@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-release",
+    "role": "reviewer",
+    "session_id": "ses_eb369b3c11493c96ca4c23ba"
+  },
+  "at": "2026-11-17T14:44:08.353954177Z",
+  "change_id": "canon-0-43-release-hardening",
+  "code_tree": "4b5936a80e0e068509cbd792d38efa24c6ac2306",
+  "disposition": "open",
+  "file_ref": "scripts/check-release-workflow-safety.py:1046-1063,1088-1099",
+  "introduced_by": "5d5ba16f29a450b33bedacbf68b6c960245f5422",
+  "kind": "finding",
+  "reviewed_sha": "5d5ba16f29a450b33bedacbf68b6c960245f5422",
+  "reviewer": "rev-0-43-release",
+  "round": 2,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "P3 (standards; r2 re-check of 1_1, probed against the r1 checker at 52e0967ac): the new heredoc handling hides two unguarded whoami calls the r1 scanner caught. An unquoted heredoc body is skipped whole, but bash runs its `$(npm whoami)` and backticks (`cat <<EOF` / `$(npm whoami)` / `EOF`: r1 [1], now []). An arithmetic shift `X=$(( 1 << 2 ))` is read as a heredoc with delimiter `2` and swallows every later line, so a following `npm whoami` is not counted (r1 [1], now []). Fix: scan `$(`/backticks inside the body when the delimiter is unquoted, and do not start a heredoc inside `$((`/`((`. Blast radius: the shipped pre-flight has no heredoc or arithmetic and passes either way.",
+  "worktree_dirty": false
+}
