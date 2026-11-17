@@ -38,7 +38,7 @@ Adding a target (e.g. `core-darwin-x64`) is a CI matrix row plus a new package
 directory — never a redesign of the launcher (design non-goals). A matrix row
 carries `binary_ext` (`""` or `".exe"`); the build/stage/upload steps are
 written against it, and `strip` is skipped when it is non-empty. Runner
-labels are pinned images (`macos-26`, `ubuntu-26.04`, `ubuntu-26.04-arm`,
+labels are pinned images (`macos-15`, `ubuntu-26.04`, `ubuntu-26.04-arm`,
 `windows-2025`), never `-latest`; a Linux row builds a musl target on its own
 architecture, and only the aarch64 musl row has `lg_page: "16"` (jemalloc with
 64K pages).

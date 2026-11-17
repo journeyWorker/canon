@@ -316,9 +316,9 @@ class RunnerLabelTests(unittest.TestCase):
         self.assertTrue(CHECKER.runner_label_errors(text, "publish.yml"))
 
     def test_rejects_a_pinned_label_that_is_not_the_allowed_one(self) -> None:
-        text = mutate(workflow("build-native.yml"), "host: macos-26", "host: macos-15")
+        text = mutate(workflow("build-native.yml"), "host: macos-15", "host: macos-14")
         errors = CHECKER.runner_label_errors(text, "build-native.yml")
-        self.assertTrue(any("macos-15" in error for error in errors), errors)
+        self.assertTrue(any("macos-14" in error for error in errors), errors)
 
     def test_rejects_a_job_without_runs_on(self) -> None:
         text = mutate(workflow("build-native.yml"), "  safety:\n    name: Release workflow safety check\n    runs-on: ubuntu-26.04\n", "  safety:\n    name: Release workflow safety check\n")

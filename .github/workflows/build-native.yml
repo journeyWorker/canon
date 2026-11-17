@@ -5,7 +5,7 @@ name: Build Native (Test Only)
 # target 15.0), Linux x64 and arm64 as static musl binaries (jemalloc is
 # their allocator; glibc is not a floor), Windows x64 msvc with a static C
 # runtime. Every row builds on a host that natively matches the target (the
-# runners are pinned images, never `-latest`: macos-26, ubuntu-26.04,
+# runners are pinned images, never `-latest`: macos-15, ubuntu-26.04,
 # ubuntu-26.04-arm, windows-2025), so no cross-compilation toolchain (zig /
 # cargo-zigbuild) is needed for any row.
 # The x86_64 musl row links on the host with `musl-tools`
@@ -156,7 +156,7 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-26
+          - host: macos-15
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             binary_ext: ""

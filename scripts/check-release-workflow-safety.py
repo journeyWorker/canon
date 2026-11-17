@@ -69,8 +69,9 @@ REQUIRED_ENV = ("CARGO_TERM_COLOR", "CARGO_INCREMENTAL", "MACOSX_DEPLOYMENT_TARG
 # The macOS deployment target both workflows declare (the binary's `minos`, checked by check-release-binary.py).
 MACOS_DEPLOYMENT_TARGET = "15.0"
 
-# The only runner labels a release job may use: the newest image, its label written down, never `-latest`.
-ALLOWED_RUNNERS = ("macos-26", "ubuntu-26.04", "ubuntu-26.04-arm", "windows-2025")
+# The only runner labels a release job may use: a pinned image, its label written down, never `-latest`
+# (macOS arm64 is `macos-15`: `macos-26` was not assigned a runner in the 0.43 dry runs).
+ALLOWED_RUNNERS = ("macos-15", "ubuntu-26.04", "ubuntu-26.04-arm", "windows-2025")
 
 # The scalar fields every `matrix.settings` row carries that must agree
 # across the two workflows (publish additionally carries `package_name`,

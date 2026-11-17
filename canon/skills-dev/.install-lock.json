@@ -1,12 +1,12 @@
 {
   "skills": {
     "repo-scaffold": {
-      "contentHash": "sha256:159190fd6bc98edd99c72eda31036f401cce5aa73c61803faa9f674d39c230d7",
-      "version": 3
+      "contentHash": "sha256:91c1488834299a3d67e967b44566046b7b37d82547a3ddcf842fec28a31904b7",
+      "version": 4
     },
     "state-model": {
-      "contentHash": "sha256:1d3d6206ecdd5690706d40c4e4e4ae5abd14cee95875ee0bd5ac55efa0379626",
-      "version": 3
+      "contentHash": "sha256:1bec9b44ad38745fc09c9eece2d0b8694cf74f6ef203830294caecfaefdc3223",
+      "version": 4
     }
   }
 }
