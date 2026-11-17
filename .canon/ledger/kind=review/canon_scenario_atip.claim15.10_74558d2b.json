@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-atip-rust",
+    "role": "reviewer",
+    "session_id": "01a1e9e0-7fc8-7209-9088-91985c72b133"
+  },
+  "at": "2026-11-17T14:50:38.380458685Z",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "kind": "review",
+  "pin": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_claim15_10_the_fixture_and_the_tree_say_the_minor_canon_declares"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "459203693fc47263edee20d638a980fb2d9abbf88612a2f7485502bbd868c4c7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-atip-0-3-2/brief.md"
+  },
+  "review_id": "01M7MZT3XCVF506QTH6H8K9DNE",
+  "reviewer": "rev-0-43-atip-rust",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.claim15.10",
+  "schema": 2,
+  "worktree_dirty": false
+}

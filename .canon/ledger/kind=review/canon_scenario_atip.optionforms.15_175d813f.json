@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-atip-rust",
+    "role": "reviewer",
+    "session_id": "01a1e9e0-7fc8-7209-9088-91985c72b133"
+  },
+  "at": "2026-11-17T14:50:38.380458685Z",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "kind": "review",
+  "pin": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_optionforms_15_the_checker_fixture_lists_values_the_new_domains_refuse"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "a37312e86f01f9f336259ded44b9b581e1f3ffb8db8acc441e9dbf629243bf1c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-atip-0-3-2/brief.md"
+  },
+  "review_id": "01M7MZT3XCVF506QTH6H8K9DNE",
+  "reviewer": "rev-0-43-atip-rust",
+  "reviewer_harness": "omp",
+  "scenario_id": "atip.optionforms.15",
+  "schema": 2,
+  "worktree_dirty": false
+}

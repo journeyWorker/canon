@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-atip-rust",
+    "role": "reviewer",
+    "session_id": "01a1e9e0-7fc8-7209-9088-91985c72b133"
+  },
+  "at": "2026-11-17T14:50:09.567707145Z",
+  "change_id": "canon-0-43-atip-0-3-2",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "open",
+  "file_ref": ".github/workflows/test.yml:37-76",
+  "introduced_by": "c6dde67b6ea087369db2c45a407fdd33294c3604",
+  "kind": "finding",
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-atip-rust",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "P2 (standards) The checker version moved from test.yml into tools/atip-check/package.json and bun.lock, but the push and pull_request paths filters of test.yml (lines 40-57 and 59-76) do not list tools/atip-check/**. Before this change, moving the checker edited the cargo install line in test.yml, so the atip job ran. Now a PR that only bumps the lockfile (the documented way to move the checker) does not trigger the Test workflow, so the new checker never runs against canon before merge, and the push to main does not run it either. Fix: add \"tools/atip-check/**\" to both path lists. Blast radius: only when the atip job is triggered; its steps and result are unchanged.",
+  "worktree_dirty": false
+}
