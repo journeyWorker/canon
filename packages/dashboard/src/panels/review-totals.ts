@@ -44,7 +44,7 @@ import { FIX_OF_FIX_MEANING } from "./review-rounds";
 //
 // The markdown report's Review totals panel
 // (`crates/canon-report/src/render.rs`, `REVIEW_TOTALS_PANEL`) carries
-// the same statement; `test/panel-copy.test.ts` pins the two together.
+// the same statement.
 const QUERY = `
   SELECT
     change_id,

@@ -41,10 +41,8 @@ import { renderTable, type ColumnDef } from "../render-table";
 //     SOMETHING; nothing in canon records a round as merely RUN.
 //
 // The markdown report's Review rounds panel
-// (`crates/canon-report/src/render.rs`) carries the same statement;
-// `test/panel-copy.test.ts` pins the two together so neither surface
-// can drift, and pins `FIX_OF_FIX_MEANING` below character-for-
-// character against the Rust constant of the same name.
+// (`crates/canon-report/src/render.rs`) carries the same statement
+// as `FIX_OF_FIX_MEANING` below (the Rust constant of the same name).
 const QUERY = `
   SELECT
     change_id,
@@ -68,12 +66,9 @@ const QUERY = `
 /**
  * The ONE sentence every surface states about `fix_of_fix`, verbatim.
  *
- * Character-for-character `canon_report::render::FIX_OF_FIX_MEANING`
+ * The same statement as `canon_report::render::FIX_OF_FIX_MEANING`
  * (`crates/canon-report/src/render.rs`), which is where the whole
  * argument for having exactly one sentence is written down.
- * `test/panel-copy.test.ts` reads that declaration out of the Rust
- * source and asserts equality with this constant — not a substring
- * match, so a surface cannot satisfy the pin by quoting half of it.
  *
  * Used twice below: verbatim inside `NOTE` (which `renderTable` splits
  * on backticks into `<code>` spans), and backtick-stripped inside the
