@@ -4,6 +4,21 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+### Changed
+
+- **canon's atip crate is `atip-crate-v0.3.2` and the checker is the pre-built `@journeykit/atip-check` 0.4.1** (`canon-0-43-atip-0-3-2`; canon's output does not change: the answers of `canon schema --json`, every `schema <command> --json` and `--schemas --json`, `schema --errors --json` and `--warnings --json` are the same bytes before and after, sha256 `ac14c89211aeef2cc87eb8273a5d66f99ce5006d8c70d9663265d8581249c061` over 165 lines). The crate is still a git dependency pinned by `Cargo.lock`. The checker is no longer built from source: `tools/atip-check/` holds a `package.json` and a `bun.lock` (bun 1.3.14, `lockfileVersion` 1, the sha512 of `@journeykit/atip-check` and of its three platform packages), `just atip-install` and the CI job `atip` run `bun install --frozen-lockfile` there, and the recipes `atip` and `atip-deep` and the job call `tools/atip-check/node_modules/.bin/atip` by path, so an `atip` on `PATH` never stands in for it. The checker needs Rust 1.100 to build from source, which canon's toolchain (1.99.1) is not; the pre-built package does not depend on the toolchain. The contract flag is gone from the job and the recipes (the checker follows the fixture's `contractVersion`, which stays `1.6`); `--jobs 4` runs independent calls at once and the report does not depend on it (74 MUST passed, 0 failed, 0 unprovided, 8 not applicable and the one `L1.one-meaning-values` advisory for `--kind`, the same 95 rows at `--jobs 1`). The spec patch `v1.6.1` changes no rule, so canon still declares `1.6`.
+
+  | | before (0.42) | after |
+  | --- | --- | --- |
+  | `atip` crate | `atip-crate-v0.3.0` | `atip-crate-v0.3.2` (declares no `rust-version`; the next release declares `1.99`) |
+  | checker | `atip-check-v0.3.0`, `cargo install --git … --locked`, cached | `@journeykit/atip-check` 0.4.1, pre-built, `bun install --frozen-lockfile` |
+  | checker flags | `--level L2`, the contract flag at `1.6`, `--deep` | `--level L2 --jobs 4 --deep` |
+  | check step on the dev box | not measured | 3 min 57 s at `--jobs 1`, 2 min 41 s at `--jobs 4` |
+  | CI job `atip` | at most 7.7 min with the checker built from source and cached (`canon-0-42-ci-refresh`) | no checker build and no checker cache step |
+  | output of `canon schema …` | sha256 `ac14c892…c061` | the same |
+
+  The tests that read the wording of the workflow, the `justfile` and the install lines are gone (the scenarios `atip.check.43`, `atip.claim14.13`, `atip.claim14.14`, `atip.claim15.11`, `atip.claim16.11`, `atip.claim16.12`, `atip.claiml2.07`); what is kept is the data: the fixture's `contractVersion` and the tree's `meta.contractVersion` equal the declared minor (`atip.claim15.10`, now under `atip-contract`).
+
 ### Fixed
 
 - **The release publishes its tarballs by a `./` path.** The `v0.42.0` tag run stopped at its first publish: `npm publish tarballs/<file>.tgz` reads `tarballs/<file>` as a GitHub repository and ran `git ls-remote`, so nothing was published. `publish.yml` now names `./tarballs/…`, and `scripts/check-release-workflow-safety.py` refuses a `TARBALL` path without `./`, `../` or `/` in front. Release workflow only; canon's binary does not change.

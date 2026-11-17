@@ -1,8 +1,8 @@
-//! `canon-0-41-atip-1-6` (scenarios `atip.claim16.01-14`): canon declares atip/1 1.6 and uses neither of its two optional members: no repeatable option declares `commaList`
-//! and the tree declares no `pathShape`. The crate is `atip-crate-v0.3.0`, the checker `atip-check-v0.3.0`.
+//! `canon-0-41-atip-1-6` (scenarios `atip.claim16.01-10`, `13` and `14`; `11` and `12` were removed by `canon-0-43-atip-0-3-2`): canon declares atip/1 1.6 and uses neither of its two optional members: no repeatable option declares `commaList`
+//! and the tree declares no `pathShape`.
 //!
 //! Each check that a seeded fault must trip is a small pure function over text or `serde_json::Value` in this file (`declaration_problems`, `forbidden_member_problems`,
-//! `depth_problems`, `one_meaning_problems`, `stale_tag_lines`, `changelog_problems`): the real input passes it and each seeded fault is found. The checker itself is not
+//! `depth_problems`, `one_meaning_problems`, `changelog_problems`): the real input passes it and each seeded fault is found. The checker itself is not
 //! run (the CI job `atip` and `just atip-deep` run it). The one-off comparison with the 0.40.0 binary is evidence, not a test: a test cannot run 0.40.0.
 //! Tests are named by scenario id (`atip_claim16_05_…` proves `atip.claim16.05`).
 
