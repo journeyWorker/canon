@@ -383,6 +383,83 @@ pub fn splice(text: &str, mdx: bool, ko: bool, spec: &Value) -> Result<String, S
     Ok(out)
 }
 
+/// The cells of a table row, split at the `|` that are not escaped (`\|`); the first and last are the empty pieces outside the row's bars.
+fn row_cells(row: &str) -> Vec<&str> {
+    let (mut cells, mut start, mut escaped) = (Vec::new(), 0, false);
+    for (at, c) in row.char_indices() {
+        match c {
+            '\\' => escaped = !escaped,
+            '|' if !escaped => {
+                cells.push(&row[start..at]);
+                start = at + 1;
+            }
+            _ => escaped = false,
+        }
+    }
+    cells.push(&row[start..]);
+    cells
+}
+
+/// What block `name` says that a reader copying a command depends on, without the sentences the spec's `summary` lines supply (0.43 I14).
+///
+/// - `commands-<role>`: the `usage:` lines, the example invocations and the fences between them; not the `# …` comment lines and not the
+///   introduction before the first fence.
+/// - `cli-<group>`: every table row, each `Effect` cell cut to its effect word (`read`, `write`, ...); not the introduction before the table.
+/// - `removed`, `removed-031`: the old and the new spelling of each row, in order; not the `What changed` column.
+///
+/// Any other block is kept whole.
+fn machine_block(name: &str, body: &str) -> String {
+    let mut out = String::new();
+    if name.starts_with("commands-") {
+        let mut fenced = false;
+        for line in body.lines() {
+            fenced |= line.starts_with("```");
+            if fenced && !line.starts_with('#') {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+    } else if name.starts_with("cli-") {
+        for row in body.lines().filter(|line| line.starts_with('|')) {
+            let mut cells = row_cells(row);
+            if let Some(effect) = cells.get_mut(4) {
+                *effect = effect.split_once(':').map_or(*effect, |(word, _)| word);
+            }
+            out.push_str(&cells.join("|"));
+            out.push('\n');
+        }
+    } else if name == "removed" || name == "removed-031" {
+        for row in body.lines().filter(|line| line.starts_with('|')) {
+            out.push_str(&row_cells(row).into_iter().take(3).collect::<Vec<_>>().join("|"));
+            out.push('\n');
+        }
+    } else {
+        out.push_str(body);
+    }
+    out
+}
+
+/// `text` with the body of every generated block cut down to its machine content ([`machine_block`]); the hand-written text stays whole.
+pub fn machine(text: &str, mdx: bool) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut lines = text.split_inclusive('\n');
+    while let Some(line) = lines.next() {
+        out.push_str(line);
+        let Some(name) = begin_name(line, mdx) else { continue };
+        let end = marker(name, "end", mdx);
+        let mut body = String::new();
+        for inner in lines.by_ref() {
+            if inner.trim() == end {
+                out.push_str(&machine_block(name, &body));
+                out.push_str(inner);
+                break;
+            }
+            body.push_str(inner);
+        }
+    }
+    out
+}
+
 /// The generated blocks a file must carry, by repo-relative path.
 pub fn required_blocks(spec: &Value, rel: &str) -> Vec<String> {
     if let Some(role) = rel.strip_prefix("canon/skills/reference/role-").and_then(|r| r.strip_suffix(".md")) {
