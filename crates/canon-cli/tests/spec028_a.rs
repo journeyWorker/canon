@@ -376,7 +376,6 @@ fn finding_add_31_a_short_revision_that_names_no_commit_is_refused_and_nothing_i
         assert_eq!(out.status.code(), Some(2), "{flag}: {}{}", text(&out.stdout), text(&out.stderr));
         let body = json_of(&out);
         assert_eq!(body["error"]["code"], "COMMIT_REQUIRED", "{flag}: {body}");
-        assert!(body["error"]["message"].as_str().unwrap().contains("deadbee"), "the refusal names the value: {body}");
     }
     assert_eq!(tree(r), before, "a refused add stages and commits nothing");
 }

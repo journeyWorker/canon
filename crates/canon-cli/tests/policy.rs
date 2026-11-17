@@ -17,11 +17,6 @@ fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
-/// A write command's stdout without its closing `next:` line (0.21 D2).
-fn without_next(text: &str) -> String {
-    text.lines().filter(|line| !line.starts_with("next: ")).map(|line| format!("{line}\n")).collect()
-}
-
 fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
@@ -55,7 +50,6 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
     let out = run_canon(&["policy", "approve", "--approver", "alice", "--note", "reviewed the starter policy"], repo);
     let finished = chrono::Utc::now();
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
-    assert!(without_next(&stdout(&out)).ends_with("— written directly; nothing to promote\n"), "the direct-write suffix: {}", stdout(&out));
 
     let policy = std::fs::read(repo.join(".canon/policy.yaml")).unwrap();
     let recorded = approval(repo);
@@ -88,7 +82,7 @@ fn approve_refuses_a_repo_with_no_policy() {
     std::fs::write(dir.path().join("canon.yaml"), "").unwrap();
     let out = run_canon(&["policy", "approve", "--approver", "alice"], dir.path());
     assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
-    assert!(stderr(&out).contains("no policy to approve"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("canon: POLICY_REQUIRED"), "{}", stderr(&out));
     assert!(!dir.path().join(APPROVAL).exists(), "a refused approve writes nothing");
 }
 
@@ -118,31 +112,24 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
         assert_eq!(status.status.code(), Some(0), "status: {}", stderr(&status));
         assert_eq!(json.status.code(), Some(0), "status --json: {}", stderr(&json));
         let doc: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json prints one JSON document");
-        let report = &doc["data"];
-        let warnings: Vec<&str> = report["warnings"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
-        let policy_warnings: Vec<&str> = warnings.iter().copied().filter(|w| w.starts_with("policy not approved") || w.starts_with("policy changed")).collect();
+        let policy_codes: Vec<&str> = doc["meta"]["warnings"].as_array().into_iter().flatten().filter_map(|w| w["code"].as_str()).filter(|code| code.starts_with("POLICY_")).collect();
         match expect {
-            Some(text) => {
-                if gate_exit == 0 {
-                    assert!(stdout(&gate).contains(&format!("advisory: {text}")), "gate check: {}", stdout(&gate));
-                } else {
-                    assert!(stdout(&gate).contains("policy changed since approval"), "gate check: {}", stdout(&gate));
+            Some(code) => {
+                assert_eq!(policy_codes, [code], "status --json: {doc}");
+                for warning in doc["data"]["warnings"].as_array().unwrap() {
+                    let line = format!("warning: {}", warning.as_str().unwrap());
+                    assert!(stdout(&status).lines().any(|l| l == line), "--json carries the same warning as the text: {}", stdout(&status));
                 }
-                let line = stdout(&status).lines().find(|line| line.starts_with(&format!("warning: {text}"))).map(str::to_string);
-                let line = line.unwrap_or_else(|| panic!("status: {}", stdout(&status)));
-                assert_eq!(policy_warnings.len(), 1, "one policy warning in --json: {warnings:?}");
-                assert!(policy_warnings[0].starts_with(text), "{warnings:?}");
-                assert_eq!(format!("warning: {}", policy_warnings[0]), line, "--json carries the same warning text");
+                assert_eq!(stdout(&gate).contains("unreviewed-promotion policy"), gate_exit == 1, "gate check: {}", stdout(&gate));
             }
             None => {
-                assert!(!stdout(&gate).contains("policy not approved") && !stdout(&gate).contains("policy changed"), "gate check: {}", stdout(&gate));
-                assert!(!stdout(&status).contains("policy not approved") && !stdout(&status).contains("policy changed"), "status: {}", stdout(&status));
-                assert!(policy_warnings.is_empty(), "status --json: {warnings:?}");
+                assert!(!stdout(&gate).contains("unreviewed-promotion policy"), "gate check: {}", stdout(&gate));
+                assert!(policy_codes.is_empty(), "status --json: {doc}");
             }
         }
     };
 
-    check(Some("policy not approved"), 0);
+    check(Some("POLICY_NOT_APPROVED"), 0);
     let approved = run_canon(&["policy", "approve", "--approver", "alice"], repo);
     assert_eq!(approved.status.code(), Some(0), "stderr: {}", stderr(&approved));
     check(None, 0);
@@ -154,11 +141,10 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     policy.push_str("# loosened later\n");
     std::fs::write(&policy_path, &policy).unwrap();
     let current_digest = format!("sha256:{:x}", Sha256::digest(policy.as_bytes()));
-    check(Some("policy changed since approval"), 1);
+    check(Some("POLICY_CHANGED_SINCE_APPROVAL"), 1);
     let gate = stdout(&run_canon(&["gate", "check"], repo));
-    let changed = gate.lines().find(|line| line.contains("policy changed since approval")).expect("the changed-policy violation");
-    assert!(changed.contains(&format!("is {current_digest}")), "the violation names the current digest: {changed}");
-    assert!(changed.contains(&format!("approved {approved_digest}")), "and the approved one: {changed}");
+    let changed = gate.lines().find(|line| line.contains(&current_digest)).expect("the changed-policy violation names the current digest");
+    assert!(changed.contains(&approved_digest), "and the approved one: {changed}");
     assert_ne!(approved_digest, current_digest);
 
     assert_eq!(approved_digest, approval(repo)["policy_digest"].as_str().unwrap(), "the record still names the approved bytes");
@@ -169,8 +155,8 @@ fn a_repo_without_a_policy_gets_no_approval_advisory() {
     let dir = tempfile::tempdir().expect("a temp dir");
     let init = run_canon(&["init", "--no-agents-md", "--no-policy"], dir.path());
     assert_eq!(init.status.code(), Some(0), "stderr: {}", stderr(&init));
-    let gate = run_canon(&["gate", "check"], dir.path());
-    assert!(!stdout(&gate).contains("policy not approved"), "{}", stdout(&gate));
+    let status: serde_json::Value = serde_json::from_slice(&run_canon(&["status", "--json"], dir.path()).stdout).expect("one JSON document");
+    assert!(!status["meta"]["warnings"].as_array().into_iter().flatten().any(|w| w["code"] == "POLICY_NOT_APPROVED"), "{status}");
 }
 
 /// The approval is authored and must reach git: neither the

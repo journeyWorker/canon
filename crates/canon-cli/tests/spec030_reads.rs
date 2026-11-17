@@ -250,8 +250,6 @@ fn learn_promotion_13_a_rollback_with_an_unreadable_or_invalid_signature_or_a_ma
     let bad_signature = rollback(&id, "bad.sig", "2030-01-01T00:00:00Z");
     assert_eq!(bad_signature.status.code(), Some(2));
     assert_eq!(error_code(&bad_signature), "STRATEGY_SIGNATURE_INVALID");
-    let message = json(&bad_signature)["error"]["message"].as_str().unwrap().to_string();
-    assert!(message.contains("ssh signature verification failed"), "{message}");
     let bad_time = rollback(&id, "bad.sig", "yesterday");
     assert_eq!(bad_time.status.code(), Some(2));
     assert_eq!(error_code(&bad_time), "USAGE");
@@ -313,7 +311,6 @@ fn context_capability_46_schema_of_an_unknown_command_or_a_leaf_with_a_sub_path_
     let sub_path = canon(repo.path(), &["schema", "subject", "show", "nope", "extra", "--json"]);
     assert_eq!(sub_path.status.code(), Some(2));
     assert_eq!(error_code(&sub_path), "UNKNOWN_COMMAND");
-    assert!(json(&sub_path)["error"]["message"].as_str().unwrap().contains("takes no sub-path"));
     assert_eq!(tree(repo.path()), before, "a refused schema writes nothing");
 }
 

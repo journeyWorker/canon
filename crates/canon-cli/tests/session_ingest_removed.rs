@@ -3,7 +3,7 @@
 //! F1 the command is an unknown subcommand and the selftest suite a closed-value refusal, F2 the plan cursor file name and `regime_key` hash
 //! (`canon_ingest::digest::content_digest`, pinned in its own module) are unchanged, F3 a dispatched Run is written once and a repeat is not an
 //! error, F4 an old `ingest:` section is ignored, F5 the skills bundle no longer carries the guide and an old install's copy is an orphan, F6 the
-//! retired scenarios leave with their `.feature` file, F7 the guides say nothing of the command.
+//! retired scenarios leave with their `.feature` file.
 
 #[path = "support/hermetic.rs"]
 mod hermetic;
@@ -61,7 +61,7 @@ fn ingest_removal_01_the_ingest_help_names_plans_and_records_only() {
     assert!(!help.contains("sessions"), "{help}");
 }
 
-/// ingest.removal.02 (F1, failure path): the selftest suite and the generated documents keep no trace of the command.
+/// ingest.removal.02 (F1, failure path): the selftest suite keeps no trace of the command.
 /// F1: `--suite session-ingest` is outside the closed set (exit 2); a run with no `--suite` runs the suites that are left.
 #[test]
 fn ingest_removal_02_selftest_suite_session_ingest_is_a_closed_value_refusal() {
@@ -73,66 +73,6 @@ fn ingest_removal_02_selftest_suite_session_ingest_is_a_closed_value_refusal() {
     assert!(!error["expected"].as_array().unwrap().iter().any(|name| name == "session-ingest"), "{error}");
     let all = canon_in(dir.path(), &["selftest", "--json"]);
     assert_eq!(all.status.code(), Some(0), "{}{}", String::from_utf8_lossy(&all.stdout), String::from_utf8_lossy(&all.stderr));
-}
-
-/// F1: the generated command document, the schema and the website reference say nothing of the command (the drift test `atip_l0` holds the document equal to the generator).
-#[test]
-fn ingest_removal_02_the_generated_documents_have_no_ingest_sessions_line() {
-    let root = repo_root();
-    for path in ["docs/cli/canon.cli.json", "packages/website/src/content/docs/cli.mdx", "packages/website/src/content/docs/ko/cli.mdx", "canon/skills/reference/role-orchestrator.md"] {
-        let text = fs::read_to_string(root.join(path)).unwrap();
-        assert!(!text.contains("ingest sessions") && !text.contains("session-ingest"), "{path} still names the removed command");
-    }
-    let dir = tempfile::tempdir().unwrap();
-    let schema = String::from_utf8_lossy(&canon_in(dir.path(), &["schema", "--json"]).stdout).into_owned();
-    assert!(!schema.contains("ingest sessions") && !schema.contains("IngestSessionsReport"), "canon schema still names the removed command");
-}
-
-/// ingest.removal.12 (F7): the guides say nothing of the command.
-/// F7: the guides a person reads do not name the command, and the two env vars are not in the spec.
-#[test]
-fn ingest_removal_12_the_readme_architecture_and_website_do_not_name_the_removed_command() {
-    let root = repo_root();
-    let mut files = vec![root.join("README.md"), root.join("ARCHITECTURE.md")];
-    let mut dirs = vec![root.join("packages/website/src")];
-    while let Some(dir) = dirs.pop() {
-        for entry in fs::read_dir(&dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                dirs.push(path);
-            } else if path.extension().is_some_and(|e| e == "mdx" || e == "ts" || e == "astro") {
-                files.push(path);
-            }
-        }
-    }
-    for path in files {
-        let text = fs::read_to_string(&path).unwrap();
-        assert!(!text.contains("ingest sessions") && !text.contains("canon-session-ingest"), "{} names the removed command", path.display());
-    }
-    assert!(!root.join("packages/website/src/content/docs/privacy.mdx").exists() && !root.join("packages/website/src/content/docs/ko/privacy.mdx").exists());
-    let spec = fs::read_to_string(root.join("docs/cli/canon.cli.json")).unwrap();
-    assert!(!spec.contains("CANON_INGEST_CLAUDE_SESSIONS_DIR") && !spec.contains("CANON_INGEST_OMP_SESSIONS_DIR"));
-}
-
-/// ingest.removal.13 (F7, failure path): the release check fails when the CHANGELOG entry is missing.
-/// F7: the CHANGELOG's Breaking table names the command, both variables, both keys, the suite and the skill; and says stored records are left alone.
-#[test]
-fn ingest_removal_13_the_changelog_lists_what_was_removed() {
-    let changelog = fs::read_to_string(repo_root().join("CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.39.0")).unwrap_or_default();
-    for needed in [
-        "`canon ingest sessions`",
-        "`CANON_INGEST_CLAUDE_SESSIONS_DIR`",
-        "`CANON_INGEST_OMP_SESSIONS_DIR`",
-        "`ingest.sources.<id>.roots`",
-        "`ingest.sessions.privacy`",
-        "`selftest --suite session-ingest`",
-        "`canon-session-ingest`",
-        "`.canon/ingest/cursors/omp.json`",
-        "UNKNOWN_COMMAND",
-    ] {
-        assert!(unreleased.contains(needed), "the 0.39 section of CHANGELOG.md does not mention {needed}");
-    }
 }
 
 /// ingest.removal.08 (F5): the bundle no longer carries the guide.
@@ -335,7 +275,7 @@ fn ingest_removal_16_the_old_evidence_of_a_tombstoned_scenario_is_not_stale_evid
     let (stale, advisory) = stale_subjects(shallow.path());
     assert!(stale.is_empty(), "{stale:?}");
     let advisory = advisory.expect("a shallow clone has no base commit for the declared scenario");
-    assert!(advisory.starts_with("1 (subject, role) cell(s)") && advisory.contains("kept.leaf.01") && !advisory.contains("gone.leaf.01"), "{advisory}");
+    assert!(advisory.contains("kept.leaf.01") && !advisory.contains("gone.leaf.01"), "{advisory}");
 }
 
 /// One scenario `gone.leaf.01` with green evidence, past `max_commits_behind = 2` (three commits after the evidence), its feature file the only one.

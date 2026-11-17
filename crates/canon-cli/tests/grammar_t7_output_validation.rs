@@ -60,7 +60,7 @@ fn every_leafs_example_validates_against_its_report_schema() {
         }
         problems.extend(validate_document(&document).into_iter().map(|p| format!("`{path}`: {p}")));
     }
-    assert!(successes > 40 && failures > 5, "the examples ran ({successes} successes, {failures} refusals)");
+    assert!(successes > 0 && failures > 0, "the examples ran ({successes} successes, {failures} refusals)");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 

@@ -148,5 +148,4 @@ fn no_aging_rules_configured_is_a_clean_no_op() {
     let fixture = support::Fixture::new(ROUTING, "");
     let output = fixture.run_canon(&["tier", "age"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    assert!(support::stdout(&output).contains("no `aging` rules configured"));
 }

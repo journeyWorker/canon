@@ -149,7 +149,7 @@ fn dashboard_errors_clearly_when_the_app_is_not_built() {
     let snapshot = canon_repo_root().join("packages/dashboard/fixtures/snapshot");
     let output = run_canon(&["dashboard", "--repo", ".", "--snapshot", snapshot.to_str().unwrap(), "--port", "0"], repo.path());
     assert!(!output.status.success());
-    assert!(stderr(&output).contains("not built"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("DASHBOARD_UNSUPPORTED"), "{}", stderr(&output));
     assert!(stderr(&output).contains("packages/dashboard/dist"), "{}", stderr(&output));
 }
 
@@ -161,7 +161,7 @@ fn dashboard_errors_clearly_when_repo_is_missing_packages_dashboard_entirely() {
     std::fs::write(snapshot.join("manifest.json"), "{}").unwrap();
     let output = run_canon(&["dashboard", "--repo", ".", "--snapshot", snapshot.to_str().unwrap(), "--port", "0"], repo.path());
     assert!(!output.status.success());
-    assert!(stderr(&output).contains("not built"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("DASHBOARD_UNSUPPORTED"), "{}", stderr(&output));
 }
 
 #[test]

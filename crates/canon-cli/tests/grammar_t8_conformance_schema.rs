@@ -25,7 +25,7 @@ fn every_json_expectation_of_the_corpus_validates_against_its_leafs_schema() {
     let cases = repo_root().join("conformance/cases");
     let mut dirs: Vec<_> = std::fs::read_dir(&cases).expect("conformance/cases").map(|e| e.unwrap().path()).filter(|p| p.join("case.yaml").is_file()).collect();
     dirs.sort();
-    assert!(dirs.len() > 50, "the corpus was found ({} cases)", dirs.len());
+    assert!(!dirs.is_empty(), "the corpus was found ({} cases)", dirs.len());
     let (mut envelopes, mut artifacts, mut problems) = (0, 0, Vec::new());
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();

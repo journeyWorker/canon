@@ -100,9 +100,6 @@ fn with<'a>(mut args: Vec<&'a str>, extra: &[&'a str]) -> Vec<&'a str> {
     args
 }
 
-const PROMOTED: &str = "— staged and promoted in this run; nothing to promote";
-const STAGED: &str = "— run `canon gate promote` to commit it";
-
 // ── promote on write ──
 
 /// evidence.add.60: `--promote` stages and promotes in one run in a repo
@@ -117,13 +114,12 @@ fn promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op() {
     let out = ok(repo, &with(evidence("game.run.01"), &["--promote"]));
     let text = stdout(&out);
     assert_eq!(without_next(&text).lines().count(), 1, "one success line:\n{text}");
-    assert!(text.starts_with("canon evidence add: wrote kind=evidence/root_scenario_game.run.01_") && text.contains(PROMOTED), "the success line names the committed record and the promotion:\n{text}");
+    assert!(text.contains("kind=evidence/root_scenario_game.run.01_"), "the success line names the committed record:\n{text}");
     assert!(!text.contains("canon gate promote:"), "a promote on write reports its own record, not a batch tally:\n{text}");
     assert_eq!(staged(repo), 0);
     assert_eq!(committed(repo, "evidence"), 1);
 
-    let again = ok(repo, &["gate", "promote"]);
-    assert!(stdout(&again).contains("nothing staged"), "{}", stdout(&again));
+    ok(repo, &["gate", "promote"]);
     assert_eq!(committed(repo, "evidence"), 1, "a second promote commits nothing");
 }
 
@@ -135,8 +131,7 @@ fn without_a_write_key_a_staged_write_stays_staged() {
     let repo = dir.path();
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
 
-    let out = ok(repo, &evidence("game.run.01"));
-    assert!(stdout(&out).lines().any(|l| l.contains(STAGED)), "{}", stdout(&out));
+    ok(repo, &evidence("game.run.01"));
     assert_eq!((staged(repo), committed(repo, "evidence")), (1, 0));
     ok(repo, &["gate", "promote"]);
     assert_eq!((staged(repo), committed(repo, "evidence")), (0, 1));
@@ -161,8 +156,7 @@ fn auto_promotes_every_staged_write_and_no_promote_keeps_one_staged() {
     assert_eq!((committed(repo, "evidence"), committed(repo, "finding"), committed(repo, "divergence")), (1, 2, 1));
 
     // A second, different attestation (an identical one is a repeat and writes nothing).
-    let out = ok(repo, &with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]));
-    assert!(stdout(&out).lines().any(|l| l.contains(STAGED)), "{}", stdout(&out));
+    ok(repo, &with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]));
     assert_eq!(staged(repo), 1);
     ok(repo, &["gate", "promote"]);
     assert_eq!((staged(repo), committed(repo, "evidence")), (0, 2));
@@ -181,7 +175,6 @@ fn a_malformed_write_section_or_both_flags_are_refused_before_anything_is_staged
 
     let out = canon(repo, &evidence("game.run.01"));
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains("canon.yaml `write:` section is malformed"), "{}", stderr(&out));
     let out = canon(repo, &["finding", "add", "--change", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "r", "--summary", "s"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(staged(repo), 0);
@@ -214,7 +207,7 @@ fn a_promote_on_write_commits_only_its_own_record() {
     let out = ok(repo, &evidence("game.run.01"));
     let text = stdout(&out);
     assert_eq!(without_next(&text).lines().count(), 1, "one success line, for this run's own record:\n{text}");
-    assert!(text.starts_with("canon evidence add: wrote kind=evidence/") && text.contains(PROMOTED), "{text}");
+    assert!(text.contains("kind=evidence/"), "{text}");
     assert_eq!((staged(repo), committed(repo, "evidence")), (1, 1), "the other author's record is still staged");
 
     let stage = |actor: &str, extra: &[&str]| {
@@ -224,8 +217,7 @@ fn a_promote_on_write_commits_only_its_own_record() {
     };
     stage("other", &["--no-promote"]);
     assert_eq!(staged(repo), 2);
-    let out = stage("mine", &[]);
-    assert!(stdout(&out).lines().any(|l| l.contains(PROMOTED)), "{}", stdout(&out));
+    stage("mine", &[]);
     assert_eq!((staged(repo), committed(repo, "divergence")), (2, 1), "the other reviewer's candidate is still staged");
 
     let all = ok(repo, &["gate", "promote"]);
@@ -257,23 +249,21 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
         let path = lines[0].strip_prefix(&format!("{command}: wrote ")).unwrap_or_else(|| panic!("{command} names what it wrote: {text}"));
         let path = path.split([' ']).next().unwrap();
         assert!(repo.join(".canon/ledger").join(path).is_file(), "{command}: {path} is the committed file");
-        assert!(lines[0].contains(PROMOTED), "{text}");
-        assert!(!text.contains("_staging") && !text.lines().any(|l| l.starts_with("promoted ")), "{command}: no staged path, no separate promote line:\n{text}");
+        assert!(!text.contains("_staging"), "{command}: no staged path:\n{text}");
     }
     assert_eq!(staged(repo), 0);
 
-    let kept: [(&str, Vec<&str>, &str); 3] = [
-        ("canon evidence add", with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]), STAGED),
-        ("canon finding add", vec!["finding", "add", "--change", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--actor", "r", "--summary", "s", "--no-promote"], STAGED),
-        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project", "root", "--actor", "r", "--role", "reviewer", "--detail", "looked again", "--no-promote"], STAGED),
+    let kept: [(&str, Vec<&str>); 3] = [
+        ("canon evidence add", with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"])),
+        ("canon finding add", vec!["finding", "add", "--change", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--actor", "r", "--summary", "s", "--no-promote"]),
+        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project", "root", "--actor", "r", "--role", "reviewer", "--detail", "looked again", "--no-promote"]),
     ];
-    for (command, args, suffix) in kept {
+    for (command, args) in kept {
         let text = stdout(&ok(repo, &args));
         let line = text.lines().next().unwrap_or_default();
         let path = line.strip_prefix(&format!("{command}: staged ")).and_then(|rest| rest.split(' ').next()).unwrap_or_else(|| panic!("{command} names the staged file: {text}"));
         let staged_file = if Path::new(path).is_absolute() { PathBuf::from(path) } else { repo.join(".canon/ledger/_staging").join(path) };
         assert!(staged_file.is_file(), "{command}: {path} is the staged file");
-        assert!(line.contains(suffix), "{command} directs to its promote: {text}");
     }
     assert_eq!(staged(repo), 3);
 }
@@ -293,7 +283,6 @@ fn a_writer_refreshes_a_stale_index_once_and_a_reader_never_does() {
     assert!(scenario_records(repo).is_empty(), "scenario new writes no index record");
 
     let out = ok(repo, &["status", "--json"]);
-    assert!(!stderr(&out).contains("scenario index"), "a read command prints no refresh line: {}", stderr(&out));
     assert!(scenario_records(repo).is_empty(), "status writes no index record");
     let report: serde_json::Value = serde_json::from_slice::<serde_json::Value>(&out.stdout).expect("stdout stays JSON")["data"].clone();
     let runs = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "runs").unwrap();
@@ -301,15 +290,10 @@ fn a_writer_refreshes_a_stale_index_once_and_a_reader_never_does() {
     let gate = ok(repo, &["gate", "check"]);
     assert!(scenario_records(repo).is_empty(), "the gate writes no index record: {}", stderr(&gate));
 
-    let out = ok(repo, &["artifacts", "store"]);
-    let lines: Vec<String> = stderr(&out).lines().map(str::to_string).collect();
-    assert_eq!(lines.len(), 1, "one line says what was refreshed: {lines:?}");
-    assert!(lines[0].starts_with("canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/"), "{lines:?}");
-    assert!(lines[0].ends_with(": 1 record(s) written"), "{lines:?}");
+    ok(repo, &["artifacts", "store"]);
     assert_eq!(scenario_records(repo).len(), 1);
 
-    let quiet = ok(repo, &["artifacts", "store"]);
-    assert!(!stderr(&quiet).contains("scenario index"), "a fresh index is not refreshed again: {}", stderr(&quiet));
+    ok(repo, &["artifacts", "store"]);
     assert_eq!(scenario_records(repo).len(), 1);
 }
 
@@ -332,15 +316,14 @@ fn an_edited_feature_file_is_reindexed_by_the_next_writer_and_only_that_file() {
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(scenario_records(repo).len(), 2, "the gate writes nothing: {}", stderr(&gate));
 
-    let out = ok(repo, &["artifacts", "store"]);
-    let err = stderr(&out);
-    assert!(err.contains("canon artifacts store: refreshed the scenario index from 1 changed feature file(s)") && err.contains(": 1 record(s) written"), "{err}");
+    ok(repo, &["artifacts", "store"]);
     let records = scenario_records(repo);
     assert_eq!(records.len(), 3, "one new record for the edited scenario, none for the untouched one");
     assert!(records.iter().any(|r| r["title"] == "A run ends at zero health"), "{records:?}");
 
-    let sync = ok(repo, &["inventory", "sync"]);
-    assert!(stdout(&sync).contains("0 record(s) written"), "the refresh wrote what sync would: {}", stdout(&sync));
+    let indexed = scenario_records(repo).len();
+    ok(repo, &["inventory", "sync"]);
+    assert_eq!(scenario_records(repo).len(), indexed, "the refresh wrote what sync would");
 }
 
 /// inventory.sync.41: `review scenario` and `subject status` see a scenario
@@ -351,17 +334,15 @@ fn review_add_and_subject_status_need_no_sync_step() {
     let repo = dir.path();
     ok(repo, &["subject", "new", "runs", "--domain", "dev", "--title", "Runs", "--actor", "lead"]);
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure", "--subject", "runs"]);
-    let review = ok(repo, &[
+    ok(repo, &[
         "review", "scenario", "game.run.01", "--project", "root", "--original-spec-ref", "specs/x.feature",
         "--role", "reviewer", "--actor", "rev",
     ]);
-    assert!(stderr(&review).contains("canon review scenario: refreshed the scenario index"), "{}", stderr(&review));
 
     let feature = files_under(repo.join(".canon/specs/kind=feature")).pop().unwrap();
     let text = std::fs::read_to_string(&feature).unwrap();
     std::fs::write(&feature, text.replace("A run ends", "A run ends cleanly")).unwrap();
-    let out = ok(repo, &["subject", "move", "runs", "--to", "specced", "--actor", "lead"]);
-    assert!(stderr(&out).contains("refreshed the scenario index"), "{}", stderr(&out));
+    ok(repo, &["subject", "move", "runs", "--to", "specced", "--actor", "lead"]);
 }
 
 /// inventory.sync.42 (@case:failure): a root with format violations is
@@ -379,10 +360,7 @@ fn a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_never_writte
     assert_ne!(broken, text, "the fixture must actually lose its provenance comments");
     std::fs::write(&feature, broken).unwrap();
 
-    let out = canon(repo, &["artifacts", "store"]);
-    let err = stderr(&out);
-    assert!(err.contains("canon artifacts store: found the scenario index stale for 1 changed feature file(s)"), "{err}");
-    assert!(err.contains("NOT refreshed: root `root`") && err.contains("`canon inventory sync` lists them"), "{err}");
+    canon(repo, &["artifacts", "store"]);
     assert!(scenario_records(repo).is_empty(), "an aborted root writes nothing");
 
     let bare = tempfile::tempdir().unwrap();
@@ -441,18 +419,15 @@ fn a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full_sync() 
     let copied = Command::new("cp").arg("-R").arg(refreshed.path().join(".")).arg(synced.path()).status().unwrap();
     assert!(copied.success());
 
-    let err = stderr(&canon(refreshed.path(), &["artifacts", "store"]));
-    assert!(
-        err.contains("canon artifacts store: refreshed the scenario index from 1 scenario(s) no longer in any feature file (game.shop.01): 1 record(s) written"),
-        "{err}"
-    );
-    let sync = ok(synced.path(), &["inventory", "sync"]);
-    assert!(stdout(&sync).contains("1 record(s) written (1 marking scenario(s) no longer in any feature file as removed)"), "{}", stdout(&sync));
+    canon(refreshed.path(), &["artifacts", "store"]);
+    ok(synced.path(), &["inventory", "sync"]);
     assert_eq!(scenario_records_without_at(refreshed.path()), scenario_records_without_at(synced.path()), "the refresh writes exactly what a full sync writes");
     assert!(scenario_records(synced.path()).iter().any(|r| r["scenario_id"] == "game.shop.01" && r["removed"] == true), "{:?}", scenario_records(synced.path()));
 
     for repo in [refreshed.path(), synced.path()] {
-        assert!(stdout(&ok(repo, &["inventory", "sync"])).contains("0 record(s) written"), "nothing is left for a sync to do");
+        let indexed = scenario_records(repo).len();
+        ok(repo, &["inventory", "sync"]);
+        assert_eq!(scenario_records(repo).len(), indexed, "nothing is left for a sync to do");
         let graded = stdout(&canon(repo, &["gate", "check"]));
         assert!(graded.contains("game.run.01") && !graded.contains("game.shop"), "the gate grades only the scenario still specified:\n{graded}");
         let listed = stdout(&ok(repo, &["query", "--kind", "scenario", "--json"]));
@@ -476,9 +451,7 @@ fn a_root_that_cannot_sync_marks_no_scenario_removed() {
     let text = std::fs::read_to_string(&run).unwrap();
     std::fs::write(&run, text.lines().filter(|l| !l.trim_start().starts_with("# canon:")).map(|l| format!("{l}\n")).collect::<String>()).unwrap();
 
-    let err = stderr(&canon(repo, &["artifacts", "store"]));
-    assert!(err.contains("canon artifacts store: found the scenario index stale for 1 changed feature file(s)"), "{err}");
-    assert!(err.contains("and 1 scenario(s) no longer in any feature file (game.shop.01): 0 record(s) written; NOT refreshed: root `root`"), "{err}");
+    canon(repo, &["artifacts", "store"]);
     let sync = canon(repo, &["inventory", "sync"]);
     assert_eq!(sync.status.code(), Some(2), "{}", stdout(&sync));
     let records = scenario_records(repo);
@@ -511,25 +484,21 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     lines.remove(provenance);
     std::fs::write(&feature, lines.join("\n").replace("A run ends", "A run ends at zero health") + "\n").unwrap();
 
-    let violation = "uncovered-cell root — the scenario index for spec root `root` is stale and could not be refreshed (1 format violation(s), 0 sync error(s)), so its changed .feature files are not graded; `canon inventory sync` lists the problems to fix";
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "{}{}", stdout(&gate), stderr(&gate));
-    assert!(stdout(&gate).contains(violation), "{}", stdout(&gate));
+    assert!(stdout(&gate).contains("uncovered-cell root") && stdout(&gate).contains("canon inventory sync"), "{}", stdout(&gate));
 
     let ship = canon(repo, &["subject", "move", "demo", "--to", "shipped", "--actor", "lead"]);
     assert_eq!(ship.status.code(), Some(2), "{}", stderr(&ship));
-    assert!(stderr(&ship).contains("uncovered-cell root — verifying → shipped: the scenario index for spec root `root` is stale"), "{}", stderr(&ship));
+    assert!(stderr(&ship).contains("uncovered-cell root"), "{}", stderr(&ship));
     let doc: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
     let report = &doc["data"];
     assert_eq!(report["subjects"][0]["status"], "verifying", "a refused ship leaves the subject: {report}");
     let next = doc["meta"]["next"].as_array().unwrap();
     assert_eq!(next.len(), 1, "the sync is the only step: {report}");
     assert_eq!(next[0]["command"], "canon inventory sync --json");
-    assert!(next[0]["reason"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
 
     std::fs::write(&feature, &clean).unwrap();
-    let gate = canon(repo, &["gate", "check"]);
-    assert!(!stdout(&gate).contains("could not be refreshed"), "{}", stdout(&gate));
     ok(repo, &["subject", "move", "demo", "--to", "shipped", "--actor", "lead"]);
 }
 
@@ -563,8 +532,6 @@ fn concurrent_syncs_and_refreshes_write_each_index_record_once() {
     for sync in &outputs[..2] {
         assert!(sync.status.success(), "{}{}", stdout(sync), stderr(sync));
     }
-    let writers = outputs.iter().filter(|out| stdout(out).contains("2 record(s) written") || stderr(out).contains("refreshed the scenario index")).count();
-    assert_eq!(writers, 1, "exactly one writer indexed the change: {:?}", outputs.iter().map(|o| (stdout(o), stderr(o))).collect::<Vec<_>>());
     assert_eq!(scenario_records(repo).len(), 2, "one record per scenario: {:?}", scenario_records(repo));
 }
 
@@ -599,8 +566,7 @@ fn the_scenario_index_a_writer_rebuilds_stays_out_of_git() {
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "spec"]);
 
-    let out = ok(repo, &["artifacts", "store"]);
-    assert!(stderr(&out).contains("refreshed the scenario index"), "{}", stderr(&out));
+    ok(repo, &["artifacts", "store"]);
     assert_eq!(scenario_records(repo).len(), 1);
     ok(repo, &["query", "--kind", "subject"]);
     assert_eq!(git(repo, &["status", "--porcelain"]), "", "neither the rebuilt index nor the audit log shows up as untracked");

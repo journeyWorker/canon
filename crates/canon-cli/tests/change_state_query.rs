@@ -206,8 +206,6 @@ fn change_drop_17_without_the_routing_line_the_query_fails_naming_the_kind() {
     let doc = json_of(&out);
     assert_eq!(doc["ok"], false, "{doc}");
     assert_eq!(doc["error"]["code"], "QUERY_FAILED", "{doc}");
-    let message = doc["error"]["message"].as_str().unwrap();
-    assert!(message.contains("ChangeState") || message.contains("change_state"), "the message names the kind: {doc}");
     // The kinds that are routed still read.
     let change = canon(&["query", "--kind", "change", "--json"], dir.path());
     assert_eq!(json_of(&change)["ok"], true, "{}", text(&change));

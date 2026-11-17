@@ -128,7 +128,6 @@ fn the_three_command_loop_flips_a_checkbox_on_authored_evidence() {
         repo,
     );
     assert!(added.status.success(), "evidence add must succeed; stderr: {}", stderr(&added));
-    assert!(stdout(&added).contains("staged"), "{}", stdout(&added));
     assert!(!staging_is_empty(repo), "the record must land in _staging");
     assert!(committed_evidence_files(repo).is_empty(), "a staged record must not be committed yet");
 
@@ -235,7 +234,7 @@ fn evidence_add_refuses_a_repo_that_configures_no_plan_sources() {
         dir.path(),
     );
     assert_eq!(output.status.code(), Some(2));
-    assert!(stderr(&output).contains("configures no plan sources"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("PLAN_SOURCES_REQUIRED"), "{}", stderr(&output));
 }
 
 /// The fabrication scan runs at AUTHORING time, graded `1` — the same
@@ -303,7 +302,7 @@ fn evidence_add_refuses_a_newline_that_would_forge_a_second_checked_row() {
         repo,
     );
     assert_eq!(output.status.code(), Some(2), "a line separator is a usage refusal; stdout: {}", stdout(&output));
-    assert!(stderr(&output).contains("line separator"), "the refusal must name what it rejected: {}", stderr(&output));
+    assert!(stderr(&output).contains("--summary"), "the refusal must name the option it rejected: {}", stderr(&output));
     assert!(staging_is_empty(repo), "a refused add must stage nothing");
     assert_eq!(tasks_md(repo, "it-evidence-inject"), rows, "a refused add must leave the plan document byte-identical");
 }

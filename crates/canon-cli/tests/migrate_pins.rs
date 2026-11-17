@@ -126,8 +126,6 @@ fn legacy_repo() -> (tempfile::TempDir, String) {
 }
 
 
-const MIGRATED: &str = "canon migrate: pinned";
-
 /// The reviews of `scenario` in the ledger.
 fn reviews_of(repo: &Path, scenario: &str) -> Vec<serde_json::Value> {
     walk(&repo.join(".canon/ledger/kind=review"))
@@ -174,10 +172,9 @@ fn migrate_pins_01_a_current_legacy_review_counts_only_after_migrate() {
     let (dir, _) = legacy_repo();
     let repo = dir.path();
     let before = gate(repo, 1);
-    assert!(before.contains("predates 0.23 review pinning") && before.contains("`canon migrate`"), "{before}");
+    assert!(before.contains("unreviewed-promotion"), "{before}");
 
-    let out = migrate(repo);
-    assert!(out.contains(&format!("{MIGRATED} 2 review(s) to what their evidence says")), "{out}");
+    migrate(repo);
     for id in ["cart.add.01", "cart.add.02"] {
         let review = &reviews_of(repo, id)[0];
         assert!(review["pins"]["checks"].is_array(), "{review}");
@@ -185,9 +182,10 @@ fn migrate_pins_01_a_current_legacy_review_counts_only_after_migrate() {
         assert_eq!(review["reviewer"], "reviewer-2", "the converted review keeps its reviewer: {review}");
         assert!(review["pins"].get("evidence").is_none(), "no record ids any more: {review}");
     }
-    let after = gate(repo, 0);
-    assert!(!after.contains("predates 0.23"), "{after}");
-    assert!(out.contains("canon migrate") && !migrate(repo).contains(MIGRATED), "a second run finds nothing to convert");
+    gate(repo, 0);
+    let converted = reviews_of(repo, "cart.add.01");
+    migrate(repo);
+    assert_eq!(reviews_of(repo, "cart.add.01"), converted, "a second run finds nothing to convert");
 }
 
 /// migrate.pins.02: an edit that leaves the scenario's meaning alone keeps a
@@ -201,8 +199,7 @@ fn migrate_pins_02_a_legacy_review_of_a_changed_scenario_stays_stale() {
     commit_file(repo, FEATURE, &BASE.replace("Then the cart holds two of that item", "Then the cart holds one line with quantity two"), "edit cart.add.02");
     ok(repo, &["inventory", "sync"]);
 
-    let out = migrate(repo);
-    assert!(out.contains(&format!("{MIGRATED} 1 review(s)")) && out.contains("left 1 stale review(s)"), "{out}");
+    migrate(repo);
     assert!(reviews_of(repo, "cart.add.01")[0]["pins"]["checks"].is_array(), "the sibling is converted");
     let stale = &reviews_of(repo, "cart.add.02")[0];
     assert!(stale.get("pins").is_none(), "a stale review is left as it was: {stale}");
@@ -228,8 +225,7 @@ fn migrate_pins_03_a_legacy_review_older_than_the_evidence_stays_stale() {
     let (dir, _) = legacy_repo();
     let repo = dir.path();
     attest(repo, "cart.add.01");
-    let out = migrate(repo);
-    assert!(out.contains("left 1 stale review(s)"), "{out}");
+    migrate(repo);
     assert!(reviews_of(repo, "cart.add.01")[0].get("pins").is_none());
     let out = gate(repo, 1);
     assert!(out.contains("unreviewed-promotion cart.add.01"), "{out}");
@@ -255,10 +251,11 @@ fn migrate_pins_04_an_unreadable_pin_is_pinned_as_the_scenario_stands() {
     plant_legacy_review(repo, "cart.add.01", "0123456789abcdef0123456789abcdef01234567");
     plant_legacy_review(repo, "cart.add.02", &before);
 
-    let out = migrate(repo);
-    assert!(out.contains("2 of those could not be checked"), "{out}");
-    let out = gate(repo, 0);
-    assert!(out.contains("canon gate check: clean (0 violations)"), "{out}");
+    migrate(repo);
+    for id in ["cart.add.01", "cart.add.02"] {
+        assert!(reviews_of(repo, id)[0]["pins"]["checks"].is_array(), "pinned as the scenario stands: {id}");
+    }
+    gate(repo, 0);
 }
 
 /// migrate.pins.05: a scenario that lived in another `.feature` file at the
@@ -271,8 +268,10 @@ fn migrate_pins_05_a_legacy_review_finds_its_scenario_in_the_file_it_lived_in() 
     std::fs::remove_file(repo.join(FEATURE)).unwrap();
     commit_file(repo, MOVED, &BASE.replace("Feature: cart add", "Feature: cart basket"), "move the cart scenarios");
     ok(repo, &["inventory", "sync"]);
-    let out = migrate(repo);
-    assert!(out.contains(&format!("{MIGRATED} 2 review(s)")) && !out.contains("could not be checked"), "{out}");
+    migrate(repo);
+    for id in ["cart.add.01", "cart.add.02"] {
+        assert!(reviews_of(repo, id)[0]["pins"]["checks"].is_array(), "converted: {id}");
+    }
     gate(repo, 0);
 }
 
@@ -318,8 +317,7 @@ fn migrate_pins_06_a_record_pinned_review_converts_when_its_evidence_is_still_th
 
     // A newer evidence record for cart.add.02 makes its review stale under the old rule.
     attest(repo, "cart.add.02");
-    let out = migrate(repo);
-    assert!(out.contains(&format!("{MIGRATED} 1 review(s)")) && out.contains("left 1 stale review(s)"), "{out}");
+    migrate(repo);
     let converted = &reviews_of(repo, "cart.add.01")[0];
     assert_eq!(converted["actor"]["session_id"], "sess-review", "{converted}");
     assert_eq!(converted["pins"]["checks"][0]["verdict"], "faithful", "{converted}");
@@ -378,8 +376,9 @@ fn migrate_pins_07_a_moved_root_is_searched_at_its_former_path_and_only_for_its_
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
     }
-    let out = migrate(repo);
-    assert!(out.contains(&format!("{MIGRATED} 2 review(s)")) && out.contains("1 of those could not be checked"), "a is current at its former root, b is undecidable: {out}");
+    migrate(repo);
+    let pinned = reviews_of(repo, "cart.add.01").iter().filter(|r| r["pins"]["checks"].is_array()).count();
+    assert_eq!(pinned, 2, "a is current at its former root, b is undecidable and pinned as it stands");
 }
 
 /// migrate.pins.08: the preview lists every review record the commit rewrites,

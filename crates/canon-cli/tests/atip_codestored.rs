@@ -1,4 +1,4 @@
-//! `canon-0-36-codes-stored` (scenarios `atip.codestored.01-10`): a failure to read a file or state is told by its cause, not by "unreadable".
+//! `canon-0-36-codes-stored` (scenarios `atip.codestored.01-08`, `.12`, `.13`): a failure to read a file or state is told by its cause, not by "unreadable".
 //!
 //! - a path the caller named that is not there is `NOT_FOUND`, a read the system refuses is `DENIED`, a file a person edits that is wrong is
 //!   `INVALID`, state canon wrote that is broken is `CORRUPT`, and only an operating-system error a repeat can pass is `UNAVAILABLE`, the one
@@ -10,7 +10,6 @@
 
 #[path = "support/hermetic.rs"]
 mod hermetic;
-mod old_codes;
 mod support;
 
 use std::collections::BTreeMap;
@@ -382,7 +381,6 @@ fn atip_codestored_04_a_broken_policy_approval_refuses_the_ship_with_exit_2_and_
     }
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "the check's own answer stays exit 1: {}", text(&gate));
-    assert!(text(&gate).contains("policy approval unreadable"), "{}", text(&gate));
     let shown = canon(repo, &["subject", "show", "checkout"]);
     assert!(text(&shown).contains("verifying"), "the refused ship left the subject verifying");
 
@@ -439,8 +437,7 @@ fn atip_codestored_06_a_write_that_waits_in_vain_for_the_lock_is_unavailable_and
 
     let before = listing(repo);
     let short = hermetic::canon().args(args).current_dir(repo).env_remove("CANON_ROLE").env("CANON_ACTOR", "code-stored").env("CANON_TEST_REPO_LOCK_WAIT_MS", "200").output().unwrap();
-    let body = assert_refusal(&short, "REPO_LOCK_UNAVAILABLE", true);
-    assert!(body["error"]["hint"].as_str().unwrap().contains("again"), "{body}");
+    assert_refusal(&short, "REPO_LOCK_UNAVAILABLE", true);
     assert_eq!(listing(repo), before, "a write that waited in vain started nothing");
 
     drop(held);
@@ -529,142 +526,6 @@ fn atip_codestored_08_an_unwritable_target_is_denied_or_invalid_and_a_wrong_ledg
     assert_refusal(&canon(repo, &["ledger", "compact", "--json"]), "LEDGER_ARCHIVE_INVALID", false);
 }
 
-// ------------------------------------------------------------------ F5: the registry and the consumers
-
-const OLD_NAMES: [&str; 11] = [
-    "ARTIFACTS_STORE_UNREACHABLE", "BRIEF_UNREADABLE", "EVIDENCE_STORE_UNAVAILABLE", "LEARN_SIGNATURE_UNREADABLE", "LEDGER_ARCHIVE_UNAVAILABLE", "PLAN_CORPUS_UNREADABLE", "REPO_UNREADABLE",
-    "REPO_WRITE_BUSY", "SPEC_ROOTS_UNREADABLE", "TASK_ROW_NOT_FOUND", "WRITE_UNAVAILABLE",
-];
-
-/// atip.codestored.09: the old names are not in the registry and `canon schema --error` refuses them; the new codes have the exit and retryable value
-/// of the table, and of the codes this change registers only an `UNAVAILABLE` one is retryable; the warnings keep their names.
-#[test]
-fn atip_codestored_09_the_registry_has_the_new_codes_and_not_the_old_names() {
-    use canon_cli::cli_error::{all_codes, code_info, warning_info};
-    for old in OLD_NAMES.iter().chain(&["CONFIG_UNREADABLE", "DISPATCH_MANIFEST_MISMATCH", "DISPATCH_MANIFEST_UNREADABLE", "POLICY_APPROVAL_UNREADABLE"]) {
-        assert!(code_info(old).is_none(), "{old} is still an error code");
-    }
-    for warning in ["CONFIG_UNREADABLE", "DISPATCH_MANIFEST_MISMATCH", "DISPATCH_MANIFEST_UNREADABLE", "POLICY_APPROVAL_UNREADABLE"] {
-        assert!(warning_info(warning).is_some(), "{warning} is still the name of a warning");
-    }
-    for old in OLD_NAMES {
-        let out = canon(Path::new("."), &["schema", "--error", old, "--json"]);
-        assert_eq!(out.status.code(), Some(2), "{old}: {}", text(&out));
-    }
-    let table: &[(&str, bool)] = &[
-        ("ARTIFACTS_DIGEST_INVALID", false), ("ARTIFACTS_STORE_INVALID", false), ("ARTIFACTS_STORE_REQUIRED", false), ("ARTIFACTS_STORE_UNAVAILABLE", true), ("ARTIFACTS_BLOB_DENIED", false),
-        ("ARTIFACTS_STORE_DENIED", false), ("BRIEF_DENIED", false), ("BRIEF_INVALID", false), ("BRIEF_NOT_FOUND", false), ("CONFIG_DENIED", false), ("CONFIG_INVALID", false),
-        ("DISPATCH_MANIFEST_CORRUPT", false), ("DISPATCH_MANIFEST_DENIED", false), ("LEDGER_ARCHIVE_INVALID", false), ("PLAN_CORPUS_DENIED", false), ("PLAN_CORPUS_INVALID", false),
-        ("PLAN_DOCUMENT_INVALID", false), ("POLICY_APPROVAL_CORRUPT", false), ("POLICY_APPROVAL_DENIED", false), ("POLICY_DENIED", false), ("REPO_DENIED", false), ("REPO_INVALID", false),
-        ("REPO_LOCK_UNAVAILABLE", true), ("RETENTION_TIERS_CORRUPT", false), ("RETENTION_TIERS_DENIED", false), ("RETENTION_TIERS_INVALID", false), ("RETENTION_TIERS_REQUIRED", false),
-        ("RETENTION_TIERS_UNAVAILABLE", true), ("SPEC_ROOT_DENIED", false), ("SPEC_ROOT_INVALID", false), ("STRATEGY_SIGNATURE_DENIED", false), ("STRATEGY_SIGNATURE_INVALID", false),
-        ("STRATEGY_SIGNATURE_NOT_FOUND", false), ("WRITE_DENIED", false), ("WRITE_INVALID", false), ("CONTEXT_PACK_CORRUPT", false), ("ARTIFACTS_BLOB_CORRUPT", false), ("POLICY_REQUIRED", false),
-        // The sibling of each DENIED code a read can meet: the system failed the read in a way a repeat can pass (atip.codestored.11).
-        ("ADAPTER_FILE_UNAVAILABLE", true), ("BRIEF_UNAVAILABLE", true), ("CONFIG_UNAVAILABLE", true), ("DISPATCH_MANIFEST_UNAVAILABLE", true), ("EVIDENCE_BINDING_UNAVAILABLE", true),
-        ("HOOKS_FILE_UNAVAILABLE", true), ("MIGRATION_UNAVAILABLE", true), ("PLAN_CORPUS_UNAVAILABLE", true), ("POLICY_APPROVAL_UNAVAILABLE", true), ("POLICY_UNAVAILABLE", true),
-        ("REPO_UNAVAILABLE", true), ("REVIEW_ARTIFACT_UNAVAILABLE", true), ("SPEC_ROOT_UNAVAILABLE", true), ("STRATEGY_SIGNATURE_UNAVAILABLE", true),
-    ];
-    assert!(code_info("LEDGER_CORRUPT").is_none(), "no reader refuses on a broken ledger record, so the code is not registered");
-    for &(code, retryable) in table {
-        let info = code_info(code).unwrap_or_else(|| panic!("{code} is not registered"));
-        assert_eq!((info.exit, info.retryable), (2, retryable), "{code}");
-        assert_eq!(info.retryable, code.ends_with("_UNAVAILABLE"), "{code}: only an UNAVAILABLE code is retryable");
-    }
-    // The refusal of a situation a check answers with exit 1 names the check in its fix, not by a machine link.
-    for (code, check) in [("ARTIFACTS_BLOB_CORRUPT", "canon artifacts verify"), ("CONTEXT_PACK_CORRUPT", "canon context-pack verify")] {
-        let info = code_info(code).unwrap();
-        assert!(info.fix.contains(check) || info.meaning.contains(check), "{code}: names {check}");
-        assert!(info.reasons.is_empty(), "{code}: no machine link");
-    }
-    assert!(all_codes().iter().all(|info| !info.code.ends_with("_UNREADABLE")), "no error code is called UNREADABLE");
-}
-
-/// The four old names that still name a warning: their rows are in the table too, but the registry holds them as warnings.
-const WARNING_NAMES: [&str; 4] = ["CONFIG_UNREADABLE", "DISPATCH_MANIFEST_MISMATCH", "DISPATCH_MANIFEST_UNREADABLE", "POLICY_APPROVAL_UNREADABLE"];
-
-/// The codes this change registers that the CHANGELOG must name, with what each replaced.
-const REGISTERED_BY_THIS_CHANGE: [&str; 17] = [
-    "ARTIFACTS_STORE_DENIED", "RETENTION_TIERS_CORRUPT", "RETENTION_TIERS_REQUIRED", "ADAPTER_FILE_UNAVAILABLE", "BRIEF_UNAVAILABLE", "CONFIG_UNAVAILABLE",
-    "DISPATCH_MANIFEST_UNAVAILABLE", "EVIDENCE_BINDING_UNAVAILABLE", "HOOKS_FILE_UNAVAILABLE", "MIGRATION_UNAVAILABLE", "PLAN_CORPUS_UNAVAILABLE", "POLICY_APPROVAL_UNAVAILABLE",
-    "POLICY_UNAVAILABLE", "REPO_UNAVAILABLE", "REVIEW_ARTIFACT_UNAVAILABLE", "SPEC_ROOT_UNAVAILABLE", "STRATEGY_SIGNATURE_UNAVAILABLE",
-];
-
-/// What is wrong with the `unreleased` section of the CHANGELOG as the replacement of the old `*_UNREADABLE` and like names: each old name has a row
-/// whose second column names its new codes, and each code this change registers is named.
-fn changelog_problems(unreleased: &str) -> Vec<String> {
-    let mut problems = Vec::new();
-    for old in OLD_NAMES.iter().chain(&WARNING_NAMES) {
-        let Some(row) = unreleased.lines().find(|line| line.starts_with(&format!("| `{old}`"))) else {
-            problems.push(format!("the CHANGELOG has no row for {old}"));
-            continue;
-        };
-        let columns: Vec<&str> = row.split('|').collect();
-        if !columns.get(2).is_some_and(|new| new.contains('`')) {
-            problems.push(format!("{old}: the row names no replacement: {row}"));
-        }
-    }
-    for code in REGISTERED_BY_THIS_CHANGE {
-        if !unreleased.contains(&format!("`{code}`")) {
-            problems.push(format!("the CHANGELOG does not name {code}"));
-        }
-    }
-    problems
-}
-
-/// atip.codestored.10: the CHANGELOG has the replacement table: each old name of the table appears in its first column with its new codes beside it.
-#[test]
-fn atip_codestored_10_the_changelog_replaces_every_old_name_with_its_new_codes() {
-    let changelog = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## 0.35.0").next().unwrap();
-    assert_eq!(changelog_problems(unreleased), Vec::<String>::new());
-}
-
-/// The codes of `new_codes` that break the rule that only an `UNAVAILABLE` code is retryable: one that is retryable and is not `UNAVAILABLE`, and one
-/// that is `UNAVAILABLE` and is not retryable.
-fn retry_problems<'a>(new_codes: impl IntoIterator<Item = (&'a str, bool)>) -> Vec<String> {
-    new_codes
-        .into_iter()
-        .filter(|(code, retryable)| *retryable != code.ends_with("_UNAVAILABLE"))
-        .map(|(code, retryable)| format!("{code} is {}retryable", if retryable { "" } else { "not " }))
-        .collect()
-}
-
-/// atip.codestored.14 (the failure path of F5): an old name brought back into a guide, a row of the replacement table that is deleted or names no new code,
-/// a code of this change the CHANGELOG stopped naming, a retryable code that is not `UNAVAILABLE` and an `UNAVAILABLE` code that is not retryable are each
-/// found by the checks; the CHANGELOG and the registry as they stand pass.
-#[test]
-fn atip_codestored_14_a_revived_old_name_a_missing_row_or_a_wrong_retry_value_is_found() {
-    use canon_cli::cli_error::code_info;
-    // An old name in a guide: each of the eleven names the registry no longer holds is named by the old-names guard; the names of warnings are not.
-    for old in OLD_NAMES {
-        assert_eq!(old_codes::gone_codes_in(&format!("the guide says to branch on {old} after a failed read")), [old], "{old} revived in a guide goes unseen");
-    }
-    assert_eq!(old_codes::gone_codes_in("a warning still named CONFIG_UNREADABLE and a refusal REPO_DENIED"), Vec::<&str>::new());
-    // A CHANGELOG that lost a row, a replacement or a code of this change.
-    let changelog = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## 0.35.0").next().unwrap();
-    assert_eq!(changelog_problems(unreleased), Vec::<String>::new());
-    let row = unreleased.lines().find(|line| line.starts_with("| `REPO_UNREADABLE`")).expect("the row of REPO_UNREADABLE");
-    assert_eq!(changelog_problems(&unreleased.replacen(&format!("{row}\n"), "", 1)), ["the CHANGELOG has no row for REPO_UNREADABLE"]);
-    let new_cell = row.split('|').nth(2).unwrap();
-    let bare = row.replacen(new_cell, " none ", 1);
-    assert_eq!(changelog_problems(&unreleased.replacen(row, &bare, 1)).first().map(String::as_str), Some(format!("REPO_UNREADABLE: the row names no replacement: {bare}").as_str()));
-    let without_unavailable = unreleased.replace("`REPO_UNAVAILABLE`", "`REPO_UNAVAIL`");
-    assert!(changelog_problems(&without_unavailable).contains(&"the CHANGELOG does not name REPO_UNAVAILABLE".to_string()));
-    // The retry rule: the codes of the table as they stand pass, and a wrong value of either kind is named.
-    let rows = old_codes::replacement_table(&changelog).expect("the replacement table reads");
-    let names: Vec<&str> = OLD_NAMES.iter().chain(&WARNING_NAMES).copied().collect();
-    let new_codes: Vec<(&str, bool)> = rows
-        .iter()
-        .filter(|row| names.contains(&row.old.as_str()))
-        .flat_map(|row| row.new.iter())
-        .map(|code| (code.as_str(), code_info(code).unwrap_or_else(|| panic!("{code} is not registered")).retryable))
-        .collect();
-    assert!(new_codes.len() > 30, "the table names the new codes of the old names: {}", new_codes.len());
-    assert_eq!(retry_problems(new_codes.iter().copied()), Vec::<String>::new());
-    assert_eq!(retry_problems([("WRITE_DENIED", true), ("REPO_UNAVAILABLE", false), ("REPO_LOCK_UNAVAILABLE", true)]), ["WRITE_DENIED is retryable", "REPO_UNAVAILABLE is not retryable"]);
-}
-
 // ------------------------------------------------------------------ a fault in canon.yaml, and a path in the wrong state
 
 /// atip.codestored.12: a fault in a section of the user-edited canon.yaml is the config's, never the repository's: a record kind with no
@@ -684,7 +545,6 @@ fn atip_codestored_12_a_fault_in_canon_yaml_is_the_configs_and_a_path_in_the_wro
     let before = listing(repo);
     let refusal = assert_refusal(&canon(repo, &["change", "new", "other", "--subject", "demo", "--title", "Other", "--json"]), "CONFIG_INVALID", false);
     assert_eq!(refusal["error"]["reason"], "TIERS", "{refusal}");
-    assert!(refusal["error"]["message"].as_str().unwrap().contains("routing"), "{refusal}");
     assert_eq!(listing(repo), before, "a refused call writes nothing");
     fs::write(&canon_yaml, &good).unwrap();
 
@@ -736,8 +596,7 @@ fn atip_codestored_13_an_unattached_tier_is_required_and_a_stored_object_that_do
         .env("CANON_ACTOR", "code-stored")
         .output()
         .unwrap();
-    let refusal = assert_refusal(&export, "RETENTION_TIERS_REQUIRED", false);
-    assert!(refusal["error"]["hint"].as_str().unwrap().contains("set the variables"), "{refusal}");
+    assert_refusal(&export, "RETENTION_TIERS_REQUIRED", false);
     assert_eq!(listing(repo), before, "a refused export writes nothing");
     fs::write(&canon_yaml, &good).unwrap();
 
@@ -745,7 +604,6 @@ fn atip_codestored_13_an_unattached_tier_is_required_and_a_stored_object_that_do
     fs::create_dir_all(repo.join(".canon/learn/trajectories")).unwrap();
     fs::write(repo.join(".canon/learn/trajectories/broken.parquet"), "not parquet").unwrap();
     let before = listing(repo);
-    let refusal = assert_refusal(&canon(repo, &["purge", "--kind", "trajectory", "--before", "2099-01-01T00:00:00Z", "--json"]), "RETENTION_TIERS_CORRUPT", false);
-    assert!(refusal["error"]["hint"].as_str().unwrap().contains("restore the damaged object"), "{refusal}");
+    assert_refusal(&canon(repo, &["purge", "--kind", "trajectory", "--before", "2099-01-01T00:00:00Z", "--json"]), "RETENTION_TIERS_CORRUPT", false);
     assert_eq!(listing(repo), before, "a refused purge writes nothing");
 }

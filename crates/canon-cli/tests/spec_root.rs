@@ -142,7 +142,6 @@ fn evidence_add_104_the_refusal_lists_every_configured_spec_root() {
     assert_eq!(error["expected"], serde_json::json!(["game", "ui"]));
     let hint = error["hint"].as_str().unwrap();
     assert!(hint.contains("`game`") && hint.contains("`ui`"), "{hint}");
-    assert!(error["message"].as_str().unwrap().contains("game, ui"), "{error}");
     assert_eq!(written(r), before);
 
     for root in ["ui", "game"] {

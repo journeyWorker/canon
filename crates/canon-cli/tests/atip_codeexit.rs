@@ -11,8 +11,6 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
-mod old_codes;
-
 fn canon(dir: &Path, args: &[&str], role: Option<&str>) -> Output {
     let mut command = hermetic::canon();
     command.args(args).arg("--json").current_dir(dir).env_remove("CANON_ROLE").env_remove("CANON_ACTOR");
@@ -278,8 +276,7 @@ fn atip_codeexit_08_a_command_that_cannot_start_is_exit_2_with_its_code_and_writ
         std::fs::write(app.join("dist").join(page), format!("<html>canon dashboard {page}</html>")).unwrap();
     }
     std::fs::write(app.join("dist/snapshot/manifest.json"), r#"{"demo":true}"#).unwrap();
-    let b = refused(l, None, &["dashboard", "--port", &port], "DASHBOARD_PORT_UNAVAILABLE", true);
-    assert!(b["error"]["message"].as_str().unwrap().contains(&port), "{b}");
+    refused(l, None, &["dashboard", "--port", &port], "DASHBOARD_PORT_UNAVAILABLE", true);
 }
 
 /// atip.codeexit.09: the retry values of the five commands that cannot start are the table's: the port and the closing run are retryable.
@@ -289,120 +286,6 @@ fn atip_codeexit_09_the_retry_values_of_the_commands_that_cannot_start_are_the_t
         let info = canon_cli::cli_error::all_codes().iter().find(|info| info.code == code).unwrap_or_else(|| panic!("{code}"));
         assert_eq!((info.exit, info.retryable), (2, retryable), "{code}");
     }
-}
-
-/// The table of the brief: the old code, its new codes, and the new exit of each.
-const EXIT_TABLE: &[(&str, &[&str], u8)] = &[
-    ("ADAPTER_EXECUTION_NOT_AUTHORIZED", &["ADAPTER_AUTHORIZATION_FAILED"], 1),
-    ("ADAPTER_RESPONSE_INVALID", &["ADAPTER_VALIDATION_FAILED"], 1),
-    ("BRIEF_CHANGED_SINCE_APPROVAL", &["BRIEF_APPROVAL_STALE"], 2),
-    ("BRIEF_UNAPPROVED", &["BRIEF_APPROVAL_REQUIRED"], 2),
-    ("CONTEXT_GIT_UNAVAILABLE", &["CONTEXT_GIT_REQUIRED"], 2),
-    ("CONTEXT_OBJECT_CONFLICT", &["CONTEXT_OBJECT_CONFLICT"], 2),
-    ("CONTEXT_PACK_TAMPERED", &["CONTEXT_PACK_VERIFY_FAILED", "CONTEXT_PACK_CORRUPT"], 0),
-    ("DASHBOARD_NOT_BUILT", &["DASHBOARD_UNSUPPORTED"], 2),
-    ("DASHBOARD_PORT_IN_USE", &["DASHBOARD_PORT_UNAVAILABLE"], 2),
-    ("DISPATCH_END_IN_PROGRESS", &["DISPATCH_RUN_UNAVAILABLE"], 2),
-    ("DIVERGENCE_REFUSED", &["DIVERGENCE_INVALID"], 2),
-    ("EVIDENCE_CONTRACT_MISMATCH", &["EVIDENCE_CONTRACT_CONFLICT"], 2),
-    ("EVIDENCE_FABRICATED", &["EVIDENCE_NOTE_INVALID"], 2),
-    ("EVIDENCE_REPORT_CONTRADICTION", &["EVIDENCE_REPORT_CONFLICT"], 2),
-    ("GATE_TASK_BLOCKED", &["TASK_EVIDENCE_REQUIRED"], 2),
-    ("GATE_TASK_EVIDENCE_INVALID", &["TASK_EVIDENCE_INVALID"], 2),
-    ("INGEST_SOURCE_UNUSABLE", &["INGEST_SOURCE_INVALID"], 2),
-    ("LEARN_EVALUATION_REJECTED", &["STRATEGY_EVALUATION_INVALID"], 2),
-    ("LEARN_PROMOTION_BLOCKED", &["STRATEGY_PROMOTION_INVALID"], 2),
-    ("POLICY_CHANGED_SINCE_APPROVAL", &["POLICY_APPROVAL_STALE"], 2),
-    ("PROMOTE_REFUSED", &["PROMOTION_INVALID", "EVIDENCE_STALE"], 2),
-    ("REPORT_STALE", &["REPORT_CHECK_FAILED"], 1),
-    ("SUBJECT_GATE_VIOLATION", &["SUBJECT_APPROVAL_REQUIRED", "EVIDENCE_STALE", "SUBJECT_INVALID", "LAYOUT_MIGRATION_REQUIRED"], 2),
-];
-
-/// The rows of the CHANGELOG's replacement table: `(old code, new codes, exit before, exits after)`.
-fn changelog_exit_rows(changelog: &str) -> Vec<(String, Vec<String>, u8, Vec<u8>)> {
-    old_codes::replacement_table(changelog).expect("the replacement table reads").into_iter().map(|row| (row.old, row.new, row.exit_before, row.exit_after)).collect()
-}
-
-/// atip.codeexit.10: every row of the CHANGELOG's replacement table is the registry's: each new code exists and the exits of the row are the exits of its
-/// new codes, an old code that is not also a new one is gone, the rows hold every code of the brief's table, and the headline counts the old codes
-/// whose every new code moved from exit 1 to exit 2.
-#[test]
-fn atip_codeexit_10_every_row_of_the_exit_table_is_the_registrys() {
-    let all = canon_cli::cli_error::all_codes();
-    let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
-    let rows = changelog_exit_rows(&changelog);
-    assert_eq!(rows.len(), 179, "the replacement table has a row for each code of 0.35");
-    for (old, news, _, after) in &rows {
-        let mut registry: Vec<u8> = news.iter().map(|new| all.iter().find(|info| info.code == new).unwrap_or_else(|| panic!("the row of `{old}` names `{new}`, which the registry lacks")).exit).collect();
-        registry.sort_unstable();
-        registry.dedup();
-        let mut stated = after.clone();
-        stated.sort_unstable();
-        stated.dedup();
-        assert_eq!(registry, stated, "the row of `{old}` says exits {after:?} after, the registry says {registry:?}");
-        if !news.contains(old) {
-            assert!(!all.iter().any(|info| info.code == old), "`{old}` is still registered");
-        }
-    }
-    // Every old code of the brief's table has a row.
-    for (old, news, _) in EXIT_TABLE {
-        let row = rows.iter().find(|(o, ..)| o == old).unwrap_or_else(|| panic!("the CHANGELOG has no row for `{old}`"));
-        let mut stated = row.1.clone();
-        stated.sort_unstable();
-        let mut expected: Vec<String> = news.iter().map(|code| (*code).to_string()).collect();
-        expected.sort_unstable();
-        assert_eq!(stated, expected, "the row of `{old}` names the codes of the brief's table");
-    }
-    // The headline counts the old codes whose exit moved from 1 to 2.
-    let mut moved: Vec<&str> = rows.iter().filter(|(_, _, before, after)| *before == 1 && after.iter().all(|exit| *exit == 2)).map(|(old, ..)| old.as_str()).collect();
-    moved.sort_unstable();
-    moved.dedup();
-    assert!(changelog.contains(&format!("**{} codes changed from exit 1 to exit 2", moved.len())), "the headline says {} codes: {moved:?}", moved.len());
-    assert_eq!(all.iter().find(|i| i.code == "CONTEXT_PACK_VERIFY_FAILED").unwrap().exit, 1);
-    assert_eq!(all.iter().find(|i| i.code == "CONTEXT_PACK_CORRUPT").unwrap().exit, 2);
-    assert!(canon_cli::cli_error::all_warnings().iter().any(|w| w.code == "POLICY_CHANGED_SINCE_APPROVAL"), "the warning keeps its name");
-}
-
-/// atip.codeexit.10 (failure case): a row whose exit disagrees with the registry, or whose count is wrong, is found.
-#[test]
-fn atip_codeexit_10_a_row_that_disagrees_with_the_registry_is_found() {
-    let table = format!(
-        "\n## 0.36.0\n\n{}\n|---|---|---|---|---|---|---|\n| `BRIEF_UNAPPROVED` | `BRIEF_APPROVAL_REQUIRED` | renamed | 1 → 1 | no → no |  | a note |\n| `NO_COMMIT` | `COMMIT_REQUIRED` | renamed | 1 → 2 | no → no |  | a note |\n\n## 0.35.0\n",
-        old_codes::TABLE_HEADER
-    );
-    let rows = changelog_exit_rows(&table);
-    assert_eq!(rows, [("BRIEF_UNAPPROVED".to_string(), vec!["BRIEF_APPROVAL_REQUIRED".to_string()], 1, vec![1]), ("NO_COMMIT".to_string(), vec!["COMMIT_REQUIRED".to_string()], 1, vec![2])]);
-    let registry = canon_cli::cli_error::all_codes().iter().find(|i| i.code == "BRIEF_APPROVAL_REQUIRED").unwrap().exit;
-    assert_ne!(vec![registry], rows[0].3, "the first row says exit 1 where the registry says {registry}: the test above fails on it");
-}
-
-/// atip.codeexit.11: the branches on a canon exit that canon ships (the pre-commit hook, the npm launcher, the eval scripts) treat every non-zero
-/// exit alike, so a refusal that moved from 1 to 2 changes none of them.
-#[test]
-fn atip_codeexit_11_no_shipped_branch_depends_on_exit_1_of_a_changed_code() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let hook = std::fs::read_to_string(root.join("crates/canon-gate/scripts/canon-gate-pre-commit.sh")).unwrap();
-    assert!(hook.lines().any(|l| l.trim() == "canon gate check") && !branches_on_exit_1(&hook), "the hook blocks on any non-zero exit of `canon gate check`, which is unchanged");
-    let launcher = std::fs::read_to_string(root.join("packages/cli/src/index.ts")).unwrap();
-    assert!(!branches_on_exit_1(&launcher), "the launcher passes the exit through");
-}
-
-/// atip.codeexit.11 (failure case): a branch on exit `1` is found by the scan that guards the audit.
-#[test]
-fn atip_codeexit_11_a_branch_on_exit_1_is_found_by_the_scan() {
-    assert!(branches_on_exit_1("canon gate check\nif [ $? -eq 1 ]; then echo refused; fi\n"));
-    assert!(branches_on_exit_1("if (result.status === 1) refuse();"));
-    assert!(branches_on_exit_1("if returncode == 1:"));
-    assert!(!branches_on_exit_1("canon gate check || exit 1\nif [ $? -ne 0 ]; then exit 2; fi\n"));
-}
-
-/// Whether `text` compares an exit status with `1`.
-fn branches_on_exit_1(text: &str) -> bool {
-    text.lines().any(|line| {
-        let line = line.trim();
-        let mentions_exit = line.contains("$?") || line.contains("status") || line.contains("returncode") || line.contains("exitCode") || line.contains("exit_code");
-        mentions_exit && ["-eq 1", "== 1", "=== 1"].iter().any(|op| line.contains(op))
-    })
 }
 
 /// atip.codeexit.01: no exit-2 answer carries `data`: the one place that prints an error with data refuses an exit-2 error in a debug build

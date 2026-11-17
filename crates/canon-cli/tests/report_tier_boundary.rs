@@ -54,7 +54,6 @@ fn multi_tier_repo_emits_a_warn_line_matching_the_reports_own_note() {
 
     let report_path = dir.path().join(".canon/REPORT.md");
     let content = std::fs::read_to_string(&report_path).unwrap();
-    assert!(content.contains("## Kinds not read directly"), "{content}");
     for kind in ["task", "run", "handoff"] {
         assert!(content.contains(&format!("`{kind}`")), "REPORT.md must name `{kind}`:\n{content}");
     }

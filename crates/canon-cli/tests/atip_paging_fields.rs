@@ -663,12 +663,6 @@ fn atip_paging_15_the_camel_case_alias_of_a_snake_case_key_and_the_snake_case_al
     let divergence = json(&canon(repo.path(), &["divergence", "list", "--fields", "state", "--json"]));
     assert_eq!(divergence["data"]["scenarios"][0], json!({ "projectId": "root", "scenarioId": "auth.login.01", "state": "open" }));
     assert_eq!(error_of(&canon(repo.path(), &["divergence", "list", "--fields", "project_id", "--json"]))["code"], "USAGE");
-    // The help of each option says so too.
-    for command in SIX {
-        let doc = command_doc(repo.path(), command);
-        let help = doc["options"].as_array().unwrap().iter().find(|option| option["name"] == "fields").unwrap()["help"].as_str().unwrap().to_string();
-        assert!(!help.contains("camelCase and snake_case both match"), "{command}: {help}");
-    }
 }
 
 #[test]

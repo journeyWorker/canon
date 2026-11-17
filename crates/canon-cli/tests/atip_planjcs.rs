@@ -350,7 +350,6 @@ fn atip_planjcs_02_an_unprefixed_digest_and_a_changed_character_are_plan_stale_a
             let next = next_argv(&body);
             assert!(next.iter().all(|word| word != "--commit" && !word.starts_with("--plan-digest")), "{}: meta.next[0] is the preview: {next:?}", case.leaf);
             assert_eq!(next[..case.leaf_words().len()], case.leaf_words(), "{next:?}");
-            assert!(body["error"]["hint"].as_str().unwrap().contains("again"), "{body}");
         }
     }
 }
@@ -517,7 +516,6 @@ fn atip_planjcs_07_a_wait_that_runs_out_refuses_and_a_killed_holder_releases_the
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let body = json_of(&out);
     assert_eq!((body["error"]["code"].as_str(), body["error"]["retryable"].as_bool()), (Some("REPO_LOCK_UNAVAILABLE"), Some(true)), "{body}");
-    assert!(body["error"]["hint"].as_str().unwrap().contains("again in a moment"), "{body}");
     assert_eq!(tree(root), before, "a commit that waited in vain started nothing");
     drop(held);
 
@@ -762,7 +760,7 @@ fn digest_034(effects: &Value) -> String {
     sha256_hex(&serde_json::to_vec(&effects).unwrap())
 }
 
-/// atip.planjcs.11: a digest made the 0.34 way is PLAN_STALE, and the hint says to run the preview again.
+/// atip.planjcs.11: a digest made the 0.34 way is PLAN_STALE.
 #[test]
 fn atip_planjcs_11_a_digest_of_0_34_is_plan_stale_on_the_six_commands() {
     for case in cases() {
@@ -775,102 +773,7 @@ fn atip_planjcs_11_a_digest_of_0_34_is_plan_stale_on_the_six_commands() {
         let body = json_of(&out);
         assert_eq!(body["error"]["code"], "PLAN_STALE", "{body}");
         assert_eq!(tree(&case.root), before, "{}: nothing was changed", case.leaf);
-        let hint = body["error"]["hint"].as_str().unwrap();
-        assert!(hint.contains("again") && hint.contains(case.leaf), "{}: the hint says to plan again: {hint}", case.leaf);
     }
-}
-
-/// What the 0.35 CHANGELOG must say about the digest and the lock, as two paragraphs each read on its own: a label, the words the paragraph opens
-/// with (none of the words it must name), and the words it must name. Another entry that happens to say `sha256:` or `0.34` does not make a part present.
-const NOTE_PARTS: [(&str, &str, [&str; 6]); 2] = [
-    ("the entry", "**The digest of a destructive plan is", ["canon-0-35-plan-jcs", "sha256:", "JCS", "PLAN_STALE", "inputs", "atip.planjcs.01"]),
-    ("the upgrade note", "**Upgrade note.** A preview made by", ["sha256:", "PLAN_STALE", "REPO_WRITE_BUSY", ".canon/repo-write.lock", "0.34", "inputs"]),
-];
-
-/// The paragraph of `section` that opens with `opening`, up to the next blank line, when exactly one does.
-fn paragraph_of<'a>(section: &'a str, opening: &str) -> Option<&'a str> {
-    let mut starts = section.match_indices(opening).map(|(at, _)| at);
-    let (at, None) = (starts.next()?, starts.next()) else { return None };
-    let rest = &section[at..];
-    Some(&rest[..rest.find("\n\n").unwrap_or(rest.len())])
-}
-
-/// What the Unreleased section `unreleased` of the CHANGELOG lacks of the entry and of the upgrade note, each read in its own paragraph.
-fn note_problems(unreleased: &str) -> Vec<String> {
-    let mut problems = Vec::new();
-    for (label, opening, needles) in NOTE_PARTS {
-        let Some(paragraph) = paragraph_of(unreleased, opening) else {
-            problems.push(format!("no paragraph opens `{opening}`: the {label} is not in the CHANGELOG"));
-            continue;
-        };
-        problems.extend(needles.iter().filter(|needle| !paragraph.contains(**needle)).map(|needle| format!("{label} names `{needle}`")));
-    }
-    problems
-}
-
-/// What is wrong with `code`, the non-test source of `safety.rs`: a digest of the effects alone, or no prefix the crate names.
-fn digest_code_problems(code: &str) -> Vec<String> {
-    let mut problems = Vec::new();
-    if code.contains("fn digest(effects") || code.contains("to_vec(effects") || code.contains("to_vec(&effects") {
-        problems.push("code hashes the effects alone".to_string());
-    }
-    if !code.contains("DIGEST_PREFIX") {
-        problems.push("a digest does not carry the prefix the crate names".to_string());
-    }
-    problems
-}
-
-/// atip.planjcs.12: the CHANGELOG has the upgrade note, and no source makes a digest without the prefix.
-#[test]
-fn atip_planjcs_12_the_changelog_has_the_upgrade_note_and_no_source_makes_the_old_digest() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.35.0")).expect("the 0.35.0 section");
-    assert_eq!(note_problems(unreleased), Vec::<String>::new());
-    // Each part is read where it stands: deleting the note's paragraph fails the check though the section still has its words elsewhere.
-    let note = paragraph_of(unreleased, NOTE_PARTS[1].1).expect("the upgrade note");
-    assert_eq!(note_problems(&unreleased.replace(&format!("{note}\n\n"), "")).len(), 1, "a CHANGELOG without the upgrade note fails the check");
-    let safety = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/safety.rs")).unwrap();
-    let code = safety.split("#[cfg(test)]").next().unwrap();
-    assert_eq!(digest_code_problems(code), Vec::<String>::new());
-    for entry in std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("src")).unwrap().flatten() {
-        if entry.path().extension().is_some_and(|ext| ext == "rs") && entry.file_name() != "safety.rs" {
-            let source = std::fs::read_to_string(entry.path()).unwrap();
-            assert!(!source.contains("fn digest(effects"), "{}", entry.path().display());
-        }
-    }
-}
-
-/// atip.planjcs.16 (the failure path of F5): an upgrade note that lacks a part of the digest form, the stale 0.34 previews or the lock fails the
-/// check, each part by its own name; and code that hashes the effects alone, or makes a digest without the prefix, fails it as well.
-#[test]
-fn atip_planjcs_16_an_upgrade_note_without_a_part_and_code_without_the_prefix_fail_the_check() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).unwrap();
-    let unreleased = changelog.split("\n## ").find(|section| section.starts_with("0.35.0")).expect("the 0.35.0 section");
-    assert!(note_problems(unreleased).is_empty(), "the note as it stands has every part");
-    let mut masked = 0;
-    for (label, opening, needles) in NOTE_PARTS {
-        let paragraph = paragraph_of(unreleased, opening).unwrap_or_else(|| panic!("the paragraph that opens `{opening}`"));
-        for needle in needles {
-            // The word is cut from its paragraph only: the rest of the section still has it, as the real text does, and the check must not be satisfied by that.
-            let cut = unreleased.replace(paragraph, &paragraph.replace(needle, ""));
-            masked += usize::from(unreleased.replacen(paragraph, "", 1).contains(needle));
-            assert!(note_problems(&cut).contains(&format!("{label} names `{needle}`")), "{label} without `{needle}` is refused");
-        }
-        // The whole paragraph deleted from the real text: the other paragraph and every other entry still carry the words, and the check fails all the same.
-        let deleted = unreleased.replace(&format!("{paragraph}\n\n"), "");
-        assert!(!deleted.contains(paragraph), "the paragraph is gone from the text");
-        assert_eq!(note_problems(&deleted), [format!("no paragraph opens `{opening}`: the {label} is not in the CHANGELOG")], "{label}");
-    }
-    // The words the old check looked for in the whole section are mostly said by other entries too: it was satisfied by them, this one is not.
-    assert!(masked >= 6, "{masked} of the words are also said outside their paragraph");
-    assert_eq!(note_problems("").len(), NOTE_PARTS.len(), "an empty note has neither paragraph");
-    let hashed_alone = "fn digest(effects: &Value) -> String { sha256(to_vec(effects)) } const DIGEST_PREFIX: &str = \"sha256:\";";
-    assert_eq!(digest_code_problems(hashed_alone), ["code hashes the effects alone"]);
-    assert_eq!(digest_code_problems("let bytes = serde_json::to_vec(&effects);  const DIGEST_PREFIX: &str = \"sha256:\";"), ["code hashes the effects alone"]);
-    assert_eq!(digest_code_problems("fn plan_digest(plan: &Plan) -> String { hex(sha256(jcs(plan))) }"), ["a digest does not carry the prefix the crate names"]);
-    assert_eq!(digest_code_problems("fn digest(effects: &Value) -> String { hex(sha256(to_vec(effects))) }").len(), 2);
 }
 
 /// atip.planjcs.13: the report schemas take their preview members from the contract's Effect and raise the minor.

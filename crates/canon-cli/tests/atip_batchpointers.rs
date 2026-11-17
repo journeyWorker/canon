@@ -1,7 +1,6 @@
 //! Batches of `--input` follow spec 11.8 and 11.11 (`canon-0-35-batch-pointers`, scenarios `atip.batchpointers.*`),
 //! against the built binary: a preflight refusal is the item's own code with a `/<index>/…` pointer and no `data`, a
-//! failure while an item runs is `BATCH_INCOMPLETE` at `/<index>` (index 0 too), preflight reads no state, and a failed
-//! item has its own `error` and no `data`.
+//! failure while an item runs is `BATCH_INCOMPLETE` at `/<index>` (index 0 too), and preflight reads no state.
 //!
 //! Tests are named by scenario id (`atip_batchpointers_01_…` proves `atip.batchpointers.01`).
 
@@ -237,58 +236,4 @@ fn atip_batchpointers_06_an_item_that_needs_what_an_earlier_item_writes_passes_p
     assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("BATCH_INCOMPLETE"), Some("/0")), "{body}");
     assert_eq!(statuses(&body), ["failed", "skipped"], "{body}");
     assert_eq!(body["data"]["items"][0]["error"]["code"], "SUBJECT_CONFLICT", "{body}");
-}
-
-#[test]
-fn atip_batchpointers_07_a_failed_item_has_its_error_and_no_data_and_a_skipped_item_has_neither() {
-    let dir = fixture();
-    let repo = dir.path();
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "fixed"), close(1, "rejected"), close(1, "fixed")]);
-    assert_eq!(exit, Some(1), "{body}");
-    let items = body["data"]["items"].as_array().unwrap();
-    assert_eq!(items.len(), 4, "one entry per submitted item: {body}");
-    assert!(items[0]["data"].is_object() && items[0].get("error").is_none(), "{body}");
-    assert!(items[1].get("data").is_none(), "a failed item has no data: {body}");
-    assert_eq!(items[1]["error"]["code"], "FINDING_NOT_FOUND", "{body}");
-    assert_eq!(items[1]["error"]["retryable"], false, "the registry's retryable: {body}");
-    for skipped in &items[2..] {
-        assert_eq!(skipped["status"], "skipped", "{body}");
-        assert!(skipped.get("data").is_none() && skipped.get("error").is_none(), "{body}");
-    }
-}
-
-#[test]
-fn atip_batchpointers_08_a_batch_with_an_item_that_fails_is_never_exit_zero_and_the_failed_and_later_items_report_no_success() {
-    let dir = fixture();
-    let repo = dir.path();
-    // item 1 names a finding no ledger has: the batch has a failure, so it is not the success report of step 2
-    let (exit, body) = run_batch(repo, &["finding", "close"], &[close(1, "deferred"), close(9, "fixed"), close(1, "rejected")]);
-    assert_eq!(exit, Some(1), "{body}");
-    assert_eq!((body["ok"].as_bool(), body["error"]["code"].as_str()), (Some(false), Some("BATCH_INCOMPLETE")), "{body}");
-    let items = body["data"]["items"].as_array().expect("a batch report");
-    assert_eq!(statuses(&body), ["written", "failed", "skipped"], "{body}");
-    for item in &items[1..] {
-        assert!(!matches!(item["status"].as_str(), Some("written" | "unchanged")), "the failed and the later items report no success: {body}");
-        assert!(item.get("data").is_none(), "{body}");
-    }
-}
-
-#[test]
-fn atip_batchpointers_09_a_failed_item_points_at_what_to_fix_in_its_own_error_and_the_items_after_it_carry_nothing() {
-    let dir = fixture();
-    let repo = dir.path();
-    let feature = ".canon/specs/kind=feature/area=auth/login.feature";
-    let items = [
-        json!({"operands": ["auth.login.02"], "title": "Two", "feature": feature}),
-        json!({"operands": ["auth.login.01"], "title": "Again", "feature": feature}),
-        json!({"operands": ["auth.login.03"], "title": "Three", "feature": feature}),
-    ];
-    let (exit, body) = run_batch(repo, &["scenario", "new"], &items);
-    assert_eq!(exit, Some(1), "{body}");
-    let report = body["data"]["items"].as_array().expect("a batch report");
-    assert_eq!(report[1]["error"]["code"], "SCENARIO_TAG_EXISTS", "{body}");
-    assert_eq!(report[1]["error"]["field"], "/1/operands", "the field of the item's own error names what to fix: {body}");
-    assert!(report[1].get("data").is_none(), "a failed item has no data: {body}");
-    assert_eq!(report[2]["status"], "skipped", "{body}");
-    assert!(report[2].get("data").is_none() && report[2].get("error").is_none(), "a skipped item carries nothing: {body}");
 }

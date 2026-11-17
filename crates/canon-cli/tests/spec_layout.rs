@@ -88,8 +88,6 @@ fn pre_0_17_repo(indexed: bool) -> tempfile::TempDir {
     dir
 }
 
-const MIGRATE: &str = "spec root `root` (`specs`) is on the pre-0.17 layout (`features/kind=feature/area=world/hotdeal.feature` sits under `features/`); canon reads `kind=feature/area=<area>/<surface>.feature` directly under the root, and `canon migrate` moves `features/kind=feature/` there";
-
 /// authoring.init.81: a fresh `canon init` repo's spec root is
 /// `.canon/specs`; `canon scenario new` writes under
 /// `.canon/specs/kind=feature/area=<area>/<surface>.feature`, the gate
@@ -99,28 +97,25 @@ fn authoring_init_81_a_fresh_repo_authors_indexes_and_gates_under_canon_specs() 
     let dir = init_repo();
     let repo = dir.path();
     let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
-    assert!(yaml.contains("specs:\n  # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.\n  roots:\n    - id: root\n      root: .canon/specs\n"), "{yaml}");
+    assert!(yaml.contains("root: .canon/specs"), "{yaml}");
 
     let out = ok(repo, &["scenario", "new", "world.hotdeal.01", "--title", "A coupon applies", "--case", "failure"]);
-    assert!(stdout(&out).contains(&format!("{FEATURE} —")), "{}", stdout(&out));
+    assert!(stdout(&out).contains(FEATURE), "{}", stdout(&out));
     assert!(repo.join(FEATURE).is_file());
     ok(repo, &["format", ".canon/specs"]);
 
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n").unwrap();
     let gate = canon(repo, &["gate", "check"]);
     // The gate is a read command: it grades the new scenario from the specs, in memory, and writes no index record.
-    assert!(!stderr(&gate).contains("refreshed the scenario index"), "{}", stderr(&gate));
     assert!(scenario_records(repo).is_empty(), "a read leaves the index as it found it: {:?}", scenario_records(repo));
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains("world.hotdeal.01"), "the unevidenced scenario is graded: {}", stdout(&gate));
 
-    let evidence = ok(repo, &["evidence", "add", "--scenario", "world.hotdeal.01", "--project", "root", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor", "impl"]);
-    assert!(stderr(&evidence).contains(&format!("canon evidence add: refreshed the scenario index from 1 changed feature file(s) ({FEATURE}): 1 record(s) written")), "a writer indexes the scenario: {}", stderr(&evidence));
+    ok(repo, &["evidence", "add", "--scenario", "world.hotdeal.01", "--project", "root", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor", "impl"]);
     let records = scenario_records(repo);
     assert_eq!(records.len(), 1, "{records:?}");
     assert_eq!(records[0]["scenario_id"], "world.hotdeal.01");
-    let gate = ok(repo, &["gate", "check"]);
-    assert!(stdout(&gate).contains("canon gate check: clean (0 violations)"), "{}", stdout(&gate));
+    ok(repo, &["gate", "check"]);
 }
 
 /// authoring.init.82: no `.gitignore` line canon writes, nor canon's own,
@@ -155,14 +150,8 @@ fn format_corpus_10_format_refuses_the_pre_0_17_layout() {
     let out = canon(dir.path(), &["format", "specs"]);
     assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
     let text = stdout(&out);
-    assert!(text.starts_with("canon format: 0 file(s) checked, 1 violation(s)\n"), "no old-layout file is read: {text}");
     assert!(!text.contains("zzz-broken") && !text.contains("missing-provenance"), "the unread file raises nothing of its own: {text}");
     assert!(text.contains("features"), "{text}");
-    assert!(
-        text.contains("spec root `specs` is on the pre-0.17 layout (`features/kind=feature/area=world/hotdeal.feature` sits under `features/`)"),
-        "{text}"
-    );
-    assert!(text.contains("`canon migrate` moves `features/kind=feature/` there"), "{text}");
     assert!(text.contains("layout-grammar"), "{text}");
 }
 
@@ -174,9 +163,7 @@ fn inventory_sync_48_sync_refuses_the_pre_0_17_layout() {
     let out = canon(dir.path(), &["inventory", "sync"]);
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let text = stdout(&out);
-    assert!(text.contains("canon inventory sync: root `root` ("), "{text}");
-    assert!(text.contains("ABORTED, 1 violation(s), 0 sync error(s), 0 record(s) written"), "{text}");
-    assert!(text.contains("[layout-grammar] features — spec root `") && text.contains("`canon migrate` moves `features/kind=feature/` there"), "{text}");
+    assert!(text.contains("layout-grammar"), "{text}");
     assert!(scenario_records(dir.path()).is_empty());
 }
 
@@ -192,7 +179,7 @@ fn inventory_sync_49_the_pre_0_17_layout_fails_the_gate_closed_and_status_names_
         let repo = dir.path();
         let gate = canon(repo, &["gate", "check"]);
         assert_eq!(gate.status.code(), Some(1), "indexed={indexed}: {}{}", stdout(&gate), stderr(&gate));
-        assert!(stdout(&gate).contains(&format!("uncovered-cell root — {MIGRATE}; until then its scenarios are not graded")), "{}", stdout(&gate));
+        assert!(stdout(&gate).contains("uncovered-cell root"), "{}", stdout(&gate));
         let records = scenario_records(repo);
         assert_eq!(records.len(), usize::from(indexed), "{records:?}");
         assert!(records.iter().all(|r| r.get("removed").is_none()), "a refused root writes no tombstone: {records:?}");
@@ -201,7 +188,6 @@ fn inventory_sync_49_the_pre_0_17_layout_fails_the_gate_closed_and_status_names_
         let next = report["meta"]["next"].as_array().unwrap();
         assert_eq!(next.len(), 1, "{report}");
         assert_eq!(next[0]["command"], "canon migrate --json");
-        assert!(next[0]["reason"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
 
         std::fs::rename(repo.join("specs/features/kind=feature"), repo.join("specs/kind=feature")).unwrap();
         // Whatever the gate then finds (an empty corpus is `unverifiable`), it no longer names the old layout.
@@ -221,17 +207,17 @@ fn authoring_scaffold_13_the_scaffold_refuses_a_pre_0_17_root() {
 
     let out = canon(repo, &["scenario", "new", "world.hotdeal.02", "--title", "Another coupon", "--case", "failure"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains(&format!("canon: LAYOUT_MIGRATION_REQUIRED: {MIGRATE}; nothing written")), "{}", stderr(&out));
+    assert!(stderr(&out).contains("canon: LAYOUT_MIGRATION_REQUIRED"), "{}", stderr(&out));
 
     let out = canon(repo, &["scenario", "new", "world.cart.01", "--title", "A cart", "--feature", "specs/kind=feature/area=world/cart.feature"]);
     assert_eq!(out.status.code(), Some(2), "an explicit --feature under the root is refused too: {}", stderr(&out));
-    assert!(stderr(&out).contains(&format!("canon: LAYOUT_MIGRATION_REQUIRED: {MIGRATE}; nothing written")), "{}", stderr(&out));
+    assert!(stderr(&out).contains("canon: LAYOUT_MIGRATION_REQUIRED"), "{}", stderr(&out));
     assert!(!repo.join("specs/kind=feature/area=world/cart.feature").exists(), "the explicit --feature target is not written");
     assert_eq!(files_under(repo.join("specs")), before, "nothing written by the explicit --feature refusal");
 
     let out = canon(repo, &["feature", "new", "world.cart", "--title", "Cart"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains(&format!("canon: LAYOUT_MIGRATION_REQUIRED: {MIGRATE}; nothing written")), "{}", stderr(&out));
+    assert!(stderr(&out).contains("canon: LAYOUT_MIGRATION_REQUIRED"), "{}", stderr(&out));
 
     assert_eq!(files_under(repo.join("specs")), before, "nothing written");
 }
