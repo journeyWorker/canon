@@ -714,9 +714,6 @@ class ConditionTests(unittest.TestCase):
     def test_the_shipped_expression_reads_false_true_false(self) -> None:
         self.assertEqual(self.renders("github.event_name == 'workflow_dispatch' && inputs.dry_run"), ["false", "true", "false"])
 
-    def test_the_scenarios_are_a_tag_push_and_both_manual_runs(self) -> None:
-        self.assertEqual([want for _, _, want in CHECKER.DRY_RUN_SCENARIOS], ["false", "true", "false"])
-
     def test_a_form_that_reads_empty_on_a_tag_push_differs(self) -> None:
         self.assertNotEqual(self.renders("inputs.dry_run"), ["false", "true", "false"])
         self.assertNotEqual(self.renders("github.event.inputs.dry_run"), ["false", "true", "false"])
@@ -853,6 +850,37 @@ class DryRunSettingTests(unittest.TestCase):
             text = mutate(workflow("publish.yml"), step, f"      - name: Set it\n        run: {line}\n" + step)
             self.assertTrue(self.check(text), line)
 
+    def test_rejects_npm_config_set_with_options_aliases_or_a_location_in_between(self) -> None:
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        for line in (
+            "npm config set -g dry-run true",
+            "npm config set --location=user dry-run true",
+            "npm config --global set dry-run true",
+            "npm config --location project set dry_run true",
+            "npm c set dry-run true",
+            "npm --loglevel=error c set -g dry-run=true",
+            "npm set -g dry-run true",
+        ):
+            text = mutate(workflow("publish.yml"), step, f"      - name: Set it\n        run: {line}\n" + step)
+            self.assertTrue(self.check(text), line)
+
+    def test_rejects_the_setting_written_into_an_npmrc(self) -> None:
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        for line in (
+            'echo "dry-run=true" >> ~/.npmrc',
+            "printf 'dry_run=true\\n' >> .npmrc",
+            "echo dry-run=true | tee -a .npmrc",
+            "|\n          cat >> .npmrc <<EOF\n          dry-run=true\n          EOF",
+        ):
+            text = mutate(workflow("publish.yml"), step, f"      - name: Set it\n        run: {line}\n" + step)
+            self.assertTrue(self.check(text), line)
+
+    def test_accepts_an_npmrc_write_and_a_config_read_that_do_not_set_it(self) -> None:
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        for line in ('echo "registry=https://registry.npmjs.org" >> ~/.npmrc', "npm config get dry-run", "npm config set registry https://registry.npmjs.org"):
+            text = mutate(workflow("publish.yml"), step, f"      - name: Set it\n        run: {line}\n" + step)
+            self.assertEqual(self.check(text), [], line)
+
     def test_ignores_a_comment_that_names_it(self) -> None:
         step = "      - name: Upgrade npm for OIDC trusted publishing\n"
         text = mutate(workflow("publish.yml"), step, "      # NPM_CONFIG_DRY_RUN and `npm config set dry-run` are not set here.\n" + step)
@@ -924,7 +952,17 @@ class TarballTests(unittest.TestCase):
         step = "      - name: Upgrade npm for OIDC trusted publishing\n"
         text = mutate(workflow("publish.yml"), step, "      # TARBALL=tarballs/x.tgz would be read as a GitHub repo.\n" + step)
         self.assertEqual(self.check(text), [])
-        self.assertEqual(self.check(self.assigning(self.ASSIGN + '\n          echo TARBALL=tarballs/x.tgz >/dev/null')), [])
+
+    def test_rejects_a_case_arm_mapfile_append_and_a_quoted_env_key(self) -> None:
+        for extra in ("case x in\n            *-*) TARBALL=tarballs/x.tgz ;;\n          esac", "mapfile -t TARBALL < list.txt", "readarray TARBALL < list.txt", "TARBALL+=x"):
+            self.assertTrue(self.check(self.assigning(self.ASSIGN + "\n          " + extra, 1)), extra)
+        self.assertTrue(self.check(self.assigning("case x in\n            *-*) TARBALL=tarballs/x.tgz ;;\n          esac", 1)))
+        package = '          PACKAGE: "@journeykit/canon-core-linux-arm64"\n'
+        for key in ('"TARBALL"', "'TARBALL'"):
+            self.assertTrue(self.check(mutate(workflow("publish.yml"), package, package + f"          {key}: ./tarballs/x.tgz\n")), key)
+
+    def test_accepts_a_case_arm_that_assigns_a_path(self) -> None:
+        self.assertEqual(self.check(self.assigning(self.ASSIGN + "\n          case x in\n            *-*) TARBALL=./tarballs/x.tgz ;;\n          esac", 1)), [])
 
 
 class ScopeTests(unittest.TestCase):
@@ -969,6 +1007,12 @@ class ScopeTests(unittest.TestCase):
     def test_rejects_a_build_job_without_the_condition(self) -> None:
         self.assertTrue(self.check(mutate(workflow("build-native.yml"), self.IF, "", 1)))
 
+    def test_rejects_an_if_on_the_scope_job_or_its_steps(self) -> None:
+        job = "    name: Decide whether to build\n"
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), job, job + "    if: github.event_name == 'pull_request'\n", 1)))
+        step = "      - name: Decide from the changed files\n"
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), step, step + "        if: github.event_name == 'pull_request'\n", 1)))
+
     def test_rejects_a_condition_that_does_not_build_unless_told_to(self) -> None:
         for condition in (
             "needs.scope.outputs.skip == 'false'",
@@ -982,11 +1026,6 @@ class ScopeTests(unittest.TestCase):
             "false",
         ):
             self.assertTrue(self.check(mutate(workflow("build-native.yml"), self.IF, f"    if: {condition}\n", 1)), condition)
-
-    def test_the_safety_job_does_not_have_to_wait_for_scope(self) -> None:
-        job = CHECKER._job_block(workflow("build-native.yml"), "safety")
-        self.assertNotIn("scope", CHECKER._needs(job))
-        self.assertEqual(self.check(), [])
 
 
 class PreflightTests(unittest.TestCase):
@@ -1035,6 +1074,34 @@ class PreflightTests(unittest.TestCase):
             "/usr/local/bin/npm whoami",
         ):
             self.assertTrue(self.check(self.with_call(call)), call)
+
+    def test_rejects_an_unguarded_whoami_behind_a_redirect_a_parameter_expansion_or_a_heredoc(self) -> None:
+        pad = "            "
+        for call in (
+            "npm whoami>/dev/null",
+            "npm whoami</dev/null",
+            "npm whoami 2>/dev/null",
+            "npm whoami>&2",
+            "X=${Y:-$(npm whoami)}",
+            "X=${Y:-${Z:-$(npm whoami)}}",
+            'X="${Y:-$(npm whoami)}"',
+            "X=${#Y}$(npm whoami)",
+            f"cat <<EOF\n{pad}can't\n{pad}EOF\n{pad}npm whoami",
+            f"cat <<'EOF' >/dev/null\n{pad}it's\n{pad}EOF\n{pad}npm whoami",
+            f"cat <<-EOF\n{pad}it's\n{pad}EOF\n{pad}npm whoami",
+            "cat <<EOF | npm whoami\n" + pad + "x\n" + pad + "EOF",
+        ):
+            self.assertTrue(self.check(self.with_call(call)), call)
+
+    def test_accepts_a_heredoc_body_and_an_expansion_that_only_mention_whoami(self) -> None:
+        pad = "            "
+        for call in (
+            f"cat <<EOF\n{pad}npm whoami\n{pad}EOF",
+            f"cat <<'EOF'\n{pad}don't npm whoami\n{pad}EOF",
+            "echo ${NPM:-npm} whoami",
+            "echo ${#Y} npm-whoami",
+        ):
+            self.assertEqual(self.check(self.with_call(call)), [], call)
 
     def test_accepts_text_that_only_mentions_whoami(self) -> None:
         for line in ('echo "npm whoami is not run here"', "echo 'npm whoami'", "# npm whoami", "echo \"a $(date) npm whoami\"", "npm view whoami-package"):

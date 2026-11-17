@@ -828,8 +828,12 @@ DRY_RUN_SCENARIOS = (
 )
 # A publish step's environment entry (10 spaces: under the step's `env:`), the way npm reads `npm_config_*`: any case, `_` or `-`.
 DRY_RUN_ENV = re.compile(r"^ {10}(npm_config_dry[_-]run):[ \t]*(.*?)[ \t]*$", re.IGNORECASE)
-# Every other way to switch npm into a dry run: the variable in any spelling and place, or `npm config set dry-run`.
-DRY_RUN_SETTING = re.compile(r"npm_config_dry[_-]run|\bnpm\s+(?:config\s+)?set\s+dry[_-]run\b", re.IGNORECASE)
+# Every other way to switch npm into a dry run: the variable in any spelling and place, `npm … set … dry-run` (`npm config set`,
+# `npm c set`, `npm set`, with options or a location in between) and the setting written as an `.npmrc` entry.
+DRY_RUN_SETTING = re.compile(
+    r"npm_config_dry[_-]run|\bnpm\b[^\n;&|]*?\bset\b[^\n;&|]*?\bdry[_-]run\b|npmrc[^\n]*\bdry[_-]run\b|\bdry[_-]run[^\n]*npmrc|^[\s\"']*dry[_-]run[ \t]*=",
+    re.IGNORECASE,
+)
 
 
 def _step_condition(step: str) -> str | None:
@@ -910,7 +914,7 @@ def dry_run_errors(text: str, workflow: str) -> list[str]:
 def dry_run_setting_errors(text: str, workflow: str) -> list[str]:
     """npm's dry run is set on the five publish steps and nowhere else: on a job or the workflow it would also stop
     `npm install -g npm@…` from installing in a dry run; the other ways in are another step's `env:`, a write to
-    `$GITHUB_ENV` and `npm config set dry-run`. The name is read in any case and as `dry_run` or `dry-run`."""
+    `$GITHUB_ENV`, `npm config set dry-run` (any options, any alias) and a `dry-run=` entry written into an `.npmrc`. The name is read in any case and as `dry_run` or `dry-run`."""
     allowed: set[int] = set()
     position = 0
     for step in _steps(text):
@@ -949,6 +953,7 @@ def _whoami_calls(script: str) -> list[int]:
     front and options (`--loglevel=error`, `--registry <url>`) in between do not matter. Text in quotes and comments is
     not read; `$( )` and backticks are, quotes or not. Line continuations join."""
     calls: list[int] = []
+    heredocs: list[str] = []
     saved: list[tuple[list[tuple[str, int]], str, bool, int]] = []
     modes = ["code"]
     words: list[tuple[str, int]] = []
@@ -1012,6 +1017,9 @@ def _whoami_calls(script: str) -> list[int]:
             elif pair == "$(":
                 open_substitution("paren")
                 i += 1
+            elif pair == "${":
+                open_substitution("brace")
+                i += 1
             elif char == "`":
                 open_substitution("bt")
             elif char == "\n":
@@ -1031,9 +1039,29 @@ def _whoami_calls(script: str) -> list[int]:
                 open_substitution("paren")
                 i += 1
             elif pair == "${":
-                end = script.find("}", i)
-                i = len(script) if end < 0 else end
-                add("\0")
+                open_substitution("brace")
+                i += 1
+            elif char == "}" and mode == "brace":
+                close_substitution()
+            elif pair == "<<":
+                end_word()
+                if script[i : i + 3] == "<<<":
+                    i += 2
+                else:
+                    k = i + 2
+                    if script[k : k + 1] == "-":
+                        k += 1
+                    while k < len(script) and script[k] in " \t":
+                        k += 1
+                    delimiter = ""
+                    while k < len(script) and script[k] not in " \t\n;&|<>()":
+                        if script[k] not in "'\"\\":
+                            delimiter += script[k]
+                        k += 1
+                    heredocs.append(delimiter)
+                    i = k - 1
+            elif char in "<>":
+                end_word()
             elif char == "`":
                 if mode == "bt":
                     close_substitution()
@@ -1049,7 +1077,7 @@ def _whoami_calls(script: str) -> list[int]:
                     end_command()
                     if mode == "sub":
                         modes.pop()
-            elif char == "#" and not open_word:
+            elif char == "#" and not open_word and mode != "brace":
                 while i + 1 < len(script) and script[i + 1] != "\n":
                     i += 1
             elif char in " \t":
@@ -1057,6 +1085,18 @@ def _whoami_calls(script: str) -> list[int]:
             elif char == "\n":
                 end_command()
                 line += 1
+                while heredocs:
+                    delimiter = heredocs.pop(0)
+                    j = i + 1
+                    while j < len(script):
+                        eol = script.find("\n", j)
+                        eol = len(script) if eol < 0 else eol
+                        done = script[j:eol].strip() == delimiter
+                        line += eol < len(script)
+                        j = eol + 1
+                        if done:
+                            break
+                    i = j - 1
             elif char in ";&|":
                 end_command()
             else:
@@ -1068,8 +1108,8 @@ def _whoami_calls(script: str) -> list[int]:
     return calls
 
 
-_TARBALL_ASSIGN = re.compile(r"(?:^|[;&|({]|\bthen\b|\bdo\b|\belse\b)[ \t]*(?:(?:export|declare|typeset|readonly|local)\b(?:[ \t]+-[A-Za-z]+)*[ \t]+)?TARBALL=(\S*)", re.MULTILINE)
-_TARBALL_OTHER_SOURCE = re.compile(r"\bfor[ \t]+TARBALL\b|\bread\b[^\n;&|]*\bTARBALL\b|\bprintf[ \t]+-v[ \t]+TARBALL\b")
+_TARBALL_ASSIGN = re.compile(r"(?:^|[;&|(){]|\bthen\b|\bdo\b|\belse\b)[ \t]*(?:(?:export|declare|typeset|readonly|local)\b(?:[ \t]+-[A-Za-z]+)*[ \t]+)?TARBALL=(\S*)", re.MULTILINE)
+_TARBALL_OTHER_SOURCE = re.compile(r"\bfor[ \t]+TARBALL\b|\bread\b[^\n;&|]*\bTARBALL\b|\bprintf[ \t]+-v[ \t]+TARBALL\b|\b(?:mapfile|readarray)\b[^\n;&|]*\bTARBALL\b|\bTARBALL\+=")
 
 
 def tarball_errors(text: str, workflow: str) -> list[str]:
@@ -1086,11 +1126,11 @@ def tarball_errors(text: str, workflow: str) -> list[str]:
             errors.append(f"{workflow}: `{title}` writes TARBALL through $GITHUB_ENV; the publish step must assign it itself")
         if not re.search(r"\bnpm[ \t]+publish\b[^\n]*\$\{?TARBALL\b", code):
             continue
-        if re.search(r"^\s+TARBALL:", code, re.MULTILINE):
+        if re.search(r"^\s+[\"']?TARBALL[\"']?:", code, re.MULTILINE):
             errors.append(f"{workflow}: `{title}` takes TARBALL from its `env:`; the publish step must assign it in its script")
         script = "\n".join(_uncommented(_run_script(step)))
         if _TARBALL_OTHER_SOURCE.search(script):
-            errors.append(f"{workflow}: `{title}` takes TARBALL from `for`, `read` or `printf -v`; the publish step must assign it directly")
+            errors.append(f"{workflow}: `{title}` takes TARBALL from `for`, `read`, `mapfile`, `+=` or `printf -v`; the publish step must assign it directly")
         values = [match.group(1).lstrip("\"'") for match in _TARBALL_ASSIGN.finditer(script)]
         if not values:
             errors.append(f"{workflow}: `{title}` assigns TARBALL no readable value (npm reads a/b.tgz as a GitHub repo)")
@@ -1138,6 +1178,8 @@ def scope_errors(text: str, workflow: str) -> list[str]:
     if not scope:
         errors.append(f"{workflow}: no `scope` job to decide whether the builds run")
     else:
+        if _field(scope, "if") is not None or any(_step_condition(step) is not None for step in _steps(scope)):
+            errors.append(f"{workflow}: the `scope` job and its steps have no `if:`; a skipped `scope` skips every build job (only an explicit skip=true skips)")
         if _field(scope, "timeout-minutes") != "5":
             errors.append(f"{workflow}: the `scope` job has `timeout-minutes: 5`")
         if not re.search(r"^    outputs:\n(?:      .*\n)*?      skip:", scope + "\n", re.MULTILINE):
