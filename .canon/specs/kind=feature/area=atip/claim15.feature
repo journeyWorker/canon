@@ -10,7 +10,7 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   Scenario: A declaration of 1.4 fails the declaration check, and the crate judges a property pattern by the declared minor: a problem of a 1.4 document, none of a 1.5 one
     Given the declaration check seeded with an envelope that says 1.4, a schema answer that says 1.4 and one with no declaration, and the property pattern of Annex V2 judged by the atip crate at the minors 1.4 and 1.5
     When the checks read the seeded answers and the crate judges the pattern and a document that has it
-    Then the declaration check finds each seeded answer, the crate reads the pattern as no problem at the declared minor 1.6 and as a problem at 1.4, and a document that declares 1.6 has no problem while one that declares 1.4 has
+    Then the declaration check finds each seeded answer, the crate reads the pattern as no problem at the declared minor and as a problem at 1.4, and a document that declares the declared minor has no problem while one that declares 1.4 has
 
   # canon: {"schema":1,"at":"2026-11-05T12:08:43Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -21,7 +21,7 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   Scenario: No declared pattern lists white space by hand, each of the 59 declarations says it as the property, and none uses a shorthand or an alias
     Given every pattern of the tree and of every command document of canon schema, and the 59 places the 0.36.0 build declared a list of white space
     When each pattern is read for a class that lists three or more white-space members, for a shorthand and for a property that is not named
-    Then no pattern lists white space by hand, none has a shorthand or an alias, the crate finds none outside the 1.5 form, the 29 places that kept their values say the property now, the 17 places of the six name and sentence options and the places that had no pattern say the one text pattern of 0.37 (`atip.optionvalues.03`), the 11 places of the time options say the RFC 3339 patterns of 0.37, which name no white space (`atip.optionforms.11`), and the 2 places of `--providers` are no declaration any more (`canon-0-38-provider-option` removed the option), and the distinct patterns that name white space are 11
+    Then no pattern lists white space by hand, none has a shorthand or an alias, the crate finds none outside the 1.5 form, the 29 places that kept their values say the property now, the 17 places of the six name and sentence options and the places that had no pattern say the one text pattern of 0.37 (`atip.optionvalues.03`), the 11 places of the time options say the RFC 3339 patterns of 0.37, which name no white space (`atip.optionforms.11`), and the 2 places of `--providers` are no declaration any more (`canon-0-38-provider-option` removed the option)
 
   # canon: {"schema":1,"at":"2026-11-05T12:08:49Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -30,9 +30,9 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @flow:canon-0-37-claim-1-5.F2
   @atip.claim15.04
   Scenario: Each new pattern of a place that kept its values takes and refuses the values its pattern of 0.36.0 did, over every scalar value and the near misses of the bases
-    Given the 17 patterns of 0.36.0 as canon schema printed them, the new pattern of each of the 29 places that kept their values (the 17 places of the six name and sentence options are held to the text rule of `atip.optionvalues`, the 11 places of the time options to `atip.optionforms`, and the 2 places of `--providers` are not declared in 0.38) and the words of its refusal, every scalar value up to U+3100 with a sample of the rest, and the near misses of the bases built from the controls and the white space and their neighbours
+    Given the 17 patterns of 0.36.0 as canon schema printed them, the new pattern of each of the 29 places that kept their values (the 17 places of the six name and sentence options are held to the text rule of `atip.optionvalues`, the 11 places of the time options to `atip.optionforms`, and the 2 places of `--providers` are not declared in 0.38), every scalar value up to U+3100 with a sample of the rest, and the near misses of the bases built from the controls and the white space and their neighbours
     When each old and new pattern decides each value, and the one-word token pattern that --relayed-via declared decides every scalar value against the white space of the standard library
-    Then no value changes sides, each pattern takes some values and refuses some, the property is exactly the 25 code points of White_Space, and the refusal of each of the 29 places says what it said in 0.36.0 (where it quotes its pattern it quotes the one declared now)
+    Then no value changes sides, each pattern takes some values and refuses some, the property is exactly the 25 code points of White_Space, and the pattern each of those places declares now names the property White_Space
 
   # canon: {"schema":1,"at":"2026-11-05T12:08:54Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -43,7 +43,7 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   Scenario: The checks find a listed class, a shorthand, an alias and a value that changed sides
     Given the 17 patterns of 0.36.0, the shorthands and aliases of white space, and a class that lost one member, a pattern that gained one and a pattern that was narrowed to the separators
     When the checks read each
-    Then the check for a list finds every pattern of 0.36.0 and none of the 1.5 spellings, the crate and the check find each shorthand and alias, and the value check finds the no-break space, the bell and the tab as values that changed sides
+    Then the check for a list finds every pattern of 0.36.0 and none of the 1.5 spellings, the crate and the check find each shorthand and alias, and the value check finds the no-break space and the bell as values that changed sides and finds a difference in the pattern narrowed to the separators
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:01Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -52,9 +52,9 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @flow:canon-0-37-claim-1-5.F3
   @atip.claim15.06
   Scenario: The rules of 1.4 hold at 1.5: compact documents, USAGE for --help --json, no member at its default, commit and plan-digest on the destructive commands
-    Given every document of canon schema for the tree and each command, canon --help --json, canon finding close --help --json, canon --version --json and the five destructive command documents
+    Given every document of canon schema for the tree and each command, canon --help --json, canon finding close --help --json, canon --version --json and the six destructive command documents
     When each document is read for whitespace outside a string, for a member at its default and for a member of the 1.3 form, and each call is made
-    Then no document has whitespace outside a string or a member at its default, path or schemas, each call is refused with USAGE at exit 2 naming contractVersion 1.6, and each destructive document lists commit and plan-digest
+    Then no document has whitespace outside a string or a member at its default, path or schemas, each call is refused with USAGE at exit 2 naming the declared contractVersion, and each destructive document lists commit and plan-digest
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:06Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-schema
@@ -74,7 +74,7 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
   @flow:canon-0-37-claim-1-5.F4
   @atip.claim15.08
   Scenario: A caller of the 1.4 profile reads the property as a problem and a caller that only compiles the pattern takes and refuses the same values
-    Given each of the 11 distinct property patterns of canon, the crate's profile of 1.4 and of 1.5, and the pattern compiled by the Rust regex crate
+    Given each of the distinct property patterns of canon, the crate's profile of 1.4 and of 1.5, and the pattern compiled by the Rust regex crate
     When the profile of each minor reads the pattern and the compiler takes and refuses the corpus of values
     Then the profile of 1.4 reads each as a problem that names White_Space and 1.5, the profile of 1.5 reads none, each compiles and, where it has a 0.36.0 pattern, takes and refuses the values it did, and every pattern of 0.36.0 is still read as none by the profile of 1.4
 

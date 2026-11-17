@@ -328,7 +328,7 @@ fn authoring_brief_check_06_a_code_citation_is_flagged_and_provenance_goes_on_on
 /// authoring.brief-check.07: `prose.parenthetical` reports the number of
 /// asides, the characters measured and its threshold.
 #[test]
-fn authoring_brief_check_07_asides_above_the_density_are_flagged_with_count_and_threshold() {
+fn authoring_brief_check_07_asides_above_the_density_are_flagged() {
     let ko = fixture("good-ko-lantern.md");
     let dense = swap(&ko, "- 반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운다.", "- 반납함은 책 태그를 읽고 (근거리 무선) 대출 목록에서 (서버 기준) 해당 책을 지운다 (지연 없이).");
     let report = judged(None, &dense);

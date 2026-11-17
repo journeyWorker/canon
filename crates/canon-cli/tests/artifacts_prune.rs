@@ -254,7 +254,7 @@ fn artifacts_prune_01_the_preview_names_what_goes_and_what_stays_and_writes_noth
 /// artifacts.prune.02: a store with nothing to delete. The preview says so, offers no `--commit` command and writes nothing; committing its
 /// digest anyway deletes nothing.
 #[test]
-fn artifacts_prune_02_nothing_to_delete_is_said_and_offers_no_commit() {
+fn artifacts_prune_02_nothing_to_delete_offers_no_commit() {
     let repo = new_repo(None);
     repo.attest(V1, true);
     let before = repo.files();

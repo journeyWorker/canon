@@ -823,7 +823,7 @@ fn search_trace_03_tracing_a_review_id_starts_from_every_review_the_run_wrote_an
 
 /// search.trace.04
 #[test]
-fn search_trace_04_an_unknown_id_an_ambiguous_sha_prefix_and_an_unrecognized_shape_exit_2_and_name_the_three_accepted_shapes() {
+fn search_trace_04_an_unknown_id_an_ambiguous_sha_prefix_and_an_unrecognized_shape_exit_2() {
     let dir = repo();
     let r = dir.path();
     let actor = json!({"agent_id": "t", "role": "implementer"});

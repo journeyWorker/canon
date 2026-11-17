@@ -558,7 +558,7 @@ const NOT_PROVOKABLE: &[&str] = &["EVIDENCE_STALE"];
 
 /// `EVIDENCE_STALE` cannot be provoked from a process (see [`NOT_PROVOKABLE`]); what is checked is the registry's row (exit 2, not retryable).
 #[test]
-fn atip_codeexit_01_evidence_stale_is_the_registrys_exit_2_and_the_one_mapping_of_the_stale_class() {
+fn atip_codeexit_01_evidence_stale_is_the_registrys_exit_2() {
     let info = registered("EVIDENCE_STALE");
     assert_eq!((info.exit, info.retryable), (2, false));
 }

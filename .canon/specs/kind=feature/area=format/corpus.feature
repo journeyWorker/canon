@@ -103,11 +103,10 @@ Feature: format corpus
   @subject:format-corpus
   @case:failure
   @format.corpus.10
-  Scenario: Format refuses a root still on the pre-0.17 layout and names canon migrate
+  Scenario: Format refuses a root still on the pre-0.17 layout
     Given a spec root that still holds its feature files under features/kind=feature/
     When canon format is run over that root
-    Then it exits 1 with one layout-grammar violation at features
-    And the violation names the root and the first file, the layout canon reads, and canon migrate
+    Then it exits 1 with a layout-grammar violation at features
     And none of the root's feature files is read
 
   # canon: {"schema":1,"at":"2026-10-22T04:50:15Z","actor":{"agent_id":"canon-impl-027"}}

@@ -603,7 +603,7 @@ fn atip_optionforms_10_a_provider_name_that_is_not_exact_is_refused_by_the_four_
 // atip.optionforms.11 - 12 (F5): the declarations.
 
 #[test]
-fn atip_optionforms_11_each_option_declares_one_domain_in_every_command_and_the_help_says_the_new_spelling() {
+fn atip_optionforms_11_each_option_declares_one_domain_in_every_command() {
     let docs = docs();
     let problems = forms_problems(&docs);
     assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n"));
@@ -851,7 +851,7 @@ fn atip_daterefusals_01_a_leap_second_is_refused_in_every_place_and_the_second_b
 }
 
 #[test]
-fn atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refused_in_every_place_and_says_what_does_not_exist() {
+fn atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refused_in_every_place() {
     for value in ["2026-02-30T10:00:00Z", "2026-02-29T10:00:00Z", "2026-13-01T10:00:00Z", "2026-01-01T25:00:00Z", "2026-01-01T10:61:00Z", "2026-01-01T10:00:00+24:00"] {
         refused_in_every_place(value);
     }
@@ -870,7 +870,7 @@ fn atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refuse
 }
 
 #[test]
-fn atip_daterefusals_03_a_misspelled_value_keeps_the_spelling_refusal_of_0_37() {
+fn atip_daterefusals_03_a_misspelled_value_is_refused_in_every_place() {
     for value in ["2026-2-30", "2026-02-30 10:00:00Z", "2030-1-1T10:00:00Z"] {
         refused_in_every_place(value);
     }

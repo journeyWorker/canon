@@ -49,5 +49,5 @@ Feature: finding list
   Scenario: finding list shows each closed finding's reason in the table and in JSON
     Given a rejected finding closed with a reason and a fixed one closed without
     When canon finding list runs, and again with --json
-    Then the table appends the reason to the summary of the finding that has one, leaving the columns as they were
+    Then the table shows the reason of the finding that has one, once
     And the JSON rows carry a reason field, null for the finding without one

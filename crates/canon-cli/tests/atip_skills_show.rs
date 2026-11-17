@@ -214,7 +214,7 @@ fn points_at_both(line: &str) -> bool {
 /// atip.skillsshow.10 (the failure path of F4): a first line that names only `schema` (as 0.34 had it), only `skills show`, or neither is
 /// not the pointer; and a help whose pointer line is cut is read from the line below it, which is not the pointer either.
 #[test]
-fn atip_skillsshow_10_a_first_line_that_names_one_entrance_or_none_is_not_the_pointer() {
+fn atip_skillsshow_10_the_first_line_of_every_help_is_the_pointer_and_the_line_below_is_not() {
     let mut root = canon_cli::cli::command();
     root.build();
     for node in atip::project::nodes(&root) {

@@ -53,8 +53,8 @@ Feature: gate ci-run
   @gate.ci-run.05
   Scenario: min_cases 100 refuses a run of 99 cases as short_run and passes a run of 100
     Given require_ci_run with min_cases 100 and CI records of 99 and of 100 cases run
-    When gate check runs on each
-    Then 99 is short_run naming 99 and 100, and 100 passes
+    When gate check runs on each and then the subject ships
+    Then 99 is an uncovered-cell short_run at gate check and refuses shipping with exit 2, and 100 passes both
 
   # canon: {"schema":1,"at":"2026-11-09T10:25:03Z","actor":{"agent_id":"spec-ci-evidence","role":"planner"}}
   @subject:evidence-attestation
@@ -73,10 +73,10 @@ Feature: gate ci-run
   @case:failure
   @flow:canon-0-40-ci-evidence.F4
   @gate.ci-run.07
-  Scenario: A malformed require_ci_run (min_cases 0, scope [done], an unknown key, null) makes spec_coverage unusable and gate check fails
+  Scenario: A malformed require_ci_run (min_cases 0, scope [done], an unknown key, null) fails gate check naming spec_coverage and the key
     Given a policy whose require_ci_run has min_cases 0, scope [done], an unknown key, or null
     When gate check runs on each
-    Then spec_coverage is unusable and gate check reports a violation
+    Then gate check exits 1 naming spec_coverage and the offending key
 
   # canon: {"schema":1,"at":"2026-11-09T10:26:07Z","actor":{"agent_id":"spec-ci-evidence","role":"planner"}}
   @subject:evidence-attestation

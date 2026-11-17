@@ -88,7 +88,7 @@ Feature: Evidence blobs in the object-store tier are zstd frames
   @case:failure
   @flow:canon-0-40-object-store-zstd.F5
   @artifacts.object-zstd.10
-  Scenario: when the tier refuses the second name of a digest prune says what it deleted and a repeat deletes the name that remains
+  Scenario: when the tier refuses the second name of a digest prune answers ARTIFACTS_PRUNE_INCOMPLETE and a repeat deletes the name that remains
     Given a step
 
   # canon: {"schema":1,"at":"2026-11-09T10:13:39Z","actor":{"agent_id":"Impl40_zstd","role":"planner"}}

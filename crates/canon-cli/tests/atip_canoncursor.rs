@@ -442,7 +442,7 @@ fn atip_canoncursor_10_a_flag_only_key_of_a_document_is_flag_only_key_at_its_poi
 }
 
 #[test]
-fn atip_canoncursor_11_the_flag_only_set_is_the_crates_and_repo_and_as_and_no_source_lists_the_contracts_options() {
+fn atip_canoncursor_11_the_flag_only_set_is_the_crates_and_repo_and_as() {
     let mut want: Vec<&str> = atip::flag_only_options(atip::Minor::V1_2).to_vec();
     want.extend(["repo", "as"]);
     want.sort_unstable();

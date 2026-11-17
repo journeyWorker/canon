@@ -140,7 +140,7 @@ Feature: learn promotion
     Given a repo with a strategy candidate, an approver pinned in the policy, and a signature file whose content is not a signature
     When canon strategy rollback runs for the candidate with a signature file that does not exist, with the file that is not a signature, with --approval-at yesterday, and with no --reason
     Then the missing signature file exits 2 with STRATEGY_SIGNATURE_NOT_FOUND
-    And the file that is not a signature exits 2 with STRATEGY_SIGNATURE_INVALID, its message saying the ssh signature verification failed
+    And the file that is not a signature exits 2 with STRATEGY_SIGNATURE_INVALID
     And the malformed timestamp and the missing reason each exit 2 with USAGE
     And no file in the repo changed
 

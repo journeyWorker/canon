@@ -632,7 +632,7 @@ mod tests {
     }
 
     #[test]
-    fn gate_git_boundary_09_a_call_past_its_deadline_is_stopped_and_names_the_subcommand_and_the_deadline() {
+    fn gate_git_boundary_09_a_call_past_its_deadline_is_stopped() {
         let repo = here();
         let started = Instant::now();
         let err = GitCall::new(&repo).args(["-c", "alias.nap=!sleep 30", "nap"]).within(Duration::from_secs(1)).run().expect_err("the alias sleeps 30 seconds");

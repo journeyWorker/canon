@@ -292,7 +292,7 @@ fn authoring_brief_check_17_english_headings_without_comments_pass_and_every_rea
 
 /// authoring.brief-check.18
 #[test]
-fn authoring_brief_check_18_a_misspelt_heading_names_the_nearest_one_and_a_deleted_or_moved_section_is_reported() {
+fn authoring_brief_check_18_a_misspelt_heading_and_a_deleted_or_moved_section_are_reported() {
     let dir = repo(None);
     let r = dir.path();
     ok(r, &["change", "new", "a", "--subject", "demo", "--title", "A"]);
@@ -494,7 +494,7 @@ fn authoring_change_08_change_new_writes_the_title_and_empty_headed_sections_wit
 
 /// authoring.brief-check.23
 #[test]
-fn authoring_brief_check_23_show_prints_each_empty_sections_guidance_in_the_briefs_language() {
+fn authoring_brief_check_23_show_prints_the_empty_sections() {
     for (language, expected) in [(Some("ko"), "ko"), (None, "en")] {
         let dir = repo(language);
         let r = dir.path();
@@ -808,7 +808,7 @@ fn report_dashboard_16_the_shared_reader_gives_each_section_its_key_and_role_and
 
 /// authoring.migrate.20
 #[test]
-fn authoring_migrate_20_the_preview_writes_nothing_and_says_first_whether_it_re_binds() {
+fn authoring_migrate_20_the_preview_writes_nothing() {
     let dir = old_repo();
     let r = dir.path();
     let before = tree(r);

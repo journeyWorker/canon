@@ -213,7 +213,7 @@ fn atip_readwrites_02_a_call_that_is_accepted_refreshes_the_index_it_owes() {
 }
 
 #[test]
-fn atip_readwrites_03_subject_show_says_its_cache_effect_and_is_quiet_on_stderr_in_json() {
+fn atip_readwrites_03_subject_show_is_quiet_on_stderr_in_json() {
     let world = world();
     // JSON: the refresh is a warning in `meta`, never a line on stderr
     let out = world.canon(&["subject", "show", "demo", "--json"]);
@@ -235,7 +235,7 @@ fn world_stale_text() -> String {
 /// atip.readwrites.08 (the failure path of F2): `subject show` of a subject that does not exist is exit 2 `SUBJECT_NOT_FOUND` with one
 /// envelope on stdout and nothing on stderr in JSON mode, and it neither refreshes the stale scenario index nor writes anything.
 #[test]
-fn atip_readwrites_08_subject_show_of_a_missing_subject_is_refused_quietly_and_writes_nothing() {
+fn atip_readwrites_08_subject_show_of_a_missing_subject_writes_nothing() {
     let world = world();
     let before = world.snapshot();
     let out = world.canon(&["subject", "show", "nosuch", "--json"]);

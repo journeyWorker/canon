@@ -1213,7 +1213,7 @@ fn subject_lifecycle_26_an_override_ships_an_unapproved_brief_and_records_the_wa
 /// advisory that the brief is not approved and no refusal; status reads
 /// the same brief as not approved and not enforced, with no human step.
 #[test]
-fn subject_lifecycle_27_a_subject_with_no_adopted_change_ships_with_an_advisory() {
+fn subject_lifecycle_27_a_subject_with_no_adopted_change_ships() {
     let dir = repo();
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
@@ -1525,7 +1525,7 @@ fn subject_lifecycle_29_a_shipped_subject_reopens_inside_its_approved_scope_and_
 /// brief, `--override-reason` does not waive it, and the subject stays
 /// shipped; once the human answers, the same reopen goes through.
 #[test]
-fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused_naming_the_brief() {
+fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused() {
     let dir = repo();
     seed_shipped(dir.path());
     seed_change(dir.path(), "c-next");

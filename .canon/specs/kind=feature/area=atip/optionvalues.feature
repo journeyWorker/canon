@@ -32,7 +32,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   Scenario: A name is trimmed and the trimmed value is what is recorded and signed, and every name and sentence option declares one domain in every command
     Given --actor with white space around it on scenario new and finding add, --approver with white space around it on evidence approval-payload, and every command document that has --actor, --approver, --relayed-via, --reason, --summary or --override-reason
     When the calls run and the documents are read
-    Then the record holds alice and not the padded value, the payload signed over the padded approver is the payload of the trimmed one, and the 55 declarations of the six options are one pattern with the class [^\p{Cc}\p{Zl}\p{Zp}]
+    Then the record holds alice and not the padded value, the payload signed over the padded approver is the payload of the trimmed one, and the declarations of the six options are one pattern with the class [^\p{Cc}\p{Zl}\p{Zp}]
 
   # canon: {"schema":1,"at":"2026-11-05T14:12:44Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-schema
@@ -42,7 +42,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   @atip.optionvalues.04
   Scenario: A blank name, or one with a control character or a line break inside, is refused with the command's own code and nothing is recorded
     Given a name that is empty, only white space, or has a line feed, a tab or an escape inside, for --actor and --approver in every command that takes them
-    When the declared domain of each command judges the values and six commands answer the same values with --json
+    When the declared domain of each command judges the values and seven commands answer the same values with --json
     Then each domain refuses what the table says and takes the spaces, the no-break space and the scripts of the table, and each call exits 2 with the code of its command, the field and no written file
 
   # canon: {"schema":1,"at":"2026-11-05T14:12:55Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
@@ -131,7 +131,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   Scenario: Every option of the same name has one domain in every command
     Given every command document of canon schema and the one name allowed by a reason, --kind (`--harness` declares no domain at all since `canon-0-38-provider-option`: it is an enumeration)
     When the sweep groups the declarations by option name
-    Then no name has two domains or closed sets that are not nested outside the allowed list, the sweep reads more than 80 names and more than 25 shared ones, and every option of the three rules has one domain
+    Then no name has two domains or closed sets that are not nested outside the allowed list, the sweep reads option names and finds names shared by several commands, and every option of the three rules has one domain
 
   # canon: {"schema":1,"at":"2026-11-05T14:14:23Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-schema
@@ -142,7 +142,7 @@ Feature: atip option values: an option of the same name takes the same value in 
   Scenario: A command that declares another domain for the same name fails the sweep
     Given the real documents with one command given the pattern of a bare id for --actor, one without a domain for --reason and one with a closed set that is not nested for --disposition
     When the sweep reads each seeded set of documents
-    Then it finds each seeded fault by the option name and the commands, finds --kind when it is not allowed, and passes the real documents with the one allowed
+    Then it finds each seeded fault, finds --kind when it is not allowed, and passes the real documents with the one allowed
 
   # canon: {"schema":1,"at":"2026-11-05T14:14:56Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
   @subject:atip-schema

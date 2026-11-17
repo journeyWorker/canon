@@ -715,7 +715,7 @@ fn authoring_init_101_init_check_shows_where_the_hot_store_is() {
 }
 
 #[test]
-fn authoring_init_102_init_check_says_so_when_no_hot_store_is_configured_and_names_a_hot_store_it_cannot_open(
+fn authoring_init_102_init_check_says_so_when_no_hot_store_is_configured_and_fails_a_hot_store_it_cannot_open(
 ) {
     let none = init_repo("tiers:\n  local: { backend: git, root: .canon/ledger }\n");
     assert!(text(&canon(&["init", "--check"], none.path())).contains("[not configured] hot-store"));

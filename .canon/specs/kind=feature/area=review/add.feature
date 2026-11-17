@@ -258,7 +258,7 @@ Feature: review scenario
   Scenario: The subject move guard and status judge a review that predates 0.23 as the gate does
     Given a building subject whose scenario's review predates 0.23 pinning
     When the subject is moved to verifying
-    Then the guard refuses with the gate's detail naming `canon migrate` and prints the advisory for the subject's own scenarios
+    Then the guard refuses with the gate's detail naming `canon migrate`
     And `canon status` counts the scenario as a stale review
     And once the scenario is reviewed again the move goes through
 
@@ -392,7 +392,7 @@ Feature: review scenario
   Scenario: A review batch whose second write fails removes the first review and every blob it stored
     Given a review scenario call naming two indexed scenarios with one artifact, whose second review write fails
     When the call runs
-    Then the first review is removed and the blob the call stored is removed, and the error names the second review
+    Then the first review is removed and the blob the call stored is removed, and the error is WRITE_FAILED with exit 1
     And a read-only review directory is refused before anything is written
     And the same call with nothing failing writes both reviews and stores the blob
 

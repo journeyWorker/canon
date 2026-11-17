@@ -865,7 +865,7 @@ fn gate(repo: &Path, exit: i32) -> String {
 
 /// context.capability.60: a rewritten step text makes the scenario's review stale until it is reviewed again.
 #[test]
-fn context_capability_60_a_rewritten_scenario_without_a_new_review_is_reported_by_gate_check_as_stale() {
+fn context_capability_60_a_rewritten_scenario_without_a_new_review_is_reported_by_gate_check() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     git(repo, &["init", "-q"]);

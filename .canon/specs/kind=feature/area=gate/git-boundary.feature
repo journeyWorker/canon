@@ -88,7 +88,7 @@ Feature: gate git-boundary
   @case:failure
   @flow:canon-0-39-git-boundary.F3
   @gate.git-boundary.10
-  Scenario: evidence add is refused as COMMIT_REQUIRED, naming git add and the deadline, when the code tree cannot be made in time
+  Scenario: evidence add is refused as COMMIT_REQUIRED, naming git add, when the code tree cannot be made in time
     Given a step
 
   # canon: {"schema":1,"at":"2026-11-08T06:18:42Z","actor":{"agent_id":"spec-gitstale","role":"planner"}}

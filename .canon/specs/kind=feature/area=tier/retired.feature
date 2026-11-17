@@ -57,7 +57,7 @@ Feature: retired record kinds
   Scenario: A retired key that cannot be deleted line by line is refused and the file stays as it was
     Given a canon.yaml whose retired key is a flow mapping entry, an anchor or a tagged value
     When canon migrate runs
-    Then it is refused as a configuration error that says to remove the key by hand, naming the key
+    Then it is refused with exit 2 as a configuration error
     And the file is unchanged
 
   # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
@@ -116,7 +116,7 @@ Feature: retired record kinds
   Scenario: The report snapshot has nine tables and a manifest listing exactly those
     Given a repo and canon report snapshot
     When it writes its Parquet files
-    Then it reports nine tables and one Parquet file per mart, none for the session costs
+    Then it writes one Parquet file per mart, nine in all, none for the session costs
     And the manifest lists exactly those nine tables
 
   # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
@@ -128,7 +128,7 @@ Feature: retired record kinds
   Scenario: A report built by 0.38 is drift until it is rebuilt
     Given a built report, then the same report with the `## Session costs` section 0.38 wrote
     When canon report check runs, then canon report build, then check again
-    Then the new report has no `## Session costs` and its Run observability names only Run columns
+    Then the new report does not name `mart_session_costs` and its Run observability names only Run columns
     And the first check exits 1 naming DRIFT and after the build the check exits 0
 
   # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}

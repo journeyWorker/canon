@@ -9,7 +9,7 @@ Feature: ATIP 1.1 contract
   Scenario: Every envelope declares contract atip/1 and the contractVersion canon declares (1.4 in 0.36, 1.5 in 0.37, 1.6 since 0.41), and a registry answer names its kind
     Given a repo with canon.yaml
     When canon status --json, canon nosuch --json, canon schema --errors --json and canon schema --json run
-    Then every meta holds contract atip/1 and contractVersion 1.6 and passes the contract envelope schema; the errors answer has data.kind errors and meta.schemaVersion 1.6
+    Then every meta holds contract atip/1 and the declared contractVersion and passes the contract envelope schema; the errors answer has data.kind errors and the declared meta.schemaVersion
 
   # canon: {"schema":1,"at":"2026-11-01T07:33:57Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract

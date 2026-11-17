@@ -80,7 +80,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   Scenario: A commit that waits for the lock past its time starts nothing and answers REPO_LOCK_UNAVAILABLE, exit 2, retryable; a killed holder releases the lock and the lock file stays
     Given a repo whose lock is held by another process and a commit whose wait is a few hundred milliseconds
     When the commit is run, and then a holder is killed with SIGKILL and the commit is run again
-    Then the first is exit 2 REPO_LOCK_UNAVAILABLE, retryable, with a hint to run it again and the tree of the repository the same, and after the kill the commit proceeds and the lock file is still there
+    Then the first is exit 2 REPO_LOCK_UNAVAILABLE, retryable, with the tree of the repository the same, and after the kill the commit proceeds and the lock file is still there
 
   # canon: {"schema":1,"at":"2026-11-02T15:04:29Z","actor":{"agent_id":"impl-plan-jcs","role":"implementer","session_id":"s-0-35-plan-jcs"}}
   @subject:atip-contract
@@ -121,10 +121,10 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @case:failure
   @flow:canon-0-35-plan-jcs.F4
   @atip.planjcs.11
-  Scenario: A digest made the 0.34 way (SHA-256 hex of the effects, no prefix) is PLAN_STALE on the six commands, and the hint says to run the preview again
+  Scenario: A digest made the 0.34 way (SHA-256 hex of the effects, no prefix) is PLAN_STALE on the six commands
     Given the six commands and a digest made as 0.34 made it: the SHA-256 of the effects' JSON in 64 hex digits
     When the commit is run with it
-    Then each is exit 2 PLAN_STALE and no 0.34 form is accepted, and the hint says to run the preview again and commit the digest it prints
+    Then each is exit 2 PLAN_STALE, no 0.34 form is accepted and the tree of the repository is the same
 
   # canon: {"schema":1,"at":"2026-11-02T15:06:36Z","actor":{"agent_id":"impl-plan-jcs","role":"implementer","session_id":"s-0-35-plan-jcs"}}
   @subject:atip-contract

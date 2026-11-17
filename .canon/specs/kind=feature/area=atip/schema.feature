@@ -9,7 +9,7 @@ Feature: atip schema: the L1 self-description documents
   Scenario: The schema tree is a tree document at level L2 that lists every group and command once, a group before its commands, and --as filters while CANON_ROLE does not
     Given a built canon and no environment
     When canon schema --json runs twice, then with --as reviewer, and with CANON_ROLE=reviewer
-    Then data.kind is tree and level is L2; the groups and commands appear once each with a group before its commands and no entry has path or kind command; meta.schemaVersion and contractVersion are 1.6; the two plain answers are byte-equal; --as keeps only the reviewer commands and their groups and the tree names the role in x-canon.as; every tree, filtered or not, says the two forms of x-canon.roles once in x-canon.rolesForm and the unfiltered trees have no other x-canon member; each command entry carries x-canon.roles as all or an array of role names; CANON_ROLE changes nothing
+    Then data.kind is tree and level is L2; the groups and commands appear once each with a group before its commands and no entry has path or kind command; meta.schemaVersion and contractVersion are the declared contract version; the two plain answers are byte-equal; --as keeps only the reviewer commands and their groups and the tree names the role in x-canon.as; every tree, filtered or not, says the two forms of x-canon.roles once in x-canon.rolesForm and the unfiltered trees have no other x-canon member; each command entry carries x-canon.roles as all or an array of role names; CANON_ROLE changes nothing
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:12Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema
@@ -109,7 +109,7 @@ Feature: atip schema: the L1 self-description documents
   Scenario: The first line of the help of the root, every group and every command points at schema
     Given a built canon
     When the --help of the root, of finding, of finding close and of schema, and help finding run
-    Then the first line of each is Agents: "canon schema --json" describes every command as JSON. and the introduction is below it
+    Then the first line of each names "canon schema --json"
 
   # canon: {"schema":1,"at":"2026-11-01T09:33:44Z","actor":{"agent_id":"impl-schema-doc","role":"implementer","session_id":"s-0-34-schema-doc"}}
   @subject:atip-schema
@@ -129,4 +129,4 @@ Feature: atip schema: the L1 self-description documents
   Scenario: The checked-in spec holds the tree and, for every command, the document canon schema answers
     Given the checked-in spec file
     When canon schema <command> --json runs for every command
-    Then the file says the declared contractVersion and holds the 1.4-form tree and, for each command, the document the answer carries, and under schemas the --schemas answer of each command; the tree defines each shared option once and every 1.4 rule of the form holds
+    Then the file says the declared contractVersion and holds the 1.4-form tree and, for each command, the document the answer carries, and under schemas the --schemas answer of each command, each equal in every field but the prose; the tree defines each shared option once and every 1.4 rule of the form holds

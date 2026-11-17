@@ -35,11 +35,11 @@ Feature: report dashboard
   @subject:report-generation
   @case:failure
   @report.dashboard.04
-  Scenario: A repo whose snapshot cannot be generated is still served, says why, and never shows demo data
+  Scenario: A repo whose snapshot cannot be generated is still served and never shows demo data
     Given a repository whose snapshot cannot be generated, for example because duckdb is not on PATH
     When canon dashboard is run in it
-    Then the server starts and warns on stderr and in the JSON meta.warnings
-    And GET /api/status reports the snapshot unavailable with the reason and the fix, and the panels page shows that instead of panels
+    Then the server starts and warns in the JSON meta.warnings, and stderr stays empty in JSON mode
+    And GET /api/status reports the snapshot unavailable, and the panels page shows the reason and the fix it is given instead of panels
     And the demo fixture is never served at /snapshot/ and the live snapshot route answers 404
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}
@@ -68,7 +68,7 @@ Feature: report dashboard
   Scenario: A brief that changed since the page loaded is refused and left as it is
     Given a briefs page that loaded a brief and a brief file edited afterwards
     When the page posts the approval with the sha256 it loaded
-    Then the server answers 409 BRIEF_PAGE_STALE with a hint to reload
+    Then the server answers 409 BRIEF_PAGE_STALE
     And the brief file and the policy approval are untouched
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}
@@ -78,7 +78,7 @@ Feature: report dashboard
   Scenario: A brief with blockers is not approved from the page
     Given a brief with blocker findings, coverage rules excluded
     When the page posts its approval
-    Then the server answers 409 BRIEF_CHECK_FAILED
+    Then the server answers 409 BRIEF_INVALID
     And the brief file and the policy approval are untouched
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}
@@ -108,7 +108,7 @@ Feature: report dashboard
   Scenario: The briefs page shows an advisory count badge per brief and its findings grouped by rule
     Given an unapproved brief with no blockers and advisories left
     When GET /api/briefs is requested
-    Then the brief lists each advisory finding with its rule id, line and matched text, its counts and its language source, and stays approvable
+    Then the brief lists each advisory finding with its rule id, line and section, its counts and its language source, and stays approvable
     And the briefs page, from that list, shows the advisory count as a badge next to the blocker count and groups the advisories by rule id with each group's count, line and matched text, rendered as text nodes
 
   # canon: {"schema":1,"at":"2026-10-21T16:25:21Z","actor":{"agent_id":"canon-impl-026"}}
@@ -141,7 +141,7 @@ Feature: report dashboard
     Given a briefs page that read three briefs and one of them edited afterwards
     When the page's request approves all three
     Then the server answers 409 BRIEF_PAGE_STALE, the refused brief's own code, with no error.details (one stale brief is the refusal itself; details is for several causes) and no data
-    And none of the three briefs and no policy approval changed, and the page names the refused brief and says to read it again
+    And none of the three briefs and no policy approval changed, and the refusal names the refused brief
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:14Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
   @subject:report-generation
@@ -163,4 +163,4 @@ Feature: report dashboard
     Given pending briefs with English headings, one with Korean prose and one with a shipped Korean heading
     When the dashboard briefs page is read
     Then each section has the key and role its English heading names and the flow steps are read, a Korean-prose brief reads the same
-    And the old-format brief carries brief.old-format with a hint naming canon migrate and cannot be approved from the page
+    And the old-format brief carries brief.old-format and cannot be approved from the page

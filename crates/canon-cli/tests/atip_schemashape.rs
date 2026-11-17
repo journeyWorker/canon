@@ -476,7 +476,7 @@ fn atip_schemashape_09_a_roles_value_that_is_not_all_or_an_array_of_role_names_o
 }
 
 #[test]
-fn atip_schemashape_10_the_root_of_the_tree_says_the_two_forms_once_and_the_documents_say_them() {
+fn atip_schemashape_10_the_root_of_the_tree_says_the_two_forms_once() {
     let tree = answer(&["schema", "--json"])["data"].clone();
     assert_eq!(tree["x-canon"].as_object().expect("an object").keys().collect::<Vec<_>>(), ["rolesForm"], "the root says the two forms and nothing else");
     assert!(tree["x-canon"]["rolesForm"].is_string());

@@ -18,8 +18,8 @@ Feature: atip claim 1.4: canon writes its schema answers in the 1.4 form (declar
   @case:happy
   @flow:canon-0-36-claim-1-4.F2
   @atip.claim14.03
-  Scenario: A command document carries the call surface only: no schemas, path, schemaRef, option or rejects, no implied option or code, and the five destructive commands list commit and plan-digest
-    Given canon schema finding close --json and the documents of purge, artifacts move, migrate, ledger compact and tier age
+  Scenario: A command document carries the call surface only: no schemas, path, schemaRef, option or rejects, no implied option or code, and the destructive commands list commit and plan-digest
+    Given canon schema finding close --json and the documents of purge, artifacts move, artifacts prune, migrate, ledger compact and tier age
     When the documents are read
     Then finding close has no schemas, path, input.schemaRef, input.option or rejects and lists no --json, --input or --fields and no USAGE, INTERNAL or INPUT_* code, and each destructive document lists commit and plan-digest by name
 
@@ -41,7 +41,7 @@ Feature: atip claim 1.4: canon writes its schema answers in the 1.4 form (declar
   @flow:canon-0-36-claim-1-4.F2
   @atip.claim14.05
   Scenario: A bare run of each destructive command whose document lists --commit is a preview that writes nothing and says so
-    Given a repository with records and the five destructive commands purge, artifacts move, migrate, ledger compact and tier age, whose documents list --commit
+    Given a repository with records and the destructive commands purge, artifacts move, artifacts prune, migrate, ledger compact and tier age, whose documents list --commit
     When each runs bare with --json
     Then each is a preview with committed false or a planDigest, and the tree of the repository is identical before and after
 

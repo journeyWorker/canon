@@ -138,7 +138,7 @@ Feature: authoring scaffold
   Scenario: The scaffold refuses to write under a root still on the pre-0.17 layout
     Given a spec root that still holds its feature files under features/kind=feature/
     When canon scenario new derives a path under it, or names one with --feature, or canon feature new targets it
-    Then each exits 2 naming the root and saying canon migrate moves it
+    Then each exits 2 with LAYOUT_MIGRATION_REQUIRED
     And nothing is written
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:44Z","actor":{"agent_id":"canon-impl-026"}}

@@ -9,7 +9,7 @@ Feature: atip codesplit
   Scenario: A call that gives no task or scenario, two arguments that contradict each other and an empty value each answer with their own condition
     Given an empty directory
     When evidence add runs with neither --task nor --scenario, with --all-scenarios beside --scenario, and with an empty --ref, and evidence add and evidence approval-payload run with a --task that names no task
-    Then the three exit 2 with EVIDENCE_REQUIRED, EVIDENCE_ARGUMENT_CONFLICT and EVIDENCE_ARGUMENT_INVALID, none carries data, and nothing is written; the missing task is TASK_NOT_FOUND from both commands, with the hint of the task, a --surface-ref that gets past the argument validator is EVIDENCE_ARGUMENT_INVALID naming it, and EVIDENCE_INVALID is no code
+    Then the three exit 2 with EVIDENCE_REQUIRED, EVIDENCE_ARGUMENT_CONFLICT and EVIDENCE_ARGUMENT_INVALID, none carries data, and nothing is written; the missing task is TASK_NOT_FOUND from both commands, a --surface-ref that gets past the argument validator is EVIDENCE_ARGUMENT_INVALID naming it, and EVIDENCE_INVALID is no code
 
   # canon: {"schema":1,"at":"2026-11-04T04:06:32Z","actor":{"agent_id":"impl-codes-refusals","role":"implementer","session_id":"s-0-36-codes-refusals"}}
   @subject:atip-contract
@@ -69,7 +69,7 @@ Feature: atip codesplit
   Scenario: A file or lock the system refuses is told by the code of its own subject
     Given an adapter response and a hook file this user may not read, a policy that is a directory, a canon.yaml the system refuses or that does not parse, an artifact tier that is not an object store, a scenario index another process holds and a migrate preview whose temp directory cannot be written
     When adapter validate, gate install-hooks, policy approve, export, purge, artifacts move, inventory sync and migrate run
-    Then they exit 2 with ADAPTER_FILE_DENIED, HOOKS_FILE_DENIED, POLICY_INVALID, RETENTION_TIERS_DENIED or RETENTION_TIERS_INVALID, ARTIFACTS_TIER_INVALID, INVENTORY_INDEX_UNAVAILABLE (retryable, the hint says to wait) and MIGRATION_DENIED, nothing is written, and plugin sync, which takes no index lock, is not refused for a lock another process holds
+    Then they exit 2 with ADAPTER_FILE_DENIED, HOOKS_FILE_DENIED, POLICY_INVALID, RETENTION_TIERS_DENIED or RETENTION_TIERS_INVALID, ARTIFACTS_TIER_INVALID, INVENTORY_INDEX_UNAVAILABLE (retryable) and MIGRATION_DENIED, nothing is written, and plugin sync, which takes no index lock, is not refused for a lock another process holds
 
   # canon: {"schema":1,"at":"2026-11-04T19:21:05Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
   @subject:atip-contract

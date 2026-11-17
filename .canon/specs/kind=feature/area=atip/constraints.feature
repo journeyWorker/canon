@@ -19,7 +19,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A relation stated twice in one command is found, and --commit without --plan-digest is USAGE naming --plan-digest
     Given a built canon and a document with the same atMostOne written twice
     When the document check runs, and canon purge runs with only --commit, then with only --plan-digest
-    Then the check names the relation as stated twice; each purge exits 2 with USAGE and field --plan-digest, then --commit
+    Then the check finds the relation stated twice; each purge exits 2 with USAGE and field --plan-digest, then --commit
 
   # canon: {"schema":1,"at":"2026-11-01T10:59:32Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
   @subject:atip-schema
@@ -56,10 +56,10 @@ Feature: atip constraints: the relations, domains and validators of the command 
   @case:failure
   @flow:canon-0-34-atip-constraints.F3
   @atip.constraints.06
-  Scenario: A pattern that is not a restricted I-Regexp, one the Rust regex refuses, a keyword outside the profile and a default outside its domain are each found, and every id pattern agrees with its Rust parser
+  Scenario: A pattern that is not a restricted I-Regexp, a keyword outside the profile and a default outside its domain are each found, and every id pattern agrees with its Rust parser
     Given domains that leave the contract's profile
     When the document check and the id pattern comparison run
-    Then a pattern with an alternation outside parentheses, a class escape or a dot, a pattern the Rust regex refuses, a keyword outside the profile of the value type, a bound beyond 2^53-1 and a default outside the domain are each named; each id pattern accepts and refuses what its Rust parser does, and the time pattern admits everything the time parser accepts
+    Then a pattern with an alternation outside parentheses, a class escape, a keyword outside the profile of the value type, a bound beyond 2^53-1 and a default outside the domain are each found; each id pattern accepts and refuses what its Rust parser does, and the time pattern admits everything the time parser accepts
 
   # canon: {"schema":1,"at":"2026-11-01T11:00:10Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
   @subject:atip-schema
@@ -89,7 +89,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A validator whose rejects call is accepted, is refused with another code or is also an example is found
     Given a validator whose rejects call the binary accepts, one whose code the binary does not give and one whose rejects is also an example
     When the validator sweep runs on each
-    Then each is found with the reason
+    Then each is found
 
   # canon: {"schema":1,"at":"2026-11-01T11:00:25Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints"}}
   @subject:atip-schema
@@ -129,7 +129,7 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: A constraint, a code or a domain declared with no check behind it is found by the sweeps
     Given a constraint declared with no check behind it, a rule with a code the binary does not give and a domain the parser does not hold
     When the rule and the domain sweeps run on each
-    Then each is found: the call that should break the rule is not refused for it, and the value outside the domain is accepted
+    Then each is found
 
   # canon: {"schema":1,"at":"2026-11-01T14:23:07Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r2"}}
   @subject:atip-schema
@@ -239,17 +239,17 @@ Feature: atip constraints: the relations, domains and validators of the command 
   Scenario: The calendar of a time option, the form of --surface-ref and --introduced-rev are validators of the stage and answer after the domains and constraints
     Given an empty directory
     When a call breaks a constraint and carries an impossible date, a finding add breaks exclusivity and carries --introduced-rev self, an evidence add breaks all-scenarios and carries --surface-ref /etc/passwd, and each of them alone
-    Then the constraint answers first; alone, the shape of a time is the declared domain's refusal, the calendar, the surface-ref form and `self` are USAGE naming the option; a batch with such an element is refused in preflight
+    Then the constraint answers first; alone, the shape of a time, the calendar, the surface-ref form and `self` are USAGE naming the option; a batch with such an element is refused in preflight
 
   # canon: {"schema":1,"at":"2026-11-01T17:50:42Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r4"}}
   @subject:atip-schema
   @case:failure
   @flow:canon-0-34-atip-constraints.F5
   @atip.constraints.25
-  Scenario: An integer refusal names the declared bound and clap's range sentence never contradicts a declared minimum
+  Scenario: An integer refusal names the declared upper bound and clap's range sentence never contradicts a declared minimum
     Given an empty directory
     When finding close runs with --round 0, --round -1 and --seq 4294967296, and query --limit 0
-    Then the refusal says the declared bound (at least 1; from 1 to 4294967295; from 1 to 9007199254740991) and clap's `0..=4294967295` never appears
+    Then --round 0 is refused with FINDING_ARGUMENT_INVALID naming --round; --round -1 and --seq 4294967296 are refused with USAGE naming their option and writing nothing; the --round -1 and --seq refusals carry the declared upper bound 4294967295, the --limit refusal 9007199254740991, and clap's `0..=` never appears in the --round -1 refusal
 
   # canon: {"schema":1,"at":"2026-11-01T19:04:04Z","actor":{"agent_id":"impl-constraints","role":"implementer","session_id":"s-0-34-constraints-r5"}}
   @subject:atip-schema

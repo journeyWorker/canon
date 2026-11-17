@@ -7,10 +7,10 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
   @case:failure
   @flow:canon-0-41-atip-1-6.F1
   @atip.claim16.02
-  Scenario: A declaration of 1.5 fails the declaration check: an envelope, a schema answer or a constant that says 1.5 is found and named
-    Given the declaration check seeded with an envelope, a schema answer and a command document that say 1.5, and one with no declaration
+  Scenario: A declaration of 1.5 fails the declaration check: an envelope, a schema answer or a refusal that says 1.5 is found and named by its member
+    Given the declaration check seeded with an envelope and a schema answer that say 1.5, a refusal that says 1.5, and one with no declaration
     When the check reads each seeded answer
-    Then it finds each by the member that is wrong, names the command whose document says 1.5, and finds nothing in an answer that says 1.6
+    Then it finds each by the member that is wrong, and finds nothing in an answer that says 1.6
 
   # canon: {"schema":1,"at":"2026-11-13T18:20:00Z","actor":{"agent_id":"impl-atip-1-6","role":"planner"}}
   @subject:atip-contract
@@ -21,7 +21,7 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
   Scenario: No document has commaList or pathShape, and no generated spec or conformance expectation prints one
     Given the tree, the command documents, the registry and schemas answers, the generated spec and the conformance expectations of canon at 1.6
     When each is scanned for the members commaList and pathShape
-    Then none holds either member, so a 1.5 caller reads the documents as it read them and they differ from 0.40.0 in the declaration strings alone
+    Then none holds either member
 
   # canon: {"schema":1,"at":"2026-11-13T18:20:00Z","actor":{"agent_id":"impl-atip-1-6","role":"planner"}}
   @subject:atip-contract

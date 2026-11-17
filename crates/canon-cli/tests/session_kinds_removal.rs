@@ -658,7 +658,7 @@ fn tier_purge_preview_03_a_preview_whose_tiers_all_attach_offers_the_commit_comm
 
 /// tier.purge-preview.01 (F2), the other cause: a tier that is configured and did not answer is a retry, not a variable to set; its commit is `RETENTION_TIERS_UNAVAILABLE`.
 #[test]
-fn tier_purge_preview_01_a_configured_tier_that_does_not_answer_is_a_retry_not_a_variable() {
+fn tier_purge_preview_01_a_configured_tier_that_does_not_answer_is_unavailable_in_the_preview_and_refuses_the_commit() {
     let repo = Repo::init();
     let yaml = repo.read("canon.yaml");
     let sqlite = format!("  hot:\n    backend: sqlite\n    path: {}\n", ".canon/hot.db");

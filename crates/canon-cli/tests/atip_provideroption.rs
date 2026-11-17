@@ -311,7 +311,7 @@ fn atip_provideroption_03_no_harness_records_an_empty_list_and_installs_nothing(
 }
 
 #[test]
-fn atip_provideroption_04_no_harness_beside_a_harness_or_beside_check_is_refused_naming_both_and_nothing_is_written() {
+fn atip_provideroption_04_no_harness_beside_a_harness_or_beside_check_is_refused_and_nothing_is_written() {
     for command in SKILLS_COMMANDS {
         for args in [["--no-harness", "--harness", "claude"], ["--harness", "claude", "--no-harness"]] {
             let mut argv = vec!["skills", command];

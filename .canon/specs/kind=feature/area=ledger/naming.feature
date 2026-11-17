@@ -6,8 +6,8 @@ Feature: ledger naming
   @case:happy
   @flow:canon-0-30-ledger-naming.F1
   @ledger.naming.01
-  Scenario: Every one of the thirteen kinds is stored under the one name rule
-    Given a record of each of the twelve core kinds and one plugin overlay record
+  Scenario: Every one of the thirteen core kinds is stored under the one name rule
+    Given a record of each of the thirteen core kinds and one plugin overlay record
     When each is written through its store
     Then the write output and the stored file are `kind=<kind>/<components>_<digest8>.json`, with the components the component table gives that kind, in table order
     And the directory is one level, `kind=<kind>/`, and no `area=` level exists
@@ -205,7 +205,7 @@ Feature: ledger naming
   Scenario: A cursor from canon 0.29 is refused with a way to start over
     Given a cursor `canon query` issued in 0.29, which names a record by its 0.29 id and 12-hex digest
     When it is passed with `--cursor` to the 0.30 query
-    Then the query is refused CURSOR_INVALID, the message says the cursor names records by 0.29 names, and the hint says to drop `--cursor` and start from the first page
+    Then the query exits 2 with CURSOR_INVALID, reason FOREIGN and a hint naming `--cursor`, and a query without it, then the cursor the 0.30 query issues, is accepted
 
   # canon: {"schema":1,"at":"2026-10-26T16:24:41Z","actor":{"agent_id":"impl-030-ln","role":"implementer","session_id":"ln-2026-10-26"}}
   @subject:plugin-overlay
@@ -215,7 +215,7 @@ Feature: ledger naming
   Scenario: An overlay file whose name does not match its body's join key values is reported
     Given an overlay directory holding a file whose key components are not the body's join key values, and one named by the 0.29 rule
     When the overlay kind is scanned
-    Then each is reported as a violation and skipped, and the matching records are returned
+    Then each is reported in the query's warnings and skipped, and the matching records are returned
 
   # canon: {"schema":1,"at":"2026-10-26T16:24:42Z","actor":{"agent_id":"impl-030-ln","role":"implementer","session_id":"ln-2026-10-26"}}
   @subject:divergence-lifecycle
@@ -236,7 +236,7 @@ Feature: ledger naming
   Scenario: A canon.yaml key still spelled evidence_record is read only to send the user to canon migrate
     Given a repo on the 0.30 layout whose `canon.yaml` routes the kind as `evidence_record: local`
     When `canon context --json` runs
-    Then it exits 0, warns that `canon.yaml` spells `evidence_record` the 0.29 way, and its first next step is `canon migrate --json`
+    Then it exits 0, warns with a message naming `evidence_record`, and its first next step is `canon migrate --json`
     And `canon evidence add` exits 2 with `LAYOUT_MIGRATION_REQUIRED`, a hint naming `canon migrate`, and writes nothing
 
   # canon: {"schema":1,"at":"2026-10-26T21:17:31Z","actor":{"agent_id":"impl-030-ln-fix","role":"implementer","session_id":"ln-fix-2026-10-26c"}}
@@ -247,5 +247,5 @@ Feature: ledger naming
   Scenario: A divergence file whose name is not the one its body computes is a layout violation, reported and not read
     Given a promoted divergence whose file name says another round than its body, in a repo whose policy turns `spec_coverage` on
     When the reads scan the divergence kind and `canon gate check` runs
-    Then the divergence is skipped and not counted, and `canon gate check` names the file as a layout violation and exits 1
+    Then the divergence is skipped and not counted, and `canon gate check` lists the file among its violations, with the name its body computes, and exits 1
     And with no `spec_coverage` section `canon gate check` stays green, while `canon status` says `canon query --kind divergence` reports the file

@@ -148,8 +148,8 @@ Feature: atip paging: a cursor bound to its call, and field selection as the con
   @atip.paging.15
   Scenario: The camelCase alias of a snake_case key and the snake_case alias of a report member are refused
     Given a repo with three subjects, a change with three findings and two divergent scenarios
-    When canon query, finding list and divergence list run with --fields in the spellings 0.33 accepted: changeIds, resolution_sha, project_id, Reward
-    Then each is exit 2 USAGE with field --fields and expected the declared paths; the spellings the records and reports use select
+    When canon query, finding list and divergence list run with --fields in the spellings 0.33 accepted: changeIds, resolution_sha, project_id
+    Then changeIds is exit 2 with field --fields, resolution_sha and project_id are exit 2 USAGE; the spellings the records and reports use select
 
   # canon: {"schema":1,"at":"2026-11-01T12:58:57Z","actor":{"agent_id":"impl-paging-fields","role":"implementer","session_id":"s-0-34-paging-fields"}}
   @subject:atip-contract

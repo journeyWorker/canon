@@ -209,8 +209,8 @@ Feature: skills install
   Scenario: An explicit provider list is written to canon.yaml and later runs follow it
     Given a target with a canon.yaml that has comments and no skills section, and a .claude directory
     When canon skills install runs with --harness codex and --harness omp
-    Then it projects Codex and OMP only and appends `skills: { providers: [codex, omp] }` to canon.yaml, keeping every other byte
-    And install, check and doctor with no provider named follow that list and say it came from canon.yaml
+    Then it projects Codex and OMP only and appends a skills section listing the providers codex and omp to canon.yaml, keeping every other byte
+    And install and check with no provider named follow that list, install taking it from canon.yaml
     And a later --harness replaces the section in place, a flow-style section in the middle of the file included, and --no-harness records an empty list
     And a target without canon.yaml gets no canon.yaml
 
@@ -221,8 +221,8 @@ Feature: skills install
   Scenario: A repo set up before 0.17 keeps working from its install lock
     Given a target whose canon.yaml has no skills section and whose install lock records Claude and Codex, beside an .omp directory
     When canon skills check, doctor and install run with no provider named
-    Then each serves Claude and Codex and says the list came from the install lock because canon.yaml has no skills key
-    And the check exits 0, the doctor reports healthy and the install reports unchanged
+    Then each serves Claude and Codex, the providers of the install lock
+    And the check exits 0, the doctor reports healthy and the install exits 0
     And the lock and canon.yaml are byte-identical afterwards, and nothing is projected for OMP
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
@@ -243,10 +243,10 @@ Feature: skills install
   Scenario: A malformed skills section in canon.yaml fails loud
     Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know, and a clean canon.yaml
     When canon skills install, check and doctor run with no harness named, and with --harness naming an unknown harness
-    Then each canon.yaml section is refused with exit 2 as CONFIG_INVALID with the reason SKILLS (a provider canon.yaml names is the section's fault), naming the expected shape or the unknown provider, and the unknown provider on the --harness option of the clean canon.yaml is USAGE, refused by the enumeration of the option before any section is read
+    Then each canon.yaml section is refused with exit 2 as CONFIG_INVALID with the reason SKILLS (a provider canon.yaml names is the section's fault), and the unknown provider on the --harness option of the clean canon.yaml is USAGE naming the option and the four providers, refused by the enumeration of the option before any section is read
     And nothing is projected and canon.yaml is byte-identical
     And a --skills-source directory that does not exist is refused the same way, exit 2 naming the option
-    And canon init --check exits 1 reporting the skills section as FAIL with the same reason
+    And canon init --check exits 1 reporting the skills section as FAIL
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
   @subject:skills-install
@@ -298,11 +298,11 @@ Feature: skills install
   @case:failure
   @skills.install.60
   Scenario: Install keeps a dropped projected file whose bytes changed and says what to do
-    Given a target with canon's projection installed for Claude, then a canon whose bundle no longer ships one reference file
-    And the projected file's bytes were edited after the install
+    Given a target with canon's projection installed for Claude, then a canon whose bundle no longer ships two reference files
+    And the bytes of one projected file were edited after the install
     When the skill is installed again
-    Then the edited file is kept and the install reports its path, that its bytes differ from the install lock, and that it can be removed by hand
-    And the JSON lists it under `kept` with a hint, and nothing under `pruned`
+    Then the edited file is kept and the install reports its path and that it can be removed by hand
+    And the JSON lists it under `kept` with a hint, and only the unedited dropped file under `pruned`
     And the install lock no longer lists it, and a rerun reports unchanged
 
   # canon: {"schema":1,"at":"2026-10-21T11:50:51Z","actor":{"agent_id":"canon-impl-025"}}

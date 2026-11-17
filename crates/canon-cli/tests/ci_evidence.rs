@@ -467,7 +467,7 @@ fn evidence_ci_run_10_a_batch_says_how_many_cases_each_report_held() {
 
 /// evidence.ci-run.11 (F3, failure path): a report that cannot be parsed is refused as before: no counts, nothing written.
 #[test]
-fn evidence_ci_run_11_an_unparseable_report_is_refused_without_counts() {
+fn evidence_ci_run_11_an_unparseable_report_is_refused() {
     let dir = shop_repo();
     let repo = dir.path();
     write(repo, "reports/good.xml", SUITE);
@@ -712,7 +712,7 @@ fn gate_ci_run_04_status_covers_the_configured_scope_and_names_the_reason() {
 
 /// gate.ci-run.07 (F4, failure path): a malformed `require_ci_run` does not switch itself off: it makes `spec_coverage` unusable.
 #[test]
-fn gate_ci_run_07_a_malformed_policy_makes_spec_coverage_unusable() {
+fn gate_ci_run_07_a_malformed_policy_fails_gate_check_naming_spec_coverage_and_the_key() {
     for (yaml, key) in [
         ("require_ci_run:\n    min_cases: 0\n", "require_ci_run.min_cases"),
         ("require_ci_run:\n    min_cases: -3\n", "require_ci_run.min_cases"),

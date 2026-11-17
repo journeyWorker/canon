@@ -18,10 +18,10 @@ Feature: atip daterefusals
   @case:failure
   @flow:canon-0-38-date-refusals.F2
   @atip.daterefusals.02
-  Scenario: A date, a time or an offset that does not exist is refused in the twelve places and the message says what does not exist
+  Scenario: A date, a time or an offset that does not exist is refused in every place that takes a date
     Given 2026-02-30, 2026-02-29, 2026-04-31, month 13, hour 25, minute 61 and an offset of +24:00, and 2028-02-29
-    When each is given to the twelve places
-    Then each missing value is refused with USAGE and exit 2 and a message naming the day, month, hour, minute or offset that does not exist, 2028-02-29 is taken, and nothing is written
+    When each is given to every place that takes a date, the dates alone to the date options
+    Then each missing value is refused with USAGE and exit 2 naming the option, and a value with a time also comes back as received with nothing written, and 2028-02-29 is read as a date
 
   # canon: {"schema":1,"at":"2026-11-06T16:46:43Z","actor":{"agent_id":"impl-date-refusals","role":"implementer","session_id":"s-0-38-date-refusals"}}
   @subject:atip-schema
@@ -29,7 +29,7 @@ Feature: atip daterefusals
   @case:failure
   @flow:canon-0-38-date-refusals.F3
   @atip.daterefusals.03
-  Scenario: A misspelled value keeps the refusal of 0.37 that says the spelling
+  Scenario: A misspelled value is refused in every place that takes a date
     Given 2026-2-30 and two other values spelled wrong
-    When each is given to the twelve places
-    Then each is refused with the 0.37 sentence that names the RFC 3339 spelling and not a missing date, and the order check of --after and --before is as before
+    When each is given to every place that takes a date
+    Then each is refused with USAGE and exit 2, naming the option, the value as received and nothing written

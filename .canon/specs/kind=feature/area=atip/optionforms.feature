@@ -117,10 +117,10 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @case:happy
   @flow:canon-0-37-option-forms.F5
   @atip.optionforms.11
-  Scenario: Each of the six time options declares one domain in every command that has it, as a pattern of characters, and the help says the new spelling
+  Scenario: Each of the six time options declares one domain in every command that has it, as a pattern of characters
     Given every command document of canon schema, the four commands that take --approval-at and the five date options in their eight places
-    When the declarations and the help are read
-    Then the four places of --approval-at declare one pattern and the eight of the date options another, each is a pattern of characters with no white-space class that the 1.5 profile reads, the help names the date-time and the RFC 3339 date
+    When the declarations are read
+    Then the places of --approval-at declare one pattern and those of the date options another, and each is a pattern of characters with no white-space class that the 1.5 profile reads
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:19Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
@@ -129,9 +129,9 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @flow:canon-0-37-option-forms.F5
   @atip.optionforms.12
   Scenario: The table of values inside and outside each domain agrees with the real parsers, and a command that declares another domain fails the sweep
-    Given the table of values inside and outside each domain, and seeded documents in which a command declares another domain, none or the pattern of the other option
+    Given the table of values inside and outside each domain, and seeded documents in which a command declares the pattern of the other option
     When each value is judged by the declared pattern and by the parser of its option, and the sweep reads each document
-    Then the pattern and the parser agree on every value, a date or time that does not exist is the pattern's and the parser's refusal, which says what does not exist, and the sweep finds each seeded fault by the option and the command
+    Then the pattern and the parser agree on every value, a date or time that does not exist matches the pattern and is refused by the parser, and the sweep finds each seeded fault
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:36Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema

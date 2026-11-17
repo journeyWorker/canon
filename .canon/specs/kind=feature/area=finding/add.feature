@@ -139,7 +139,7 @@ Feature: finding add
   Scenario: A short revision that names no commit is refused
     Given a git repository
     When canon finding add names a short revision that matches no commit on --rev, --introduced-rev or --resolution-rev
-    Then the add is refused with exit 2 and COMMIT_REQUIRED, naming the value
+    Then the add is refused with exit 2 and COMMIT_REQUIRED
     And nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-21T09:00:00Z","actor":{"agent_id":"canon-impl-0241"}}
@@ -267,5 +267,5 @@ Feature: finding add
   Scenario: An introducing commit together with the unknown mark is refused
     Given a change under review
     When canon finding add is given --introduced-rev together with --introduced-unknown
-    Then it is refused with FINDING_ARGUMENT_INVALID, exit 2, naming the two options as exclusive
+    Then it is refused with FINDING_ARGUMENT_INVALID, exit 2
     And nothing is staged

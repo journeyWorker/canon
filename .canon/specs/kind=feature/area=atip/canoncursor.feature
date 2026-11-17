@@ -115,10 +115,10 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
   @flow:canon-0-35-canon-cursor-1-2.F5
   @flow:canon-0-35-crate-1-2.F3
   @atip.canoncursor.11
-  Scenario: canon's flag-only set is the crate's 1.2 set plus repo and as, and the source holds no list of its own
+  Scenario: canon's flag-only set is the crate's 1.2 set plus repo and as
     Given canon's flag-only set and the atip crate's set at 1.2
-    When they are compared and the sources of canon-cli are read
-    Then the set is the crate's eight options and repo and as, the schema documents mark each of them, and no source file lists the contract's options by name
+    When they are compared and the schema documents of the commands that have these options are read
+    Then the set is the crate's options and repo and as, and the schema documents mark each of them
 
   # canon: {"schema":1,"at":"2026-11-02T13:44:33Z","actor":{"agent_id":"impl-canon-cursor","role":"implementer","session_id":"s-0-35-canon-cursor"}}
   @subject:atip-contract

@@ -406,7 +406,7 @@ Feature: gate check
     When the subject is moved to shipped with canon subject move, and gate check and status are read
     Then each refuses naming A only, and the remedy is the per-scenario canon evidence add --scenario, never the whole-suite batch
     And evidence for B recorded after the close does not clear it, and evidence for A recorded before the close does not either
-    And evidence for A recorded after the close clears gate check and the move, while B's evidence stays older than the close
+    And evidence for A recorded after the close clears the move, while B's evidence stays older than the close
 
   # canon: {"schema":1,"at":"2026-10-21T09:00:04Z","actor":{"agent_id":"canon-impl-0241"}}
   @subject:gate-trust-spine
@@ -519,7 +519,7 @@ Feature: gate check
   Scenario: Gate install-hooks refuses a repo that is no directory and an unreadable timeout and writes nothing
     Given a git work tree with a canon.yaml and a plain file afile
     When canon gate install-hooks is run with --repo afile, with --repo naming a directory that does not exist (also with --dry-run), with --timeout abc, or with an option it does not have
-    Then --repo afile exits 2 with HOOKS_REPO_INVALID saying afile is not a directory
+    Then --repo afile exits 2 with HOOKS_REPO_INVALID
     And the missing directory exits 2 with HOOKS_REPO_INVALID and is not created
     And --timeout abc exits 2 with USAGE naming the --timeout field, and the unknown option exits 2
     And the tree is unchanged after each

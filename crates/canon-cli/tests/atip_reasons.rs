@@ -368,7 +368,7 @@ fn replace_section(yaml: &str, key: &str, replacement: &str) -> String {
 /// atip.reasons.05: a wrong `specs:` section, a wrong policy and a wrong canon.yaml are `CONFIG_INVALID` with three different reasons, each the one
 /// of its file; the same file with the same fault gives the same reason every time, and every one is exit 2 and not retryable.
 #[test]
-fn atip_reasons_05_a_wrong_specs_section_a_wrong_policy_and_a_wrong_canon_yaml_are_config_invalid_with_three_reasons() {
+fn atip_reasons_05_a_wrong_specs_section_a_wrong_policy_and_a_wrong_canon_yaml_are_config_invalid() {
     let dir = repo();
     let d = dir.path();
     let original = fs::read_to_string(d.join("canon.yaml")).unwrap();

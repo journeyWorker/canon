@@ -687,7 +687,7 @@ fn report_dashboard_10_leaves_the_brief_untouched_on_every_refusal() {
 
 /// report.dashboard.04: no snapshot is a message, never demo data.
 #[test]
-fn report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served_and_says_why() {
+fn report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served() {
     let dir = repo_with_briefs();
     let live = serve(dir.path());
     let warnings = live.startup["meta"]["warnings"].as_array().expect("meta.warnings");

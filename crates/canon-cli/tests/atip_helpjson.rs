@@ -181,7 +181,7 @@ fn atip_helpjson_07_the_refusal_reads_nothing_and_writes_nothing() {
 }
 
 #[test]
-fn atip_helpjson_08_text_help_keeps_its_first_line_and_the_help_command_stays_text() {
+fn atip_helpjson_08_text_help_and_the_help_command_stays_text() {
     let dir = repo();
     for args in [&["--help"][..], &["finding", "--help"], &["finding", "close", "--help"], &["schema", "-h"], &["help", "finding"], &["help", "finding", "--json"], &["--json", "help", "finding"]] {
         let out = canon(dir.path(), args);

@@ -20,7 +20,7 @@ Feature: Placeholder nodes
   Scenario: Tracing a placeholder id exits 2
     Given the placeholder change of search.graph.01
     When canon trace runs with the change id and with the placeholder's node id
-    Then each exits 2 naming the three accepted shapes
+    Then each exits 2 with a TRACE_ error code
 
   # canon: {"schema":1,"at":"2026-10-27T14:16:13Z","actor":{"agent_id":"impl-031-search","role":"implementer","session_id":"search-2026-10-27"}}
   @subject:search-index

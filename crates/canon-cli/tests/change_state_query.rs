@@ -198,7 +198,7 @@ fn change_drop_17_a_change_never_closed_reads_as_an_empty_list() {
 
 /// change.drop.17: with no `change_state` line in `routing:` the query fails (`QUERY_FAILED`, exit 1) and the message names the kind.
 #[test]
-fn change_drop_17_without_the_routing_line_the_query_fails_naming_the_kind() {
+fn change_drop_17_without_the_routing_line_the_query_fails() {
     let yaml = YAML.replace("  change_state: local\n", "");
     let dir = repo_with(&yaml);
     let out = query(dir.path(), &[]);

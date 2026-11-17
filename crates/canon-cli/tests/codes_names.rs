@@ -150,7 +150,7 @@ const SPLIT: &[(&str, i64, bool, &[&str])] = &[
 
 /// atip.codesplit.01: each code the split registers has the exit, retryable and reasons of the table and follows the name rule.
 #[test]
-fn atip_codesplit_01_each_code_of_the_split_is_registered_as_the_table_says_and_no_old_name_remains() {
+fn atip_codesplit_01_each_code_of_the_split_is_registered_as_the_table_says() {
     for (code, exit, retryable, reasons) in SPLIT {
         let info = canon_cli::cli_error::all_codes().iter().find(|info| info.code == *code).unwrap_or_else(|| panic!("`{code}` is not in the registry"));
         assert_eq!((i64::from(info.exit), info.retryable), (*exit, *retryable), "{code}");

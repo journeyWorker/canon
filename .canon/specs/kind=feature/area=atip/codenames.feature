@@ -17,7 +17,7 @@ Feature: atip: error code names, <SUBJECT>_<CONDITION>
   @flow:canon-0-36-codes-rename.F2
   @atip.codenames.03
   Scenario: The renamed codes and the kept ones follow the name rule, and the renamed ones have the exit and reason of the table
-    Given the registry of the renamed codes and of the 48 kept ones
+    Given the registry of the renamed codes and of the kept ones
     When the contract's name rule runs on each code, with its exit and retryable
     Then each follows the rule, and each renamed code has the exit, retryable false and reason of the brief's table
 

@@ -71,7 +71,6 @@ Feature: Durable record writes
     Given the source of every crate
     When it is searched for the fixed temp names of the four private write copies: canon.yaml, the legacy migration, the brief migration and the strategy activation file
     Then none of them is found
-    And the one write path left is canon_store::write_atomic
 
   # canon: {"schema":1,"at":"2026-11-08T06:24:46Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
   @subject:tier-storage

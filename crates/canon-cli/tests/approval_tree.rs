@@ -502,7 +502,7 @@ fn gate_approval_tree_10_ship_status_and_gate_check_state_the_same_requirement()
 /// gate.approval-tree.11: status says why a chore asks for nothing, and says
 /// nothing of the kind over changed code.
 #[test]
-fn gate_approval_tree_11_status_says_why_a_chore_asks_for_nothing_and_not_over_changed_code() {
+fn gate_approval_tree_11_status_marks_a_chore_over_unchanged_code_and_not_over_changed_code() {
     let dir = repo();
     let r = dir.path();
     other_change_edits_code(r);

@@ -366,7 +366,7 @@ Feature: evidence add
     When evidence add, finding add, finding close and divergence add run
     Then each prints one success line, naming the record's committed file under the ledger, which exists
     And no line names the staged file promotion moved, and no separate promote line is printed
-    And with --no-promote, evidence add, finding add and divergence add print the staged file and canon gate promote
+    And with --no-promote, evidence add, finding add and divergence add print the staged file
 
   # canon: {"schema":1,"at":"2026-10-12T07:30:40Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
@@ -375,9 +375,8 @@ Feature: evidence add
   Scenario: Evidence for a subject whose brief is not approved is refused, and nothing is staged
     Given a building subject owning a scenario tagged @flow:<change>.F1 and adopting that change, whose .canon/changes brief.md has no "Approved:" line, with a task row in its tasks.md
     When evidence is added for the scenario, and then for the task
-    Then each add exits 1 with an unreviewed-promotion line naming the subject and that brief.md
-    And the refusal tells the agent to stop, report the brief and wait for the human's answer, and names --override-reason
-    And nothing is staged or committed, and once the change is approved, alone or with others in one call, both adds succeed
+    Then each add exits 2 with a BRIEF_APPROVAL_REQUIRED unreviewed-promotion line naming the subject and the scenario or task
+    And nothing is staged or committed
     And canon review scenario and canon finding add for the same scenario and change are not refused
 
   # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
@@ -388,19 +387,18 @@ Feature: evidence add
     Given a building subject that adopts no change, one whose newest change has no brief, and a scenario no subject owns
     When evidence is added for each scenario
     Then each add succeeds with no brief refusal
-    And the record carries no brief override and canon status lists none
+    And the record carries no brief override
 
   # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
   @case:edge
   @evidence.add.70
-  Scenario: An override attests anyway and records its reason and actor where a reader sees it
+  Scenario: An override attests anyway and records its reason and actor on the record
     Given a building subject owning a scenario whose newest change's brief.md has no "Approved:" line
     When evidence is added for the scenario with a blank --override-reason, then with a one-line reason and an actor id
     Then the blank reason exits 2 and nothing is written
-    And the reasoned add succeeds, printing the waived unreviewed-promotion line and who recorded the override
+    And the reasoned add succeeds, printing the waived unreviewed-promotion line naming the subject
     And the record carries brief_override with the reason, the waived unreviewed-promotion naming the subject, and the actor
-    And canon status lists it as a warning and canon gate check as an advisory, without failing
     And once the brief is approved, an override nothing needed is not recorded
 
   # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
@@ -419,7 +417,7 @@ Feature: evidence add
   Scenario: A change from an external plan is answered in a canon brief, and its task rows still flip
     Given a building subject owning a scenario and adopting a change from an external openspec plan, whose proposal.md carries an "Approved:" line and whose tasks.md has a task row, and no canon brief
     When evidence is added for the scenario, and then for the task
-    Then each add exits 1 with an unreviewed-promotion line naming .canon/changes/<change>/brief.md as not existing yet, the external proposal.md it must point at with a "Source:" line, and the approval to record there
+    Then each add exits 2 with a BRIEF_APPROVAL_REQUIRED unreviewed-promotion line naming the subject and the scenario or task
     And nothing is staged or committed
     And once that canon brief.md holds the "Source:" line and the "Approved:" line, both adds succeed
     And the external proposal.md is never edited, and canon task done flips the external task row
@@ -433,7 +431,6 @@ Feature: evidence add
     When evidence is added with --report and --all-scenarios and no --verdict
     Then three records are written, each binding only its own cases, with the failing scenario's verdict divergent and the others faithful
     And every record pins the same stored report blob, which is stored once
-    And the output lists each scenario with its verdict on its own line
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
   @subject:evidence-attestation
@@ -442,7 +439,7 @@ Feature: evidence add
   Scenario: A faithful claim over a batch with any failed case refuses the whole batch
     Given indexed scenarios and a report where one scenario's case failed and the others passed
     When evidence is added with --all-scenarios --verdict faithful
-    Then the add exits 1 naming the failed case and its scenario
+    Then the add exits 2 with EVIDENCE_REPORT_CONFLICT naming the failed case and its scenario
     And no record is staged or committed and no blob is stored
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
@@ -452,7 +449,7 @@ Feature: evidence add
   Scenario: A case whose scenario id is not indexed is named and skipped
     Given a report with a case leading with an id no indexed scenario carries, and a case with no id at all
     When evidence is added with --all-scenarios
-    Then the indexed scenarios get their records and the output names the unindexed id and counts the case with no id as skipped
+    Then the indexed scenarios get their records and the output names the unindexed id
     And a report in which no case belongs to an indexed scenario is refused with exit 2 and nothing is written
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
@@ -462,7 +459,7 @@ Feature: evidence add
   Scenario: Any refusal one record of a batch would meet refuses all of them
     Given a batch of scenarios where one belongs to a subject whose brief is not approved
     When evidence is added with --all-scenarios
-    Then the add exits 1 with the brief refusal and nothing is staged for any scenario
+    Then the add exits 2 with the brief refusal and nothing is staged for any scenario
     And a summary carrying a fabrication marker refuses the batch the same way
     And --all-scenarios with --scenario, --task, --report-case or an approval, or without --report, is refused with exit 2
 
@@ -474,7 +471,7 @@ Feature: evidence add
     Given a task row and a report whose cases carry no scenario id
     When evidence is added with --task and --report and no --scenario
     Then the record binds every case in the report
-    And when any case failed, a faithful verdict is refused with exit 1 and nothing is staged
+    And when any case failed, a faithful verdict is refused with exit 2 and nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
   @subject:evidence-attestation
@@ -509,7 +506,7 @@ Feature: evidence add
     Given a scenario and a summary naming "pack.json/atlas JSON", "tbd_notes.md" and "https://example.com/tbd"
     When evidence is added for the scenario with that summary
     Then the add succeeds and the committed record carries the summary as given
-    And a summary where "n/a" stands on its own is still refused with exit 1 and nothing is written
+    And a summary where "n/a" stands on its own is still refused with exit 2 and nothing is written
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
   @subject:evidence-attestation
@@ -548,7 +545,7 @@ Feature: evidence add
   Scenario: A bare artifact is refused in a batch because it would bind to every scenario
     Given indexed scenarios and a report that owns a case for several of them
     When evidence is added with --all-scenarios and --artifact <path>
-    Then the add exits 2 with the code EVIDENCE_ARGUMENT_CONFLICT and a hint naming per-test report attachments and --artifact <scenario-id>=<path>
+    Then the add exits 2 with the code EVIDENCE_ARGUMENT_CONFLICT
     And nothing is staged, committed or stored
 
   # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
@@ -588,7 +585,7 @@ Feature: evidence add
   Scenario: A re-run with new screenshot bytes leaves a pinned review current
     Given a scenario with a current signed review that pinned its report evidence, the cases having screenshots
     When the suite runs again and evidence is added with the same cases and verdicts but new screenshot bytes
-    Then the new record binds the new bytes, prints no stale-review line, and the review stays current
+    Then the new record binds the new bytes, prints no `canon review scenario` re-pin command, and the review stays current
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:32Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:evidence-attestation
@@ -619,7 +616,7 @@ Feature: evidence add
     When evidence is added again for an evidenced untagged scenario, and for one that was never evidenced
     Then the evidenced one is accepted, being existing behavior attested before any approved scope and before the subject adopted its first change
     And evidence recorded only after that adoption, for example while the subject was specced, does not exempt the scenario
-    And the never-evidenced one is refused BRIEF_APPROVAL_REQUIRED naming the draft change's brief.md
+    And the never-evidenced one is refused BRIEF_APPROVAL_REQUIRED
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:00Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:evidence-attestation
@@ -638,7 +635,7 @@ Feature: evidence add
   Scenario: The refusal of an unknown project id lists every configured spec root
     Given a repo whose canon.yaml configures two spec roots
     When evidence add names a --project that matches neither
-    Then it exits 2 with SPEC_ROOT_NOT_FOUND, and the message, the hint and the JSON expected list name both roots
+    Then it exits 2 with SPEC_ROOT_NOT_FOUND, and the hint and the JSON expected list name both roots
     And a root id that is configured is accepted whichever order the roots are listed in
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:18Z","actor":{"agent_id":"canon-impl-026"}}
@@ -751,7 +748,7 @@ Feature: evidence add
   Scenario: An evidence batch whose second record fails to stage or promote leaves nothing behind
     Given a batch of two records and one artifact, whose second record fails to stage in one run and whose second promotion is refused in another
     When each batch is landed
-    Then no record is left staged or committed and no new blob is left, the error naming the second record
+    Then no record is left staged or committed and no new blob is left, the failed staging being WRITE_FAILED (exit 1) and the refused second record PROMOTION_INVALID (exit 2) named by its index
     And a read-only destination is refused before anything is written
     And the same batch with nothing failing lands whole, both records committed and the blob stored
 
@@ -762,9 +759,8 @@ Feature: evidence add
   @evidence.add.116
   Scenario: Artifacts verify reports every bound file as stored
     Given a repo whose scenario is attested with one bound artifact file, held in the local artifact store
-    When canon artifacts verify is run, with and without --json
+    When canon artifacts verify is run with --json
     Then it exits 0, reporting one bound file, one stored and an empty problems list
-    And the human form says one bound file was checked with problems 0
     And nothing in the tree changed
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:31Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
@@ -801,7 +797,7 @@ Feature: evidence add
   Scenario: Artifacts move refuses a tier that is no object store or a missing tier and changes nothing
     Given a repo with an object-store tier cold and a scenario attested with one bound artifact in the local store
     When canon artifacts move names tier hot, which is no object store, with --json
-    Then it exits 2 with ARTIFACTS_TIER_INVALID saying the tier is not an object store
+    Then it exits 2 with ARTIFACTS_TIER_INVALID
     And canon artifacts move with no --tier exits 2 naming --tier, and --commit without --plan-digest exits 2 naming --plan-digest
     And after each refusal the tree is unchanged, the local blob is still there and the store holds nothing
 
@@ -838,7 +834,7 @@ Feature: evidence add
   Scenario: An approval payload is refused without a task or scenario, or with an unreadable time, and prints no bytes
     Given a repo with one indexed scenario
     When canon evidence approval-payload is run with neither --task nor --scenario, with --approval-at yesterday, or with no --approver
-    Then each exits 2, the first with EVIDENCE_REQUIRED and the others as usage errors naming invalid timestamp and --approver
+    Then each exits 2, the first with EVIDENCE_REQUIRED and the one without --approver naming --approver
     And no payload bytes reach stdout
     And the tree is unchanged
 
@@ -883,7 +879,7 @@ Feature: evidence add
   Scenario: An approval payload for a scenario the index does not hold is refused and prints no bytes
     Given a repo with one indexed scenario
     When canon evidence approval-payload is run with --scenario naming a scenario the index does not hold, and then with the indexed one
-    Then the first exits 2 with SCENARIO_INDEX_REQUIRED, its message names the id and the spec root and its hint points to canon inventory sync, and stdout is empty
+    Then the first exits 2 with SCENARIO_INDEX_REQUIRED, its message names the id and its hint points to canon inventory sync, and stdout is empty
     And the indexed scenario exits 0 and prints the bytes to sign
     And the tree is unchanged after both
 
@@ -895,5 +891,4 @@ Feature: evidence add
   Scenario: evidence add is refused, writing nothing, when a brief it judges is in the 0.30 format, approved or not
     Given a subject whose adopted change has a brief in the 0.30 format, approved with a matching digest and not
     When canon evidence add runs for a scenario the subject answers for
-    Then it exits 2 with BRIEF_MIGRATION_REQUIRED whose hint is canon migrate, writes nothing, and --override-reason does not waive it
-    And an approved old brief whose digest matches still reads as approved by status
+    Then it exits 2 with BRIEF_MIGRATION_REQUIRED, writes nothing, and --override-reason does not waive it

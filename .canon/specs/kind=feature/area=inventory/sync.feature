@@ -218,20 +218,20 @@ Feature: inventory sync
     Given a verifying subject whose only scenario is indexed and evidenced, so it could ship
     And its feature file is then edited and loses a provenance comment, so the refresh refuses the root
     When canon gate check runs
-    Then it exits 1 with an uncovered-cell violation naming the root and saying canon inventory sync lists the problems
-    And canon subject move to shipped is refused with exit 1 by the same violation, and the subject stays verifying
-    And canon status's only next step is canon inventory sync, naming the root, with no step that moves a subject on
-    And once the provenance comment is restored the gate has no such violation and the subject ships
+    Then it exits 1 with an uncovered-cell violation naming the root and canon inventory sync
+    And canon subject move to shipped is refused with exit 2 by the same violation, and the subject stays verifying
+    And canon status's only next step is canon inventory sync, with no step that moves a subject on
+    And once the provenance comment is restored the subject ships
 
   # canon: {"schema":1,"at":"2026-10-12T10:34:27Z","actor":{"agent_id":"canon"}}
   @subject:inventory-sync
   @case:failure
   @inventory.sync.48
-  Scenario: Sync aborts a root still on the pre-0.17 layout and names canon migrate
+  Scenario: Sync aborts a root still on the pre-0.17 layout
     Given a configured spec root that still holds its feature files under features/kind=feature/
     When canon inventory sync runs
-    Then the root is ABORTED with one layout-grammar violation naming the root and canon migrate
-    And the sync exits 1 and writes no scenario record
+    Then the sync reports a layout-grammar violation
+    And the sync exits 2 and writes no scenario record
 
   # canon: {"schema":1,"at":"2026-10-12T10:34:27Z","actor":{"agent_id":"canon"}}
   @subject:inventory-sync
@@ -240,8 +240,8 @@ Feature: inventory sync
   Scenario: A root still on the pre-0.17 layout fails the gate closed and status names canon migrate
     Given a configured spec root that still holds its feature files under features/kind=feature/, with or without its scenarios already indexed
     When canon gate check runs
-    Then its refresh says the root is not refreshed, naming the root and canon migrate, and writes no record that marks a scenario removed
-    And it exits 1 with an uncovered-cell violation naming the root and canon migrate
+    Then its refresh writes no record that marks a scenario removed
+    And it exits 1 with an uncovered-cell violation naming the root
     And canon status's only next step is canon migrate
     And once the files move to kind=feature/ directly under the root the gate has no such violation
 

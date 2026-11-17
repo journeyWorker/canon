@@ -110,4 +110,4 @@ Feature: atip codestored
   Scenario: A tier a purge or export needs that is not attached is RETENTION_TIERS_REQUIRED and a stored object that does not decode is RETENTION_TIERS_CORRUPT
     Given a repository whose hot tier names a Postgres server with its DSN variable unset, and a trajectory file that is not a Parquet file
     When export and purge run
-    Then export exits 2 with RETENTION_TIERS_REQUIRED and purge with RETENTION_TIERS_CORRUPT, neither is retryable, each hint says what to do, and nothing is written; only a backend that does not answer or an error a repeat can pass is RETENTION_TIERS_UNAVAILABLE
+    Then export exits 2 with RETENTION_TIERS_REQUIRED and purge with RETENTION_TIERS_CORRUPT, neither is retryable, each carries a hint, and nothing is written; only a backend that does not answer or an error a repeat can pass is RETENTION_TIERS_UNAVAILABLE

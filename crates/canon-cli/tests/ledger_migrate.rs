@@ -834,7 +834,7 @@ fn ledger_migrate_07_pre_0_23_reviews_keep_their_standing() {
 /// ledger.migrate.13 -- Then: the stale pre-0.23 review is left as it is and still stale, and
 /// the one that cannot be checked (its commit is not in the clone) is pinned as it stands and counted.
 #[test]
-fn ledger_migrate_13_stale_stays_stale_and_the_undecidable_one_is_pinned_and_counted() {
+fn ledger_migrate_13_stale_stays_stale_and_the_undecidable_one_is_pinned() {
     let repo = Repo::old();
     repo.migrate();
     // 04: pre-0.15, no pins at all, its commit is not here: pinned as it stands.

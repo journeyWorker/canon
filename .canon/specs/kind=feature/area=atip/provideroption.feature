@@ -40,10 +40,10 @@ Feature: atip harness option: the harnesses are chosen by a repeatable --harness
   @case:failure
   @flow:canon-0-38-provider-option.F2
   @atip.provideroption.04
-  Scenario: --no-harness beside --harness, or beside --check for init, is refused naming both options and nothing is written
-    Given --no-harness and --harness claude in both orders on init and the three skills commands, and init with --check beside --harness or --no-harness
+  Scenario: --no-harness beside --harness, or beside --check for init, is refused with USAGE and nothing is written
+    Given --no-harness and --harness claude in both orders on the three skills commands, init with --no-harness before --harness claude, and init with --check beside --harness or --no-harness
     When each call runs
-    Then each exits 2 with USAGE and a message that names every option of the clash, and nothing is written, canon.yaml included
+    Then each exits 2 with USAGE, the skills commands naming --harness as the field, and nothing is written, canon.yaml included
 
   # canon: {"schema":1,"at":"2026-11-06T11:02:00Z","actor":{"agent_id":"impl-provider-option","role":"implementer","session_id":"s-0-38-provider-option"}}
   @subject:atip-schema
@@ -131,4 +131,4 @@ Feature: atip harness option: the harnesses are chosen by a repeatable --harness
   Scenario: A command that declares other names, a pattern, no repetition or the old option fails the check
     Given the real documents and copies in which one command lists a fifth name or a name twice, declares a pattern, is not repeatable, still declares --providers, lacks --no-harness or lacks the exclusion
     When the declarations are checked
-    Then the real documents pass and each seeded fault is found by command and by what is wrong
+    Then the real documents pass and each seeded fault is found

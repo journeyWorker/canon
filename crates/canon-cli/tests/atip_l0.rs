@@ -532,7 +532,7 @@ fn atip_l0_22_input_dash_beside_another_stdin_reader_is_usage_and_on_a_terminal_
 }
 
 #[test]
-fn atip_l0_26_the_spec_file_and_the_conformance_corpus_are_the_new_contract() {
+fn atip_l0_26_the_spec_and_the_conformance_corpus_are_the_new_contract() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     // The one declaration: the constant, the fixture the checker reads and the spec the documents are generated into say the same minor, and the crate knows it.
     let declared = canon_cli::json_out::DECLARED_MINOR;

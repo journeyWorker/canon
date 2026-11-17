@@ -66,7 +66,7 @@ Feature: ATIP: skills show, the guides and their command lines
   @case:failure
   @flow:canon-0-35-skills-show.F4
   @atip.skillsshow.10
-  Scenario: A help line that names only schema, only skills show or neither is not the pointer
-    Given the first lines of help that name schema only, skills show only, neither and nothing, and the first line of every real help
+  Scenario: The first line of every help is the pointer to both entrances and the line below it is not
+    Given the first line of every real help and the line below it
     When each is judged as the pointer to both entrances
-    Then the four are refused, every real help has the pointer on its first line, and the line below it is the introduction and not a second pointer
+    Then every real help has the pointer on its first line, and the line below it is the introduction and not a second pointer

@@ -248,7 +248,7 @@ mod tests {
 
     /// atip.claim15.04 (F2): the pattern of each place that listed white space in 0.36.0 is written with the property now.
     #[test]
-    fn atip_claim15_04_a_refusal_says_for_each_pattern_that_listed_white_space_what_it_said_in_0_36() {
+    fn atip_claim15_04_each_pattern_that_listed_white_space_is_written_with_the_property() {
         let golden: serde_json::Value = serde_json::from_str(include_str!("../../tests/atip/white_space_0_36.json")).expect("the golden patterns are JSON");
         let model = crate::spec::model();
         let mut compared = 0;

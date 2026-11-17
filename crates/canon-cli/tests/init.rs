@@ -303,7 +303,7 @@ fn authoring_init_30_default_init_writes_the_strict_starter_under_a_level_line()
 
 /// authoring.init.31
 #[test]
-fn authoring_init_31_light_starter_requires_evidence_only_and_says_how_to_raise_it() {
+fn authoring_init_31_light_starter_requires_evidence_only() {
     let dir = tempfile::tempdir().unwrap();
     let out = run_canon(&["init", "--policy", "light"], dir.path());
     assert!(out.status.success(), "{}", stderr(&out));
@@ -328,7 +328,7 @@ fn authoring_init_31_light_starter_requires_evidence_only_and_says_how_to_raise_
 
 /// authoring.init.32
 #[test]
-fn authoring_init_32_standard_starter_adds_a_failure_case_and_says_how_to_reach_strict() {
+fn authoring_init_32_standard_starter_adds_a_failure_case() {
     let dir = tempfile::tempdir().unwrap();
     let out = run_canon(&["init", "--policy", "standard"], dir.path());
     assert!(out.status.success(), "{}", stderr(&out));

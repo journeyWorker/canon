@@ -794,7 +794,7 @@ mod tests {
     /// artifacts.object-zstd.06 (F3 failure): a flipped byte, a cut tail, a file that is no zstd and a frame that decompresses to other bytes are each
     /// `Altered`; a frame that decompresses past the `canon-size` it recorded stops at that limit. An object whose reads fail is an `Err`, never a pass.
     #[test]
-    fn artifacts_object_zstd_06_a_damaged_zst_object_is_altered_and_a_bomb_stops_at_its_recorded_size() {
+    fn artifacts_object_zstd_06_a_damaged_zst_object_is_altered_and_a_bomb_is_altered() {
         let (memory, blobs) = store();
         let bytes = report(100_000);
         let d = digest(&bytes);
@@ -914,7 +914,7 @@ mod tests {
     /// artifacts.object-zstd.10 (F5 failure): when the store refuses the second name, the error says the first is already deleted and the second is not;
     /// the digest is still listed (by the name that remains), and a repeat once the store accepts removes it.
     #[test]
-    fn artifacts_object_zstd_10_a_refused_second_delete_names_what_went_and_a_repeat_removes_the_rest() {
+    fn artifacts_object_zstd_10_a_refused_second_delete_and_a_repeat_removes_the_rest() {
         let memory = Arc::new(InMemory::new());
         let flaky = Arc::new(RefusesPlainDelete { inner: Arc::clone(&memory), refuse: std::sync::atomic::AtomicBool::new(false) });
         let blobs = ObjectBlobStore::new(Arc::<RefusesPlainDelete>::clone(&flaky), "artifacts/").unwrap();
