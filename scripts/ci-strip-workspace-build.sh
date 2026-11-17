@@ -4,8 +4,8 @@
 # The workspace crates' own build output is most of `target/` (the test binaries alone are 60% of a debug build) and is rebuilt on every change
 # of the crates anyway; a cache that held it would also keep every earlier version's test binaries, which cargo never cleans up. This removes the
 # build output of every workspace package (`cargo clean -p`, which knows the test binaries of the integration test files), then the files
-# that still carry a workspace crate's name: the units of another path's copy of the workspace (the job `grammar-mutation` builds one) have other
-# package ids and are not found by `cargo clean -p`.
+# that still carry a workspace crate's name: units with other package ids (a build of the workspace from another path) are not found by
+# `cargo clean -p`.
 #
 # Usage: scripts/ci-strip-workspace-build.sh [--release]
 # `--release` cleans `target/release` instead of `target/debug`. When GITHUB_STEP_SUMMARY is set, the sizes of what is saved are written there

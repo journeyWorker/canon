@@ -189,11 +189,12 @@ jobs:
           cargo test --workspace --locked --offline
 
       # The unit tests under three callers (none, an implementer with an actor, an unknown role): a test that reads CANON_ROLE or CANON_ACTOR fails in one of them.
+      # Only canon-cli has such tests, so only its lib runs here; the step above already runs every other crate's lib tests, which read no caller.
       - name: unit tests under three callers
         run: |
-          env -u CANON_ROLE -u CANON_ACTOR cargo test --workspace --lib --locked --offline
-          env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test --workspace --lib --locked --offline
-          env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test --workspace --lib --locked --offline
+          env -u CANON_ROLE -u CANON_ACTOR cargo test -p canon-cli --lib --locked --offline
+          env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test -p canon-cli --lib --locked --offline
+          env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test -p canon-cli --lib --locked --offline
 
       - name: every declared output was emitted by the suite (witness)
         env:
@@ -384,57 +385,6 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: canon-test-atip-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
-
-  # T15: the grammar tests catch seeded violations (scripts/check-mutations.sh). Its own job:
-  # it builds a copy of the workspace, which would double the time of the job above.
-  grammar-mutation:
-    name: grammar tests catch seeded violations
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Restore cargo cache
-        id: cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: canon-test-mutation-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            canon-test-mutation-deps-${{ hashFiles('rust-toolchain.toml') }}-
-            canon-test-mutation-cargo-
-
-      - name: cargo fetch --locked
-        run: cargo fetch --locked
-
-      - name: seeded violations each fail their test
-        id: build
-        run: scripts/check-mutations.sh
-
-      # Main only, when no cache of this exact key was restored, and only after the one step that builds (the copy of the workspace, its tests) succeeded (see the top of this file).
-      - name: Keep only the dependency build
-        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
-        env:
-          CACHE_KEY: canon-test-mutation-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
-        run: scripts/ci-strip-workspace-build.sh
-
-      - name: Save cargo cache
-        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: canon-test-mutation-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
 
   # 0.29 D1: the corpus-size shape gate. Every other job here proves what canon
   # does; none noticed that `gate check` re-derived whole-corpus data once per

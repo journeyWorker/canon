@@ -29,12 +29,13 @@ install:
 test:
     cargo test --workspace --locked
 
-# The unit tests of the workspace under three callers: none, an implementer with an actor, and an unknown role. A unit test that reads the declared role
+# The unit tests of canon-cli under three callers: none, an implementer with an actor, and an unknown role. A unit test that reads the declared role
 # or actor from the environment (`closing_role` once did) answers differently in two of them and fails here; `tests/hermetic_env.rs` covers the tests that start the binary.
+# Only canon-cli has such tests (canon-model has one comment); `test` already runs every other crate's lib tests without a caller.
 test-callers:
-    env -u CANON_ROLE -u CANON_ACTOR cargo test --workspace --lib --locked
-    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test --workspace --lib --locked
-    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test --workspace --lib --locked
+    env -u CANON_ROLE -u CANON_ACTOR cargo test -p canon-cli --lib --locked
+    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test -p canon-cli --lib --locked
+    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test -p canon-cli --lib --locked
 
 # The three clippy runs of test.yml `clippy`, and its git boundary scan (every git call goes through `canon_store::git`).
 lint:
