@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-final",
+    "role": "reviewer",
+    "session_id": "Rev43_final"
+  },
+  "at": "2026-11-17T18:03:02.838829126Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/migrate.rs:918-927",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "b3ce6e4fb3da2da7c6c8d4963f72bdec1a06743d",
+  "resolution_sha": "7068ea73b57c4d6ce5f53cf0a89d2f7aa308b61c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "reviewer": "rev-0-43-tests-r3-rest",
+  "round": 3,
+  "scenario_ids": [
+    "change.drop.26"
+  ],
+  "schema": 2,
+  "seq": 67,
+  "severity": "note",
+  "summary": "[spec fidelity, P3] The Then of change.drop.26 says the preview 'writes nothing'. In change_drop_26_migrate_adds_the_change_state_route_line_and_the_next_plan_is_empty, the check labelled 'a preview writes nothing' (migrate.rs:923) runs before the first `canon migrate --json` preview (migrate.rs:924). Nothing compares canon.yaml after that preview, and ok_commit runs its own preview, so a preview that wrote the line would still pass. Fix: move the assert_eq of line 923 to after the preview at line 924 (test only), or drop 'and writes nothing' from the Then.",
+  "worktree_dirty": false
+}

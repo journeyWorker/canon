@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-final",
+    "role": "reviewer",
+    "session_id": "Rev43_final"
+  },
+  "at": "2026-11-17T18:02:58.942559489Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip_claiml2.rs:197",
+  "introduced_by": "af11ec7eff43d33029b50ee4c5c5d2a23fb31450",
+  "kind": "finding",
+  "resolution_code_tree": "b3ce6e4fb3da2da7c6c8d4963f72bdec1a06743d",
+  "resolution_sha": "7068ea73b57c4d6ce5f53cf0a89d2f7aa308b61c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "reviewer": "rev-0-43-tests-r3-atip",
+  "round": 3,
+  "scenario_ids": [
+    "atip.claiml2.18"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "atip.claiml2.18 Then says init \"installs for claude and records it\", but its bound test atip_claiml2_18_... (tests/atip_claiml2.rs:197) asserts only that canon.yaml ends with skills.providers [claude] (the record); the canon skill install that init does after it (init.rs install_chosen_skills) is not checked. Fix: say \"records claude as the harness\" or assert the installed skill file. (spec fidelity)",
+  "worktree_dirty": false
+}

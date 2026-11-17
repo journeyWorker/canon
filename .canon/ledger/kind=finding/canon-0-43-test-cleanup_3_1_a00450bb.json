@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-final",
+    "role": "reviewer",
+    "session_id": "Rev43_final"
+  },
+  "at": "2026-11-17T18:02:58.385486569Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip_codesplit.rs:324",
+  "introduced_by": "56499ba18041cda113a7cf2dcff93d6b13026848",
+  "kind": "finding",
+  "resolution_code_tree": "b3ce6e4fb3da2da7c6c8d4963f72bdec1a06743d",
+  "resolution_sha": "7068ea73b57c4d6ce5f53cf0a89d2f7aa308b61c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "reviewer": "rev-0-43-tests-r3-atip",
+  "round": 3,
+  "scenario_ids": [
+    "atip.codesplit.07"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "atip.codesplit.07 Then still promises \"plugin sync, which takes no index lock, is not refused for a lock another process holds\", but its bound test atip_codesplit_07_a_file_or_lock_the_system_refuses_is_told_by_the_code_of_its_own_subject (tests/atip_codesplit.rs:324) never runs plugin sync; that leg is asserted only by atip_codesplit_04_..., which is bound to atip.codesplit.04. Fix: drop the clause from .07 (it belongs to .04) or bind the .04 case to .07 as well. (spec fidelity, r3 reword left it as is)",
+  "worktree_dirty": false
+}
