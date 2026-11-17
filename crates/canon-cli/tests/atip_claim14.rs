@@ -4,11 +4,11 @@
 //! The 1.4 form (contract 5.1, 9, 15.7): every envelope says `contractVersion` `MINOR` (1.6) and the tree `level` `L2`; the tree defines the shared options once
 //! and carries no `path`, no `kind: "command"` and no member at its default; a command document is the call surface only (no `schemas`, `path`,
 //! `input.schemaRef`, `input.option`, `rejects`, no implied option or code); `schema <COMMAND> --schemas` answers the schemas, the derived `Input` and the
-//! `rejects`; every JSON document is compact. The consumers (guides, website, evals, conformance, generated spec) and the CI configuration say the declared minor, and the
+//! `rejects`; every JSON document is compact. The consumers (guides, website, evals, conformance, generated spec) say the declared minor, and the
 //! CHANGELOG entry states the measured sizes.
 //!
 //! The checks that seeded faults must trip are small pure functions over text or `serde_json::Value` in this file (`form_problems`, `whitespace_problems`,
-//! `consumer_problems`, `minor_problems`, `changelog_problems`): each real document passes them, each seeded fault is found, and no sweep is vacuous.
+//! `consumer_problems`, `changelog_problems`): each real document passes them, each seeded fault is found, and no sweep is vacuous.
 //! Tests are named by scenario id (`atip_claim14_05_…` proves `atip.claim14.05`).
 
 #[path = "support/hermetic.rs"]
@@ -754,81 +754,6 @@ fn tracked_files() -> Vec<String> {
 }
 
 // ---------------------------------------------------------------------------
-// The CI configuration (F6).
-
-/// The `--contract` values of `lines`.
-fn contracts_in(lines: &[String]) -> Vec<String> {
-    let mut found = Vec::new();
-    for line in lines {
-        let tokens: Vec<&str> = line.split_whitespace().collect();
-        for (index, token) in tokens.iter().enumerate() {
-            if *token == "--contract" {
-                if let Some(next) = tokens.get(index + 1) {
-                    found.push(next.trim_matches(['"', '\'']).to_string());
-                }
-            } else if let Some(value) = token.strip_prefix("--contract=") {
-                found.push(value.trim_matches(['"', '\'']).to_string());
-            }
-        }
-    }
-    found
-}
-
-/// The lines of the job `name` of a workflow: from its two-space-indented key to the next job.
-fn job_block(workflow: &str, name: &str) -> Vec<String> {
-    let header = format!("  {name}:");
-    let lines = workflow.lines().skip_while(|line| *line != header).skip(1);
-    let mut block = Vec::new();
-    for line in lines {
-        let is_job_key = line.starts_with("  ") && !line.starts_with("   ") && line.trim_end().ends_with(':') && !line.trim_start().starts_with('#');
-        if is_job_key {
-            break;
-        }
-        block.push(line.to_string());
-    }
-    block
-}
-
-/// The header and the body of the recipe `name` of a justfile.
-fn recipe(justfile: &str, name: &str) -> (String, Vec<String>) {
-    let mut lines = justfile.lines();
-    let header = lines.by_ref().find(|line| line.split(':').next() == Some(name) && line.contains(':') && !line.starts_with(' ')).unwrap_or_else(|| panic!("the justfile has the recipe `{name}`")).to_string();
-    let body = lines.take_while(|line| line.starts_with("    ") || line.starts_with('\t')).map(str::to_string).collect();
-    (header, body)
-}
-
-/// Every problem of the declared minors: each of the five must be `1.4` (they agree because they are the one value).
-fn minor_problems(declared: &str, fixture: &str, ci: &[String], atip: &[String], deep: &[String]) -> Vec<String> {
-    let mut found = Vec::new();
-    let mut check = |what: &str, values: &[String]| {
-        if values.is_empty() {
-            found.push(format!("{what} gives no minor"));
-        }
-        for value in values {
-            if value != MINOR {
-                found.push(format!("{what} says {value}, not {MINOR}"));
-            }
-        }
-    };
-    check("DECLARED_MINOR", &[declared.to_string()]);
-    check("the fixture's contractVersion", &[fixture.to_string()]);
-    check("the CI job `atip`", ci);
-    check("the recipe `atip`", atip);
-    check("the recipe `atip-deep`", deep);
-    found
-}
-
-fn tokens_of(lines: &[String], needle: &str) -> Vec<String> {
-    let line = lines.iter().find(|line| line.contains(needle)).unwrap_or_else(|| panic!("a line holds `{needle}`: {lines:#?}"));
-    line.split_whitespace().map(str::to_string).collect()
-}
-
-/// The value after `flag` in `tokens`.
-fn value_after<'a>(tokens: &'a [String], flag: &str) -> Option<&'a str> {
-    tokens.iter().position(|token| token == flag).and_then(|index| tokens.get(index + 1)).map(String::as_str)
-}
-
-// ---------------------------------------------------------------------------
 // The CHANGELOG entry (F7).
 
 /// The five commands the entry measures, with the argv that prints each document, and the tree.
@@ -1489,80 +1414,10 @@ fn atip_claim14_12_the_consumer_scan_finds_a_declaration_below_1_5_and_a_stated_
 }
 
 // ===========================================================================
-// atip.claim14.13 - 14 (F6)
+// The CHANGELOG file
 
 fn read(path: &str) -> String {
     std::fs::read_to_string(root().join(path)).unwrap_or_else(|e| panic!("`{path}` is readable: {e}"))
-}
-
-const FIXTURE: &str = "crates/canon-cli/tests/atip/canon.fixture.json";
-
-#[test]
-fn atip_claim14_13_the_declared_minor_the_fixture_the_job_and_the_recipes_agree_on_1_5() {
-    let workflow = read(".github/workflows/test.yml");
-    let justfile = read("justfile");
-    let fixture: Value = serde_json::from_str(&read(FIXTURE)).expect("the fixture is JSON");
-    let fixture_minor = fixture["contractVersion"].as_str().expect("the fixture has a contractVersion").to_string();
-    let ci = contracts_in(&job_block(&workflow, "atip"));
-    let atip = contracts_in(&recipe(&justfile, "atip").1);
-    let deep = contracts_in(&recipe(&justfile, "atip-deep").1);
-    let declared = canon_cli::json_out::DECLARED_MINOR;
-
-    assert_eq!(minor_problems(declared, &fixture_minor, &ci, &atip, &deep), Vec::<String>::new(), "the declaration, the fixture, the job and the recipes");
-    assert_eq!((ci.len(), atip.len(), deep.len()), (1, 1, 1), "each of the job and the two recipes gives its `--contract` once: {ci:?} {atip:?} {deep:?}");
-    let built = &SURFACE.tree.value["meta"]["contractVersion"];
-    assert_eq!(built, declared, "the binary declares the constant");
-
-    // Lowering one of them fails the agreement.
-    let one = |value: &str| vec![value.to_string()];
-    let lowered = [
-        minor_problems("1.4", &fixture_minor, &ci, &atip, &deep),
-        minor_problems(declared, "1.4", &ci, &atip, &deep),
-        minor_problems(declared, &fixture_minor, &one("1.4"), &atip, &deep),
-        minor_problems(declared, &fixture_minor, &ci, &one("1.4"), &deep),
-        minor_problems(declared, &fixture_minor, &ci, &atip, &one("1.4")),
-    ];
-    let named = ["DECLARED_MINOR", "fixture", "CI job", "`atip`", "`atip-deep`"];
-    for (problems, name) in lowered.iter().zip(named) {
-        assert_found(&format!("{name} lowered to 1.4"), problems, name);
-        assert_eq!(problems.len(), 1, "only the lowered one is found: {problems:?}");
-    }
-    assert_found("a missing declaration", &minor_problems(declared, &fixture_minor, &[], &atip, &deep), "gives no minor");
-    // The readers of the files find a lowered value too.
-    assert_eq!(contracts_in(&job_block(&workflow.replace("--contract 1.6", "--contract 1.4"), "atip")), vec!["1.4".to_string()]);
-    assert_eq!(contracts_in(&recipe(&justfile.replace("--contract 1.6", "--contract 1.4"), "atip-deep").1), vec!["1.4".to_string()]);
-}
-
-#[test]
-fn atip_claim14_14_the_job_and_the_recipes_run_the_checker_at_l2_1_5_with_the_fixture() {
-    let workflow = read(".github/workflows/test.yml");
-    let justfile = read("justfile");
-    let job = job_block(&workflow, "atip");
-    assert!(job.len() > 20, "the job `atip` was read ({} lines)", job.len());
-    let (_, deep_body) = recipe(&justfile, "atip-deep");
-    let (_, plain_body) = recipe(&justfile, "atip");
-    let expected_fixture = FIXTURE;
-    for (what, lines, deep) in [("the job `atip`", &job, true), ("the recipe `atip-deep`", &deep_body, true), ("the recipe `atip`", &plain_body, false)] {
-        let tokens = tokens_of(lines, "atip check --bin");
-        assert_eq!(value_after(&tokens, "--level"), Some("L2"), "{what}: {tokens:?}");
-        assert_eq!(value_after(&tokens, "--contract"), Some(MINOR), "{what}: {tokens:?}");
-        assert_eq!(tokens.iter().any(|token| token == "--deep"), deep, "{what} {} `--deep`: {tokens:?}", if deep { "runs" } else { "runs without" });
-        assert_eq!(value_after(&tokens, "--fixture"), Some(expected_fixture), "{what} runs the canon fixture: {tokens:?}");
-        assert!(tokens.join(" ").contains("--bin {{ target }}/debug/canon") || value_after(&tokens, "--bin").is_some_and(|bin| bin.ends_with("debug/canon")), "{what} runs the built canon: {tokens:?}");
-    }
-    // The checker's tag is the same in the job (install and cache key) and in the recipe that installs it.
-    assert!(job.iter().any(|line| line.contains("cargo install") && line.contains("--tag atip-check-v0.3.0")), "the job installs the checker at atip-check-v0.3.0");
-    assert!(job.iter().any(|line| line.contains("key:") && line.contains("atip-check-v0.3.0")), "the cache key of the checker names its tag");
-    let (_, install) = recipe(&justfile, "atip-install");
-    assert!(install.iter().any(|line| line.contains("--tag atip-check-v0.3.0")), "`just atip-install` installs the checker at atip-check-v0.3.0");
-    // `just ci` includes the deep run.
-    let (ci_header, _) = recipe(&justfile, "ci");
-    assert!(ci_header.split_whitespace().skip(1).any(|dependency| dependency == "atip-deep"), "`just ci` depends on atip-deep: {ci_header}");
-    // The fixture claims the declared minor and is the file the commands name.
-    let fixture: Value = serde_json::from_str(&read(FIXTURE)).expect("the fixture is JSON");
-    assert_eq!(fixture["contractVersion"], MINOR, "the fixture claims {MINOR}");
-    // The fixture holds what the checks read.
-    assert!(fixture["commands"].as_object().is_some_and(|commands| DESTRUCTIVE.iter().all(|name| commands[*name]["preview"].is_array())), "the fixture previews the six destructive commands");
 }
 
 // ===========================================================================

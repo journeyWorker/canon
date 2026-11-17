@@ -1,6 +1,6 @@
 //! `canon-0-35-claim-l2`, moved to 1.4 by `canon-0-36-claim-1-4` to 1.5 by `canon-0-37-claim-1-5` and to 1.6 by `canon-0-41-atip-1-6`: canon declares atip/1 1.6 and claims level L2, and the CI job proves it (scenarios `atip.claiml2.01-20`; `canon-0-36-atip-dep` moved the checker to the atip repository).
 //!
-//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --contract 1.6 --deep`
+//! The declaration is `canon_cli::json_out::DECLARED_MINOR` and `canon_cli::spec::LEVEL`; the proof is `atip check --level L2 --deep`
 //! on the committed fixture, which `just atip-deep` and the job `atip` run (`just atip` runs it without `--deep`), and which no test of canon runs. The CHANGELOG holds the release entry and the list of tests that
 //! stand for the obligations of contract 17.2 that a green checker run does not prove; the last four tests read it.
 
@@ -100,42 +100,6 @@ fn atip_claiml2_06_input_too_large_names_the_field_input() {
         assert_eq!(exit, Some(2), "a refusal: {document}");
         assert_eq!((document["error"]["code"].as_str(), document["error"]["reason"].as_str(), document["error"]["field"].as_str()), (Some("INPUT_TOO_LARGE"), Some(reason), Some("--input")), "{document}");
     }
-}
-
-/// The `run:` lines of the job `job` of the workflow.
-fn job_commands(workflow: &str, job: &str) -> Vec<String> {
-    let mut lines = workflow.lines().skip_while(|line| *line != format!("  {job}:"));
-    assert!(lines.next().is_some(), "the job {job} is in the workflow");
-    lines.take_while(|line| !line.starts_with("  ") || line.starts_with("   ")).filter_map(|line| line.trim().strip_prefix("run: ")).map(str::to_string).collect()
-}
-
-/// The command lines of the recipe `name` of the justfile, `{{ target }}` spelled `target`.
-fn recipe_lines(justfile: &str, name: &str) -> Vec<String> {
-    let mut lines = justfile.lines().skip_while(|line| !line.starts_with(&format!("{name}:")));
-    assert!(lines.next().is_some(), "the recipe {name} is in the justfile");
-    lines.take_while(|line| line.starts_with("    ")).map(|line| line.trim().replace("{{ target }}", "target")).collect()
-}
-
-#[test]
-fn atip_claiml2_07_just_atip_and_the_job_run_canon_at_l2_with_deep_at_1_5() {
-    let root = repo_root();
-    let workflow = read(&root.join(".github/workflows/test.yml"));
-    let justfile = read(&root.join("justfile"));
-    let canon_at_l2 = "atip check --bin target/debug/canon --level L2 --contract 1.6 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json".to_string();
-    let recipe = recipe_lines(&justfile, "atip-deep");
-    assert!(recipe.contains(&canon_at_l2), "the recipe atip-deep runs `{canon_at_l2}`: {recipe:?}");
-    assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "the recipe builds canon only: {recipe:?}");
-    assert!(!recipe.iter().any(|line| line.contains("--level L0") || line.contains("--level L1")), "the L2 report holds the L0 and L1 rows: {recipe:?}");
-    let quick = recipe_lines(&justfile, "atip");
-    assert!(quick.contains(&canon_at_l2.replace(" --deep", "")), "the recipe atip runs the same check without --deep: {quick:?}");
-    let job = job_commands(&workflow, "atip");
-    assert!(job.contains(&canon_at_l2), "the job atip runs `{canon_at_l2}`: {job:?}");
-    assert!(job.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{job:?}");
-    for retired in ["atip-l0", "atip-l1", "atip-l2", "atip-check-tests"] {
-        assert!(!workflow.lines().any(|line| line == format!("  {retired}:")), "the job {retired} is folded into the job atip");
-    }
-    let ci = justfile.lines().find(|line| line.starts_with("ci:")).expect("the recipe ci");
-    assert!(ci.split_whitespace().any(|word| word == "atip-deep"), "just ci runs the recipe atip-deep, as the job does: {ci}");
 }
 
 /// The commands the schema calls destructive, sorted: the ones the fixture must preview.

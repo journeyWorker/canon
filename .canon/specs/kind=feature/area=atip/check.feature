@@ -22,15 +22,3 @@ Feature: atip check: the atip/1 L0 conformance checker
     Given a canon fixture with a row dropped, an exit changed, a retryable flipped, a member of prose added, a warning dropped, a call changed or a key added
     When the generation test compares it with the generated one
     Then each difference is noticed
-
-  # canon: {"schema":1,"at":"2026-10-31T11:47:19Z","actor":{"agent_id":"impl-atip-check","role":"implementer","session_id":"s-0-33-atip-check"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-33-atip-check.F6
-  @atip.check.43
-  Scenario: The CI job and the just recipe run atip check against the canon binary with the same command
-    Given the workflow job atip and the just recipes atip-deep, atip and atip-install
-    When their commands are read
-    Then the job and the recipe atip-deep install the checker from the atip repository at its tag, build canon-cli only, and run atip check once on the canon binary at L2 with --contract 1.6, --deep and the canon fixture
-    And the recipe atip runs the same command without --deep

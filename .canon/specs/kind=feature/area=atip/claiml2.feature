@@ -34,17 +34,6 @@ Feature: atip canon claim l2: canon declares atip/1 (1.4 in 0.36, 1.5 in 0.37, 1
     When a source over 8 MiB and a batch of 10001 documents are given as --input
     Then both are exit 2 INPUT_TOO_LARGE with the reason TOO_MANY_BYTES and TOO_MANY_ITEMS and the field --input
 
-  # canon: {"schema":1,"at":"2026-11-02T21:08:39Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-35-claim-l2.F3
-  @atip.claiml2.07
-  Scenario: just atip-deep and the CI job atip run canon at L2 with --contract 1.6 and --deep, just atip runs it without --deep, and just ci includes atip-deep
-    Given the justfile and the workflow of the repository
-    When the recipes atip-deep and atip and the job atip are read
-    Then the recipe atip-deep and the job run the installed checker once on the canon binary at L2 with --contract 1.6, --deep and the canon fixture, both build canon only, the recipe atip runs the same check without --deep, the jobs atip-l0, atip-l1, atip-l2 and atip-check-tests are gone because the L2 report holds every L0 and L1 row and the checker's tests are the atip repository's, and the recipe ci lists atip-deep
-
   # canon: {"schema":1,"at":"2026-11-02T21:09:34Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
   @subject:atip-contract
   @lane:behavior

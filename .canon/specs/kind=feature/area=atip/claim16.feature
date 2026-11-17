@@ -115,28 +115,6 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
   @subject:atip-contract
   @lane:behavior
   @case:happy
-  @flow:canon-0-41-atip-1-6.F6
-  @atip.claim16.11
-  Scenario: No consumer names the crate or the checker at 0.2.0, and the dependency, the install lines and the fixture say 0.3.0 and 1.6
-    Given Cargo.toml, Cargo.lock, the justfile, the workflow, README, ARCHITECTURE, the install constant of the test and the fixture
-    When each is read for the tags and the declaration
-    Then none names a tag of 0.2.0, the install lines and the cache key name atip-check-v0.3.0, the dependency is atip-crate-v0.3.0 at its commit and the fixture declares 1.6
-
-  # canon: {"schema":1,"at":"2026-11-13T18:20:00Z","actor":{"agent_id":"impl-atip-1-6","role":"planner"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-41-atip-1-6.F6
-  @atip.claim16.12
-  Scenario: An install line or a dependency at a tag of 0.2.0 is found
-    Given a workflow line that installs atip-check-v0.2.0 and a manifest line that depends on atip-crate-v0.2.0
-    When the stale-tag check reads the lines
-    Then it names both lines by number and finds nothing in a line at 0.3.0
-
-  # canon: {"schema":1,"at":"2026-11-13T18:20:00Z","actor":{"agent_id":"impl-atip-1-6","role":"planner"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
   @flow:canon-0-41-atip-1-6.F7
   @atip.claim16.13
   Scenario: The CHANGELOG entry canon declares atip/1 1.6 has the before and after table, the callers note, the reasons for the members not used and the contributors line

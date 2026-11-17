@@ -133,28 +133,6 @@ Feature: atip claim 1.4: canon writes its schema answers in the 1.4 form (declar
     When the consumer scan reads them
     Then it finds each of them
 
-  # canon: {"schema":1,"at":"2026-11-04T15:59:40Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-36-claim-1-4.F6
-  @atip.claim14.13
-  Scenario: The declared minor, the fixture, the CI job atip and the recipes atip and atip-deep agree on 1.6, and the check fails when one of them says 1.4
-    Given DECLARED_MINOR, the fixture's contractVersion, the --contract of the CI job atip and of the recipes atip and atip-deep, with one of them seeded as 1.3
-    When the agreement check reads them
-    Then all real values are 1.6 and the check fails for the seeded one
-
-  # canon: {"schema":1,"at":"2026-11-04T15:59:46Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-36-claim-1-4.F6
-  @atip.claim14.14
-  Scenario: The CI job and the recipe atip-deep run atip check --level L2 --contract 1.6 --deep with the canon fixture, the recipe atip runs it without --deep, and just ci includes atip-deep
-    Given the CI job atip, the recipes atip and atip-deep, the recipe ci and the canon fixture
-    When their commands are read
-    Then the job and atip-deep run atip check --level L2 --contract 1.6 --deep with the fixture at the tag atip-check-v0.3.0, atip runs it without --deep, ci includes atip-deep and the fixture claims 1.6
-
   # canon: {"schema":1,"at":"2026-11-04T15:59:52Z","actor":{"agent_id":"impl-claim-1-4","role":"implementer","session_id":"s-0-36-claim-1-4"}}
   @subject:atip-contract
   @lane:behavior

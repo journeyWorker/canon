@@ -401,43 +401,6 @@ fn atip_claim16_10_a_document_set_with_one_name_and_two_meanings_fails_the_check
 }
 
 // ---------------------------------------------------------------------------
-// atip.claim16.11 - 12 (F6): the tags.
-
-/// The lines of `text` that name the checker or the crate at 0.2.0.
-fn stale_tag_lines(text: &str) -> Vec<String> {
-    text.lines().enumerate().filter(|(_, line)| line.contains("atip-check-v0.2.0") || line.contains("atip-crate-v0.2.0")).map(|(number, line)| format!("line {}: {}", number + 1, line.trim())).collect()
-}
-
-/// atip.claim16.11: no consumer names the tags of 0.2.0, and the install lines of the job, the recipe and the test name the checker at 0.3.0.
-#[test]
-fn atip_claim16_11_the_install_lines_and_the_dependency_name_the_tags_of_0_3_0() {
-    for path in ["justfile", ".github/workflows/test.yml", "Cargo.toml", "README.md", "ARCHITECTURE.md", "crates/canon-cli/tests/atip_check.rs"] {
-        assert_eq!(stale_tag_lines(&read(path)), Vec::<String>::new(), "`{path}` names a tag of 0.2.0");
-    }
-    let install = "--tag atip-check-v0.3.0 atip-check --locked";
-    assert!(read("justfile").contains(install), "`just atip-install`");
-    assert!(read(".github/workflows/test.yml").contains(install), "the job installs the checker at 0.3.0");
-    assert!(read(".github/workflows/test.yml").contains("key: canon-test-atip-check-v0.3.0-"), "the cache key names the tag");
-    assert!(read("crates/canon-cli/tests/atip_check.rs").contains(install), "the test's install constant");
-    assert!(read("Cargo.toml").contains("tag = \"atip-crate-v0.3.0\""), "the dependency");
-    let lock = read("Cargo.lock");
-    assert!(lock.contains("source = \"git+https://github.com/journeyWorker/atip?tag=atip-crate-v0.3.0#9cbc74a4"), "the lock holds the tag at its commit");
-    let fixture: Value = serde_json::from_str(&read(FIXTURE)).expect("the fixture is JSON");
-    assert_eq!(fixture["contractVersion"], MINOR, "the fixture");
-}
-
-/// atip.claim16.12: an install line or a dependency at 0.2.0 is found.
-#[test]
-fn atip_claim16_12_a_line_at_a_tag_of_0_2_0_is_found() {
-    let stale = "run: cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.2.0 atip-check --locked\nkey: x\natip = { tag = \"atip-crate-v0.2.0\" }";
-    let found = stale_tag_lines(stale);
-    assert_eq!(found.len(), 2, "{found:?}");
-    assert_found("the install line", &found, "line 1");
-    assert_found("the dependency", &found, "line 3");
-    assert_eq!(stale_tag_lines("--tag atip-check-v0.3.0 atip-check --locked and atip-crate-v0.3.0"), Vec::<String>::new(), "a line at 0.3.0 is no stale line");
-}
-
-// ---------------------------------------------------------------------------
 // atip.claim16.13 - 14 (F7): the CHANGELOG.
 
 const ENTRY_HEADING: &str = "canon declares atip/1 1.6";

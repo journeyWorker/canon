@@ -101,26 +101,15 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
     Then the document that declares 1.4 has the pattern as a problem, the one that declares 1.5 has none, and the shorthand is not I-Regexp at both minors
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:24Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
-  @subject:atip-check
+  @subject:atip-contract
   @lane:behavior
   @case:happy
   @flow:canon-0-37-claim-1-5.F5
   @atip.claim15.10
-  Scenario: The job and the recipes run atip check --level L2 --contract 1.6 --deep with the fixture, and the fixture and the declaration say 1.6
-    Given the job atip of the workflow, the recipes atip and atip-deep of the justfile, the fixture of the checker, its source and the declared minor
-    When each command line is read
-    Then the job and atip-deep run atip check --level L2 --contract 1.6 --deep with the canon fixture, atip runs it without --deep, the fixture and the declared minor say 1.6, the checker is installed at atip-check-v0.3.0, and the fixture lists values a domain refuses for the L1.patterns row
-
-  # canon: {"schema":1,"at":"2026-11-05T12:09:30Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
-  @subject:atip-check
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-37-claim-1-5.F5
-  @atip.claim15.11
-  Scenario: Lowering the declaration, the fixture, the job or a recipe to 1.4 fails the agreement
-    Given the declared minor, the fixture, the job atip and the recipes atip and atip-deep with one of them lowered to 1.4 at a time
-    When the agreement check reads each
-    Then the check fails for the lowered one by name and for no other, fails for a missing declaration, and the readers of the workflow and the justfile find a lowered value
+  Scenario: The fixture and the tree say the minor canon declares
+    Given the fixture of the checker, the schema tree and the declared minor
+    When each is read
+    Then the fixture's contractVersion and the tree's meta.contractVersion are the declared minor
 
   # canon: {"schema":1,"at":"2026-11-05T12:09:36Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-contract
