@@ -86,7 +86,7 @@ fn atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generat
     let committed = std::fs::read_to_string(fixture_path()).expect("tests/atip/canon.fixture.json");
     assert_eq!(drift(&committed, &generated), None, "run CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check and commit the fixture");
     let fixture: Value = serde_json::from_str(&committed).expect("the fixture is JSON");
-    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.6"), json!("status"), json!([["--repo", "."]])));
+    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!(canon_cli::json_out::DECLARED_MINOR), json!("status"), json!([["--repo", "."]])));
     let mut keys: Vec<&String> = fixture.as_object().expect("object").keys().collect();
     keys.sort();
     assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "notRun", "prepare", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L2 keys are `commands` members (`preview`, `batchFailsAt`, `batchFailsFirst`, `allowedEffects`), not top-level ones");

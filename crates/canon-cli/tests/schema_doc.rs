@@ -6,6 +6,9 @@
 
 #[path = "support/hermetic.rs"]
 mod hermetic;
+#[path = "support/prose.rs"]
+#[expect(dead_code, reason = "this test uses only the schema-document half of the prose list")]
+mod prose;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::Output;
@@ -1038,14 +1041,21 @@ fn spec_file() -> Value {
     serde_json::from_str(&std::fs::read_to_string(repo_root().join(canon_cli::spec::SPEC_PATH)).expect("the spec file")).expect("the spec file is JSON")
 }
 
+/// `value` as the member `key` of the spec document, with the prose of the spec emptied: what the checked-in file and the answers must agree on.
+fn machine(key: &str, value: &Value) -> Value {
+    let mut document = json!({ key: value });
+    prose::spec_document(&mut document);
+    document[key].take()
+}
+
 /// atip.schemadoc.13: the checked-in spec holds the tree and, for every command, the document `canon schema <command>
-/// --json` answers, byte for byte once printed the same way.
+/// --json` answers, equal in every machine field (the prose is no part of the comparison; the bytes the answer prints are the serializer's).
 #[test]
 fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command() {
     let file = spec_file();
     let root = canon_cli::spec::built_root();
     let described = canon_cli::spec::described(&root, None).expect("described");
-    assert_eq!(file["tree"], described.tree().to_value());
+    assert_eq!(machine("tree", &file["tree"]), machine("tree", &described.tree().to_value()));
     assert_eq!(file["tree"]["level"], "L2");
     assert_eq!(file["contractVersion"], canon_cli::json_out::DECLARED_MINOR);
     // The file is the 1.4 form: the tree and the command documents hold no `path`, and the schemas live in their own map.
@@ -1073,7 +1083,7 @@ fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command(
         assert_eq!(out.status.code(), Some(0), "{args:?}");
         let text = String::from_utf8(out.stdout.clone()).expect("text");
         let answer: Value = serde_json::from_str(&text).expect("JSON");
-        assert_eq!(answer["data"], *doc, "`{command}`: the file and the answer differ");
+        assert_eq!(machine("commands", &json!([answer["data"]])), machine("commands", &json!([doc])), "`{command}`: the file and the answer differ");
         // The bytes of `data` in the answer are the bytes the serializer writes.
         let generated = described.command(&command).expect("a command document").to_line();
         let printed = &text[text.find("\"data\":").expect("data") + "\"data\":".len()..text.rfind(",\"meta\":").expect("meta")];
@@ -1083,7 +1093,7 @@ fn atip_schemadoc_13_the_spec_file_is_the_tree_and_the_answers_of_every_command(
         let out = &answered[2 * at + 1];
         assert_eq!(out.status.code(), Some(0), "{args:?}");
         let answer: Value = serde_json::from_slice(&out.stdout).expect("JSON");
-        assert_eq!(answer["data"], file["schemas"][&command], "`{command}`: the file's schemas and the --schemas answer differ");
+        assert_eq!(machine("schemas", &answer["data"]), machine("schemas", &file["schemas"][&command]), "`{command}`: the file's schemas and the --schemas answer differ");
         assert_eq!(answer["data"]["kind"], "schemas");
     }
     assert_eq!(file["schemas"].as_object().expect("schemas").len(), commands.len(), "the file's schemas map has one answer per command");

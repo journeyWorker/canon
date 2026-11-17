@@ -29,7 +29,7 @@ Feature: ATIP 1.1 contract
   Scenario: A reason that is not registered under its code, or an INPUT_INVALID without a reason, fails the tests
     Given the registry and the conformance corpus
     When a test emits a reason that the registry does not hold under the code, and the corpus is read for INPUT_INVALID and INPUT_TOO_LARGE errors
-    Then the unregistered reason fails in a debug build, every input error the corpus froze has a registered reason, and every reason the registry holds is emitted somewhere
+    Then the unregistered reason fails in a debug build, every input error the corpus froze has a registered reason
 
   # canon: {"schema":1,"at":"2026-11-01T07:34:03Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract

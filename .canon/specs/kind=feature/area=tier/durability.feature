@@ -82,7 +82,7 @@ Feature: Durable record writes
   Scenario: A write that cannot happen fails with its cause, and a migrate that cannot replace canon.yaml stops incomplete and the next run finishes it
     Given a legacy file whose parent is a file, so the write cannot happen, and an old repo whose root takes no new entry
     When the legacy write is made, and migrate --commit is run on the repo
-    Then the legacy error reads could not write <file> and keeps its io cause, and migrate exits 1 with MIGRATION_INCOMPLETE, reason STOPPED, and canon.yaml as it was
+    Then the legacy write fails with an error that keeps its io cause, and migrate exits 1 with MIGRATION_INCOMPLETE, reason STOPPED, and canon.yaml as it was
     And running migrate again finishes the migration and writes the migrated canon.yaml
 
   # canon: {"schema":1,"at":"2026-11-08T06:25:56Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}

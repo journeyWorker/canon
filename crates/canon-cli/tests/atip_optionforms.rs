@@ -773,9 +773,9 @@ fn atip_optionforms_16_the_golden_file_is_the_measure_of_0_36_and_its_classes_ar
     assert!(!held("accepted", "none,claude") && !held("accepted", "gemini") && held("refused", "gemini"));}
 
 // ===========================================================================
-// `canon-0-38-date-refusals`: a leap second is refused in the twelve places, and a date, a time or an offset that does not exist says so.
+// `canon-0-38-date-refusals`: a leap second is refused in every place that takes a date, and a date, a time or an offset that does not exist says so.
 
-/// The call that gives `--option` the value `value` in `command`, any of the twelve places.
+/// The call that gives `--option` the value `value` in `command`, any place that takes a date.
 fn place_call(option: &str, command: &str, value: &str) -> Vec<String> {
     let given = format!("--{option}={value}");
     let ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -790,7 +790,7 @@ fn place_call(option: &str, command: &str, value: &str) -> Vec<String> {
     harness::strs(&argv)
 }
 
-/// Every `(option, command)` of the twelve places, with the call of a value there refused with `USAGE` for the option and nothing written; its message.
+/// Every `(option, command)` place that takes a date, with the call of a value there refused with `USAGE` for the option and nothing written; its message.
 fn refused_in_every_place(value: &str) -> Vec<(String, String)> {
     refused_places(value).into_iter().map(|(_, command, message)| (command, message)).collect()
 }
@@ -814,7 +814,7 @@ fn refused_places(value: &str) -> Vec<(String, String, String)> {
 }
 
 #[test]
-fn atip_daterefusals_01_a_leap_second_is_refused_in_the_twelve_places_and_the_second_before_and_the_next_day_are_taken() {
+fn atip_daterefusals_01_a_leap_second_is_refused_in_every_place_and_the_second_before_and_the_next_day_are_taken() {
     for value in ["2030-01-01T23:59:60Z", "1998-12-31T23:59:60Z", "2030-01-01T10:00:60Z", "2030-01-01T23:59:60.5Z", "2030-01-01T23:59:60+01:00"] {
         refused_in_every_place(value);
     }
@@ -851,7 +851,7 @@ fn atip_daterefusals_01_a_leap_second_is_refused_in_the_twelve_places_and_the_se
 }
 
 #[test]
-fn atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refused_in_the_twelve_places_and_says_what_does_not_exist() {
+fn atip_daterefusals_02_a_date_a_time_or_an_offset_that_does_not_exist_is_refused_in_every_place_and_says_what_does_not_exist() {
     for value in ["2026-02-30T10:00:00Z", "2026-02-29T10:00:00Z", "2026-13-01T10:00:00Z", "2026-01-01T25:00:00Z", "2026-01-01T10:61:00Z", "2026-01-01T10:00:00+24:00"] {
         refused_in_every_place(value);
     }

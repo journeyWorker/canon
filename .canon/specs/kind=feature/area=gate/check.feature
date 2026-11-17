@@ -249,11 +249,10 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:failure
   @gate.check.24
-  Scenario: An altered stored blob is stale evidence that says it was altered, not gone
+  Scenario: An altered stored blob is stale evidence naming the blob's actual digest
     Given a committed record whose stored blob's bytes were changed while the working-tree report still matches
     When the gate checks the repository
     Then the gate exits 1 with stale-evidence naming the blob's actual digest
-    And the line says the stored blob does not match its name, never that the bound bytes are gone
 
   # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine

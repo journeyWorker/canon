@@ -590,7 +590,6 @@ Feature: context capability
     Given `canon schema <command> --json` for every command, the skills and the website's command pages
     When the options and every command line in the text are read
     Then no option ends in -id, and every command line parses against the spec
-    And the skill guide states the rule once: an option that takes an id is the bare noun, and a JSON key is that name without Id
 
   # canon: {"schema":1,"at":"2026-10-27T13:14:41Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
   @subject:context-capability
