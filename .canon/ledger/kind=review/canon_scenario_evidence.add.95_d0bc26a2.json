@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-r3-evidence_gate",
+    "role": "reviewer",
+    "session_id": "Rev43r3_evgate"
+  },
+  "at": "2026-11-17T17:32:10.658431981Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "kind": "review",
+  "pin": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:evidence_add_95_a_bare_artifact_is_refused_in_a_batch"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e6392b35f10d978823d0706d93eb5ba17a791d11713706ee95993e9dd0d73ee3",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-test-cleanup/brief.md"
+  },
+  "review_id": "01M7N91X12HZVKDE6GG7NZ6PH2",
+  "reviewer": "rev-0-43-tests-r3-evidence_gate",
+  "scenario_id": "evidence.add.95",
+  "schema": 2,
+  "worktree_dirty": false
+}

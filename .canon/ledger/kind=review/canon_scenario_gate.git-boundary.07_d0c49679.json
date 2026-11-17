@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-r3-evidence_gate",
+    "role": "reviewer",
+    "session_id": "Rev43r3_evgate"
+  },
+  "at": "2026-11-17T17:32:10.658431981Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "kind": "review",
+  "pin": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:gate_git_boundary_07_a_name_that_is_not_utf8_gives_no_surface_and_never_a_stale_verdict",
+          "junit:risk::tests::gate_git_boundary_07_a_commit_that_changed_a_name_that_is_not_utf8_closes_the_risk_check",
+          "junit:staleness::tests::gate_git_boundary_07_a_name_that_is_not_utf8_leaves_the_surface_query_unanswered_and_the_evidence_not_stale"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "de1d10cc24390bc5f9bb19a5e935ab33251cc5400a62bcf72e7f311288c84eed",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-test-cleanup/brief.md"
+  },
+  "review_id": "01M7N91X12HZVKDE6GG7NZ6PH2",
+  "reviewer": "rev-0-43-tests-r3-evidence_gate",
+  "scenario_id": "gate.git-boundary.07",
+  "schema": 2,
+  "worktree_dirty": false
+}
