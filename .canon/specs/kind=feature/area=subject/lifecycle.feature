@@ -391,7 +391,7 @@ Feature: subject lifecycle
   @subject.lifecycle.39
   Scenario: A tagged unapproved change still blocks reopen and ship under a newer untagged draft
     Given a shipped subject adopting an approved change a, a draft change b that one of its scenarios is tagged @flow:b.F1 for, and a newer draft change c no scenario is tagged for
-    When the shipped subject is reopened, and a verifying subject set up the same way, with b's scenario attested, is shipped
+    When the shipped subject is reopened, and a verifying subject set up the same way is shipped
     Then both are refused naming b's brief, and the output names every pending draft, here c, through its @flow:c.* tag
     And without c the refusal is the same, and only a change never approved, no chore and tagged by no scenario is ever a pending draft
     And canon status does not advise the refused reopen
