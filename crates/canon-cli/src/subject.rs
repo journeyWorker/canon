@@ -226,7 +226,7 @@ fn fold_latest(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
         record: RawRecord,
     }
     let candidates = records.into_iter().map(|record| {
-        let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
+        let key = canon_store::partition::resolve_partition(kind, &record.0).map_or_default(|p| p.natural_key);
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
         let digest = canon_store::partition::content_digest(&record.0);
@@ -1155,7 +1155,7 @@ pub fn run_move(
             }
             let reverify: Vec<&Violation> = waivable.iter().filter(|v| canon_gate::review_gate::is_reverify(v)).collect();
             if reverify.iter().any(|v| !canon_gate::review_gate::is_scoped_reverify(v)) {
-                let commands = gate_context.as_ref().map(|ctx| crate::reverify::batch_commands_of(&repo, ctx, &code_tree, &subject)).unwrap_or_default();
+                let commands = gate_context.as_ref().map_or_default(|ctx| crate::reverify::batch_commands_of(&repo, ctx, &code_tree, &subject));
                 fixes.push(match commands.as_slice() {
                     [] => "record the suite again with `canon evidence add --all-scenarios` and a --report for each test report of the suite (a review stays current while the verdicts and checks are the same)".to_string(),
                     many => format!("record the suite again for the scenarios named with {} (a review stays current while the verdicts and checks are the same)", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),

@@ -364,7 +364,7 @@ fn a_refused_write_leaves_the_tree_and_git_status_unchanged() {
         let out = run(&t, home.path(), &recipe_argv(row), &[]);
         let after = snap(&t);
         let document = parse(&out);
-        let code = document.as_ref().map(error_code).unwrap_or_default();
+        let code = document.as_ref().map_or_default(error_code);
         if out.status.code() != Some(row.exit) || code != row.code || document.as_ref().is_some_and(|d| d["ok"] != false) {
             found.push((row.leaf.to_string(), format!("exit {:?} `{code}`, expected {} `{}`: {}", out.status.code(), row.exit, row.code, String::from_utf8_lossy(&out.stdout))));
             continue;
@@ -409,7 +409,7 @@ fn atip_contract11_15_a_refused_read_leaves_the_tree_and_dot_git_as_they_were() 
         let out = run(&t, home.path(), &strs(argv), &[]);
         let after = snap(&t);
         let document = parse(&out);
-        let got = document.as_ref().map(error_code).unwrap_or_default();
+        let got = document.as_ref().map_or_default(error_code);
         if out.status.code() != Some(2) || got != *code {
             problems.push(format!("{leaf_path} {argv:?}: exit {:?} `{got}`, expected 2 `{code}`: {}", out.status.code(), String::from_utf8_lossy(&out.stdout)));
             continue;
@@ -499,7 +499,7 @@ fn a_write_leaf_that_needs_canon_state_refuses_a_directory_without_a_config() {
         let before = snap(&t);
         let out = run(&t, home.path(), &argv, &[]);
         let after = snap(&t);
-        let code = parse(&out).as_ref().map(error_code).unwrap_or_default();
+        let code = parse(&out).as_ref().map_or_default(error_code);
         if out.status.code() != Some(2) || code != "CONFIG_REQUIRED" {
             found.push((name, format!("exit {:?} `{code}`: {}", out.status.code(), String::from_utf8_lossy(&out.stdout))));
             continue;
@@ -533,7 +533,7 @@ fn a_dry_run_refuses_with_the_code_of_the_real_run_and_writes_nothing() {
         argv.push("--dry-run".into());
         let out = run(&t, home.path(), &argv, &[]);
         let after = snap(&t);
-        let code = parse(&out).as_ref().map(error_code).unwrap_or_default();
+        let code = parse(&out).as_ref().map_or_default(error_code);
         if out.status.code() != Some(row.exit) || code != row.code {
             found.push((row.leaf.to_string(), format!("the dry run exits {:?} `{code}`, the real run {} `{}`: {}", out.status.code(), row.exit, row.code, String::from_utf8_lossy(&out.stdout))));
             continue;
@@ -631,7 +631,7 @@ fn a_declared_idempotent_write_leaf_is_a_no_op_the_second_time() {
             match parse(&second) {
                 _ if node["effect"] == "destructive" => {}
                 Some(document) if unchanged_of(&document) == Some(Value::Bool(true)) => {}
-                other => found.push((name.clone(), format!("a `{kind}` leaf: the second run does not report unchanged = true: {}", other.map(|d| d.to_string()).unwrap_or_default()))),
+                other => found.push((name.clone(), format!("a `{kind}` leaf: the second run does not report unchanged = true: {}", other.map_or_default(|d| d.to_string())))),
             }
             // `unchanged` is the report's own word for a no-op: when it is there it is true, and `meta` has none.
             if let Some(document) = parse(&second) {

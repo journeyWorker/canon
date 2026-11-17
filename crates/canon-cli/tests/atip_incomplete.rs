@@ -395,12 +395,11 @@ fn atip_midway_01_the_reserved_code_is_gone_and_each_incomplete_code_is_register
         );
         let listed: Vec<&str> = from_all["reasons"]
             .as_array()
-            .map(|list| {
+            .map_or_default(|list| {
                 list.iter()
                     .filter_map(|reason| reason["reason"].as_str())
                     .collect()
-            })
-            .unwrap_or_default();
+            });
         assert_eq!(listed, *reasons, "{code}");
         assert!(
             atip::registry_entry_problems(&from_all).is_empty(),
@@ -1161,13 +1160,12 @@ fn repo_with_scenario() -> tempfile::TempDir {
 
 fn files_in(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
-        .map(|entries| {
+        .map_or_default(|entries| {
             entries
                 .flatten()
                 .map(|entry| entry.file_name().to_string_lossy().into_owned())
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     names.sort();
     names
 }

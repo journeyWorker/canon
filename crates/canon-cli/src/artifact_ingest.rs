@@ -646,7 +646,7 @@ struct ArtifactsSectionManifest {
 /// resolved relative to `repo` (never the process CWD), mirroring
 /// `build_tiers`'s `tiers.git.root` resolution.
 fn load_artifact_source_config(repo: &Path, canon_yaml_text: &str) -> ArtifactSourceConfig {
-    let parsed = serde_yaml::from_str::<ArtifactsSectionManifest>(canon_yaml_text).map(|m| m.artifacts).unwrap_or_default();
+    let parsed = serde_yaml::from_str::<ArtifactsSectionManifest>(canon_yaml_text).map_or_default(|m| m.artifacts);
     ArtifactSourceConfig {
         ledger_root: parsed.ledger_root.map(|p| repo.join(p)),
         divergences_root: parsed.divergences_root.map(|p| repo.join(p)),
@@ -787,7 +787,7 @@ fn fold_handoff_records(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRec
         record: RawRecord,
     }
     let candidates = records.into_iter().map(|record| {
-        let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
+        let key = canon_store::partition::resolve_partition(kind, &record.0).map_or_default(|p| p.natural_key);
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
         let digest = canon_store::partition::content_digest(&record.0);
@@ -2393,8 +2393,7 @@ fn run_pass(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<Artifa
     // MALFORMED `canon.yaml` still fails the whole command loud, above,
     // before this line is ever reached.
     let scenario_titles = read_kind_records(RecordKind::Scenario, store.as_ref(), policy_for_reason.as_ref(), &unavailable_reasons, missing_config_reason.as_deref())
-        .map(|records| ScenarioTitleIndex::from_records(&records))
-        .unwrap_or_default();
+        .map_or_default(|records| ScenarioTitleIndex::from_records(&records));
 
     let mut adapters = Vec::new();
     let mut all_events: Vec<ArtifactEvent> = Vec::new();

@@ -68,11 +68,11 @@ pub fn check(root: &Command, matches: &ArgMatches) -> Option<(String, CliError)>
         let (rule, table) = (&docs[at], rules[at]);
         let code = table.code.unwrap_or("USAGE");
         let message = table.says.map_or_else(|| message_of(&args, rule, &given), str::to_string);
-        let value = rule.when.as_ref().and_then(|when| given_values.get(&when.name)).and_then(|values| values.first()).map(|(_, text)| text.clone()).unwrap_or_default();
+        let value = rule.when.as_ref().and_then(|when| given_values.get(&when.name)).and_then(|values| values.first()).map_or_default(|(_, text)| text.clone());
         let hint = table.hint.map_or_else(|| rule.help.clone().map_or_else(|| points_to(&path, "lists the constraints of the command"), |help| format!("{help} {}", points_to(&path, "lists the constraints of the command"))), |hint| hint.replace("{value}", &value));
         let mut error = CliError::refused(code, message).hint(hint).field(field_of(&args, &fault));
         // The closed set of the argument at fault, as clap's own refusal of the pair gave it (`--policy`: light, standard, strict).
-        let closed: Vec<String> = args.iter().find(|arg| atip::constraint::name_of(arg) == fault).map(|arg| arg.get_possible_values().iter().filter(|value| !value.is_hide_set()).map(|value| value.get_name().to_string()).collect()).unwrap_or_default();
+        let closed: Vec<String> = args.iter().find(|arg| atip::constraint::name_of(arg) == fault).map_or_default(|arg| arg.get_possible_values().iter().filter(|value| !value.is_hide_set()).map(|value| value.get_name().to_string()).collect());
         if !closed.is_empty() {
             error = error.expected(closed);
         }
@@ -177,7 +177,7 @@ pub(crate) fn values_of(matches: &ArgMatches, args: &[&Arg], explicit_only: bool
                 .try_get_raw(id)
                 .ok()
                 .flatten()
-                .map(|raw| {
+                .map_or_default(|raw| {
                     raw.map(|value| {
                         let text = value.to_string_lossy().into_owned();
                         let normal = if integer { text.trim_start_matches('+').parse::<i64>().map_or_else(|_| json!(text), |number| json!(number)) } else { json!(text) };
@@ -185,7 +185,6 @@ pub(crate) fn values_of(matches: &ArgMatches, args: &[&Arg], explicit_only: bool
                     })
                     .collect()
                 })
-                .unwrap_or_default()
         } else {
             vec![(json!(true), "true".to_string())]
         };

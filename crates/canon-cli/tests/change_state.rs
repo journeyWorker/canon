@@ -163,7 +163,7 @@ fn code(body: &Value) -> (&str, &str) {
 }
 
 fn warning_codes(body: &Value) -> Vec<String> {
-    body["meta"]["warnings"].as_array().map(|w| w.iter().filter_map(|w| w["code"].as_str().map(str::to_string)).collect()).unwrap_or_default()
+    body["meta"]["warnings"].as_array().map_or_default(|w| w.iter().filter_map(|w| w["code"].as_str().map(str::to_string)).collect())
 }
 
 /// Writes one more version of subject `id` into the ledger, as `subject move` and `subject adopt` do: the newest version of it, with

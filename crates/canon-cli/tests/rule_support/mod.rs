@@ -215,7 +215,7 @@ pub fn clap_refusal(words: &[String]) -> Option<(String, String)> {
     match ROOT.clone().try_get_matches_from(argv) {
         Ok(_) => None,
         Err(error) => {
-            let blamed = error.get(ContextKind::InvalidArg).map(ToString::to_string).unwrap_or_default();
+            let blamed = error.get(ContextKind::InvalidArg).map_or_default(ToString::to_string);
             Some((blamed, error.to_string()))
         }
     }

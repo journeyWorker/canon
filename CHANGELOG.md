@@ -6,6 +6,19 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ### Changed
 
+- **Building canon from source takes Rust 1.100.0** (`canon-0-43-rust-1-100`; canon's behavior, output, exit values, records and declaration do not change). A pinned toolchain moves from 1.99.1 to 1.100.0, the workspace declares `rust-version = "1.100.0"` (the eleven crates inherit it), and the aarch64 musl release row builds in `rust:1.100.0-alpine3.24` pinned by digest. The checker is still the pre-built npm binary, so installing it needs no Rust. The CI cache no longer restores the `target/` of the time before the toolchain hash was in the key.
+
+  | | before | after |
+  | --- | --- | --- |
+  | `rust-toolchain.toml` `channel` | `1.99.1` | `1.100.0` |
+  | `rust-version` | not declared | `1.100.0`, in `[workspace.package]`, inherited by the eleven crates |
+  | aarch64 musl image | `rust:1.99.1-alpine3.24@sha256:44819b27…9383` | `rust:1.100.0-alpine3.24@sha256:de1e0058…affb` |
+  | CI job name | `clippy 1.99.1 and visibility rule` | `clippy and visibility rule` |
+  | `map_unwrap_or` sites (clippy 1.100 widened it to `.map(f).unwrap_or_default()`) | 0 on 1.99.1; 129 in 71 files on 1.100.0 | 0, rewritten to `.map_or_default(f)` |
+  | cargo lints on 1.100.0 | two warnings | none: `repository` removed from `[workspace.package]`, unused `canon-fmt` removed from `canon-gate` (`Cargo.lock` loses that one line) |
+  | `scripts/ci-strip-workspace-build.sh` | `cargo clean -p`, then a delete by name | `cargo clean -p` only: nothing carrying a crate's name is left on the 1.100 layout |
+  | cache `restore-keys` | the toolchain-hash line and an old `canon-test-<job>-cargo-` line | the toolchain-hash line only |
+
 - **canon's atip crate is `atip-crate-v0.3.2` and the checker is the pre-built `@journeykit/atip-check` 0.4.1** (`canon-0-43-atip-0-3-2`; canon's output does not change: the answers of `canon schema --json`, every `schema <command> --json` and `--schemas --json`, `schema --errors --json` and `--warnings --json` are the same bytes before and after, sha256 `ac14c89211aeef2cc87eb8273a5d66f99ce5006d8c70d9663265d8581249c061` over 165 lines). The crate is still a git dependency pinned by `Cargo.lock`. The checker is no longer built from source: `tools/atip-check/` holds a `package.json` and a `bun.lock` (bun 1.3.14, `lockfileVersion` 1, the sha512 of `@journeykit/atip-check` and of its three platform packages), `just atip-install` and the CI job `atip` run `bun install --frozen-lockfile` there, and the recipes `atip` and `atip-deep` and the job call `tools/atip-check/node_modules/.bin/atip` by path, so an `atip` on `PATH` never stands in for it. The checker needs Rust 1.100 to build from source, which canon's toolchain (1.99.1) is not; the pre-built package does not depend on the toolchain. The contract flag is gone from the job and the recipes (the checker follows the fixture's `contractVersion`, which stays `1.6`); `--jobs 4` runs independent calls at once and the report does not depend on it (74 MUST passed, 0 failed, 0 unprovided, 8 not applicable and the one `L1.one-meaning-values` advisory for `--kind`, the same 95 rows at `--jobs 1`). The spec patch `v1.6.1` changes no rule, so canon still declares `1.6`.
 
   | | before (0.42) | after |

@@ -86,7 +86,7 @@ fn attest(repo: &Path, extra: &[&str]) -> Output {
 
 fn committed_records(repo: &Path) -> Vec<serde_json::Value> {
     let dir = repo.join(".canon/ledger/kind=evidence");
-    let mut paths: Vec<_> = std::fs::read_dir(dir).map(|d| d.filter_map(Result::ok).map(|e| e.path()).collect()).unwrap_or_default();
+    let mut paths: Vec<_> = std::fs::read_dir(dir).map_or_default(|d| d.filter_map(Result::ok).map(|e| e.path()).collect());
     paths.sort();
     paths.iter().map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()).collect()
 }

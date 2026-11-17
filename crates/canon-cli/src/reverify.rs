@@ -549,7 +549,7 @@ pub fn hint(repo: &Path, ctx: Option<&GateContext>, code_tree: &CodeTreeMemo, su
     if reverify.iter().all(|v| is_scoped_reverify(v)) {
         return Some("record evidence again for the scenarios named, one command each (`canon evidence add --project <root> --scenario <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`); the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
     }
-    let commands = ctx.map(|ctx| batch_commands_of(repo, ctx, code_tree, subject)).unwrap_or_default();
+    let commands = ctx.map_or_default(|ctx| batch_commands_of(repo, ctx, code_tree, subject));
     let how = match commands.as_slice() {
         [] => "record the suite again for the scenarios named with `canon evidence add --all-scenarios` and a --report for each test report of the suite".to_string(),
         [one] => format!("record the suite again for the scenarios named: `{one}`"),
@@ -577,5 +577,5 @@ pub fn batch_commands_of(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMem
 
 /// The chore changes of `subject` whose approval is on record, by slug.
 fn chore_review_commands(repo: &Path, ctx: Option<&GateContext>, subject: &Subject) -> Vec<String> {
-    ctx.map(|ctx| chore_approvals(repo, ctx, subject).into_iter().map(|approval| approval.change.as_str().to_string()).collect()).unwrap_or_default()
+    ctx.map_or_default(|ctx| chore_approvals(repo, ctx, subject).into_iter().map(|approval| approval.change.as_str().to_string()).collect())
 }

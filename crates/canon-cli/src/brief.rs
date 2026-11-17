@@ -772,7 +772,7 @@ pub fn attested_briefs<'a>(
 ) -> Vec<(&'a Subject, BriefStatus)> {
     let owner = scenario.and_then(|(project, id)| latest_scenario(ctx, project, id).and_then(|s| s.subject_id.as_ref()));
     let task_change = task.map(TaskId::change_id);
-    let tagged = scenario.map(|(project, id)| flow_changes.changes_of(repo, project, id).to_vec()).unwrap_or_default();
+    let tagged = scenario.map_or_default(|(project, id)| flow_changes.changes_of(repo, project, id).to_vec());
     let mut subjects: Vec<(&Subject, Vec<ChangeId>)> = latest_subjects(ctx)
         .into_iter()
         .map(|s| (s, subject_change_ids(ctx, s)))

@@ -104,8 +104,7 @@ fn archive_label(repo: &Path) -> String {
     GateCtx::from_repo(repo)
         .ok()
         .and_then(|ctx| canon_store::archive::archive_root_of(&ctx.ledger_root))
-        .map(|root| root.strip_prefix(repo).unwrap_or(&root).display().to_string())
-        .unwrap_or_default()
+        .map_or_default(|root| root.strip_prefix(repo).unwrap_or(&root).display().to_string())
 }
 
 /// One kind's row in a compaction report.

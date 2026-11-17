@@ -1169,7 +1169,7 @@ fn diagnose_unknown_keys(content: &str, diagnostics: &mut Vec<PolicyDiagnostic>)
     for key in entries.keys() {
         let key = match key {
             serde_yaml::Value::String(key) => key.clone(),
-            other => serde_yaml::to_string(other).map(|rendered| rendered.trim_end().to_string()).unwrap_or_default(),
+            other => serde_yaml::to_string(other).map_or_default(|rendered| rendered.trim_end().to_string()),
         };
         if !KNOWN_TOP_LEVEL_KEYS.contains(&key.as_str()) {
             diagnostics.push(PolicyDiagnostic::UnknownKey { key });

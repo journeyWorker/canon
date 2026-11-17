@@ -437,7 +437,7 @@ fn atip_codeexit_01_context_object_conflict_is_exit_2_and_writes_nothing() {
     std::fs::write(d.join("doc.md"), "hi\n").unwrap();
     std::fs::write(d.join("m.json"), r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":["doc.md"],"examples":[],"toolSchemas":[],"injectedGuidance":[]}"#).unwrap();
     let objects = d.join(".canon/context-packs/objects");
-    let stored = |dir: &Path| -> Vec<PathBuf> { std::fs::read_dir(dir).map(|entries| entries.map(|e| e.unwrap().path()).collect()).unwrap_or_default() };
+    let stored = |dir: &Path| -> Vec<PathBuf> { std::fs::read_dir(dir).map_or_default(|entries| entries.map(|e| e.unwrap().path()).collect()) };
     let before: BTreeSet<PathBuf> = stored(&objects).into_iter().collect();
     ok(d, &["context-pack", "add", "--manifest", "m.json"], None);
     let mut added: Vec<PathBuf> = stored(&objects).into_iter().filter(|path| !before.contains(path)).collect();

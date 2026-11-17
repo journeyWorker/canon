@@ -330,8 +330,7 @@ fn filename_stamp(path: &Path) -> Option<DateTime<Utc>> {
 /// itself returned, but kept total rather than panicking).
 fn relative_components(root: &Path, path: &Path) -> Vec<String> {
     path.strip_prefix(root)
-        .map(|rel| rel.components().filter_map(|c| c.as_os_str().to_str().map(str::to_string)).collect())
-        .unwrap_or_default()
+        .map_or_default(|rel| rel.components().filter_map(|c| c.as_os_str().to_str().map(str::to_string)).collect())
 }
 
 #[cfg(test)]

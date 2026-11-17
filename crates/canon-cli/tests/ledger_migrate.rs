@@ -296,7 +296,7 @@ fn assert_unchanged_strictly(before: &Snapshot, repo: &Repo, what: &str) {
 }
 
 fn warnings(doc: &Value) -> Vec<String> {
-    doc["meta"]["warnings"].as_array().map(|a| a.iter().filter_map(|w| w["message"].as_str().map(str::to_string)).collect()).unwrap_or_default()
+    doc["meta"]["warnings"].as_array().map_or_default(|a| a.iter().filter_map(|w| w["message"].as_str().map(str::to_string)).collect())
 }
 
 fn steps(doc: &Value) -> Vec<String> {
@@ -316,7 +316,7 @@ fn violations(doc: &Value) -> Vec<(String, String)> {
 }
 
 fn advisory_kinds(doc: &Value) -> Vec<String> {
-    doc["data"]["advisories"].as_array().map(|a| a.iter().filter_map(|v| v["kind"].as_str().map(str::to_string)).collect()).unwrap_or_default()
+    doc["data"]["advisories"].as_array().map_or_default(|a| a.iter().filter_map(|v| v["kind"].as_str().map(str::to_string)).collect())
 }
 
 /// A write the 0.29 layout refuses: not `ok`, not a success exit, code `LAYOUT_MIGRATION_REQUIRED`, the hint names `canon migrate`.

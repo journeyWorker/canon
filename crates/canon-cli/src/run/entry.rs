@@ -156,7 +156,7 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
             }
             let valid: Vec<String> = match error.get(ContextKind::ValidValue) {
                 Some(ContextValue::Strings(values)) => values.clone(),
-                _ => usage.field_name().map(|field| possible_values(node, field)).unwrap_or_default(),
+                _ => usage.field_name().map_or_default(|field| possible_values(node, field)),
             };
             if !valid.is_empty() {
                 usage = usage.expected(valid);
@@ -300,7 +300,7 @@ fn sent_empty_value(field: &str, args: &[String]) -> bool {
 fn possible_values(node: &clap::Command, field: &str) -> Vec<String> {
     let name = field.trim_start_matches('-');
     // A switch has the values `true` and `false` only to clap: they are not a set the caller chooses from.
-    node.get_arguments().find(|arg| arg.get_long() == Some(name) && arg.get_action().takes_values()).map(|arg| arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect()).unwrap_or_default()
+    node.get_arguments().find(|arg| arg.get_long() == Some(name) && arg.get_action().takes_values()).map_or_default(|arg| arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect())
 }
 
 /// The example of the first leaf at or below the group at `path`.

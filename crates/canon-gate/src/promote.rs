@@ -891,8 +891,7 @@ fn record_at(raw: &RawRecord) -> DateTime<Utc> {
         .get("at")
         .and_then(serde_json::Value::as_str)
         .and_then(|at| DateTime::parse_from_rfc3339(at).ok())
-        .map(|at| at.with_timezone(&Utc))
-        .unwrap_or_default()
+        .map_or_default(|at| at.with_timezone(&Utc))
 }
 
 /// Whether `candidate` supersedes the record committed at
@@ -1818,8 +1817,7 @@ mod tests {
     fn evidence_names(dir: &TempDir, tier: &str) -> Vec<String> {
         let kind_dir = dir.path().join(".canon").join(tier).join("kind=evidence");
         let mut names: Vec<String> = std::fs::read_dir(kind_dir)
-            .map(|entries| entries.filter_map(Result::ok).filter(|entry| entry.path().is_file()).map(|entry| entry.file_name().to_string_lossy().into_owned()).collect())
-            .unwrap_or_default();
+            .map_or_default(|entries| entries.filter_map(Result::ok).filter(|entry| entry.path().is_file()).map(|entry| entry.file_name().to_string_lossy().into_owned()).collect());
         names.sort();
         names
     }

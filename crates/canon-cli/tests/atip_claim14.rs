@@ -218,10 +218,10 @@ fn form_problems(data: &Value) -> Vec<String> {
             if data.get("path").is_some() {
                 found.push("the document has `path`".to_string());
             }
-            for entry in data["commands"].as_array().map(Vec::as_slice).unwrap_or_default() {
+            for entry in data["commands"].as_array().map_or_default(Vec::as_slice) {
                 found.extend(entry_problems(entry));
             }
-            for option in data["options"].as_array().map(Vec::as_slice).unwrap_or_default() {
+            for option in data["options"].as_array().map_or_default(Vec::as_slice) {
                 match option.as_object() {
                     Some(object) => found.extend(member_defaults(&format!("tree option `{}`", option_name(option)), object)),
                     None => found.push(format!("a tree option is a bare name: {option}")),
@@ -242,7 +242,7 @@ fn command_problems(doc: &Value) -> Vec<String> {
             found.push(format!("`{name}`: the command document has `{key}`"));
         }
     }
-    for (index, validator) in doc["validators"].as_array().map(Vec::as_slice).unwrap_or_default().iter().enumerate() {
+    for (index, validator) in doc["validators"].as_array().map_or_default(Vec::as_slice).iter().enumerate() {
         if validator.get("rejects").is_some() {
             found.push(format!("`{name}`: validator {index} has `rejects`"));
         }
@@ -256,10 +256,10 @@ fn command_problems(doc: &Value) -> Vec<String> {
     if doc["input"]["batch"] == false {
         found.push(format!("`{name}`: `input.batch` is false, its default"));
     }
-    let outputs = doc["outputs"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let outputs = doc["outputs"].as_array().map_or_default(Vec::as_slice);
     let has_fields = outputs.iter().any(|output| output.get("fields").is_some());
     let mut names = BTreeSet::new();
-    for option in doc["options"].as_array().map(Vec::as_slice).unwrap_or_default() {
+    for option in doc["options"].as_array().map_or_default(Vec::as_slice) {
         let option_name = option_name(option);
         names.insert(option_name.to_string());
         if option_name == "json" || (option_name == "input" && has_input) || (option_name == "fields" && has_fields) {
@@ -269,7 +269,7 @@ fn command_problems(doc: &Value) -> Vec<String> {
             found.extend(member_defaults(&format!("`{name}` option `{option_name}`"), object));
         }
     }
-    for operand in doc["operands"].as_array().map(Vec::as_slice).unwrap_or_default() {
+    for operand in doc["operands"].as_array().map_or_default(Vec::as_slice) {
         if let Some(object) = operand.as_object() {
             found.extend(member_defaults(&format!("`{name}` operand `{}`", option_name_of_operand(operand)), object));
         }
@@ -301,7 +301,7 @@ fn command_problems(doc: &Value) -> Vec<String> {
             implied.push(code);
         }
     }
-    for error in doc["errors"].as_array().map(Vec::as_slice).unwrap_or_default() {
+    for error in doc["errors"].as_array().map_or_default(Vec::as_slice) {
         if implied.contains(&error_code(error)) {
             found.push(format!("`{name}`: the implied code {} is listed", error_code(error)));
         }
@@ -437,7 +437,7 @@ fn option_definition(entry: &Value, shared: &BTreeMap<String, &Value>) -> Value 
 /// `required`, `operands` (an array, at least one, at most one per operand unless the last is variadic) and one property per option that is not flag-only.
 fn derived_input(doc: &Value, shared: &BTreeMap<String, &Value>) -> Value {
     let mut properties = Map::new();
-    let operands = doc["operands"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let operands = doc["operands"].as_array().map_or_default(Vec::as_slice);
     if let Some(last) = operands.last() {
         let variadic = last["variadic"] == true;
         let of = |operand: &Value| encoded(operand["valueType"].as_str().unwrap_or("string"), operand.get("possibleValues"));
@@ -454,7 +454,7 @@ fn derived_input(doc: &Value, shared: &BTreeMap<String, &Value>) -> Value {
         array.insert("items".into(), if variadic { of(last) } else { Value::Bool(false) });
         properties.insert("operands".into(), Value::Object(array));
     }
-    for entry in doc["options"].as_array().map(Vec::as_slice).unwrap_or_default() {
+    for entry in doc["options"].as_array().map_or_default(Vec::as_slice) {
         let option = option_definition(entry, shared);
         if option["flagOnly"] == true {
             continue;
@@ -527,7 +527,7 @@ fn schemas_problems(doc: &Value, answered: &Value, shared: &BTreeMap<String, &Va
         found.push(format!("`{name}`: the answer is no `schemas` answer of its command: kind {} command {}", data["kind"], data["command"]));
     }
     let schemas = data["schemas"].as_object().cloned().unwrap_or_default();
-    for key in data.as_object().map(|object| object.keys().cloned().collect::<Vec<_>>()).unwrap_or_default() {
+    for key in data.as_object().map_or_default(|object| object.keys().cloned().collect::<Vec<_>>()) {
         if !["kind", "command", "schemas", "rejects"].contains(&key.as_str()) {
             found.push(format!("`{name}`: the answer has the member `{key}`"));
         }
@@ -640,7 +640,7 @@ fn atip_claim14_02_schema_answers_the_same_bytes_without_a_repository_and_the_fo
 const DESTRUCTIVE: [&str; 6] = ["artifacts move", "artifacts prune", "ledger compact", "migrate", "purge", "tier age"];
 
 fn option_names(doc: &Value) -> Vec<String> {
-    doc["options"].as_array().map(Vec::as_slice).unwrap_or_default().iter().map(|option| option_name(option).to_string()).collect()
+    doc["options"].as_array().map_or_default(Vec::as_slice).iter().map(|option| option_name(option).to_string()).collect()
 }
 
 #[test]
@@ -684,7 +684,7 @@ fn atip_claim14_03_a_command_document_carries_the_call_surface_only() {
     for (name, doc) in &surface.docs {
         let data = &doc.value["data"];
         assert!(data.get("schemas").is_none() && data.get("path").is_none() && data.get("rejects").is_none(), "`{name}` has no `schemas`, `path` or `rejects`");
-        for option in data["options"].as_array().map(Vec::as_slice).unwrap_or_default() {
+        for option in data["options"].as_array().map_or_default(Vec::as_slice) {
             if let Some(shared) = option.as_str() {
                 *uses.entry(shared.to_string()).or_default() += 1;
             }

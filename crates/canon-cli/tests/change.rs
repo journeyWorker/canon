@@ -172,8 +172,7 @@ fn change_new_refuses_an_existing_slug_and_leaves_it_untouched() {
 /// Entries `canon change new` leaves under `.canon/` (its staging dirs).
 fn staging_leftovers(repo: &Path) -> Vec<String> {
     std::fs::read_dir(repo.join(".canon"))
-        .map(|entries| entries.filter_map(Result::ok).map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with("change-new-")).collect())
-        .unwrap_or_default()
+        .map_or_default(|entries| entries.filter_map(Result::ok).map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with("change-new-")).collect())
 }
 
 /// Nothing of `add-login` survives a failed `change new`: no change dir,

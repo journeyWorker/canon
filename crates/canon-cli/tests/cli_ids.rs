@@ -184,7 +184,7 @@ fn masked(text: &str) -> String {
 
 fn ledger_records(repo: &Path, kind: &str) -> Vec<Value> {
     let dir = repo.join(format!(".canon/ledger/kind={kind}"));
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).map(|d| d.flatten().map(|e| e.path()).collect()).unwrap_or_default();
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).map_or_default(|d| d.flatten().map(|e| e.path()).collect());
     files.sort();
     files.iter().map(|f| serde_json::from_str(&std::fs::read_to_string(f).unwrap()).unwrap()).collect()
 }
@@ -516,7 +516,7 @@ fn context_capability_52_an_input_document_keyed_by_the_bare_option_names_writes
     assert_eq!(record(a), record(b));
     let keys: Vec<String> = ledger_records(a, "evidence")[0].as_object().unwrap().keys().cloned().collect();
     assert!(keys.contains(&"scenario_id".to_string()) && keys.contains(&"project_id".to_string()), "{keys:?}");
-    let data_keys: Vec<String> = json(&out_a)["data"].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
+    let data_keys: Vec<String> = json(&out_a)["data"].as_object().map_or_default(|o| o.keys().cloned().collect());
     assert!(data_keys.iter().all(|k| !NOUNS.contains(&k.as_str()) || k == "actor"), "the report JSON keeps the keys it had: {data_keys:?}");
 }
 

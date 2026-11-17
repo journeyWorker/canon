@@ -482,7 +482,7 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
         argv.remove(0);
         let output = run(&cwd, home.path(), &argv);
         let Ok(doc) = serde_json::from_slice::<Value>(&output.stdout) else { continue };
-        for step in doc["meta"]["next"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
+        for step in doc["meta"]["next"].as_array().map_or_default(std::vec::Vec::as_slice) {
             if step["x-canon"]["actor"] == "agent" && step["command"].as_str().is_some_and(|c| c.starts_with("canon ")) {
                 let text = step["command"].as_str().unwrap().to_string();
                 if seen.insert(text.clone()) {

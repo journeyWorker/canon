@@ -914,7 +914,7 @@ fn audit_summary(ctx: &GateContext) -> Option<AuditSummary> {
     if active.is_none() && refuted.is_empty() {
         return None;
     }
-    let sampled = active.map(|(ra, lanes)| audit::sampled(ctx, ra, lanes)).unwrap_or_default();
+    let sampled = active.map_or_default(|(ra, lanes)| audit::sampled(ctx, ra, lanes));
     let owed = sampled
         .iter()
         .filter(|o| o.state.is_owed())
@@ -1768,7 +1768,7 @@ pub fn render(report: &StatusReport) -> String {
         let _ = writeln!(out);
         let _ = writeln!(out, "audits: {} sampled, {} confirmed, {} owed, {} refuted", audits.sampled, audits.confirmed, audits.owed.len(), audits.refuted.len());
         for entry in audits.owed.iter().chain(&audits.refuted) {
-            let evaluator = entry.evaluator.as_ref().map(|e| format!(" by {e}")).unwrap_or_default();
+            let evaluator = entry.evaluator.as_ref().map_or_default(|e| format!(" by {e}"));
             let label = if entry.state == "refuted" { "false-success" } else { "owes an audit" };
             let _ = writeln!(out, "  {label}: {} ({}{evaluator})", entry.scenario, entry.state);
         }

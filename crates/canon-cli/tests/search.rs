@@ -109,7 +109,7 @@ fn without_rebuilt(mut data: Value) -> Value {
 fn warnings(output: &Output) -> Vec<String> {
     json_of(output)["meta"]["warnings"]
         .as_array()
-        .map(|w| {
+        .map_or_default(|w| {
             w.iter()
                 .map(|warning| {
                     let code = warning["code"].as_str().unwrap_or_else(|| panic!("a warning carries a code: {warning}"));
@@ -118,7 +118,6 @@ fn warnings(output: &Output) -> Vec<String> {
                 })
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 fn finding(repo: &Path, round: &str, seq: &str, summary: &str, extra: &[&str]) -> Output {

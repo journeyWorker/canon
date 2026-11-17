@@ -2,6 +2,7 @@
 name = "canon-vocab"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "canon's typed authoring vocabulary (S10): plugin.yaml/directives/enums.yaml manifests, ONE resolve_snapshot capability-snapshot resolution, the check_directive-lineage checker/diagnostics, and typed task-atom/handoff-body compile+round-trip against canon-model's Task/HandoffBody — lifted from the donor manifest layer + the donor span primitives (source-imported as modules, no donor crate dependency) and INSPIRE-only against the donor checker's fold_env/check_directive shape (design.md open-Q1)."
 

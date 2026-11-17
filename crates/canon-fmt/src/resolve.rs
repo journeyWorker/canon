@@ -64,7 +64,7 @@ pub fn resolve_divergence(json: &serde_json::Value) -> Result<ResolvedPartition,
     match event_type {
         "manifest" => {
             let surface = json.get("surface").and_then(|v| v.as_str()).ok_or(FmtResolveError::MissingField { field: "surface" })?;
-            let reviewed_ids: Vec<&str> = json.get("reviewed_ids").and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|v| v.as_str()).collect()).unwrap_or_default();
+            let reviewed_ids: Vec<&str> = json.get("reviewed_ids").and_then(|v| v.as_array()).map_or_default(|a| a.iter().filter_map(|v| v.as_str()).collect());
             let Some(first) = reviewed_ids.first() else {
                 return Err(FmtResolveError::NoReviewedIds);
             };

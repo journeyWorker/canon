@@ -49,7 +49,7 @@ fn install_panic_hook() {
         }
         let payload = info.payload();
         let text = payload.downcast_ref::<&str>().map(|s| (*s).to_string()).or_else(|| payload.downcast_ref::<String>().cloned()).unwrap_or_else(|| "a panic with no message".to_string());
-        let at = info.location().map(|location| format!(" at {}:{}", location.file(), location.line())).unwrap_or_default();
+        let at = info.location().map_or_default(|location| format!(" at {}:{}", location.file(), location.line()));
         if let Ok(mut slot) = PANIC.lock() {
             *slot = Some(format!("{text}{at}"));
         }

@@ -130,7 +130,7 @@ fn given_of(command: &Command, matches: &ArgMatches) -> Vec<Given> {
             Some(ValueSource::EnvVariable) => true,
             _ => continue,
         };
-        let raw: Vec<String> = matches.get_raw(id).map(|values| values.map(|value| value.to_string_lossy().into_owned()).collect()).unwrap_or_default();
+        let raw: Vec<String> = matches.get_raw(id).map_or_default(|values| values.map(|value| value.to_string_lossy().into_owned()).collect());
         if arg.is_positional() {
             operands.extend(raw.iter().map(|text| value_of(arg, text)));
             continue;

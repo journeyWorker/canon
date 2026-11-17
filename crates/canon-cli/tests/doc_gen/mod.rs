@@ -127,8 +127,7 @@ fn kind_word(kind: &str) -> String {
 fn operand_cell(leaf: &Value) -> String {
     let parts: Vec<String> = leaf["operands"]
         .as_array()
-        .map(std::vec::Vec::as_slice)
-        .unwrap_or_default()
+        .map_or_default(std::vec::Vec::as_slice)
         .iter()
         .map(|o| {
             let word = kind_word(o["valueName"].as_str().unwrap_or("value"));
@@ -154,7 +153,7 @@ fn option_syntax(o: &Value) -> String {
 }
 
 fn required_cell(leaf: &Value) -> String {
-    let mut parts: Vec<String> = leaf["options"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter(|o| o["required"] == true).map(option_syntax).collect();
+    let mut parts: Vec<String> = leaf["options"].as_array().map_or_default(std::vec::Vec::as_slice).iter().filter(|o| o["required"] == true).map(option_syntax).collect();
     for group in relations(leaf).required_one_of {
         let names: Vec<String> = group.iter().map(|n| format!("`--{n}`")).collect();
         parts.push(format!("one of {}", names.join(" or ")));
@@ -194,7 +193,7 @@ pub fn cli_table(spec: &Value, group: &str, ko: bool) -> String {
 const SHARED: [&str; 4] = ["repo", "json", "input", "as"];
 
 fn options_of(leaf: &Value) -> &[Value] {
-    leaf["options"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default()
+    leaf["options"].as_array().map_or_default(std::vec::Vec::as_slice)
 }
 
 fn find_option<'a>(leaf: &'a Value, name: &str) -> Option<&'a Value> {
@@ -207,7 +206,7 @@ fn atom(o: &Value) -> String {
     if matches!(o["valueType"].as_str(), Some("switch" | "count")) {
         return format!("--{name}");
     }
-    let set: Vec<&str> = o["possibleValues"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).collect();
+    let set: Vec<&str> = o["possibleValues"].as_array().map_or_default(std::vec::Vec::as_slice).iter().filter_map(Value::as_str).collect();
     if set.is_empty() { format!("--{name} <{}>", o["valueName"].as_str().unwrap_or("VALUE")) } else { format!("--{name} <{}>", set.join("|")) }
 }
 
@@ -221,10 +220,10 @@ fn is_required(relations: &atip::project::Relations, o: &Value) -> bool {
 /// block's header (`--input` is flagged on the lines that take it).
 fn syntax_line(leaf: &Value) -> String {
     let relations = relations(leaf);
-    let conflicts = |name: &str| -> Vec<&str> { relations.conflicts_with.get(name).map(|names| names.iter().map(String::as_str).collect()).unwrap_or_default() };
-    let needs = |name: &str| -> Vec<&str> { relations.requires.get(name).map(|names| names.iter().map(String::as_str).collect()).unwrap_or_default() };
+    let conflicts = |name: &str| -> Vec<&str> { relations.conflicts_with.get(name).map_or_default(|names| names.iter().map(String::as_str).collect()) };
+    let needs = |name: &str| -> Vec<&str> { relations.requires.get(name).map_or_default(|names| names.iter().map(String::as_str).collect()) };
     let mut parts: Vec<String> = vec![format!("canon {}", leaf["command"].as_str().expect("command"))];
-    for o in leaf["operands"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
+    for o in leaf["operands"].as_array().map_or_default(std::vec::Vec::as_slice) {
         let word = format!("<{}>", o["valueName"].as_str().unwrap_or("VALUE"));
         let (required, repeatable) = (o["required"] == true, o["variadic"] == true);
         parts.push(match (required, repeatable) {
@@ -321,7 +320,7 @@ pub fn removed_table(spec: &Value, since: &str) -> String {
         }
         let old = row["old"].as_str().expect("old");
         let new = row["new"].as_str().expect("new");
-        let scope: Vec<&str> = row["scope"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).collect();
+        let scope: Vec<&str> = row["scope"].as_array().map_or_default(std::vec::Vec::as_slice).iter().filter_map(Value::as_str).collect();
         let (old, new) = match row["kind"].as_str() {
             Some("option") => {
                 let on = scope.iter().map(|s| format!("`canon {s}`")).collect::<Vec<_>>().join(", ");

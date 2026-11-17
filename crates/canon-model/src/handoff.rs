@@ -174,8 +174,7 @@ impl HandoffTemplate for GihoekTemplate {
         let criteria = fields
             .get(GIHOEK_ACCEPTANCE_FIELD)
             .and_then(|v| v.as_array())
-            .map(|items| items.iter().filter_map(|v| v.as_str()).map(|s| format!("- {s}")).collect::<Vec<_>>().join("\n"))
-            .unwrap_or_default();
+            .map_or_default(|items| items.iter().filter_map(|v| v.as_str()).map(|s| format!("- {s}")).collect::<Vec<_>>().join("\n"));
         format!("# {title}\n\n{summary}\n\n## Acceptance Criteria\n\n{criteria}\n")
     }
 }

@@ -90,7 +90,7 @@ fn evidence_add_args<'a>(reference: &'a str, extra: &[&'a str]) -> Vec<&'a str> 
 }
 
 fn evidence_records(repo: &Path) -> Vec<Value> {
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(repo.join(".canon/ledger/kind=evidence")).map(|d| d.filter_map(Result::ok).map(|e| e.path()).collect()).unwrap_or_default();
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(repo.join(".canon/ledger/kind=evidence")).map_or_default(|d| d.filter_map(Result::ok).map(|e| e.path()).collect());
     paths.sort();
     paths.iter().map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()).collect()
 }

@@ -485,7 +485,7 @@ impl DigestWalk {
         }
         let digest = SpecDigest::of(input.as_bytes());
         let body = ScenarioBody {
-            title: lines.iter().find_map(|line| SCENARIO_HEADERS.iter().find_map(|header| line.strip_prefix(header))).map(|label| label.trim().to_string()).unwrap_or_default(),
+            title: lines.iter().find_map(|line| SCENARIO_HEADERS.iter().find_map(|header| line.strip_prefix(header))).map_or_default(|label| label.trim().to_string()),
             text: [&self.feature_tags, &self.feature_background, &self.rule, &self.rule_background, &lines].into_iter().flatten().map(|line| shown(line)).collect::<Vec<_>>().join("\n"),
         };
         for id in std::mem::take(&mut self.scenario_ids) {
