@@ -55,6 +55,7 @@ on:
       - "scripts/check_git_boundary.py"
       - ".github/workflows/test.yml"
       - "scripts/ci-strip-workspace-build.sh"
+      - "tools/atip-check/**"
   pull_request:
     paths:
       - "crates/**"
@@ -74,6 +75,7 @@ on:
       - "scripts/check_git_boundary.py"
       - ".github/workflows/test.yml"
       - "scripts/ci-strip-workspace-build.sh"
+      - "tools/atip-check/**"
   workflow_dispatch:
 
 env:
