@@ -11,7 +11,7 @@
 mod hermetic;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output};
 
 use canon_cli::cli_error::{all_codes, code_info};
