@@ -69,12 +69,13 @@ rule-calls-check:
 conformance:
     conformance/regenerate.sh
 
-# The release-workflow safety check and its test, and the release binary check's test.
+# The release-workflow safety check and its test, the release binary check's test, and the build-scope script's test.
 # On a binary: `python3 scripts/check-release-binary.py --target <triple> <canon>` (see its header).
 release-check:
     python3 scripts/check-release-workflow-safety.py
     python3 scripts/test-release-workflow-safety.py
     python3 scripts/test-check-release-binary.py
+    python3 scripts/test-build-scope.py
 
 # The npm launcher's tests (test.yml `launcher`).
 launcher:
