@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="215" skipped="0" failures="0" errors="0" uuid="5dcb2b72-4a5f-40ee-9395-12621fdef1f7" timestamp="2026-11-17T17:51:53.649+00:00" time="70.406">
+    <testsuite name="canon-cli::atip_claiml2" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="atip_claiml2_06_input_too_large_names_the_field_input" classname="canon-cli::atip_claiml2" timestamp="2026-11-17T17:51:53.650+00:00" time="0.686"/>
+        <testcase name="atip_claiml2_18_no_command_of_canon_reads_a_terminal_for_input_and_init_asks_nothing_on_one" classname="canon-cli::atip_claiml2" timestamp="2026-11-17T17:51:53.650+00:00" time="0.904"/>
+        <testcase name="atip_claiml2_16_the_preview_of_a_move_to_the_local_store_leads_with_the_commit_call" classname="canon-cli::atip_claiml2" timestamp="2026-11-17T17:51:53.650+00:00" time="3.062"/>
+        <testcase name="atip_claiml2_15_a_batch_of_unchanged_elements_has_only_items_in_data" classname="canon-cli::atip_claiml2" timestamp="2026-11-17T17:51:53.650+00:00" time="6.010"/>
+        <testcase name="atip_claiml2_17_a_known_secret_of_the_environment_reaches_no_output_and_no_file" classname="canon-cli::atip_claiml2" timestamp="2026-11-17T17:51:53.650+00:00" time="32.156"/>
+    </testsuite>
+    <testsuite name="canon-cli::atip_codesplit" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="atip_codesplit_01_a_missing_subject_a_contradiction_and_an_empty_value_answer_with_their_own_condition" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:53.650+00:00" time="0.721"/>
+        <testcase name="atip_codesplit_04_a_broken_section_and_a_bad_provider_answer_with_their_condition_and_reason" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:53.650+00:00" time="2.121"/>
+        <testcase name="atip_codesplit_03_ending_a_run_twice_is_a_conflict_with_the_reason_already_ended" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:53.650+00:00" time="3.462"/>
+        <testcase name="atip_codesplit_01_a_task_that_names_no_task_is_task_not_found_for_the_payload_and_the_attestation_alike" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:53.650+00:00" time="3.602"/>
+        <testcase name="atip_codesplit_05_no_brief_and_a_named_change_without_one_answer_with_their_own_code_and_the_fix_lets_the_call_through" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:53.650+00:00" time="4.284"/>
+        <testcase name="atip_codesplit_07_a_file_or_lock_the_system_refuses_is_told_by_the_code_of_its_own_subject" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:53.650+00:00" time="4.477"/>
+        <testcase name="atip_codesplit_08_a_batch_approval_with_refused_ids_answers_with_the_first_refused_ids_code_and_details" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:54.340+00:00" time="4.287"/>
+        <testcase name="atip_codesplit_09_the_refused_ids_fixed_one_at_a_time_let_the_same_call_approve_them_all" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:54.392+00:00" time="4.280"/>
+        <testcase name="atip_codesplit_02_a_file_to_bind_is_refused_by_its_condition_and_nothing_is_written" classname="canon-cli::atip_codesplit" timestamp="2026-11-17T17:51:53.650+00:00" time="6.026"/>
+    </testsuite>
+    <testsuite name="canon-cli::brief_format" tests="25" skipped="0" errors="0" failures="0">
+        <testcase name="authoring_brief_check_18_a_misspelt_heading_and_a_deleted_or_moved_section_are_reported" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:55.777+00:00" time="1.664"/>
+        <testcase name="authoring_brief_check_20_a_frontmatter_waiver_clears_one_rule_is_listed_and_binds_to_the_approval" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:57.115+00:00" time="1.599"/>
+        <testcase name="authoring_brief_check_24_a_filled_section_that_keeps_a_todo_is_still_a_placeholder" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:58.133+00:00" time="1.295"/>
+        <testcase name="authoring_brief_check_25_scenario_new_flow_refuses_an_old_format_brief_with_its_code" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:58.675+00:00" time="0.813"/>
+        <testcase name="authoring_brief_check_19_the_language_never_changes_the_headings_and_a_note_with_one_known_heading_is_legacy" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:56.714+00:00" time="2.829"/>
+        <testcase name="authoring_brief_check_21_invalid_waivers_and_unreadable_frontmatter_are_blockers_that_waive_nothing" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:57.255+00:00" time="2.405"/>
+        <testcase name="authoring_brief_check_25_an_old_format_brief_gets_one_blocker_and_its_waiver_comments_are_not_read" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:58.631+00:00" time="1.041"/>
+        <testcase name="authoring_brief_check_23_show_prints_the_empty_sections" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:57.937+00:00" time="2.512"/>
+        <testcase name="authoring_change_08_change_new_writes_the_title_and_empty_headed_sections_without_a_comment" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:58.715+00:00" time="2.428"/>
+        <testcase name="authoring_migrate_20_the_preview_writes_nothing" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:59.430+00:00" time="1.986"/>
+        <testcase name="authoring_migrate_21_a_dirty_brief_is_refused_and_edited_or_role_mismatched_briefs_are_named" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:59.492+00:00" time="3.187"/>
+        <testcase name="report_dashboard_16_the_shared_reader_gives_each_section_its_key_and_role_and_flags_the_old_format" classname="canon-cli::brief_format" timestamp="2026-11-17T17:52:02.680+00:00" time="0.030"/>
+        <testcase name="ingest_plans_13_the_intent_summary_is_the_first_paragraph_of_the_intent_section" classname="canon-cli::brief_format" timestamp="2026-11-17T17:52:01.418+00:00" time="1.358"/>
+        <testcase name="context_status_87_the_readers_warn_and_lead_with_canon_migrate" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:59.677+00:00" time="3.899"/>
+        <testcase name="authoring_migrate_23_a_changed_plan_is_refused_and_a_brief_edited_after_approval_stays_changed" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:59.663+00:00" time="4.263"/>
+        <testcase name="authoring_migrate_24_a_plan_that_re_binds_is_human_only_and_one_that_does_not_is_not" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:59.663+00:00" time="5.219"/>
+        <testcase name="evidence_add_131_every_governing_change_of_the_subject_is_checked" classname="canon-cli::brief_format" timestamp="2026-11-17T17:52:00.450+00:00" time="4.570"/>
+        <testcase name="review_add_103_a_change_review_pins_a_new_chore_brief_and_refuses_an_old_format_one" classname="canon-cli::brief_format" timestamp="2026-11-17T17:52:02.712+00:00" time="2.762"/>
+        <testcase name="authoring_brief_check_17_english_headings_without_comments_pass_and_every_reader_finds_the_same_sections" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:54.560+00:00" time="11.734"/>
+        <testcase name="evidence_add_131_is_refused_when_a_brief_it_judges_is_old_format_and_an_override_does_not_waive_it" classname="canon-cli::brief_format" timestamp="2026-11-17T17:52:01.150+00:00" time="5.562"/>
+        <testcase name="authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second_run_has_nothing_to_do" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:59.549+00:00" time="8.987"/>
+        <testcase name="subject_lifecycle_57_a_relayed_migrate_commit_records_the_relay_in_the_backup_journal" classname="canon-cli::brief_format" timestamp="2026-11-17T17:52:03.578+00:00" time="6.014"/>
+        <testcase name="authoring_brief_check_22_kind_chore_in_the_frontmatter_makes_a_chore_and_its_absence_a_feature" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:57.443+00:00" time="16.780"/>
+        <testcase name="authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished" classname="canon-cli::brief_format" timestamp="2026-11-17T17:51:59.675+00:00" time="20.489"/>
+        <testcase name="subject_lifecycle_47_ship_and_reopen_refuse_an_old_brief_the_subject_answers_for_and_ignore_one_it_does_not" classname="canon-cli::brief_format" timestamp="2026-11-17T17:52:02.777+00:00" time="22.754"/>
+    </testsuite>
+    <testsuite name="canon-cli::brief_scope" tests="16" skipped="0" errors="0" failures="0">
+        <testcase name="context_status_82_a_pending_draft_with_advisories_is_polished_before_it_is_reported" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:03.928+00:00" time="3.809"/>
+        <testcase name="evidence_add_101_an_override_attestation_does_not_exempt_the_scenario_later" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:05.476+00:00" time="4.406"/>
+        <testcase name="evidence_add_100_a_tag_naming_a_change_the_subject_did_not_adopt_is_ignored" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:05.021+00:00" time="6.304"/>
+        <testcase name="evidence_add_102_evidence_recorded_after_adoption_does_not_exempt" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:07.741+00:00" time="4.410"/>
+        <testcase name="evidence_add_102_a_legacy_subject_keeps_re_verifying_its_evidenced_scenarios" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:06.715+00:00" time="5.598"/>
+        <testcase name="subject_lifecycle_35_adopting_an_unapproved_change_into_a_shipped_subject_warns" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:08.537+00:00" time="4.023"/>
+        <testcase name="evidence_add_101_an_unapproved_only_change_and_an_edited_approval_still_refuse" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:06.315+00:00" time="7.034"/>
+        <testcase name="subject_lifecycle_37_unadopt_refuses_a_change_a_scenario_is_tagged_for" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:11.327+00:00" time="3.595"/>
+        <testcase name="subject_lifecycle_37_unadopt_refuses_an_approved_change" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:12.190+00:00" time="2.842"/>
+        <testcase name="subject_lifecycle_36_unadopt_removes_the_link_on_both_sides" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:09.892+00:00" time="6.172"/>
+        <testcase name="subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matters" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:09.594+00:00" time="8.802"/>
+        <testcase name="evidence_add_100_a_draft_change_freezes_only_the_scenarios_it_is_tagged_on" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:04.885+00:00" time="14.015"/>
+        <testcase name="subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:12.562+00:00" time="9.327"/>
+        <testcase name="subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:13.355+00:00" time="11.143"/>
+        <testcase name="subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:12.315+00:00" time="12.765"/>
+        <testcase name="subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside" classname="canon-cli::brief_scope" timestamp="2026-11-17T17:52:14.226+00:00" time="13.255"/>
+    </testsuite>
+    <testsuite name="canon-cli::evidence_batch" tests="19" skipped="0" errors="0" failures="0">
+        <testcase name="evidence_add_80_one_report_writes_one_record_per_owned_scenario" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:15.033+00:00" time="2.132"/>
+        <testcase name="evidence_add_81_a_faithful_claim_over_a_failed_case_refuses_the_batch" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:16.065+00:00" time="1.677"/>
+        <testcase name="evidence_add_42_a_batch_binds_only_what_it_names" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:14.924+00:00" time="4.136"/>
+        <testcase name="evidence_add_82_unindexed_ids_are_named_and_skipped" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:17.167+00:00" time="3.347"/>
+        <testcase name="evidence_add_84_a_task_report_without_a_scenario_binds_every_case" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:18.399+00:00" time="3.493"/>
+        <testcase name="evidence_add_83_any_refusal_refuses_the_whole_batch" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:17.744+00:00" time="4.271"/>
+        <testcase name="evidence_add_85_a_swift_testing_stream_binds_every_scenario" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:18.908+00:00" time="3.979"/>
+        <testcase name="evidence_add_91_the_drop_flags_are_gone" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:20.173+00:00" time="3.100"/>
+        <testcase name="evidence_add_95_a_bare_artifact_is_refused_in_a_batch" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:22.027+00:00" time="1.494"/>
+        <testcase name="evidence_add_94_a_cucumber_embedding_is_stored_by_digest" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:21.892+00:00" time="3.153"/>
+        <testcase name="evidence_add_93_a_batch_binds_each_tests_own_attachments" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:21.892+00:00" time="3.167"/>
+        <testcase name="evidence_add_92_a_batch_file_at_the_same_path_binds_the_new_bytes" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:20.515+00:00" time="4.847"/>
+        <testcase name="evidence_add_98_a_single_scenario_binds_its_cases_attachments" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:23.526+00:00" time="3.478"/>
+        <testcase name="review_scenario_one_invocation_signs_off_several_scenarios" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:25.065+00:00" time="2.550"/>
+        <testcase name="review_scenario_a_batch_with_an_unindexed_scenario_writes_nothing" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:25.048+00:00" time="2.725"/>
+        <testcase name="evidence_add_96_a_scoped_artifact_binds_one_scenario" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:22.904+00:00" time="7.584"/>
+        <testcase name="evidence_add_97_an_unbindable_report_attachment_refuses" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:23.280+00:00" time="7.374"/>
+        <testcase name="evidence_add_99_new_screenshot_bytes_keep_a_review_current" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:24.561+00:00" time="7.610"/>
+        <testcase name="evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin" classname="canon-cli::evidence_batch" timestamp="2026-11-17T17:52:19.065+00:00" time="15.776"/>
+    </testsuite>
+    <testsuite name="canon-cli::evidence_store" tests="13" skipped="0" errors="0" failures="0">
+        <testcase name="a_fabrication_marker_refusal_exits_2_and_writes_nothing" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:25.364+00:00" time="2.207"/>
+        <testcase name="canon_init_never_gitignores_the_artifact_store" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:27.776+00:00" time="0.600"/>
+        <testcase name="a_case_that_mentions_another_scenario_id_binds_only_to_its_own" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:25.083+00:00" time="3.919"/>
+        <testcase name="a_summary_is_kept_on_scenario_only_evidence_and_still_scanned_for_fabrication" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:27.005+00:00" time="3.365"/>
+        <testcase name="a_flipped_row_aggregates_every_record_and_the_task_store_agrees" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:25.537+00:00" time="4.918"/>
+        <testcase name="a_stored_blob_keeps_a_rewritten_report_provable_and_a_lost_one_is_stale_evidence" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:25.826+00:00" time="4.757"/>
+        <testcase name="a_task_and_scenario_keyed_record_missing_a_required_role_fails_its_scenario_cell" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:27.488+00:00" time="3.451"/>
+        <testcase name="an_unstored_binding_is_an_advisory_until_canon_evidence_vault_stores_it" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:27.619+00:00" time="4.548"/>
+        <testcase name="evidence_add_90_a_marker_inside_a_path_a_file_name_a_url_or_a_longer_word_is_not_a_fabrication_marker" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:29.006+00:00" time="3.707"/>
+        <testcase name="a_task_and_scenario_keyed_record_ships_its_scenario_and_still_flips_its_task" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:27.574+00:00" time="5.269"/>
+        <testcase name="every_report_case_carrying_the_scenario_id_is_bound_and_any_failure_refuses_faithful" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:28.378+00:00" time="5.023"/>
+        <testcase name="evidence_add_refuses_a_bound_file_over_the_size_limit_and_names_the_override" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:30.376+00:00" time="4.257"/>
+        <testcase name="gate_check_24_an_altered_stored_blob_is_stale_evidence_naming_the_blobs_actual_digest" classname="canon-cli::evidence_store" timestamp="2026-11-17T17:52:30.458+00:00" time="5.326"/>
+    </testsuite>
+    <testsuite name="canon-cli::init" tests="39" skipped="0" errors="0" failures="0">
+        <testcase name="authoring_init_30_default_init_writes_the_strict_starter_under_a_level_line" classname="canon-cli::init" timestamp="2026-11-17T17:52:34.847+00:00" time="1.210"/>
+        <testcase name="authoring_init_100_a_scenario_edit_and_a_reader_run_leave_only_the_feature_modified" classname="canon-cli::init" timestamp="2026-11-17T17:52:34.636+00:00" time="1.453"/>
+        <testcase name="authoring_init_33_an_unknown_policy_level_is_refused_and_nothing_is_written" classname="canon-cli::init" timestamp="2026-11-17T17:52:36.093+00:00" time="0.161"/>
+        <testcase name="authoring_init_34_a_policy_level_with_no_policy_is_refused" classname="canon-cli::init" timestamp="2026-11-17T17:52:36.257+00:00" time="0.253"/>
+        <testcase name="authoring_init_32_standard_starter_adds_a_failure_case" classname="canon-cli::init" timestamp="2026-11-17T17:52:36.062+00:00" time="0.779"/>
+        <testcase name="authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records_it" classname="canon-cli::init" timestamp="2026-11-17T17:52:36.512+00:00" time="0.512"/>
+        <testcase name="authoring_init_91_providers_codex_installs_only_the_agents_projection" classname="canon-cli::init" timestamp="2026-11-17T17:52:36.845+00:00" time="0.352"/>
+        <testcase name="authoring_init_92_a_bare_repo_installs_nothing_and_names_the_flag" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.025+00:00" time="0.271"/>
+        <testcase name="authoring_init_31_light_starter_requires_evidence_only" classname="canon-cli::init" timestamp="2026-11-17T17:52:35.793+00:00" time="1.655"/>
+        <testcase name="authoring_init_93_an_explicit_empty_choice_is_recorded" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.199+00:00" time="0.290"/>
+        <testcase name="authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.298+00:00" time="0.232"/>
+        <testcase name="authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.454+00:00" time="0.240"/>
+        <testcase name="authoring_init_96_on_a_terminal_init_asks_nothing_and_takes_the_detected_harnesses" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.492+00:00" time="0.398"/>
+        <testcase name="authoring_init_97_a_rerun_adds_the_missing_canon_gitignore_lines" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.532+00:00" time="0.545"/>
+        <testcase name="change_drop_23_this_repos_gitignore_does_not_ignore_change_state_records" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.895+00:00" time="0.280"/>
+        <testcase name="change_drop_23_a_gitignore_without_the_reinclude_ignores_the_records_and_init_made_repos_do_not" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.696+00:00" time="0.633"/>
+        <testcase name="check_config_fails_loud_on_a_sqlite_entry_missing_path" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.177+00:00" time="0.154"/>
+        <testcase name="change_drop_24_init_routes_every_record_kind_and_change_state_to_local" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.079+00:00" time="0.274"/>
+        <testcase name="check_config_on_a_missing_canon_yaml_fails_loud" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.331+00:00" time="0.084"/>
+        <testcase name="check_config_fails_on_a_malformed_pg_schema_and_never_prints_pass_for_tiers" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.331+00:00" time="0.092"/>
+        <testcase name="check_config_surfaces_a_malformed_section_without_hiding_the_others" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.417+00:00" time="0.086"/>
+        <testcase name="check_config_treats_an_absent_plans_key_as_not_configured_not_a_failure" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.427+00:00" time="0.254"/>
+        <testcase name="check_config_on_the_freshly_scaffolded_config_reports_all_sections_pass" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.355+00:00" time="0.349"/>
+        <testcase name="check_config_validates_a_sqlite_hot_config_end_to_end" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.506+00:00" time="0.254"/>
+        <testcase name="init_appends_the_block_to_an_existing_agents_md_without_touching_its_text" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.706+00:00" time="0.177"/>
+        <testcase name="init_keeps_an_existing_policy_yaml_byte_identical" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.763+00:00" time="0.243"/>
+        <testcase name="init_no_agents_md_and_no_policy_skip_those_files" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.853+00:00" time="0.173"/>
+        <testcase name="init_refuses_an_agents_md_with_an_unclosed_canon_block_and_writes_nothing" classname="canon-cli::init" timestamp="2026-11-17T17:52:39.010+00:00" time="0.131"/>
+        <testcase name="init_refuses_a_duplicate_begin_marker_and_changes_nothing" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.886+00:00" time="0.258"/>
+        <testcase name="authoring_init_98_the_derived_directories_dashboard_and_report_write_stay_out_of_git" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.567+00:00" time="1.610"/>
+        <testcase name="ingest_removal_14_init_then_dispatch_begin_writes_the_sqlite_hot_tier_with_zero_env_or_services" classname="canon-cli::init" timestamp="2026-11-17T17:52:38.684+00:00" time="0.769"/>
+        <testcase name="init_rerun_keeps_canon_yaml_and_policy_and_refreshes_only_the_agents_md_block" classname="canon-cli::init" timestamp="2026-11-17T17:52:39.032+00:00" time="0.459"/>
+        <testcase name="init_scaffolds_a_working_config_in_a_fresh_repo" classname="canon-cli::init" timestamp="2026-11-17T17:52:39.148+00:00" time="0.400"/>
+        <testcase name="init_rerun_with_no_agents_md_leaves_an_existing_canon_yaml_alone_and_reports_unchanged" classname="canon-cli::init" timestamp="2026-11-17T17:52:39.148+00:00" time="0.500"/>
+        <testcase name="authoring_init_99_check_config_warns_about_a_missing_gitignore_line_and_names_the_fix" classname="canon-cli::init" timestamp="2026-11-17T17:52:37.689+00:00" time="1.983"/>
+        <testcase name="init_then_ingest_plans_exits_0_as_a_clean_no_op" classname="canon-cli::init" timestamp="2026-11-17T17:52:39.456+00:00" time="0.374"/>
+        <testcase name="init_treats_markers_inside_a_code_fence_as_text" classname="canon-cli::init" timestamp="2026-11-17T17:52:39.551+00:00" time="0.320"/>
+        <testcase name="init_then_inventory_sync_succeeds_with_zero_further_edits" classname="canon-cli::init" timestamp="2026-11-17T17:52:39.493+00:00" time="0.477"/>
+        <testcase name="init_starter_policy_makes_the_gate_report_an_unevidenced_scenario" classname="canon-cli::init" timestamp="2026-11-17T17:52:39.207+00:00" time="1.524"/>
+    </testsuite>
+    <testsuite name="canon-cli::governing_changes" tests="9" skipped="0" errors="0" failures="0">
+        <testcase name="context_status_86_status_lists_a_brief_per_governing_change_with_state_and_reason" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:30.491+00:00" time="7.073"/>
+        <testcase name="evidence_add_125_an_unapproved_chore_and_a_never_approved_brief_do_not_block_evidence" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:30.944+00:00" time="6.742"/>
+        <testcase name="evidence_add_124_an_untagged_scenario_is_refused_while_an_approved_change_is_edited" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:30.656+00:00" time="8.192"/>
+        <testcase name="evidence_add_123_a_tagged_scenario_waits_only_for_its_tagged_changes" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:30.584+00:00" time="11.675"/>
+        <testcase name="subject_lifecycle_46_a_never_approved_untagged_feature_brief_blocks_nothing" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:33.403+00:00" time="11.411"/>
+        <testcase name="subject_lifecycle_44_an_edited_approved_brief_no_scenario_tags_refuses_ship" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:32.716+00:00" time="13.114"/>
+        <testcase name="subject_lifecycle_45_a_chore_that_is_not_approved_now_refuses_reopen_and_ship" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:32.867+00:00" time="14.087"/>
+        <testcase name="subject_lifecycle_43_an_edited_tagged_change_refuses_and_removing_its_tags_does_not_help" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:32.174+00:00" time="14.826"/>
+        <testcase name="subject_lifecycle_42_every_tagged_change_must_be_approved_in_either_order" classname="canon-cli::governing_changes" timestamp="2026-11-17T17:52:32.174+00:00" time="29.565"/>
+    </testsuite>
+    <testsuite name="canon-cli::migrate" tests="25" skipped="0" errors="0" failures="0">
+        <testcase name="authoring_migrate_03_a_dirty_path_it_moves_is_refused" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:39.884+00:00" time="1.319"/>
+        <testcase name="authoring_migrate_02_another_root_only_drops_its_features_level" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:39.836+00:00" time="1.381"/>
+        <testcase name="authoring_migrate_04_an_existing_destination_is_refused" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:39.998+00:00" time="1.476"/>
+        <testcase name="authoring_migrate_08_a_canon_yaml_it_cannot_edit_safely_is_refused" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:41.478+00:00" time="1.758"/>
+        <testcase name="authoring_migrate_06_an_ambiguous_change_stays_and_is_named" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:41.206+00:00" time="2.082"/>
+        <testcase name="authoring_migrate_05_an_external_approval_moves_into_a_pointer_brief" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:40.737+00:00" time="3.987"/>
+        <testcase name="authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_approval" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:43.237+00:00" time="1.522"/>
+        <testcase name="authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:39.675+00:00" time="6.295"/>
+        <testcase name="authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:41.220+00:00" time="5.093"/>
+        <testcase name="authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by_the_next" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:42.262+00:00" time="4.108"/>
+        <testcase name="authoring_migrate_14_a_kept_comment_gets_its_missing_line_and_no_second_comment" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:44.816+00:00" time="1.962"/>
+        <testcase name="authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_finished" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:43.289+00:00" time="3.631"/>
+        <testcase name="authoring_migrate_13_adds_the_derived_directory_lines_to_an_existing_block_once" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:44.762+00:00" time="2.187"/>
+        <testcase name="authoring_migrate_12_unread_openspec_material_keeps_the_source" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:44.726+00:00" time="3.257"/>
+        <testcase name="change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:46.375+00:00" time="1.737"/>
+        <testcase name="change_drop_26_an_existing_line_is_skipped_and_its_value_kept" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:45.835+00:00" time="2.297"/>
+        <testcase name="atip_incomplete_10_a_migrate_that_stopped_after_it_began_is_incomplete_with_the_reason_where_it_stopped" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:39.650+00:00" time="9.423"/>
+        <testcase name="change_drop_26_revert_restores_the_canon_yaml_bytes" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:46.316+00:00" time="3.180"/>
+        <testcase name="change_drop_26_migrate_adds_the_change_state_route_line_and_the_next_plan_is_empty" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:45.972+00:00" time="3.842"/>
+        <testcase name="change_drop_27_a_stale_digest_is_plan_stale_and_the_file_is_untouched" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:46.922+00:00" time="2.994"/>
+        <testcase name="change_drop_27_a_routing_section_that_cannot_take_a_line_is_refused_and_blocks_the_other_steps" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:46.782+00:00" time="3.461"/>
+        <testcase name="migrate_previews_by_default_and_commits_only_the_previewed_plan" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:47.003+00:00" time="3.793"/>
+        <testcase name="change_drop_28_a_plan_that_also_re_binds_an_approval_is_still_human_only" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:46.951+00:00" time="3.849"/>
+        <testcase name="tier_durability_07_a_canon_yaml_that_cannot_be_replaced_stops_the_migrate_incomplete_and_the_next_run_finishes" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:47.986+00:00" time="4.192"/>
+        <testcase name="change_drop_28_an_agent_role_runs_the_route_step_without_a_human_answer" classname="canon-cli::migrate" timestamp="2026-11-17T17:52:46.959+00:00" time="6.986"/>
+    </testsuite>
+    <testsuite name="canon-cli::subject" tests="55" skipped="0" errors="0" failures="0">
+        <testcase name="a_domain_outside_the_activated_vocabulary_is_refused_naming_the_legal_set" classname="canon-cli::subject" timestamp="2026-11-17T17:52:49.077+00:00" time="0.704"/>
+        <testcase name="a_domain_the_repos_own_vocabulary_declares_is_accepted" classname="canon-cli::subject" timestamp="2026-11-17T17:52:49.499+00:00" time="0.735"/>
+        <testcase name="a_malformed_domain_is_refused_on_shape_before_membership" classname="canon-cli::subject" timestamp="2026-11-17T17:52:49.784+00:00" time="0.660"/>
+        <testcase name="a_distinct_review_lets_the_subject_through_with_no_waiver" classname="canon-cli::subject" timestamp="2026-11-17T17:52:48.135+00:00" time="2.469"/>
+        <testcase name="a_repo_declaring_no_domain_vocabulary_accepts_any_kebab_slug" classname="canon-cli::subject" timestamp="2026-11-17T17:52:49.841+00:00" time="0.768"/>
+        <testcase name="a_blocker_the_author_found_in_its_own_work_is_accepted_and_still_blocks" classname="canon-cli::subject" timestamp="2026-11-17T17:52:48.116+00:00" time="3.639"/>
+        <testcase name="adopt_refuses_an_unknown_change" classname="canon-cli::subject" timestamp="2026-11-17T17:52:50.800+00:00" time="1.058"/>
+        <testcase name="a_self_review_does_not_count_under_distinct_actor" classname="canon-cli::subject" timestamp="2026-11-17T17:52:50.238+00:00" time="1.818"/>
+        <testcase name="adopt_is_a_no_op_on_an_already_linked_pair" classname="canon-cli::subject" timestamp="2026-11-17T17:52:50.614+00:00" time="1.521"/>
+        <testcase name="adopt_into_a_read_only_change_store_is_refused_before_the_subject_record_is_written" classname="canon-cli::subject" timestamp="2026-11-17T17:52:50.606+00:00" time="2.221"/>
+        <testcase name="adopt_links_the_change_and_the_subject_on_both_sides" classname="canon-cli::subject" timestamp="2026-11-17T17:52:50.800+00:00" time="2.031"/>
+        <testcase name="an_off_chain_transition_is_refused_and_the_record_is_unchanged" classname="canon-cli::subject" timestamp="2026-11-17T17:52:51.861+00:00" time="1.400"/>
+        <testcase name="an_override_never_waives_the_ship_gate_and_a_blank_reason_is_refused" classname="canon-cli::subject" timestamp="2026-11-17T17:52:52.139+00:00" time="1.515"/>
+        <testcase name="adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link" classname="canon-cli::subject" timestamp="2026-11-17T17:52:50.449+00:00" time="3.409"/>
+        <testcase name="a_review_from_the_evidence_session_does_not_count_under_distinct_actor" classname="canon-cli::subject" timestamp="2026-11-17T17:52:49.938+00:00" time="4.460"/>
+        <testcase name="canons_base_vocabulary_does_not_leak_into_a_repo_with_its_own" classname="canon-cli::subject" timestamp="2026-11-17T17:52:53.657+00:00" time="0.837"/>
+        <testcase name="domain_filter_is_rejected_on_a_non_subject_kind" classname="canon-cli::subject" timestamp="2026-11-17T17:52:53.949+00:00" time="0.601"/>
+        <testcase name="an_open_blocker_refuses_and_a_fixed_one_clears" classname="canon-cli::subject" timestamp="2026-11-17T17:52:52.065+00:00" time="2.705"/>
+        <testcase name="an_unmigrated_review_does_not_count_and_the_gate_itself_refuses_a_verifying_subject" classname="canon-cli::subject" timestamp="2026-11-17T17:52:52.835+00:00" time="2.237"/>
+        <testcase name="a_session_on_one_side_only_leaves_the_actor_rule_in_charge" classname="canon-cli::subject" timestamp="2026-11-17T17:52:50.245+00:00" time="4.856"/>
+        <testcase name="an_unmigrated_review_does_not_count_and_every_surface_names_migrate" classname="canon-cli::subject" timestamp="2026-11-17T17:52:52.835+00:00" time="2.572"/>
+        <testcase name="duplicate_new_is_refused_and_leaves_the_store_unchanged" classname="canon-cli::subject" timestamp="2026-11-17T17:52:54.402+00:00" time="1.531"/>
+        <testcase name="domain_and_status_filters_scope_the_subject_view" classname="canon-cli::subject" timestamp="2026-11-17T17:52:53.866+00:00" time="2.429"/>
+        <testcase name="an_override_records_the_reason_and_gate_check_lists_an_advisory" classname="canon-cli::subject" timestamp="2026-11-17T17:52:52.181+00:00" time="4.131"/>
+        <testcase name="new_then_query_round_trips_the_authored_subject" classname="canon-cli::subject" timestamp="2026-11-17T17:52:55.936+00:00" time="0.888"/>
+        <testcase name="gate_check_reports_unreviewed_and_open_blocker_for_an_in_scope_subject" classname="canon-cli::subject" timestamp="2026-11-17T17:52:55.410+00:00" time="1.429"/>
+        <testcase name="require_review_skips_and_says_so_outside_its_scope" classname="canon-cli::subject" timestamp="2026-11-17T17:52:56.314+00:00" time="0.767"/>
+        <testcase name="an_absent_require_review_is_byte_identical" classname="canon-cli::subject" timestamp="2026-11-17T17:52:51.766+00:00" time="5.412"/>
+        <testcase name="require_review_refuses_entering_its_scope_without_a_review" classname="canon-cli::subject" timestamp="2026-11-17T17:52:56.297+00:00" time="1.165"/>
+        <testcase name="review_add_refuses_an_unsynced_scenario_and_names_inventory_sync" classname="canon-cli::subject" timestamp="2026-11-17T17:52:56.860+00:00" time="1.274"/>
+        <testcase name="evidence_add_70_an_override_attests_anyway_and_records_the_waiver" classname="canon-cli::subject" timestamp="2026-11-17T17:52:54.775+00:00" time="3.388"/>
+        <testcase name="shipped_is_allowed_with_a_faithful_verdict_for_every_linked_scenario" classname="canon-cli::subject" timestamp="2026-11-17T17:52:57.083+00:00" time="1.668"/>
+        <testcase name="evidence_add_68_an_unapproved_brief_refuses_the_attestation_and_stages_nothing" classname="canon-cli::subject" timestamp="2026-11-17T17:52:54.499+00:00" time="4.328"/>
+        <testcase name="shipped_is_blocked_when_a_linked_scenario_has_no_verdict" classname="canon-cli::subject" timestamp="2026-11-17T17:52:57.467+00:00" time="1.438"/>
+        <testcase name="shipped_is_blocked_when_no_scenario_is_tagged_to_the_subject" classname="canon-cli::subject" timestamp="2026-11-17T17:52:58.172+00:00" time="0.932"/>
+        <testcase name="shipped_is_blocked_when_a_linked_scenario_is_divergent" classname="canon-cli::subject" timestamp="2026-11-17T17:52:58.144+00:00" time="1.157"/>
+        <testcase name="an_unsigned_review_is_a_gap_at_the_gate_and_the_status_guard" classname="canon-cli::subject" timestamp="2026-11-17T17:52:53.263+00:00" time="6.309"/>
+        <testcase name="shipped_is_blocked_until_each_owned_surface_specifies_a_required_case" classname="canon-cli::subject" timestamp="2026-11-17T17:52:57.182+00:00" time="2.766"/>
+        <testcase name="evidence_add_69_no_refusal_when_the_brief_is_not_enforced" classname="canon-cli::subject" timestamp="2026-11-17T17:52:54.559+00:00" time="5.488"/>
+        <testcase name="evidence_add_71_the_approval_lifts_the_refusal" classname="canon-cli::subject" timestamp="2026-11-17T17:52:55.077+00:00" time="5.236"/>
+        <testcase name="evidence_add_72_an_external_change_is_answered_in_a_canon_brief_and_its_rows_still_flip" classname="canon-cli::subject" timestamp="2026-11-17T17:52:55.112+00:00" time="5.632"/>
+        <testcase name="review_add_61_the_guard_and_status_judge_a_review_that_predates_pinning_as_the_gate_does" classname="canon-cli::subject" timestamp="2026-11-17T17:52:56.825+00:00" time="3.925"/>
+        <testcase name="subject_lifecycle_26_an_override_ships_an_unapproved_brief_and_records_the_waiver" classname="canon-cli::subject" timestamp="2026-11-17T17:52:58.908+00:00" time="2.236"/>
+        <testcase name="subject_lifecycle_27_a_subject_with_no_adopted_change_ships" classname="canon-cli::subject" timestamp="2026-11-17T17:52:59.105+00:00" time="2.724"/>
+        <testcase name="subject_lifecycle_31b_any_transition_accepts_a_reason_and_records_it" classname="canon-cli::subject" timestamp="2026-11-17T17:53:00.328+00:00" time="2.010"/>
+        <testcase name="subject_lifecycle_31_a_reopen_needs_a_reason" classname="canon-cli::subject" timestamp="2026-11-17T17:53:00.052+00:00" time="2.572"/>
+        <testcase name="subject_lifecycle_28_shipping_an_external_change_needs_its_canon_brief" classname="canon-cli::subject" timestamp="2026-11-17T17:52:59.307+00:00" time="3.513"/>
+        <testcase name="subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line" classname="canon-cli::subject" timestamp="2026-11-17T17:52:58.755+00:00" time="4.093"/>
+        <testcase name="subject_lifecycle_29_a_shipped_subject_reopens_inside_its_approved_scope_and_records_why" classname="canon-cli::subject" timestamp="2026-11-17T17:52:59.576+00:00" time="3.306"/>
+        <testcase name="subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_second_adopt_appends" classname="canon-cli::subject" timestamp="2026-11-17T17:53:00.762+00:00" time="2.188"/>
+        <testcase name="the_forward_status_chain_advances_and_folds_to_one_row" classname="canon-cli::subject" timestamp="2026-11-17T17:53:01.147+00:00" time="1.866"/>
+        <testcase name="subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused" classname="canon-cli::subject" timestamp="2026-11-17T17:52:59.951+00:00" time="3.503"/>
+        <testcase name="subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again" classname="canon-cli::subject" timestamp="2026-11-17T17:53:00.746+00:00" time="2.727"/>
+        <testcase name="the_ship_guard_refuses_brief_blockers_and_only_the_briefs_own_waiver_clears_them" classname="canon-cli::subject" timestamp="2026-11-17T17:53:01.755+00:00" time="1.719"/>
+        <testcase name="subject_lifecycle_25_an_approved_line_in_a_comment_or_fence_does_not_ship" classname="canon-cli::subject" timestamp="2026-11-17T17:52:58.829+00:00" time="5.226"/>
+    </testsuite>
+</testsuites>

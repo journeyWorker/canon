@@ -1,0 +1,62 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:55:25.803202082Z",
+  "attachments": [
+    {
+      "case": "migrate_names::tests::change_drop_26_a_key_with_any_value_or_no_routing_section_is_left_byte_identical",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit-migrate.xml",
+      "sha256": "d00a709084a17c08f5632e4b43f197da186c454f9c0e99ca2b0361038e96b9cc"
+    },
+    {
+      "case": "migrate_names::tests::change_drop_26_the_route_line_is_added_last_in_the_indentation_of_the_entry_before_it",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit-migrate.xml",
+      "sha256": "d00a709084a17c08f5632e4b43f197da186c454f9c0e99ca2b0361038e96b9cc"
+    },
+    {
+      "case": "change_drop_26_an_existing_line_is_skipped_and_its_value_kept",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit-migrate.xml",
+      "sha256": "d00a709084a17c08f5632e4b43f197da186c454f9c0e99ca2b0361038e96b9cc"
+    },
+    {
+      "case": "change_drop_26_revert_restores_the_canon_yaml_bytes",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit-migrate.xml",
+      "sha256": "d00a709084a17c08f5632e4b43f197da186c454f9c0e99ca2b0361038e96b9cc"
+    },
+    {
+      "case": "change_drop_26_migrate_adds_the_change_state_route_line_and_the_next_plan_is_empty",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit-migrate.xml",
+      "sha256": "d00a709084a17c08f5632e4b43f197da186c454f9c0e99ca2b0361038e96b9cc"
+    }
+  ],
+  "code_tree": "b3ce6e4fb3da2da7c6c8d4963f72bdec1a06743d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit-migrate.xml"
+  },
+  "evidence_note": {
+    "summary": "round-3 fix: scenario text and test names follow what the test checks, bound to the nextest run of the touched test binaries at 7068ea73b, Rust 1.100.0"
+  },
+  "evidence_sha": "7068ea73b57c4d6ce5f53cf0a89d2f7aa308b61c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 147,
+  "scenario_id": "change.drop.26",
+  "schema": 1,
+  "staging_id": "71b375ed",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
