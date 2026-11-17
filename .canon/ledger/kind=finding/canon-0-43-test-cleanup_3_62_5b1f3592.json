@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-r3-rest",
+    "role": "reviewer",
+    "session_id": "Rev43r3_rest"
+  },
+  "at": "2026-11-17T17:30:46.182688663Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=subject/lifecycle.feature:437-444",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "reviewer": "rev-0-43-tests-r3-rest",
+  "round": 3,
+  "scenario_ids": [
+    "subject.lifecycle.43"
+  ],
+  "schema": 2,
+  "seq": 62,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, P2] subject.lifecycle.43 (title, Then and And) says reopen AND ship refuse with BRIEF_APPROVAL_STALE and that re-approving 'lets both go through'. Its only bound test, subject_lifecycle_43_an_edited_tagged_change_refuses_and_removing_its_tags_does_not_help (crates/canon-cli/tests/governing_changes.rs:195-223), runs only reopen. It never ships after the edit and never ships after approve_all. Fix: drop ship from the scenario (subject.lifecycle.44 and .45 cover ship on an edited brief), or add the ship legs to the test.",
+  "worktree_dirty": false
+}
