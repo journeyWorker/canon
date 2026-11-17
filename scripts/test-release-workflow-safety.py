@@ -113,7 +113,7 @@ class DashboardEmbedTests(unittest.TestCase):
         self.assertTrue(any("CANON_DASHBOARD_DIST" in error for error in errors), errors)
 
     def test_rejects_a_build_job_that_does_not_wait_for_the_app(self) -> None:
-        text = self.workflow("build-native.yml").replace("needs: [safety, dashboard]", "needs: safety")
+        text = self.workflow("build-native.yml").replace("needs: [safety, scope, dashboard]", "needs: [safety, scope]")
         errors = CHECKER.dashboard_embed_errors(text, "build-native.yml")
         self.assertTrue(errors)
 
@@ -695,31 +695,34 @@ class SmokeTests(unittest.TestCase):
         text = mutate(workflow("publish.yml"), "          name: npm-tarballs\n          path: tarballs\n\n      - name: Install the tarballs in the image", "          name: other\n          path: tarballs\n\n      - name: Install the tarballs in the image")
         self.assertTrue(self.check(publish=text))
 
-    def test_rejects_a_tarball_path_npm_would_read_as_a_github_repo(self) -> None:
-        # 0.42.0's tag run: `npm publish tarballs/x.tgz` ran `git ls-remote ssh://git@github.com/tarballs/x.tgz.git`.
-        text = workflow("publish.yml").replace('TARBALL="./tarballs/', 'TARBALL="tarballs/', 1)
-        self.assertTrue(any("must start with ./" in error for error in self.check(publish=text)))
-
 
 class ConditionTests(unittest.TestCase):
-    """The `if:` of a publish step, read the way Actions reads it."""
+    """The expression of a publish step's NPM_CONFIG_DRY_RUN, read the way Actions reads it and written as the string npm gets."""
 
-    def runs(self, condition: str) -> list[bool]:
-        return [CHECKER._truthy(CHECKER._Cond(condition, context).parse()) for _, context, _ in CHECKER.DRY_RUN_SCENARIOS]
+    def renders(self, expression: str) -> list[str]:
+        return [CHECKER._render(CHECKER._Cond(expression, context).parse()) for _, context, _ in CHECKER.DRY_RUN_SCENARIOS]
 
-    def test_the_shipped_condition_publishes_on_a_tag_and_on_dry_run_false_only(self) -> None:
-        self.assertEqual(self.runs("github.event_name != 'workflow_dispatch' || !inputs.dry_run"), [True, False, True])
+    def test_the_shipped_expression_reads_false_true_false(self) -> None:
+        self.assertEqual(self.renders("github.event_name == 'workflow_dispatch' && inputs.dry_run"), ["false", "true", "false"])
 
-    def test_the_forms_that_skip_a_tag_push(self) -> None:
-        # null == 'false' compares null as 0 and 'false' as NaN: false, so the step is skipped on a tag push.
-        self.assertEqual(self.runs("github.event.inputs.dry_run == 'false'"), [False, False, True])
-        self.assertEqual(self.runs("inputs.dry_run == 'false'"), [False, False, False])
-        self.assertEqual(self.runs("inputs.dry_run == false && github.event_name == 'workflow_dispatch'"), [False, False, True])
+    def test_the_scenarios_are_a_tag_push_and_both_manual_runs(self) -> None:
+        self.assertEqual([want for _, _, want in CHECKER.DRY_RUN_SCENARIOS], ["false", "true", "false"])
 
-    def test_equivalent_forms_that_are_safe(self) -> None:
-        self.assertEqual(self.runs("${{ github.event.inputs.dry_run != 'true' }}".removeprefix("${{ ").removesuffix(" }}")), [True, False, True])
-        self.assertEqual(self.runs("inputs.dry_run == false"), [True, False, True])
-        self.assertEqual(self.runs("!(github.event_name == 'workflow_dispatch' && inputs.dry_run)"), [True, False, True])
+    def test_a_form_that_reads_empty_on_a_tag_push_differs(self) -> None:
+        self.assertNotEqual(self.renders("inputs.dry_run"), ["false", "true", "false"])
+        self.assertNotEqual(self.renders("github.event.inputs.dry_run"), ["false", "true", "false"])
+
+    def test_a_comparison_of_a_boolean_to_a_string_is_false(self) -> None:
+        # Actions compares `true == 'true'` as 1 and NaN: not equal.
+        self.assertNotEqual(self.renders("github.event_name == 'workflow_dispatch' && inputs.dry_run == 'true'"), ["false", "true", "false"])
+
+    def test_equivalent_forms_read_the_same(self) -> None:
+        for expression in (
+            "github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'",
+            "github.event_name == 'workflow_dispatch' && inputs.dry_run == true",
+            "!(github.event_name != 'workflow_dispatch' || !inputs.dry_run)",
+        ):
+            self.assertEqual(self.renders(expression), ["false", "true", "false"], expression)
 
     def test_an_unknown_name_or_operator_is_an_error_not_a_pass(self) -> None:
         with self.assertRaises(ValueError):
@@ -729,53 +732,252 @@ class ConditionTests(unittest.TestCase):
 
 
 class DryRunTests(unittest.TestCase):
+    """The five publish steps run their command in a dry run too: NPM_CONFIG_DRY_RUN on each, no `if:` on dry_run, no `--dry-run`."""
+
+    ENV = "          NPM_CONFIG_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}\n"
     PUBLISH_IF = "        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run\n"
+    FIRST_STEP = "      - name: Publish @journeykit/canon-core-linux-arm64 (idempotent)\n"
 
     def check(self, text: str | None = None) -> list[str]:
         return CHECKER.dry_run_errors(text if text is not None else workflow("publish.yml"), "publish.yml")
 
+    def with_env(self, value: str, count: int = -1) -> str:
+        return mutate(workflow("publish.yml"), self.ENV, f"          NPM_CONFIG_DRY_RUN: {value}\n", count)
+
     def test_accepts_the_shipped_workflow(self) -> None:
         self.assertEqual(self.check(), [])
-        self.assertEqual(workflow("publish.yml").count(self.PUBLISH_IF), 5)
+
+    def test_accepts_expressions_that_read_the_same(self) -> None:
+        for value in (
+            "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}",
+            "${{ !(github.event_name != 'workflow_dispatch' || !inputs.dry_run) }}",
+        ):
+            self.assertEqual(self.check(self.with_env(value)), [], value)
 
     def test_rejects_a_dry_run_input_that_is_not_true_by_default(self) -> None:
-        text = mutate(workflow("publish.yml"), "        default: true\n", "        default: false\n")
-        self.assertTrue(any("default is true" in error for error in self.check(text)))
-        text = mutate(workflow("publish.yml"), "      dry_run:\n", "      dryrun:\n")
-        self.assertTrue(any("default is true" in error for error in self.check(text)))
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), "        default: true\n", "        default: false\n")))
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), "      dry_run:\n", "      dryrun:\n")))
 
-    def test_rejects_a_publish_step_without_the_condition(self) -> None:
-        text = mutate(workflow("publish.yml"), self.PUBLISH_IF, "", 1)
-        errors = self.check(text)
-        self.assertEqual(len(errors), 1, errors)
-        self.assertIn("has no `if:`", errors[0])
+    def test_rejects_a_publish_step_without_the_variable(self) -> None:
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), self.ENV, "", 1)))
 
-    def test_rejects_a_condition_on_a_step_that_is_not_a_publish_step(self) -> None:
-        text = mutate(workflow("publish.yml"), "      - name: Upgrade npm for OIDC trusted publishing\n", "      - name: Upgrade npm for OIDC trusted publishing\n" + self.PUBLISH_IF)
-        self.assertTrue(any("is not a publish step" in error for error in self.check(text)))
+    def test_rejects_a_value_that_is_not_false_true_false(self) -> None:
+        for value in (
+            '"true"',
+            '"false"',
+            "true",
+            "${{ inputs.dry_run }}",
+            "${{ github.event.inputs.dry_run }}",
+            "${{ github.event_name == 'workflow_dispatch' && !inputs.dry_run }}",
+            "${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == 'true' }}",
+            "${{ github.event_name != 'workflow_dispatch' || inputs.dry_run }}",
+            "${{ github.ref_name }}",
+        ):
+            self.assertTrue(self.check(self.with_env(value, 1)), value)
+
+    def test_rejects_the_variable_under_another_case_or_spelling_that_misreads(self) -> None:
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), self.ENV, "          npm_config_dry-run: true\n", 1)))
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), self.ENV, "          npm_config_dry_run: ${{ inputs.dry_run }}\n", 1)))
+
+    def test_accepts_the_variable_in_another_case_that_reads_right(self) -> None:
+        text = mutate(workflow("publish.yml"), self.ENV, self.ENV.replace("NPM_CONFIG_DRY_RUN", "npm_config_dry_run"), 1)
+        self.assertEqual(self.check(text), [])
+
+    def test_rejects_a_condition_on_a_publish_step(self) -> None:
+        for condition in (self.PUBLISH_IF, "        if: ${{ !inputs.dry_run }}\n", "        if: github.event.inputs.dry_run != 'true'\n"):
+            self.assertTrue(self.check(mutate(workflow("publish.yml"), self.FIRST_STEP, self.FIRST_STEP + condition)), condition)
+
+    def test_rejects_a_condition_on_dry_run_on_any_other_step(self) -> None:
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), step, step + self.PUBLISH_IF)))
 
     def test_rejects_a_condition_on_a_job(self) -> None:
         text = mutate(workflow("publish.yml"), "  smoke-binary:\n    name:", "  smoke-binary:\n    if: ${{ !inputs.dry_run }}\n    name:")
-        self.assertTrue(any("job `smoke-binary` has an `if:` on dry_run" in error for error in self.check(text)))
+        self.assertTrue(self.check(text))
 
-    def test_rejects_a_condition_that_skips_a_tag_push(self) -> None:
-        for bad in ("inputs.dry_run == 'false'", "inputs.dry_run == false && github.event_name == 'workflow_dispatch'", "github.event.inputs.dry_run == 'false'"):
-            text = mutate(workflow("publish.yml"), self.PUBLISH_IF, f"        if: {bad}\n", 1)
-            errors = self.check(text)
-            self.assertTrue(any("tag push" in error for error in errors), (bad, errors))
-
-    def test_rejects_a_condition_that_publishes_a_dry_run(self) -> None:
-        text = mutate(workflow("publish.yml"), self.PUBLISH_IF, "        if: true\n", 1)
-        self.assertTrue(any("must skip for a manual run with dry_run=true" in error for error in self.check(text)))
-
-    def test_accepts_other_conditions_that_read_the_same(self) -> None:
-        text = mutate(workflow("publish.yml"), self.PUBLISH_IF, "        if: ${{ github.event.inputs.dry_run != 'true' }}\n")
-        self.assertEqual(self.check(text), [])
+    def test_rejects_dry_run_written_into_the_command(self) -> None:
+        text = mutate(workflow("publish.yml"), 'npm publish "$TARBALL" --provenance --access public --tag next', 'npm publish "$TARBALL" --provenance --access public --tag next --dry-run', 1)
+        self.assertTrue(self.check(text))
+        text = mutate(workflow("publish.yml"), 'npm publish "$TARBALL" --provenance --access public\n', 'npm publish "$TARBALL" --provenance --access public --dry-run\n', 1)
+        self.assertTrue(self.check(text))
 
     def test_a_publish_step_outside_the_publish_job_is_refused(self) -> None:
-        text = workflow("publish.yml").replace("  smoke-binary:\n", "  smoke-binary:\n    name: x\n", 0)
-        stray = text + "\n  stray:\n    runs-on: ubuntu-26.04\n    steps:\n      - name: Publish\n        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run\n        run: npm publish \"$TARBALL\" --provenance --access public\n"
-        self.assertTrue(any("belongs to the `publish` job" in error for error in self.check(stray)))
+        stray = workflow("publish.yml") + "\n  stray:\n    runs-on: ubuntu-26.04\n    steps:\n      - name: Publish\n        env:\n" + self.ENV + "        run: npm publish \"$TARBALL\" --provenance --access public\n"
+        self.assertTrue(self.check(stray))
+
+
+class DryRunSettingTests(unittest.TestCase):
+    """npm's dry run is set on the five publish steps only, in any case and under either name, by any route."""
+
+    def check(self, text: str | None = None, name: str = "publish.yml") -> list[str]:
+        return CHECKER.dry_run_setting_errors(text if text is not None else workflow(name), name)
+
+    def test_accepts_the_shipped_workflows(self) -> None:
+        for name in ("publish.yml", "build-native.yml", "test.yml", "pr-guard.yml"):
+            self.assertEqual(self.check(name=name), [], name)
+
+    def test_rejects_the_variable_on_a_job_or_the_workflow(self) -> None:
+        for spelling in ("NPM_CONFIG_DRY_RUN", "npm_config_dry_run", "npm_config_dry-run", "Npm_Config_Dry_Run"):
+            job = mutate(workflow("publish.yml"), "    name: Publish npm packages\n", f"    name: Publish npm packages\n    env:\n      {spelling}: true\n")
+            self.assertTrue(self.check(job), spelling)
+            top = mutate(workflow("publish.yml"), "  CARGO_INCREMENTAL: 0\n", f"  CARGO_INCREMENTAL: 0\n  {spelling}: true\n", 1)
+            self.assertTrue(self.check(top), spelling)
+
+    def test_rejects_the_variable_on_another_step(self) -> None:
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        text = mutate(workflow("publish.yml"), step, step + "        env:\n          NPM_CONFIG_DRY_RUN: true\n")
+        self.assertTrue(self.check(text))
+
+    def test_rejects_the_variable_in_a_job_of_the_other_release_workflow(self) -> None:
+        text = mutate(workflow("build-native.yml"), "    name: Release workflow safety check\n", "    name: Release workflow safety check\n    env:\n      NPM_CONFIG_DRY_RUN: true\n")
+        self.assertTrue(self.check(text, "build-native.yml"))
+
+    def test_rejects_a_write_through_github_env_or_npm_config(self) -> None:
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        for line in (
+            'echo "NPM_CONFIG_DRY_RUN=true" >> "$GITHUB_ENV"',
+            "echo npm_config_dry-run=true >> $GITHUB_ENV",
+            "npm config set dry-run true",
+            "npm set dry-run true",
+            "npm config set dry_run=true",
+        ):
+            text = mutate(workflow("publish.yml"), step, f"      - name: Set it\n        run: {line}\n" + step)
+            self.assertTrue(self.check(text), line)
+
+    def test_ignores_a_comment_that_names_it(self) -> None:
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        text = mutate(workflow("publish.yml"), step, "      # NPM_CONFIG_DRY_RUN and `npm config set dry-run` are not set here.\n" + step)
+        self.assertEqual(self.check(text), [])
+
+
+class TarballTests(unittest.TestCase):
+    """npm reads tarballs/x.tgz as the GitHub repo `tarballs/x.tgz`; a publish step names its tarball `./...`, `../...` or `/...`."""
+
+    ASSIGN = 'TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"'
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.tarball_errors(text if text is not None else workflow("publish.yml"), "publish.yml")
+
+    def assigning(self, line: str, count: int = -1) -> str:
+        return mutate(workflow("publish.yml"), self.ASSIGN, line, count)
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_accepts_every_quoting_and_prefix_that_starts_with_a_path(self) -> None:
+        for line in (
+            "TARBALL='./tarballs/x.tgz'",
+            "TARBALL=./tarballs/x.tgz",
+            'TARBALL="../tarballs/x.tgz"',
+            "TARBALL=/work/tarballs/x.tgz",
+            'export TARBALL="./tarballs/x.tgz"',
+            "export TARBALL=./tarballs/x.tgz",
+            "declare -x TARBALL='./tarballs/x.tgz'",
+            "declare -r TARBALL=./tarballs/x.tgz",
+            "readonly TARBALL=./tarballs/x.tgz",
+            "local TARBALL=./tarballs/x.tgz",
+            'TARBALL="./tarballs/$(echo x)"',
+        ):
+            self.assertEqual(self.check(self.assigning(line)), [], line)
+
+    def test_rejects_a_value_that_starts_without_a_path_marker(self) -> None:
+        for line in (
+            "TARBALL='tarballs/x.tgz'",
+            'TARBALL="tarballs/x.tgz"',
+            "TARBALL=tarballs/x.tgz",
+            "export TARBALL=tarballs/x.tgz",
+            "export TARBALL='tarballs/x.tgz'",
+            'declare -x TARBALL="tarballs/x.tgz"',
+            "readonly TARBALL=tarballs/x.tgz",
+            "local TARBALL=tarballs/x.tgz",
+            "TARBALL=.tarballs/x.tgz",
+            'TARBALL="$PWD/tarballs/x.tgz"',
+        ):
+            self.assertTrue(self.check(self.assigning(line, 1)), line)
+
+    def test_rejects_a_value_whose_start_is_a_command_substitution(self) -> None:
+        for line in ('TARBALL=$(echo "./tarballs/x.tgz")', 'TARBALL="$(echo ./tarballs/x.tgz)"', "TARBALL=`echo ./x.tgz`", "TARBALL="):
+            self.assertTrue(self.check(self.assigning(line, 1)), line)
+
+    def test_rejects_a_step_that_assigns_nothing(self) -> None:
+        self.assertTrue(self.check(self.assigning("true", 1)))
+
+    def test_rejects_any_other_source_of_the_variable(self) -> None:
+        keep = self.ASSIGN
+        for extra in ('for TARBALL in x; do :; done', 'read -r TARBALL <<< "x"', 'printf -v TARBALL "%s" x', "read TARBALL"):
+            self.assertTrue(self.check(self.assigning(keep + "\n          " + extra, 1)), extra)
+        package = '          PACKAGE: "@journeykit/canon-core-linux-arm64"\n'
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), package, package + "          TARBALL: ./tarballs/x.tgz\n")))
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), step, '      - name: Set it\n        run: echo "TARBALL=./tarballs/x.tgz" >> "$GITHUB_ENV"\n' + step)))
+
+    def test_ignores_text_that_only_names_the_variable(self) -> None:
+        step = "      - name: Upgrade npm for OIDC trusted publishing\n"
+        text = mutate(workflow("publish.yml"), step, "      # TARBALL=tarballs/x.tgz would be read as a GitHub repo.\n" + step)
+        self.assertEqual(self.check(text), [])
+        self.assertEqual(self.check(self.assigning(self.ASSIGN + '\n          echo TARBALL=tarballs/x.tgz >/dev/null')), [])
+
+
+class ScopeTests(unittest.TestCase):
+    """build-native.yml builds by its `scope` job, never by a `paths:` filter."""
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.scope_errors(text if text is not None else workflow("build-native.yml"), "build-native.yml")
+
+    IF = "    if: needs.scope.outputs.skip != 'true'\n"
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_accepts_other_conditions_that_read_the_same(self) -> None:
+        for condition in ("${{ needs.scope.outputs.skip != 'true' }}", "!(needs.scope.outputs.skip == 'true')"):
+            self.assertEqual(self.check(mutate(workflow("build-native.yml"), self.IF, f"    if: {condition}\n")), [], condition)
+
+    def test_rejects_a_paths_filter_on_pull_request(self) -> None:
+        for filter_ in ('    paths:\n      - "crates/**"\n', '    paths-ignore:\n      - "docs/**"\n'):
+            self.assertTrue(self.check(mutate(workflow("build-native.yml"), "  pull_request:\n", "  pull_request:\n" + filter_)), filter_)
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), "  pull_request:\n", "  pull_request: { paths: ['crates/**'] }\n")))
+
+    def test_a_paths_filter_on_another_trigger_is_not_this_rule(self) -> None:
+        text = mutate(workflow("build-native.yml"), "  workflow_dispatch:\n", "  workflow_dispatch:\n  push:\n    paths:\n      - 'crates/**'\n")
+        self.assertEqual(self.check(text), [])
+
+    def test_rejects_a_workflow_without_the_scope_job(self) -> None:
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), "  scope:\n", "  scoped:\n")))
+
+    def test_rejects_a_scope_job_that_is_slow_or_has_no_output(self) -> None:
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), "    name: Decide whether to build\n    runs-on: ubuntu-26.04\n    timeout-minutes: 5\n", "    name: Decide whether to build\n    runs-on: ubuntu-26.04\n    timeout-minutes: 10\n")))
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), "      skip: ${{ steps.scope.outputs.skip }}\n", "      other: ${{ steps.scope.outputs.skip }}\n")))
+
+    def test_rejects_a_build_job_that_does_not_wait_for_scope(self) -> None:
+        for old, new in (
+            ("    needs: [safety, scope, dashboard]\n", "    needs: [safety, dashboard]\n"),
+            ("    name: Generate man pages\n    needs: [safety, scope]\n", "    name: Generate man pages\n    needs: safety\n"),
+            ("    name: Build dashboard app\n    needs: [safety, scope]\n", "    name: Build dashboard app\n    needs: [safety]\n"),
+        ):
+            self.assertTrue(self.check(mutate(workflow("build-native.yml"), old, new)), old)
+
+    def test_rejects_a_build_job_without_the_condition(self) -> None:
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), self.IF, "", 1)))
+
+    def test_rejects_a_condition_that_does_not_build_unless_told_to(self) -> None:
+        for condition in (
+            "needs.scope.outputs.skip == 'false'",
+            "needs.scope.outputs.skip",
+            "!needs.scope.outputs.skip",
+            "needs.scope.outputs.run == 'true'",
+            "needs.scope.outputs.skipp != 'true'",
+            "needs.scope.result == 'success'",
+            "true",
+            "needs.scope.outputs.skip != true",
+            "false",
+        ):
+            self.assertTrue(self.check(mutate(workflow("build-native.yml"), self.IF, f"    if: {condition}\n", 1)), condition)
+
+    def test_the_safety_job_does_not_have_to_wait_for_scope(self) -> None:
+        job = CHECKER._job_block(workflow("build-native.yml"), "safety")
+        self.assertNotIn("scope", CHECKER._needs(job))
+        self.assertEqual(self.check(), [])
 
 
 class PreflightTests(unittest.TestCase):
@@ -789,43 +991,72 @@ class PreflightTests(unittest.TestCase):
 
     def test_rejects_whoami_that_always_runs(self) -> None:
         text = mutate(workflow("publish.yml"), self.WHOAMI_GUARD, '          if true; then\n')
-        self.assertTrue(any("must run only under" in error for error in self.check(text)))
+        self.assertTrue(self.check(text))
 
     def test_rejects_whoami_in_the_else_branch(self) -> None:
         text = mutate(workflow("publish.yml"), self.WHOAMI_GUARD, '          if [ -z "$ABSENT" ]; then\n            echo all published\n          else\n')
         text = mutate(text, '          else\n            echo "every package is already on npm', '          fi\n          if [ -n "$ABSENT" ]; then\n            true\n          else\n            echo "every package is already on npm')
         self.assertTrue(self.check(text))
 
-    def test_rejects_an_unguarded_whoami_next_to_a_guarded_one(self) -> None:
-        else_branch = '          else\n            echo "every package is already on npm'
-        for call in ("npm whoami", "if ! npm whoami; then exit 1; fi", "WHO=$(npm whoami)", "echo \"$(npm whoami)\""):
-            text = mutate(workflow("publish.yml"), else_branch, f"          else\n            {call}\n            echo \"every package is already on npm")
-            errors = self.check(text)
-            self.assertTrue(any("must run only under" in error for error in errors), (call, errors))
+    ELSE_BRANCH = '          else\n            echo "every package is already on npm'
+
+    def with_call(self, call: str) -> str:
+        """The shipped workflow with one more line in the branch where no package is absent (no guard there)."""
+        return mutate(workflow("publish.yml"), self.ELSE_BRANCH, f"          else\n            {call}\n            echo \"every package is already on npm")
+
+    def test_rejects_an_unguarded_whoami_in_any_form(self) -> None:
+        for call in (
+            "npm whoami",
+            "npm --loglevel=error whoami",
+            "npm --registry https://registry.npmjs.org whoami",
+            "env FOO=1 npm whoami",
+            "FOO=1 npm whoami",
+            "command npm whoami",
+            "timeout 30 npm whoami",
+            "time npm whoami",
+            "exec npm whoami",
+            "npm \\\n            whoami",
+            "npm \\\n              --loglevel=error \\\n              whoami",
+            "if ! npm whoami; then exit 1; fi",
+            "WHO=$(npm whoami)",
+            'echo "$(npm whoami)"',
+            "echo `npm whoami`",
+            "true && npm whoami",
+            "(npm whoami)",
+            "/usr/local/bin/npm whoami",
+        ):
+            self.assertTrue(self.check(self.with_call(call)), call)
+
+    def test_accepts_text_that_only_mentions_whoami(self) -> None:
+        for line in ('echo "npm whoami is not run here"', "echo 'npm whoami'", "# npm whoami", "echo \"a $(date) npm whoami\"", "npm view whoami-package"):
+            self.assertEqual(self.check(self.with_call(line)), [], line)
+
+    def test_a_guarded_whoami_in_any_form_is_accepted(self) -> None:
+        for call in ("npm --loglevel=error whoami", "env FOO=1 npm whoami", "command npm whoami", "timeout 30 npm whoami", "npm --registry https://registry.npmjs.org whoami"):
+            text = mutate(workflow("publish.yml"), "            if ! npm whoami; then\n", f"            if ! {call}; then\n")
+            self.assertEqual(self.check(text), [], call)
 
     def test_counts_the_command_substitution_form_as_a_whoami(self) -> None:
         text = mutate(workflow("publish.yml"), "            if ! npm whoami; then\n", "            if ! WHO=$(npm whoami); then\n")
         self.assertEqual(self.check(text), [])
         text = mutate(workflow("publish.yml"), self.WHOAMI_GUARD, '          if true; then\n')
         text = mutate(text, "            if ! npm whoami; then\n", "            if ! WHO=$(npm whoami); then\n")
-        self.assertTrue(any("must run only under" in error for error in self.check(text)))
+        self.assertTrue(self.check(text))
 
     def test_rejects_a_preflight_without_whoami(self) -> None:
         text = mutate(workflow("publish.yml"), "            if ! npm whoami; then\n", "            if ! true; then\n")
-        self.assertTrue(any("must run `npm whoami`" in error for error in self.check(text)))
+        self.assertTrue(self.check(text))
 
-    def test_accepts_the_whoami_under_the_absence_condition_and_nowhere_else(self) -> None:
-        job = CHECKER._job_block(workflow("publish.yml"), "publish")
-        self.assertEqual(job.count("npm whoami"), 3)  # the comment, the call and the error message
+    def test_accepts_the_shipped_whoami_under_the_absence_condition(self) -> None:
         self.assertEqual(self.check(), [])
 
     def test_rejects_a_skipped_preflight_in_a_dry_run(self) -> None:
         text = mutate(workflow("publish.yml"), "      - name: Pre-flight npm release state (fresh-release gate + recovery + first-publish token)\n", "      - name: Pre-flight npm release state (fresh-release gate + recovery + first-publish token)\n        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run\n")
-        self.assertTrue(any("runs in a dry run" in error for error in self.check(text)))
+        self.assertTrue(self.check(text))
 
     def test_rejects_a_recovery_with_dry_run_that_does_not_fail_early(self) -> None:
         text = mutate(workflow("publish.yml"), '[ "${DRY_RUN:-false}" = "true" ]', '[ "${DRY_RUN:-false}" = "never" ]')
-        self.assertTrue(any("fail early on recovery=true with dry_run=true" in error for error in self.check(text)))
+        self.assertTrue(self.check(text))
 
     def run_refusal(self, recovery: str, dry_run: str) -> int:
         step = CHECKER._step_block(CHECKER._job_block(workflow("publish.yml"), "read-version"), "Refuse recovery together with dry_run")
