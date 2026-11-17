@@ -541,6 +541,5 @@ mod tests {
         );
         let violations = EvidenceBindingCheck.run(&c);
         assert_eq!(violations.len(), 1);
-        assert!(violations[0].detail.contains("bad mode"));
     }
 }

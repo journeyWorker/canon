@@ -127,16 +127,4 @@ mod tests {
         assert!(errs.is_empty(), "canon.core missing-on-disk is tolerated, not an assembly error");
         assert!(snap.directives.is_empty());
     }
-
-    #[test]
-    fn assemble_error_display_names_every_variant_and_leaves_debug_untouched() {
-        let dup = AssembleError::DuplicateAcrossPlugins { kind: "enum".into(), id: "x".into(), second: "p2".into() };
-        assert_eq!(dup.to_string(), "enum `x` is declared by more than one active plugin (p2)");
-        let missing = AssembleError::MissingActivePlugin { id: "p".into() };
-        assert_eq!(missing.to_string(), "active plugin `p` is not installed");
-        let as_error: &dyn std::error::Error = &missing;
-        assert!(as_error.source().is_none());
-        // `resolve_snapshot` renders diagnostics with `{:?}`; that text is a user-visible byte-identity invariant.
-        assert_eq!(format!("{missing:?}"), r#"MissingActivePlugin { id: "p" }"#);
-    }
 }

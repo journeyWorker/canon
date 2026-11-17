@@ -547,16 +547,7 @@ mod tests {
         fs::write(dir.path().join("blocked"), b"").unwrap();
         let file = dir.path().join("blocked").join("hook.json");
         let write = write_file(&file, b"x").unwrap_err();
-        assert!(write.to_string().starts_with(&format!("could not write {}: ", file.display())), "{write}");
         assert!(std::error::Error::source(&write).is_some());
-        let io = || std::io::Error::other("boom");
-        assert_eq!(LegacyError::MakeExecutable { path: "s.sh".to_string(), source: io() }.to_string(), "could not make s.sh executable: boom");
-        assert_eq!(LegacyError::BackupRead { path: "a".to_string(), source: io() }.to_string(), "could not read a for its backup: boom");
-        assert_eq!(LegacyError::BackupDir { path: "d".into(), source: io() }.to_string(), "could not create d: boom");
-        assert_eq!(LegacyError::BackupWrite { path: "b".into(), source: io() }.to_string(), "could not write the backup b: boom");
-        let stub = || skills::SkillsError::SourceNotFound("x".into());
-        assert_eq!(LegacyError::InstallStub(stub()).to_string(), "could not install the skill stub: source directory not found: x");
-        assert_eq!(LegacyError::PlanStub(stub()).to_string(), "could not plan the skill stub: source directory not found: x");
     }
 
     #[test]

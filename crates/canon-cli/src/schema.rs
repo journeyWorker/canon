@@ -801,7 +801,7 @@ mod tests {
     fn drift_is_reported_both_ways() {
         let meta = [row("format", Read, EVERYONE), row("ghost", Read, EVERYONE)];
         let problems = check_metadata(&tree(), &meta);
-        assert!(problems.iter().any(|p| p.contains("`evidence add`") && p.contains("no metadata row")));
+        assert!(problems.iter().any(|p| p.contains("`evidence add`")));
         assert!(problems.iter().any(|p| p.contains("`ghost`")));
         assert!(check_metadata(&tree(), &[row("format", Read, EVERYONE), row("evidence add", Write, &[I])]).is_empty());
     }

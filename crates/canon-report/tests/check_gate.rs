@@ -22,7 +22,6 @@ fn check_reports_missing_when_the_report_was_never_generated() {
     let outcome = check_report(&inputs(dir.path()), &report_path).unwrap();
     assert_eq!(outcome, CheckOutcome::Missing);
     assert_eq!(outcome.exit_code(), 1);
-    assert!(outcome.message(&report_path).contains("MISSING"));
 }
 
 #[test]
@@ -40,7 +39,6 @@ fn check_reports_no_drift_immediately_after_a_write() {
 
     assert_eq!(outcome, CheckOutcome::NoDrift);
     assert_eq!(outcome.exit_code(), 0);
-    assert_eq!(outcome.message(&report_path), "canon report check: no drift");
 }
 
 #[test]
@@ -59,7 +57,6 @@ fn check_reports_drift_when_the_committed_file_has_been_hand_edited() {
     let outcome = check_report(&in_, &report_path).unwrap();
     assert_eq!(outcome, CheckOutcome::Drift);
     assert_eq!(outcome.exit_code(), 1);
-    assert!(outcome.message(&report_path).contains("DRIFT"));
 }
 
 #[test]

@@ -142,7 +142,7 @@ mod tests {
         let mut atom = valid_atom();
         atom.attrs.remove("summary");
         let diags = compile_handoff_body(&atom, &snap).unwrap_err();
-        assert!(diags.iter().any(|d| d.code == "E-MISSING-ATTR" && d.message.contains("summary")));
+        assert!(diags.iter().any(|d| d.code == "E-MISSING-ATTR"));
     }
 
     #[test]

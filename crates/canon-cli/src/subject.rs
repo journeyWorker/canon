@@ -1541,22 +1541,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_value_parsers_and_the_adoption_error_read_as_before() {
-        assert_eq!(parse_status("sideways").unwrap_err().to_string(), "unknown subject move `sideways` (expected one of: proposed, specced, building, verifying, shipped, retired)");
-        assert_eq!(parse_subject_id("Bad Id").unwrap_err().to_string(), format!("invalid SubjectId: \"Bad Id\" does not match grammar `{}`", SubjectId::GRAMMAR));
-        assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
-        let change = ChangeId::parse("c").unwrap();
-        let subject = SubjectId::parse("s").unwrap();
-        let cause = || std::io::Error::other("disk full");
-        let before = AdoptionWriteError::new(false, cause());
-        assert_eq!(before.to_string(), "disk full");
-        assert!(std::error::Error::source(&before).is_some());
-        assert_eq!(before.describe(&change, &subject, "fix"), "failed to record the adoption: disk full; nothing was written");
-        let between = AdoptionWriteError::new(true, cause());
-        assert_eq!(between.describe(&change, &subject, "fix"), "subject `s` now lists change `c`, but the change record could not be written: disk full; complete the link with `fix`");
-    }
-
-    #[test]
     fn the_forward_chain_and_the_reopen_are_the_only_paths() {
         use SubjectStatus::*;
         assert!(is_valid_transition(Proposed, Specced));

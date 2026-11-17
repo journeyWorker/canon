@@ -27,10 +27,8 @@ use crate::ReportInputs;
 
 /// The nine S9/S24/S36/s43-owned marts, in the order the report declares
 /// them — [`crate::marts::REPORT_MARTS`]'s own order, duplicated here
-/// as a bare name list (`packages/dashboard/test/panel-copy.test.ts`
-/// parses this literal out of the source, so it stays a literal;
-/// `marts`' own `report_marts_are_the_snapshot_tables` pins the two
-/// together). `mart_scope_status`, `mart_subjects`, `mart_review_rounds`
+/// as a bare name list (`marts`' own `report_marts_are_the_snapshot_tables`
+/// pins the two together). `mart_scope_status`, `mart_subjects`, `mart_review_rounds`
 /// and `mart_review_totals` remain appended in their historical order;
 /// `mart_run_observability` is appended last so existing consumers'
 /// table order never moves.

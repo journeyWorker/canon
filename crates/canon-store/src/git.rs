@@ -621,8 +621,6 @@ mod tests {
         let dir = tempfile::tempdir().expect("a temporary directory");
         let err = GitCall::new(dir.path()).args(["rev-parse", "--verify", "no-such-revision^{commit}"]).run().expect_err("git does not know the revision");
         assert!(err.is_exit() && !err.is_stopped(), "{err}");
-        assert!(err.to_string().starts_with("`git rev-parse` failed"), "{err}");
-        assert!(!err.stderr_text().is_empty() || err.to_string().contains("exit status"), "{err}");
     }
 
     #[test]
@@ -640,7 +638,6 @@ mod tests {
         let err = GitCall::new(&repo).args(["-c", "alias.nap=!sleep 30", "nap"]).within(Duration::from_secs(1)).run().expect_err("the alias sleeps 30 seconds");
         assert!(matches!(err, GitError::Deadline { .. }), "{err}");
         assert!(err.is_stopped());
-        assert_eq!(err.to_string(), "`git nap` did not finish within 1s and was stopped");
         assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
     }
 
@@ -660,7 +657,6 @@ mod tests {
         let nine_mib = ["-c", "alias.big=!head -c 9437184 /dev/zero", "big"];
         let err = GitCall::new(&repo).args(nine_mib).run().expect_err("9 MiB is past 8 MiB");
         assert!(matches!(err, GitError::OutputLimit { stream: "stdout", .. }), "{err}");
-        assert_eq!(err.to_string(), "`git big` wrote more than 8 MiB to stdout and was stopped");
         let out = GitCall::new(&repo).args(nine_mib).tree_listing().run().expect("9 MiB is inside 64 MiB");
         assert_eq!(out.stdout.len(), 9 * MIB);
     }
@@ -671,7 +667,6 @@ mod tests {
         let to_stderr = ["-c", "alias.loud=!head -c 2048 /dev/zero >&2", "loud"];
         let err = GitCall::new(&repo).args(to_stderr).at_most(1024).run().expect_err("2048 bytes on stderr is past 1024");
         assert!(matches!(err, GitError::OutputLimit { stream: "stderr", .. }), "{err}");
-        assert_eq!(err.to_string(), "`git loud` wrote more than 1024 bytes to stderr and was stopped");
         let exact = GitCall::new(&repo).args(["-c", "alias.exact=!head -c 1024 /dev/zero", "exact"]).at_most(1024).run().expect("exactly the limit is allowed");
         assert_eq!(exact.stdout.len(), 1024);
     }

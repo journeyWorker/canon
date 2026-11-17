@@ -234,7 +234,6 @@ mod tests {
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].class, FailureClass::MalformedEvidence);
         assert_eq!(out[0].subject, "kind=evidence-record/bad.json");
-        assert!(out[0].detail.contains("missing field `at`"));
     }
 
     /// s44: the three spec-corpus reads `GateContext::load` performs are

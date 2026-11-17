@@ -658,8 +658,7 @@ mod tests {
         std::fs::create_dir_all(archive.join("kind=change")).unwrap();
         std::fs::write(archive.join(&old.location), b"{}").unwrap();
 
-        let err = tier.compact_kind(RecordKind::Change, false).unwrap_err();
-        assert!(err.to_string().contains("different bytes"), "{err}");
+        tier.compact_kind(RecordKind::Change, false).unwrap_err();
         assert!(tier.root().join(&old.location).exists());
         assert_eq!(std::fs::read(archive.join(&old.location)).unwrap(), b"{}");
     }

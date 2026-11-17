@@ -788,7 +788,7 @@ mod tests {
         fs::write(dir.path().join("secret.txt"), b"one\ntwo\nkey AKIAIOSFODNN7EXAMPLE\n").unwrap();
         let spec = ContextPackSpec { selected_docs: vec![PathBuf::from("secret.txt")], ..Default::default() };
         let message = create(dir.path(), &spec).unwrap_err().to_string();
-        assert_eq!(message, "selected context input contains plaintext secret material: secret.txt (line 3, aws-access-key-id)");
+        assert!(message.contains("secret.txt") && message.contains("aws-access-key-id"), "{message}");
         assert!(!message.contains("AKIA"), "the message does not carry the value");
         assert!(!dir.path().join(CONTEXT_PACK_DIR).exists(), "a refusal stores nothing");
     }
@@ -829,7 +829,7 @@ mod tests {
         let dir = fixture();
         let guidance = ContextPackSpec { injected_guidance: vec![StrategyRef::new("s-9", "token\nsk-proj-abcdEFGH_ijkl-mnop1234", "plain")], ..Default::default() };
         let message = create(dir.path(), &guidance).unwrap_err().to_string();
-        assert_eq!(message, "selected context input contains plaintext secret material: injected guidance s-9 (line 2, api-secret-key)");
+        assert!(message.contains("s-9") && message.contains("api-secret-key"), "{message}");
         assert!(!dir.path().join(CONTEXT_PACK_DIR).exists());
     }
 

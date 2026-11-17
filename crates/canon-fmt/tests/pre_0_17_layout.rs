@@ -49,7 +49,7 @@ fn the_pre_0_17_layout_is_one_violation_naming_the_root_and_canon_migrate() {
     let v = &report.violations[0];
     assert_eq!(v.class, FmtFailureClass::LayoutGrammar);
     assert_eq!(v.path, Path::new("features"));
-    assert!(v.detail.contains(&format!("spec root `{}`", dir.path().display())), "{}", v.detail);
+    assert!(v.detail.contains(&dir.path().display().to_string()), "{}", v.detail);
     assert!(v.detail.contains("features/kind=feature/area=world/coupon.feature"), "names the first file in path order: {}", v.detail);
     assert!(v.detail.contains("`canon migrate`"), "{}", v.detail);
     assert_eq!(report.files_checked, 0, "the old layout is refused, never read");

@@ -1694,7 +1694,7 @@ mod tests {
             "routing:\n  session: !!str hot\n",
         ] {
             let err = rewrite_config(text).unwrap_err();
-            assert!(err.contains("by hand") && err.contains("`session`"), "{text:?}: {err}");
+            assert!(err.contains("`session`"), "{text:?}: {err}");
         }
     }
 

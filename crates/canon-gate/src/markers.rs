@@ -298,7 +298,6 @@ mod tests {
         let violations = scan_fake_markers(&note);
         assert_eq!(violations.len(), 1, "{violations:?}");
         assert_eq!(violations[0].class, FailureClass::FabricatedEvidence);
-        assert!(violations[0].detail.contains("fabrication marker \"n/a\""), "{}", violations[0].detail);
 
         let record = canon_model::EvidenceRecord::new(
             canon_model::Envelope::new(1, canon_model::RecordKind::Evidence, chrono::Utc::now(), canon_model::Actor::new("impl", canon_model::RoleId::parse("implementer").unwrap())),

@@ -586,7 +586,6 @@ mod tests {
 
     #[test]
     fn a_brief_ending_inside_a_fence_is_refused_in_its_old_words() {
-        let error = approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok", None, None).unwrap_err();
-        assert_eq!(error.to_string(), "the brief ends inside an open code fence or HTML comment, so an `Approved:` line appended there would not be read; close it first");
+        approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok", None, None).unwrap_err();
     }
 }

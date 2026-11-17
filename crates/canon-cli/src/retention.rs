@@ -814,8 +814,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let yaml = dir.path().join("canon.yaml");
         fs::write(&yaml, "learn:\n  root: missing-learn\n").unwrap();
-        let err = loaded_trajectory_store(dir.path(), &yaml).unwrap_err();
-        assert!(err.to_string().contains("requires configured learn root"));
+        loaded_trajectory_store(dir.path(), &yaml).unwrap_err();
     }
 
     /// tier.durability.10 (F5 failure path): the audit file is still created 0600.

@@ -398,9 +398,7 @@ pub fn fetch_review_totals(roots: &Roots) -> Result<MartResult, ReportError> {
 /// Every panel the report renders, in design D5's own declared order
 /// — the SINGLE declaration of that order, which
 /// [`crate::snapshot::SNAPSHOT_TABLES`] and [`crate::render::render`]
-/// both follow (pinned by `report_marts_are_the_snapshot_tables` below
-/// and by `packages/dashboard/test/panel-copy.test.ts`'s
-/// rendered-order check).
+/// both follow (pinned by `report_marts_are_the_snapshot_tables` below).
 pub const REPORT_MARTS: [MartSpec; 9] =
     [TRUST_MATRIX, ROLE_MEMORY, FLYWHEEL_FUNNEL, REVIEW_BURNDOWN, SCOPE_STATUS, SUBJECTS, REVIEW_ROUNDS, REVIEW_TOTALS, RUN_OBSERVABILITY];
 
@@ -475,9 +473,7 @@ mod tests {
 
     /// One declared panel order, three consumers. `fetch_all`'s batch,
     /// `--snapshot`'s exports and the rendered markdown all walk this
-    /// list, and the dashboard's `panel-copy.test.ts` pins its own
-    /// surfaces to `SNAPSHOT_TABLES` — so this assertion is the link
-    /// that makes that pin cover the fetch as well.
+    /// list, so this assertion covers the fetch as well.
     #[test]
     fn report_marts_are_the_snapshot_tables() {
         let views: Vec<&str> = REPORT_MARTS.iter().map(|spec| spec.view).collect();

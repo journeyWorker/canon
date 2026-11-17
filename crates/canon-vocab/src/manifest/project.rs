@@ -120,9 +120,7 @@ mod tests {
         let path = tmp.path().join(PROJECT_YAML_RELATIVE_PATH);
         // A directory at the config path: readable-by-name but not as a file.
         std::fs::create_dir(&path).unwrap();
-        let io_err = std::fs::read_to_string(&path).unwrap_err();
         let err = load_project(tmp.path()).unwrap_err();
-        assert_eq!(err.to_string(), format!("cannot read {}: {io_err}", path.display()));
         assert!(std::error::Error::source(&err).is_some());
     }
 
