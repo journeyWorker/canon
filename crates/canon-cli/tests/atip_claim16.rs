@@ -18,7 +18,6 @@ use serde_json::{json, Value};
 use tempfile::TempDir;
 
 const MINOR: &str = "1.6";
-const FIXTURE: &str = "crates/canon-cli/tests/atip/canon.fixture.json";
 
 // ---------------------------------------------------------------------------
 // Running the binary.
