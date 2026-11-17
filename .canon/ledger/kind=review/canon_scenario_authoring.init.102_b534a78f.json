@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-r3-authoring_context",
+    "role": "reviewer",
+    "session_id": "Rev43r3_authctx"
+  },
+  "at": "2026-11-17T17:28:35.061771252Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "kind": "review",
+  "pin": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:authoring_init_102_init_check_says_so_when_no_hot_store_is_configured_and_fails_a_hot_store_it_cannot_open"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e3fd52e4f9b552fb2ca499993c67957ca30b2cb1d0189fc7c5590e57cb56f985",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-test-cleanup/brief.md"
+  },
+  "review_id": "01M7N8VAFNK2KSY5K0YJZZKWBB",
+  "reviewer": "rev-0-43-tests-r3-authoring_context",
+  "scenario_id": "authoring.init.102",
+  "schema": 2,
+  "worktree_dirty": false
+}
