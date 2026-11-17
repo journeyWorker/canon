@@ -2,18 +2,16 @@
 
 The scenarios of the specs whose Given, When or Then (or title) differ between the 0.35.0 release commit `31df40acd` and this change, from the changes `codes-rename`, `codes-exit`, `codes-refusals`, `codes-stored`, `codes-incomplete`, `help-json`, `input-1-3`, `code-reasons`, `atip-dep` and `codes-table`. A review of one of them was pinned to the old sentence and is stale; a reviewer other than the implementer reads this table and reviews each scenario again. `name only` rows changed code names only: the sentence with every code name left out is the one 0.35 had (the code names that changed are listed as `old` → `new`). `meaning` rows changed what the sentence says, and the words that changed are listed as “before” → “after”. Scenarios added by 0.36 are not in the table (they have no earlier review).
 
-Scenarios changed: 117
+Scenarios changed: 115
 
 Name only: 86. Meaning: 31.
 
 | scenario | file | kind | what changed |
 |---|---|---|---|
-| @atip.check.43 | area=atip/check.feature | meaning | “atip-l0” → “atip”; “recipe” → “recipes atip-deep,”; “” → “and atip-install”; “both” → “the job and the recipe atip-deep install the checker from the atip repository at its tag,”; “and atip-check with --locked” → “only,”; “” → “once”; “” → “at L2 with --contract 1.2, --deep”; “on” → “the canon fixture And the recipe”; “with” → “runs”; “arguments” → “command without --deep” |
 | @atip.checkorder.04 | area=atip/checkorder.feature | name only | `FINDING_INVALID_ARGUMENT` → `FINDING_ARGUMENT_INVALID` |
 | @atip.checkorder.06 | area=atip/checkorder.feature | name only | `FINDING_INVALID_ARGUMENT`, `FINDING_INVALID_ARGUMENT`, `FINDING_INVALID_ARGUMENT`, `FINDING_INVALID_ARGUMENT` → `FINDING_ARGUMENT_INVALID`, `FINDING_ARGUMENT_INVALID`, `FINDING_ARGUMENT_INVALID`, `FINDING_ARGUMENT_INVALID` |
 | @atip.checkorder.09 | area=atip/checkorder.feature | name only | `UNKNOWN_ROLE` → `ROLE_INVALID`; `UNKNOWN_ROLE` → `ROLE_INVALID` |
 | @atip.checkorder.18 | area=atip/checkorder.feature | meaning | “APPROVAL_INCOMPLETE or POLICY_APPROVAL_REFUSED” → “APPROVAL_INVALID” |
-| @atip.claiml2.07 | area=atip/claiml2.feature | meaning | “” → “just atip-deep and the CI job atip run canon at L2 with --contract 1.2 and --deep,”; “canon at L0 and at L2 and the checker at L0, each with --contract 1.2, the CI jobs atip-l0 and atip-l2 run the same commands” → “it without --deep,”; “the recipe” → “atip-deep”; “recipe” → “recipes atip-deep and”; “jobs atip-l0 and atip-l2” → “job atip”; “” → “atip-deep”; “jobs” → “job”; “” → “the installed checker once on the”; “at L0 and” → “binary”; “and the checker at L0, each” → “”; “1.2” → “1.2, --deep”; “” → “both build canon only,”; “builds both binaries,” → “atip runs”; “job atip-l1 is” → “same check without --deep, the jobs atip-l0, atip-l1, atip-l2 and atip-check-tests are”; “row,” → “row and the checker's tests are the atip repository's,”; “atip” → “atip-deep” |
 | @atip.constraints.05 | area=atip/constraints.feature | name only | `FINDING_INVALID_ARGUMENT` → `FINDING_ARGUMENT_INVALID` |
 | @atip.constraints.14 | area=atip/constraints.feature | meaning | “APPROVAL_INCOMPLETE or POLICY_APPROVAL_REFUSED” → “APPROVAL_INVALID” |
 | @atip.constraints.15 | area=atip/constraints.feature | meaning | “APPROVAL_INCOMPLETE, POLICY_APPROVAL_REFUSED)” → “APPROVAL_INVALID)”; “CONFIG_MISSING” → “CONFIG_REQUIRED” |
