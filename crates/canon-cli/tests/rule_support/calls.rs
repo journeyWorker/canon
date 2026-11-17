@@ -9,8 +9,8 @@
 //! A row is keyed by (command, goal, source of the example). The source is the document (the first example of the command document, which
 //! `atip_check_order` uses: violations and pairs of rules) or the story (the example with the ids the story repo gives it, which `arg_rules`
 //! uses: violations and calls that meet a rule). Every row carries a digest of what the search read: the rules of the command, the
-//! arguments they name with their candidate values, the required arguments, the example words the search used, the text of the searcher
-//! (`search.rs`, `samples_*.rs`) and the revision of `atip` in `Cargo.lock`. A digest that is no longer the one of the inputs makes the
+//! arguments they name with their candidate values, the required arguments, the example words the search used and the revision of `atip` in
+//! `Cargo.lock`. A digest that is no longer the one of the inputs makes the
 //! read fail, saying how to make the table again; a table never falls back to searching.
 //!
 //! `CANON_BLESS_RULE_CALLS=1 cargo test -p canon-cli --test arg_rules the_stored_rule_calls` (`just rule-calls`) writes the table.
@@ -81,16 +81,6 @@ pub struct Table {
 
 // ------------------------------------------------------------------------------------------------ the inputs
 
-/// The text of the searcher: its files, by name.
-pub fn search_sources() -> Vec<(&'static str, &'static str)> {
-    vec![
-        ("search.rs", include_str!("search.rs")),
-        ("samples_authoring.rs", include_str!("samples_authoring.rs")),
-        ("samples_evidence.rs", include_str!("samples_evidence.rs")),
-        ("samples_reads.rs", include_str!("samples_reads.rs")),
-    ]
-}
-
 /// The revision of `atip` that `Cargo.lock` names.
 pub fn lock_atip_rev() -> String {
     let lock = std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.lock")).expect("Cargo.lock");
@@ -108,7 +98,6 @@ pub struct World<'a> {
     pub docs: &'a [Value],
     /// The example of a command as the story runs it.
     pub story_example: &'a (dyn Fn(&Value) -> Vec<String> + Sync),
-    pub sources: &'a [(&'a str, &'a str)],
     pub atip: &'a str,
 }
 
@@ -120,7 +109,7 @@ fn example_of(doc: &Value, source: Source, world: &World) -> Vec<String> {
 }
 
 /// The digest of everything the search of `doc` from `example` reads.
-pub fn digest_of(doc: &Value, rules: &[ConstraintDoc], example: &[String], atip: &str, sources: &[(&str, &str)]) -> String {
+pub fn digest_of(doc: &Value, rules: &[ConstraintDoc], example: &[String], atip: &str) -> String {
     let names = names_of(rules);
     let parsed = parse_call(doc, example).map(|parsed| parsed.text).unwrap_or_default();
     let arguments: Vec<Value> = names
@@ -139,8 +128,7 @@ pub fn digest_of(doc: &Value, rules: &[ConstraintDoc], example: &[String], atip:
         })
         .collect();
     let required: Vec<&Value> = super::search::arguments(doc).into_iter().filter(|argument| argument["required"] == true).map(|argument| &argument["name"]).collect();
-    let searcher: Vec<String> = sources.iter().map(|(name, text)| format!("{name}:{}", hex(text))).collect();
-    let input = json!({ "atip": atip, "command": doc["command"], "constraints": doc["constraints"], "required": required, "arguments": arguments, "searcher": searcher });
+    let input = json!({ "atip": atip, "command": doc["command"], "constraints": doc["constraints"], "required": required, "arguments": arguments });
     hex(&input.to_string())[..16].to_string()
 }
 
@@ -210,7 +198,7 @@ impl Table {
         let key = Key { command, source, goal };
         let Some(row) = self.rows.get(&key) else { return Err(format!("the rule-call table has no row for {}; {REMEDY}", key.describe())) };
         let rules = constraints(doc);
-        let digest = digest_of(doc, &rules, example, &self.atip, &search_sources());
+        let digest = digest_of(doc, &rules, example, &self.atip);
         if row.digest != digest {
             return Err(format!("the rule-call table row for {} was made from other inputs (digest {} now {digest}); {REMEDY}", key.describe(), row.digest));
         }
@@ -288,7 +276,7 @@ pub fn problems(text: &str, world: &World) -> Vec<String> {
         let command = doc["command"].as_str().unwrap_or_default().to_string();
         for source in [Source::Doc, Source::Story] {
             let example = example_of(doc, source, world);
-            let digest = digest_of(doc, &rules, &example, world.atip, world.sources);
+            let digest = digest_of(doc, &rules, &example, world.atip);
             let mut visit = |goal: Goal, out: &mut Vec<String>| -> Option<Found> {
                 let key = Key { command: command.clone(), source, goal };
                 wanted.insert(key.clone());
@@ -371,7 +359,7 @@ pub fn make(world: &World) -> String {
         let finish = |doc: &Value, source: Source, goal: Goal, found: Option<Found>| {
             let rules = constraints(doc);
             let example = example_of(doc, source, world);
-            let digest = digest_of(doc, &rules, &example, world.atip, world.sources);
+            let digest = digest_of(doc, &rules, &example, world.atip);
             (Key { command: doc["command"].as_str().unwrap_or_default().to_string(), source, goal }, Row { digest, found })
         };
         match job {
