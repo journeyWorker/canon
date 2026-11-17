@@ -63,21 +63,3 @@ Feature: gate git-env
   @gate.git-env.07
   Scenario: core.autocrlf is not pinned: a CRLF file of a repository set to autocrlf=true has the code tree of HEAD and the tree is not dirty, without it the tree is dirty
     Given a step
-
-  # canon: {"schema":1,"at":"2026-11-09T10:13:08Z","actor":{"agent_id":"Impl40_git_env","role":"planner"}}
-  @subject:gate-trust-spine
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-40-git-env-allowlist.F3
-  @gate.git-env.08
-  Scenario: The CHANGELOG entry names the allowed names, the shells that now fail, and the one-time change of a dirty pack id
-    Given a step
-
-  # canon: {"schema":1,"at":"2026-11-09T10:13:24Z","actor":{"agent_id":"Impl40_git_env","role":"planner"}}
-  @subject:gate-trust-spine
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-40-git-env-allowlist.F3
-  @gate.git-env.09
-  Scenario: A CHANGELOG without the entry or an entry missing an item, or a coding-rules page that only says it clears the git environment, fails the release check
-    Given a step

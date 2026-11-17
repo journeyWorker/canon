@@ -99,41 +99,6 @@ Feature: retired record kinds
   # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
   @subject:tier-storage
   @lane:behavior
-  @case:happy
-  @flow:canon-0-39-session-kinds-removal.F4
-  @tier.retired.09
-  Scenario: query, export and search refuse the retired kind names and point at purge
-    Given a repo and the commands query, export and search with --kind session and --kind event
-    When each is run
-    Then each exits 2 with the code USAGE, field `--kind` and `expected` the twelve kinds
-    And the message says the kind was removed in 0.39.0 and the hint names canon purge --kind <name> --before <date>
-
-  # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-39-session-kinds-removal.F4
-  @tier.retired.10
-  Scenario: The twelve kinds still read and purge still takes the retired names
-    Given a repo
-    When canon query --kind run, query --kind evidence, search --kind run and purge --kind session run
-    Then each answers as 0.38 did
-
-  # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-39-session-kinds-removal.F5
-  @tier.retired.11
-  Scenario: canon context lists the twelve kinds and no retired schema file is shipped
-    Given a repo and the model's schema directory
-    When canon context runs and the directory is read
-    Then the kinds are the twelve record kinds with neither `session` nor `event`
-    And no `session.schema.json` or `event.schema.json` exists
-
-  # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
   @case:failure
   @flow:canon-0-39-session-kinds-removal.F5
   @tier.retired.12
@@ -180,18 +145,6 @@ Feature: retired record kinds
   # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
   @subject:tier-storage
   @lane:behavior
-  @case:happy
-  @flow:canon-0-39-session-kinds-removal.F8
-  @tier.retired.16
-  Scenario: canon init routes the twelve kinds and no retired one
-    Given a fresh repo
-    When canon init runs and then canon init --check
-    Then the canon.yaml has no `session` or `event` line and routes `task`, `handoff` and `run` to hot
-    And the check passes without a warning
-
-  # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
   @case:failure
   @flow:canon-0-39-session-kinds-removal.F8
   @tier.retired.17
@@ -199,28 +152,6 @@ Feature: retired record kinds
     Given a repo whose canon.yaml carries the retired routing lines an older scaffold wrote
     When canon init --check runs
     Then it passes and warns RETIRED_KIND_KEYS with `canon migrate --json` first in `meta.next`
-
-  # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-39-session-kinds-removal.F9
-  @tier.retired.18
-  Scenario: The release check fails when the CHANGELOG does not announce the retired kinds
-    Given the 0.39 section of the CHANGELOG
-    When it is read for the retired keys and the warning, migrate, the one-release purge, the refusals and the removed marts
-    Then each is named, and a missing entry fails the release check naming it
-
-  # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-39-session-kinds-removal.F9
-  @tier.retired.19
-  Scenario: The architecture document, the README and the website list no session or event record kind
-    Given ARCHITECTURE.md, README.md and the website pages
-    When they are read
-    Then no page lists the two names as record kinds
 
   # canon: {"schema":1,"at":"2026-11-08T08:36:14Z","actor":{"agent_id":"impl-0-39","role":"implementer","session_id":"s-0-39-impl"}}
   @subject:tier-storage

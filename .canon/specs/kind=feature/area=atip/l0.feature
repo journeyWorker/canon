@@ -251,16 +251,6 @@ Feature: ATIP L0 output contract
     When cargo test --workspace, the conformance cases and the generated-docs drift test run
     Then they pass, and the conformance regeneration differs from the committed cases only by the contract's changes
 
-  # canon: {"schema":1,"at":"2026-10-31T11:36:30Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-33-atip-l0.F8
-  @atip.l0.27
-  Scenario: An old name in a guide, the website, the dashboard or an eval script fails the check, and a consumer that reads an old key fails its own test
-    Given the guides, the website, the dashboard and the eval scripts
-    When the old-name check runs, and a consumer reads an old key
-    Then it passes on the new text, fails when one old name is restored, and the dashboard and launcher tests fail on an old key
-
   # canon: {"schema":1,"at":"2026-10-31T15:01:06Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract
   @case:failure

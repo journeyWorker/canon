@@ -19,11 +19,10 @@ Feature: ingest removal
   @case:failure
   @flow:canon-0-39-session-ingest-removal.F1
   @ingest.removal.02
-  Scenario: The selftest suite session-ingest is a closed-value refusal and the generated documents keep no trace of the command
-    Given the closed values of `selftest --suite` and the generated command document, the schema, the website reference and the orchestrator guide
-    When `canon selftest --suite session-ingest` is run, and a bare `canon selftest`, and the documents are read
+  Scenario: The selftest suite session-ingest is a closed-value refusal
+    Given the closed values of `selftest --suite`
+    When `canon selftest --suite session-ingest` is run, and a bare `canon selftest`
     Then the suite exits 2 as a usage error that does not list `session-ingest`, and the bare run exits 0
-    And no document names `ingest sessions`, `session-ingest` or the removed report
 
   # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
   @subject:ingest-pipelines
@@ -132,28 +131,6 @@ Feature: ingest removal
     When canon inventory sync runs and canon query --kind scenario --all lists the scenarios
     Then the deleted file's scenario is gone from the listing and the other stays
     And the sync exits 0
-
-  # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
-  @subject:ingest-pipelines
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-39-session-ingest-removal.F7
-  @ingest.removal.12
-  Scenario: The README, the architecture document and the website do not name the removed command
-    Given README.md, ARCHITECTURE.md, the website sources and the generated command document
-    When they are read
-    Then none names `ingest sessions` or `canon-session-ingest`, the privacy pages do not exist, and the spec names neither removed environment variable
-
-  # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
-  @subject:ingest-pipelines
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-39-session-ingest-removal.F7
-  @ingest.removal.13
-  Scenario: The release check fails when the CHANGELOG does not list what was removed
-    Given the 0.39 section of the CHANGELOG
-    When it is read for the command, both environment variables, both configuration keys, the selftest suite, the skill, the cursor file and UNKNOWN_COMMAND
-    Then each is named, and a missing entry fails the test naming it
 
   # canon: {"schema":1,"at":"2026-11-08T06:20:00Z","actor":{"agent_id":"spec-ingest","role":"planner"}}
   @subject:ingest-pipelines

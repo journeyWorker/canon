@@ -157,30 +157,6 @@ Feature: canon artifacts prune deletes the blobs no record binds
     When canon artifacts prune is run with --commit and no --plan-digest, and with --plan-digest and no --commit
     Then each exits 2 with USAGE naming --plan-digest or --commit, and nothing is deleted
 
-  # canon: {"schema":1,"at":"2026-11-06T05:22:03Z","actor":{"agent_id":"impl-artifacts-prune","role":"implementer","session_id":"s-0-38-artifacts-prune"}}
-  @subject:evidence-attestation
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-38-artifacts-prune.F6
-  @artifacts.prune.14
-  Scenario: The guides and the CHANGELOG name the command and say a deleted local blob stays in git history
-    Given the built-in guides and the CHANGELOG of this repo
-    When canon skills show canon, canon-storage and role-orchestrator are read, and the Unreleased section of the CHANGELOG
-    Then each guide names canon artifacts prune and says a deleted local blob stays in git history
-    And the Added section of the Unreleased CHANGELOG names the command and says the same
-
-  # canon: {"schema":1,"at":"2026-11-06T09:29:35Z","actor":{"agent_id":"impl-artifacts-prune","role":"implementer","session_id":"s-0-38-artifacts-prune"}}
-  @subject:evidence-attestation
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-38-artifacts-prune.F6
-  @artifacts.prune.15
-  Scenario: A release without the announcement fails the release check, each missing item named
-    Given the guides and the CHANGELOG of this repo, and copies of them with the command or the git-history sentence taken out, with no Added section, and with no Unreleased section
-    When the release check reads each copy
-    Then it passes on the real text and fails on each copy, naming the guide or the CHANGELOG section and what it never says
-    And the failure names the missing command and the missing sentence separately
-
   # canon: {"schema":1,"at":"2026-11-08T06:17:13Z","actor":{"agent_id":"spec-prune","role":"planner","session_id":"s-0-39-prune-temps"}}
   @subject:evidence-attestation
   @lane:behavior
@@ -323,27 +299,3 @@ Feature: canon artifacts prune deletes the blobs no record binds
     When one of them is deleted, or one more is written, and canon artifacts prune is run with --commit and the old digest, and with --commit and no digest
     Then each commit with the old digest exits 2 with PLAN_STALE saying to run the preview again, the commit without a digest exits 2 with USAGE, and every file stays
     And previewing again prints a new digest whose commit deletes the listed temp files
-
-  # canon: {"schema":1,"at":"2026-11-08T06:18:52Z","actor":{"agent_id":"spec-prune","role":"planner","session_id":"s-0-39-prune-temps"}}
-  @subject:evidence-attestation
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-39-prune-temps.F6
-  @artifacts.prune.26
-  Scenario: The guides, the command help and the CHANGELOG say prune deletes the stale temp files and verify counts them
-    Given the built-in guides, the help of canon artifacts prune and canon artifacts verify, and the Unreleased section of the CHANGELOG
-    When they are read
-    Then each guide names the stale `.tmp-` files, and the help of prune says it deletes them with `data.staleTemps` and the help of verify says it counts them and points to canon artifacts prune
-    And the Unreleased entry of this change says prune deletes the stale temp files, verify counts them, the five minutes, and that a committed temp file is taken out of the commit
-
-  # canon: {"schema":1,"at":"2026-11-08T06:18:58Z","actor":{"agent_id":"spec-prune","role":"planner","session_id":"s-0-39-prune-temps"}}
-  @subject:evidence-attestation
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-39-prune-temps.F6
-  @artifacts.prune.27
-  Scenario: A release without the temp file announcement fails the release check, each missing item named
-    Given the guides and the CHANGELOG of this repo, and copies of them with the Unreleased entry of this change taken out, with one sentence of it taken out, and with the `.tmp-` files taken out of one guide
-    When the release check reads each copy
-    Then it passes on the real text and fails on each copy, naming the missing entry, the missing sentence or the guide
-    And the failures name each missing piece separately

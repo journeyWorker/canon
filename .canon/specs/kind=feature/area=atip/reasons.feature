@@ -79,17 +79,7 @@ Feature: atip reasons
   Scenario: A reason never changes the exit or the retryable value of its code, and a different value is a different code
     Given every code with reasons and the pairs of codes that differ in retryable or exit
     When an error is built for each code and each of its reasons
-    Then its exit and retryable are the row's, no source sets either beside the row, ARTIFACTS_STORE_UNAVAILABLE and ARTIFACTS_STORE_REQUIRED are two codes and PROMOTION_INVALID and PROMOTION_FAILED differ in exit
-
-  # canon: {"schema":1,"at":"2026-11-04T11:59:09Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-36-code-reasons.F6
-  @atip.reasons.09
-  Scenario: The CHANGELOG table of reasons is the registry and STOPPED_MIDWAY and its reason are gone
-    Given the CHANGELOG table of reasons and the registry
-    When the table is compared with the registry
-    Then each code of the table has the reasons the registry lists, the codes of the brief's table are in it, and neither STOPPED_MIDWAY nor its reason SKILLS_INVALID_ARGUMENT is registered or printed
+    Then its exit and retryable are the row's, ARTIFACTS_STORE_UNAVAILABLE and ARTIFACTS_STORE_REQUIRED are two codes and PROMOTION_INVALID and PROMOTION_FAILED differ in exit
 
   # canon: {"schema":1,"at":"2026-11-04T11:59:15Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract

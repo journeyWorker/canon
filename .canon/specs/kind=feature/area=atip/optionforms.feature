@@ -133,28 +133,6 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
     When each value is judged by the declared pattern and by the parser of its option, and the sweep reads each document
     Then the pattern and the parser agree on every value, a date or time that does not exist is the pattern's and the parser's refusal, which says what does not exist, and the sweep finds each seeded fault by the option and the command
 
-  # canon: {"schema":1,"at":"2026-11-05T15:56:25Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-37-option-forms.F6
-  @atip.optionforms.13
-  Scenario: The CHANGELOG has a row for every spelling 0.36.0 took and this build refuses
-    Given the golden file of what 0.36.0 took, measured on the released binary, and the Breaking table of the CHANGELOG
-    When each value of it is judged by the domain of the build
-    Then every spelling 0.36.0 took and the build refuses has a row for its option, its command and its class, with the 0.37 answer and the way to move, the table has one row per class, the spellings that are still taken have none, and what 0.36.0 refused already is still refused
-
-  # canon: {"schema":1,"at":"2026-11-05T15:56:31Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-37-option-forms.F6
-  @atip.optionforms.14
-  Scenario: The check of the CHANGELOG fails for a missing row, a missing answer and a missing note
-    Given the CHANGELOG with a row taken out, a row with no way to move, the note about the signature taken out, and a refused value of a class no row names
-    When the check of the CHANGELOG runs on each
-    Then it names the missing row by option, command and class, the row with no way to move, the missing note and the class, and the real CHANGELOG passes
-
   # canon: {"schema":1,"at":"2026-11-05T15:56:36Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
   @lane:behavior

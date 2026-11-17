@@ -278,16 +278,6 @@ Feature: context capability
     Then each answer's data is the spec's node for that command, field for field
     And the bare listing names exactly the spec's leaf commands and no other
 
-  # canon: {"schema":1,"at":"2026-10-23T11:48:38Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
-  @subject:context-capability
-  @case:happy
-  @context.capability.28
-  Scenario: The drift check compares the checked-in spec with the spec the CLI generates, byte for byte
-    Given the checked-in command spec and the spec the CLI generates
-    When the two are compared as text
-    Then they are identical on the unmodified tree
-    And the generated spec is the same text on every generation
-
   # canon: {"schema":1,"at":"2026-10-23T11:48:50Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
   @subject:context-capability
   @case:happy

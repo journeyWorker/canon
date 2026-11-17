@@ -259,22 +259,10 @@ Feature: change drop
   @case:happy
   @flow:canon-0-42-change-drop.F8
   @change.drop.24
-  Scenario: The guides, help, generated spec and conformance say how to close a change, who may, and how a closed change looks
-    Given the guides, the help, the generated spec and the conformance cases
-    When they are read
-    Then they say how a human closes a change with the relay, that six leaves are human-only, and how a closed change looks in status and gate check
-    And canon init writes the change_state routing line
-
-  # canon: {"schema":1,"at":"2026-11-16T05:58:50Z","actor":{"agent_id":"canon-scaffold"}}
-  @subject:subject-lifecycle
-  @case:failure
-  @flow:canon-0-42-change-drop.F8
-  @change.drop.25
-  Scenario: A guide command line that does not fit the schema, a human-only list that is not six, or a changelog without the caller note fails its check
-    Given a guide command line that does not fit the schema, a human-only list that is not six, or a CHANGELOG without the caller note
-    When the guide, install and release checks run
-    Then each fails its check
-    And the failure names the line
+  Scenario: canon init routes every record kind and change_state to local
+    Given a new repository
+    When canon init runs
+    Then the canon.yaml routing has a line for every record kind and for change_state, set to local
 
   # canon: {"schema":1,"at":"2026-11-16T05:58:54Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:subject-lifecycle

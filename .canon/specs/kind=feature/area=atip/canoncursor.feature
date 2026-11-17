@@ -131,16 +131,6 @@ Feature: atip canon cursor: the 1.2 binding of atip::cursor, flag-only paging op
     When it is used with --cursor
     Then it is exit 2 CURSOR_INVALID with reason FOREIGN and field --cursor, and nothing is written
 
-  # canon: {"schema":1,"at":"2026-11-02T13:45:40Z","actor":{"agent_id":"impl-canon-cursor","role":"implementer","session_id":"s-0-35-canon-cursor"}}
-  @subject:atip-contract
-  @case:happy
-  @flow:canon-0-35-canon-cursor-1-2.F6
-  @atip.canoncursor.13
-  Scenario: The CHANGELOG carries the upgrade note: 0.34 cursors are refused, the flag-only keys are FLAG_ONLY_KEY
-    Given the CHANGELOG of this repository
-    When its Unreleased section is read
-    Then the entry for canon-0-35-canon-cursor-1-2 says the cursors of 0.34 are refused (FOREIGN), starting over, the FLAG_ONLY_KEY refusal, the --cursor=<value> form of the next page and the environment binding
-
   # canon: {"schema":1,"at":"2026-11-02T13:46:39Z","actor":{"agent_id":"impl-canon-cursor","role":"implementer","session_id":"s-0-35-canon-cursor"}}
   @subject:atip-contract
   @case:edge

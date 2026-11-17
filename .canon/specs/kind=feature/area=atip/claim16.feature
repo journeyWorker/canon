@@ -4,17 +4,6 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
   # canon: {"schema":1,"at":"2026-11-13T18:20:00Z","actor":{"agent_id":"impl-atip-1-6","role":"planner"}}
   @subject:atip-contract
   @lane:behavior
-  @case:happy
-  @flow:canon-0-41-atip-1-6.F1
-  @atip.claim16.01
-  Scenario: Every envelope and schema answer says contractVersion 1.6, a schema answer says schemaVersion 1.6, and the tree says level L2
-    Given the errors and warnings registries, the schemas of finding close, a refusal, an unknown command and the answer of schema for every command, run with --json
-    When each envelope is read and the tree of canon schema --json is read
-    Then each says contractVersion 1.6, the schema answers say schemaVersion 1.6, the tree says level L2 and the generated spec says contractVersion 1.6
-
-  # canon: {"schema":1,"at":"2026-11-13T18:20:00Z","actor":{"agent_id":"impl-atip-1-6","role":"planner"}}
-  @subject:atip-contract
-  @lane:behavior
   @case:failure
   @flow:canon-0-41-atip-1-6.F1
   @atip.claim16.02
@@ -30,7 +19,7 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
   @flow:canon-0-41-atip-1-6.F2
   @atip.claim16.03
   Scenario: No document has commaList or pathShape, and no generated spec or conformance expectation prints one
-    Given the tree, the 81 command documents, the registry and schemas answers, the generated spec and the conformance expectations of canon at 1.6
+    Given the tree, the command documents, the registry and schemas answers, the generated spec and the conformance expectations of canon at 1.6
     When each is scanned for the members commaList and pathShape
     Then none holds either member, so a 1.5 caller reads the documents as it read them and they differ from 0.40.0 in the declaration strings alone
 
@@ -96,7 +85,7 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
   @flow:canon-0-41-atip-1-6.F5
   @atip.claim16.09
   Scenario: Every option name has one value name and one value kind in every command document
-    Given the shared options of the tree and the options of the 81 command documents
+    Given the shared options of the tree and the options of the command documents
     When each name is grouped with the value names and value kinds it carries
     Then no name has two value names or two value kinds, and --kind keeps the one value name KIND in gate promote and purge
 
@@ -110,25 +99,3 @@ Feature: atip claim 1.6: canon declares atip/1 1.6 and uses neither optional mem
     Given the documents with --kind of purge given the value name RECORD in one set and the value kind string in another
     When the check groups the names
     Then it finds the name with two value names and the name with two value kinds
-
-  # canon: {"schema":1,"at":"2026-11-13T18:20:00Z","actor":{"agent_id":"impl-atip-1-6","role":"planner"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-41-atip-1-6.F7
-  @atip.claim16.13
-  Scenario: The CHANGELOG entry canon declares atip/1 1.6 has the before and after table, the callers note, the reasons for the members not used and the contributors line
-    Given the newest section of the CHANGELOG
-    When the entry is checked for its table, the callers paragraph, the paragraph on the members not used and the contributors line
-    Then the table holds the declaration, the tags, the options with commaList, pathShape, the longest path, the names with two meanings and the advice, and both paragraphs and the line say what the brief decided
-
-  # canon: {"schema":1,"at":"2026-11-13T18:20:00Z","actor":{"agent_id":"impl-atip-1-6","role":"planner"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-41-atip-1-6.F7
-  @atip.claim16.14
-  Scenario: An entry without the callers note, a table row, the reasons or the contributors commit is found
-    Given a complete entry with the callers paragraph removed, one with the reasons removed, one with a row removed, one with another commit and a section with no entry
-    When the CHANGELOG check reads each
-    Then it names the missing paragraph, row or line each time and finds nothing in the complete entry

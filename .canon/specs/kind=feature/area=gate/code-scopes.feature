@@ -127,27 +127,6 @@ Feature: gate code-scopes
     Then the exit codes are the same and gate check is clean
     And a `code_scopes` key that is not a map of lists is warned about as malformed and declares no scope
 
-  # canon: {"schema":1,"at":"2026-11-06T05:02:12Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
-  @subject:gate-trust-spine
-  @case:happy
-  @flow:canon-0-38-code-scopes.F6
-  @gate.code-scopes.12
-  Scenario: The CHANGELOG names the new key and the cases the gate asks less for
-    Given the CHANGELOG's Unreleased section
-    When the release check reads it
-    Then `### Added` names `code_scopes`, its keys and the human's approval
-    And `### Changed` names the rule, the changed paths and that a policy without the key behaves as before
-
-  # canon: {"schema":1,"at":"2026-11-06T05:02:13Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
-  @subject:gate-trust-spine
-  @case:failure
-  @flow:canon-0-38-code-scopes.F6
-  @gate.code-scopes.13
-  Scenario: A CHANGELOG without the entries is named by the release check
-    Given an Unreleased section without the entries or without a piece of one
-    When the release check reads it
-    Then it names each missing entry and each missing piece
-
   # canon: {"schema":1,"at":"2026-11-06T09:07:32Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
   @subject:gate-trust-spine
   @case:failure

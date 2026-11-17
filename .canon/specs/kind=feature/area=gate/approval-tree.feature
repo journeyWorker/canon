@@ -123,26 +123,6 @@ Feature: gate approval-tree
     Then the unchanged chore's line says the code tree is the one it was approved on and asks for no evidence, its brief has `treeUnchanged: true`, and `meta.next` names no evidence command
     And over changed code the line is absent, `treeUnchanged` is absent and the batch command leads
 
-  # canon: {"schema":1,"at":"2026-11-05T10:33:00Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
-  @subject:gate-trust-spine
-  @case:happy
-  @flow:canon-0-37-approval-evidence.F6
-  @gate.approval-tree.12
-  Scenario: The CHANGELOG says an unchanged-tree chore approval asks for no evidence and names the new information of the approval line
-    Given the CHANGELOG
-    When its Unreleased section is read
-    Then a Changed entry says a chore approval over an unchanged code tree asks for no evidence, names the `(code tree <id>)` marker of the approval line, says a review of other code no longer counts, says the marker is outside the digest and can be edited by hand like the approval time, and says an approval written before 0.37 behaves as it did
-
-  # canon: {"schema":1,"at":"2026-11-05T10:33:05Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
-  @subject:gate-trust-spine
-  @case:failure
-  @flow:canon-0-37-approval-evidence.F6
-  @gate.approval-tree.13
-  Scenario: A CHANGELOG without that entry is named by the release check
-    Given the CHANGELOG's Unreleased section without that entry, and without the marker or the line about older approvals
-    When the release check reads it
-    Then it names each missing piece, and the real section has none
-
   # canon: {"schema":1,"at":"2026-11-05T12:21:16Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
   @subject:gate-trust-spine
   @case:failure

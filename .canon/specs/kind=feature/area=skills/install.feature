@@ -94,18 +94,6 @@ Feature: skills install
     And the doctor reports it as a legacy remnant naming the same fix
     And a following install keeps the file, because canon cannot prove it wrote it
 
-  # canon: {"schema":1,"at":"2026-10-10T16:35:35Z","actor":{"agent_id":"canon"}}
-  @subject:skills-install
-  @case:edge
-  @skills.install.11
-  Scenario: The stub claims build work in a canon repo and the guide it points at opens with the working loop
-    Given canon's own skill source and the guide built into the binary
-    When the skill is installed for Claude, Codex, OMP and Pi, and canon skills show canon prints the guide
-    Then each projected SKILL.md is a stub that keeps the source's frontmatter, points at canon skills show canon and names this canon's version, with no reference files beside it
-    And its description claims build, implement, feature and fix work in a repo that has canon.yaml, within the 1024-character limit skill loaders enforce
-    And the guide's first section is the working loop, naming brief, subject, scenarios, units, implement, evidence, independent review and transition in that order
-    And the AGENTS.md block canon init writes names the same steps in the same order
-
   # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:skills-install
   @case:happy
@@ -448,25 +436,3 @@ Feature: skills install
     When canon brief approve runs with one of them written twice, then with one id, then with both ids and --json
     Then the repeated id is approved once, a single id prints the document it always printed, and several ids print one entry per id with written, unchanged, failed or skipped
     And a --input array still stops at its first failure and keeps the approvals before it, one name and answer per element
-
-  # canon: {"schema":1,"at":"2026-10-27T10:24:11Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
-  @subject:skills-install
-  @case:edge
-  @flow:canon-0-31-loop.F3
-  @skills.install.73
-  Scenario: The skills, README, status help and schema state the governing-change rule and the status briefs list
-    Given the packaged skills, the README, the status help and the schema documentation of this release
-    When they are read for the rule on which changes a subject answers for and for the status JSON
-    Then they say that reopen, ship and status judge every tagged, approved-line and chore change, that a never-approved untagged feature change blocks nothing, and that brief approve takes several ids
-    And the README Upgrading section says the status brief field became the briefs list and the status schema version rose, and status --json carries that new version
-
-  # canon: {"schema":1,"at":"2026-10-27T12:04:58Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
-  @subject:skills-install
-  @case:happy
-  @flow:canon-0-31-brief-format.F3
-  @skills.install.74
-  Scenario: The brief skill documents carry the section table, the guidance, the frontmatter waiver and the old-format path
-    Given the brief-shape and brief-polish skill documents
-    When they are read
-    Then brief-shape carries the section table with each section's heading, role and the same guidance text brief show prints, the frontmatter waiver form and the old-format path
-    And brief-polish shows waivers as frontmatter entries and no skill document names a canon:section, canon:hint or canon:waive comment as the way to write a brief

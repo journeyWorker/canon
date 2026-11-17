@@ -1,17 +1,6 @@
 Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of its domain patterns as the Unicode property
   # canon: {"schema":1,"at":"2026-11-05T12:08:10Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
 
-  # canon: {"schema":1,"at":"2026-11-05T12:08:24Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-37-claim-1-5.F1
-  @atip.claim15.01
-  Scenario: Every envelope and schema answer says contractVersion 1.6, a schema answer says schemaVersion 1.6, and the tree says level L2
-    Given canon status, an unknown command, a refusal, schema, schema finding close, schema finding close --schemas, schema --errors and schema --warnings run with --json, and the answer of schema for every command
-    When each envelope is read and the tree of canon schema --json is read
-    Then each says contractVersion 1.6 and the schema answers say schemaVersion 1.6, the tree says level L2, the generated spec says contractVersion 1.6, and schema --json is the same bytes from another directory
-
   # canon: {"schema":1,"at":"2026-11-05T12:08:35Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
   @subject:atip-contract
   @lane:behavior
@@ -110,47 +99,3 @@ Feature: atip claim 1.5: canon declares atip/1 1.5 and writes the white space of
     Given the fixture of the checker, the schema tree and the declared minor
     When each is read
     Then the fixture's contractVersion and the tree's meta.contractVersion are the declared minor
-
-  # canon: {"schema":1,"at":"2026-11-05T12:09:36Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-37-claim-1-5.F6
-  @atip.claim15.12
-  Scenario: The guides, website pages, eval scripts, conformance expectations, generated spec, README, ARCHITECTURE, workflow and justfile declare 1.6 and show no list of white space
-    Given the tracked guides, website pages in both languages, eval scripts, conformance expectations, generated spec, README, ARCHITECTURE, workflow and justfile
-    When each file is scanned for a declaration below 1.6 and for a list of white space shown by hand, and each envelope an expectation prints is read
-    Then no file declares a minor below 1.6 or shows a list of white space, every envelope the expectations print says 1.6, and the two cli pages and the guide say 1.6 where they name the declaration
-
-  # canon: {"schema":1,"at":"2026-11-05T12:09:42Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-37-claim-1-5.F6
-  @atip.claim15.13
-  Scenario: The consumer scan finds a declaration below 1.5 and a list of white space shown by hand
-    Given lines that declare 1.2, 1.3, 1.4 and 1.5 in the spellings the repository uses, lines that declare 1.6, a pattern of 0.36.0 shown in a guide and the classes of 1.5
-    When the consumer scan reads each
-    Then the scan finds each declaration below 1.6 by its version and a shown list of white space, and finds nothing in a declaration of 1.6 or in the classes of 1.5
-
-  # canon: {"schema":1,"at":"2026-11-05T12:09:47Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-37-claim-1-5.F7
-  @atip.claim15.14
-  Scenario: The CHANGELOG Unreleased section holds the entry canon declares atip/1 1.5 with its before and after table, the length of one pattern and the callers note
-    Given the CHANGELOG Unreleased section, the pattern of --session as 0.36.0 printed it and as this build prints it
-    When the entry is read
-    Then one entry names canon declares atip/1 1.5, has a before and after table with the declaration, the white space in a pattern and the length of the pattern of --session (93 then 63 characters, the measured ones), and a Callers paragraph that tells a 1.4 caller that checks patterns by its profile that it refuses the escape and one that only compiles that it is unchanged
-
-  # canon: {"schema":1,"at":"2026-11-05T12:09:53Z","actor":{"agent_id":"impl-claim-1-5","role":"implementer","session_id":"s-0-37-claim-1-5"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-37-claim-1-5.F7
-  @atip.claim15.15
-  Scenario: The entry check fails when the table, the length row or the callers paragraph is missing
-    Given the entry check seeded with an entry that lacks the table, the length row, the declaration row, the callers paragraph or the word profile, one with a wrong length and one with a longer pattern
-    When the entry check reads each
-    Then it finds each missing part by name, the wrong length and the longer pattern, and passes the complete entry

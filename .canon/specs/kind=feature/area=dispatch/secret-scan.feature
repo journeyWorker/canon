@@ -325,30 +325,6 @@ Feature: Context pack secret scan and repository state
     Then neither has a commit and neither is dirty
     And the state digest is the digest of clean
 
-  # canon: {"schema":1,"at":"2026-11-08T06:32:55Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
-  @subject:dispatch-manifest
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-39-secret-scan.F6
-  @dispatch.secret-scan.28
-  Scenario: The CHANGELOG announces the scanner, the fixed refusals, the new refusals and the new pack ids
-    Given the CHANGELOG entry of canon-0-39-secret-scan
-    When the release check reads its Fixed and Changed parts
-    Then Fixed names risk-high and dirty: false
-    And Changed names the api_key = form, JSON, sk-, the pack id and stateDigest
-
-  # canon: {"schema":1,"at":"2026-11-08T06:33:01Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
-  @subject:dispatch-manifest
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-39-secret-scan.F6
-  @dispatch.secret-scan.29
-  Scenario: A release without the announcement fails the release check
-    Given a CHANGELOG with no entry of canon-0-39-secret-scan, one without risk-high and one without stateDigest
-    When the release check reads each
-    Then it names the missing section or the missing item
-    And an entry that has them all is named by nothing
-
   # canon: {"schema":1,"at":"2026-11-08T08:20:14Z","actor":{"agent_id":"impl-0-39","role":"implementer","session_id":"s-0-39-impl"}}
   @subject:dispatch-manifest
   @lane:behavior

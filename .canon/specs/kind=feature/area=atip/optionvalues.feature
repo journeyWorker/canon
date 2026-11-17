@@ -144,30 +144,8 @@ Feature: atip option values: an option of the same name takes the same value in 
     When the sweep reads each seeded set of documents
     Then it finds each seeded fault by the option name and the commands, finds --kind when it is not allowed, and passes the real documents with the one allowed
 
-  # canon: {"schema":1,"at":"2026-11-05T14:14:34Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-37-option-values.F7
-  @atip.optionvalues.14
-  Scenario: The CHANGELOG has a row for every value 0.36 took and this build refuses, and an entry for the values recorded trimmed
-    Given the golden file of what 0.36.0 accepted per option, command and class of value, measured on the released binary, and the Breaking table of the Unreleased entry
-    When the build judges every golden value with the declared domain of its command and the table is read
-    Then each value the build refuses has a row that names its option, its command and its class, with the answer and the way to move, no row names a value that is not refused, and one entry says the values are recorded without the white space around them
-
-  # canon: {"schema":1,"at":"2026-11-05T14:14:45Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-37-option-values.F7
-  @atip.optionvalues.15
-  Scenario: The check of the CHANGELOG fails for a missing row, a missing answer and a missing entry
-    Given the CHANGELOG with one row taken out, with the class of the other control characters left out of every row, with a row that has no way to move, and with the entry for the trimmed values reworded, and a refused value no row names
-    When the check reads each
-    Then it finds the missing row by its option and class, the missing class by name, the row with no way to move, the missing entry and the unlisted class, and passes the complete CHANGELOG
-
   # canon: {"schema":1,"at":"2026-11-05T14:14:56Z","actor":{"agent_id":"impl-option-values","role":"implementer","session_id":"s-0-37-option-values"}}
-  @subject:atip-contract
+  @subject:atip-schema
   @lane:behavior
   @case:edge
   @flow:canon-0-37-option-values.F1

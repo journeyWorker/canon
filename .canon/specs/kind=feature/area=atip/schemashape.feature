@@ -110,25 +110,3 @@ Feature: atip schema shape: id operands name their target, the id options name t
     Given a built canon
     When canon schema --json, canon schema <group> --json and canon schema <command> --json run, and the guide and the website schema section are read
     Then the root of the tree has x-canon.rolesForm saying all (every role) or an array of role names with an empty array for humans only, no group or command document says it again, the 141 bytes of that member are counted in the CHANGELOG, and the SKILL guide and the website schema section in English and Korean say the same two forms
-
-  # canon: {"schema":1,"at":"2026-11-06T15:57:05Z","actor":{"agent_id":"impl-schema-shape","role":"implementer","session_id":"s-0-38-schema-shape"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-38-schema-shape.F5
-  @atip.schemashape.11
-  Scenario: The CHANGELOG's Breaking entry has a row for each name that changed and the bytes saved
-    Given the CHANGELOG
-    When the table of the Breaking entry of canon-0-38-schema-shape is read
-    Then it has a row for each of the six operands (subject new, subject show, subject move, context-pack show, context-pack verify, trace), each of the three options and each of the thirteen commands whose roles is all, each with the 0.37 and the 0.38 form, and the entry says how a tool reads roles (all means four roles), who breaks and the bytes saved with the bytes the root declaration adds
-
-  # canon: {"schema":1,"at":"2026-11-06T15:57:18Z","actor":{"agent_id":"impl-schema-shape","role":"implementer","session_id":"s-0-38-schema-shape"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-38-schema-shape.F5
-  @atip.schemashape.12
-  Scenario: A table with a missing row, an empty cell or no header fails the check of the CHANGELOG
-    Given the CHANGELOG and copies of it with one row removed for each kind of row, a row with an empty cell, a table with no header, and an entry without the saved bytes
-    When the check of the Breaking entry runs on each
-    Then the check passes the real entry and names the missing row, the empty cell, the missing header and the missing bytes

@@ -168,27 +168,3 @@ Feature: Durable record writes
     When it is opened, written to, and opened read-only
     Then its mode is still 0644
     And no open changes the mode of a file that already exists
-
-  # canon: {"schema":1,"at":"2026-11-08T06:28:34Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-39-write-durability.F8
-  @tier.durability.15
-  Scenario: The CHANGELOG names the directory fsync, the one write path, the one-write audit line, the rekey write lock and the new hot.db mode
-    Given the CHANGELOG section this release ships in
-    When the release check reads the Fixed and Changed entries of canon-0-39-write-durability
-    Then Fixed names the directory fsync, the artifact blobs, the private write copies, the one-write audit line, BEGIN IMMEDIATE and Windows
-    And Changed names the 0600 hot.db, chmod 600 .canon/hot.db for an existing one, and Windows
-
-  # canon: {"schema":1,"at":"2026-11-08T06:28:50Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-39-write-durability.F8
-  @tier.durability.16
-  Scenario: A CHANGELOG without the entry or a piece of it is named by the release check
-    Given an empty section, a section without the entry, and one without chmod 600 .canon/hot.db or BEGIN IMMEDIATE
-    When the release check reads each
-    Then it names the missing entry and each missing piece
-    And a section that has them all is named by nothing

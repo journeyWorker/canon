@@ -90,23 +90,3 @@ Feature: atip codesplit
     Given the three changes of the refused approval
     When the blocked brief is fixed and the call runs again, then the unclosed one is fixed and the call runs again
     Then after the first fix the first refused id is the unclosed brief with its own reason and no details, and after the second all three are written in the order given, each carries the approval, and the answer is data without a refusal and without data.refused
-
-  # canon: {"schema":1,"at":"2026-11-04T19:21:15Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
-  @subject:atip-contract
-  @case:happy
-  @flow:canon-0-36-codes-refusals.F6
-  @atip.codesplit.10
-  Scenario: The CHANGELOG has a row for each refusal code the change split that says what it became, the registry has those codes with the row's exit and retryability, and the old names are in no registry view
-    Given the 28 codes of the change's table, the replacement table of the CHANGELOG, the registry, the errors of every command document and the guides
-    When each row is read against the registry, canon schema --errors and canon schema --error <old name> run, and the guides are scanned for the old names
-    Then every code has one row naming the new codes of the brief's table, each new code is registered with the row's exit and retryability, each reason of a row is registered under one of its new codes, the old names that no new code keeps are in no registry view and no errors list and are refused by schema --error as USAGE at --error, the BRIEF_APPROVE_REFUSED row says where the refusals of a batch are, and no guide spells an old name
-
-  # canon: {"schema":1,"at":"2026-11-04T19:21:19Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-36-codes-refusals.F6
-  @atip.codesplit.11
-  Scenario: A row left out, a new code dropped or misspelled, an exit that is not the registry's, a reason no new code registers or one the row leaves out, and an old name brought back into a guide are each found
-    Given the CHANGELOG's replacement table with one row left out, one new code dropped, one misspelled, one exit changed, one reason misspelled and one reason removed, and guide text that says an old name
-    When each changed table is checked against the registry and the guide text is scanned for the old names
-    Then the real table has no problem, each changed table has a problem that names its row and what is wrong, and the guide text that says MIGRATE_REFUSED or OLD_LAYOUT is named while one that says only names that stay is not

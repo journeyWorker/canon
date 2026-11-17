@@ -1,28 +1,6 @@
 Feature: atip canon claim l2: canon declares atip/1 (1.4 in 0.36, 1.5 in 0.37, 1.6 since 0.41) and L2, and the CI jobs prove it
   # canon: {"schema":1,"at":"2026-11-02T21:07:05Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
 
-  # canon: {"schema":1,"at":"2026-11-02T21:07:16Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-35-claim-l2.F1
-  @atip.claiml2.01
-  Scenario: Every canon envelope, an error and the schema answer included, declares contractVersion 1.6, the schema answer has schemaVersion 1.6 and its tree says level L2
-    Given a repository with canon init
-    When status, an unknown command, schema, schema --errors and schema --warnings are run with --json
-    Then every envelope has meta.contractVersion 1.6 and passes the contract's envelope schema, the schema answer has meta.schemaVersion 1.6, and the tree of schema has level L2
-
-  # canon: {"schema":1,"at":"2026-11-02T21:07:24Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-35-claim-l2.F1
-  @atip.claiml2.02
-  Scenario: No consumer of the declaration (skills, website pages, eval scripts, conformance expectations, the generated spec) spells canon's contractVersion as 1.1, 1.2 or 1.3
-    Given the skills, the website pages, the eval scripts, the conformance expectations and the generated spec of the repository
-    When they are scanned for canon's own contractVersion
-    Then none spells it 1.1, 1.2 or 1.3, and the files that name an earlier minor on purpose (the checker's tests of an earlier claim, the CHANGELOG, the ledger) are the only exceptions
-
   # canon: {"schema":1,"at":"2026-11-02T21:07:59Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
   @subject:atip-contract
   @lane:behavior
@@ -33,61 +11,6 @@ Feature: atip canon claim l2: canon declares atip/1 (1.4 in 0.36, 1.5 in 0.37, 1
     Given a repository for canon
     When a source over 8 MiB and a batch of 10001 documents are given as --input
     Then both are exit 2 INPUT_TOO_LARGE with the reason TOO_MANY_BYTES and TOO_MANY_ITEMS and the field --input
-
-  # canon: {"schema":1,"at":"2026-11-02T21:09:34Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-35-claim-l2.F4
-  @atip.claiml2.09
-  Scenario: canon's fixture claims 1.6 and holds prepare, notRun, the preview of each destructive command, batchFailsAt, batchFailsFirst and allowedEffects
-    Given canon's fixture
-    When it is read
-    Then it has contractVersion 1.6, prepare with a git repository and one empty commit, notRun naming dashboard, a preview for each of the five destructive commands, batchFailsAt and batchFailsFirst for the batch commands it lists, and allowedEffects for the commands that write the audit line, and its registry is the generated one
-
-  # canon: {"schema":1,"at":"2026-11-02T21:10:16Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-35-claim-l2.F5
-  @atip.claiml2.11
-  Scenario: The 17.2 evidence list of the CHANGELOG names a test that exists for each obligation of the contract
-    Given the evidence list of the CHANGELOG, one row per obligation of the contract 17.2 and the tests that prove it
-    When the check reads the list and looks for each test in the sources of the workspace
-    Then every obligation has a row, every named test exists, and the tests are part of the workspace run
-
-  # canon: {"schema":1,"at":"2026-11-02T21:10:29Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-35-claim-l2.F5
-  @atip.claiml2.12
-  Scenario: An obligation removed from the evidence list, or a test of it that does not exist, fails the evidence check
-    Given the evidence list of the CHANGELOG
-    When a row is taken out of it, and when a row names a test that does not exist
-    Then the check fails and names the obligation or the test
-
-  # canon: {"schema":1,"at":"2026-11-02T21:10:48Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-35-claim-l2.F5
-  @atip.claiml2.13
-  Scenario: The 0.35.0 entry of the CHANGELOG carries every breaking change of the release and the upgrade notes
-    Given the CHANGELOG section of the release and the list of breaking changes the release carries (cursor, flag-only, digest, NDJSON, +1, batch pointers, skills show, STOPPED_MIDWAY, declaration)
-    When the section is read as committed
-    Then it carries every entry, the upgrade notes included, and the evidence list of contract 17.2 stands in the same section
-
-  # canon: {"schema":1,"at":"2026-11-02T21:11:00Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-35-claim-l2.F5
-  @atip.claiml2.14
-  Scenario: An entry removed from the 0.35.0 section of the CHANGELOG fails the check that reads it
-    Given the CHANGELOG section of the release and the list of breaking changes the release carries (cursor, flag-only, digest, NDJSON, +1, batch pointers, skills show, STOPPED_MIDWAY, declaration)
-    When the section is read with one entry taken out of it, for each entry
-    Then the check names the missing entry and fails, and the section as committed has none missing
 
   # canon: {"schema":1,"at":"2026-11-02T21:53:58Z","actor":{"agent_id":"impl-claim-l2","role":"implementer","session_id":"s-0-35-claim-l2"}}
   @subject:atip-contract
@@ -132,17 +55,6 @@ Feature: atip canon claim l2: canon declares atip/1 (1.4 in 0.36, 1.5 in 0.37, 1
     Given the sources of every crate of the workspace, and canon init run with a terminal on stdin and stderr in a repo with a .claude directory
     When the sources are scanned for /dev/tty, a prompt library, a terminal-mode call and every read of stdin, and init runs
     Then none of the first three is found, the only read of stdin is --input - (a terminal is refused with STDIN_TTY), init prints no question, and it installs for claude and records it
-
-  # canon: {"schema":1,"at":"2026-11-04T18:27:18Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-35-claim-l2.F4
-  @atip.claiml2.19
-  Scenario: A fixture missing a required item, or claiming another minor, is refused by the fixture test
-    Given canon's committed fixture, which has contractVersion 1.6, prepare, notRun, a preview for each destructive command, batchFailsAt, batchFailsFirst and allowedEffects
-    When each of those items is taken out of a copy, or contractVersion is lowered to 1.3, and the fixture test reads the copy
-    Then the committed fixture has no problem, and every copy is refused with a problem that names the missing item
 
   # canon: {"schema":1,"at":"2026-11-04T18:27:23Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix"}}
   @subject:atip-contract

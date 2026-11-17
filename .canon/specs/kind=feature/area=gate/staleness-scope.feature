@@ -108,21 +108,3 @@ Feature: gate staleness-scope
   @gate.staleness-scope.12
   Scenario: When every base is read, neither gate check nor status says anything
     Given a step
-
-  # canon: {"schema":1,"at":"2026-11-08T06:28:02Z","actor":{"agent_id":"spec-gitstale","role":"planner"}}
-  @subject:gate-trust-spine
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-39-staleness-scope.F5
-  @gate.staleness-scope.13
-  Scenario: The CHANGELOG says the new rule, the advisory and the warnings
-    Given a step
-
-  # canon: {"schema":1,"at":"2026-11-08T06:28:10Z","actor":{"agent_id":"spec-gitstale","role":"planner"}}
-  @subject:gate-trust-spine
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-39-staleness-scope.F5
-  @gate.staleness-scope.14
-  Scenario: A CHANGELOG without the entry or a piece of it is named by what it lacks
-    Given a step

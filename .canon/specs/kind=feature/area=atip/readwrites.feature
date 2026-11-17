@@ -51,16 +51,6 @@ Feature: atip read writes: a refusal and a read command write only what they dec
     When report check and selftest run on success, on a missing repository or suite, and on a canon.yaml that does not parse
     Then the temp dir holds no file afterwards
 
-  # canon: {"schema":1,"at":"2026-11-02T13:05:44Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
-  @subject:atip-contract
-  @case:edge
-  @flow:canon-0-35-read-writes.F5
-  @atip.readwrites.06
-  Scenario: dashboard is declared a server: one report, then it serves until signalled, and the schema has no stream lines
-    Given the schema of dashboard
-    When its effectNote and its outputs are read
-    Then the note says it prints one report and serves until signalled, and the one output is the DashboardReport with no stream line
-
   # canon: {"schema":1,"at":"2026-11-02T13:06:22Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
   @subject:atip-contract
   @case:failure

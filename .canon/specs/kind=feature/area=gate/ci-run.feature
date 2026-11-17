@@ -132,25 +132,3 @@ Feature: gate ci-run
     Given a record whose ci has an attempt that is a string, and one whose ci has an unknown key
     When the ledger is read
     Then the first is unreadable and reported as malformed evidence, and the second is read
-
-  # canon: {"schema":1,"at":"2026-11-09T10:31:06Z","actor":{"agent_id":"spec-ci-evidence","role":"planner"}}
-  @subject:evidence-attestation
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-40-ci-evidence.F7
-  @gate.ci-run.13
-  Scenario: The gate skill carries the GitHub Actions recipe, the policy and subject skills name the key and the check, and the CHANGELOG lists the additions
-    Given the skills, the policy and subject guides and the CHANGELOG
-    When they are read
-    Then the gate skill has the GitHub Actions recipe, the policy and subject skills name the key and the check, and the Unreleased section lists the additions
-
-  # canon: {"schema":1,"at":"2026-11-09T10:31:33Z","actor":{"agent_id":"spec-ci-evidence","role":"planner"}}
-  @subject:evidence-attestation
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-40-ci-evidence.F7
-  @gate.ci-run.14
-  Scenario: A generated block that no longer matches the spec fails the drift test
-    Given a generated block that no longer matches its spec
-    When the drift test runs
-    Then it fails

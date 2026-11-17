@@ -81,16 +81,6 @@ Feature: atip: the INCOMPLETE codes of a command that stopped after its earlier 
     When the batch runs and the child's error becomes the item error
     Then the first element is failed with INIT_INCOMPLETE and the reason SKILLS_SOURCE_NOT_FOUND in its item, the second is skipped, the batch is BATCH_INCOMPLETE with exit 1 and what the first element wrote stays
 
-  # canon: {"schema":1,"at":"2026-11-02T09:40:37Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
-  @subject:evidence-attestation
-  @case:happy
-  @flow:canon-0-35-canon-stopped-midway.F3
-  @atip.midway.09
-  Scenario: The audit lists every exit-1 code in its class and each code exists where the table says
-    Given the registry, the sources and the audit table of the exit-1 codes
-    When each code is classed INCOMPLETE, FAILED, answer, internal or batch and checked against the registry and the sources
-    Then every exit-1 code has a line, each audited code is registered and built by a source, each INCOMPLETE code ends in _INCOMPLETE and no other code does, and the codes this change replaced are in neither the registry nor a source
-
   # canon: {"schema":1,"at":"2026-11-02T09:40:43Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
   @subject:tier-storage
   @case:happy
@@ -100,16 +90,6 @@ Feature: atip: the INCOMPLETE codes of a command that stopped after its earlier 
     Given the failure codes of the work: WRITE_FAILED, ARTIFACTS_STORE_FAILED, PROMOTION_FAILED, TIER_FAILED and the other *_FAILED codes that write
     When the registry is read
     Then each keeps its name, exit 1 and retryability, and has no reason of its own, and every reason of an INCOMPLETE code is a registered code (the refusal it met, or the failure code of the step that stopped)
-
-  # canon: {"schema":1,"at":"2026-11-02T09:40:49Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-35-canon-stopped-midway.F5
-  @atip.midway.11
-  Scenario: No consumer spells a code that moved to the reserved midway code or was replaced by an INCOMPLETE code, and the check catches one that comes back
-    Given the guides, the website, the dashboard, the eval scripts, the design documents, the scenarios outside area=atip, the sources, the conformance cases and the generated spec
-    When they are scanned for INIT_SKILL_INSTALL_FAILED, the reserved midway code and the names the INCOMPLETE codes replaced
-    Then none spells one, and a text that spells one, or a longer name that contains one, is judged as the check says
 
   # canon: {"schema":1,"at":"2026-11-02T09:40:57Z","actor":{"agent_id":"impl-stopped-midway","role":"implementer","session_id":"s-0-35-stopped"}}
   @subject:subject-lifecycle
@@ -130,13 +110,3 @@ Feature: atip: the INCOMPLETE codes of a command that stopped after its earlier 
     Given the registry with a failure code removed, moved to exit 2, made retryable or not, or given a reason
     When the check of the failure codes runs on each
     Then each fault is named with its own message, and the registry as it stands passes
-
-  # canon: {"schema":1,"at":"2026-11-03T18:11:39Z","actor":{"agent_id":"impl-shipfix","role":"implementer","session_id":"s-0-35-shipfix"}}
-  @subject:evidence-attestation
-  @case:failure
-  @flow:canon-0-35-canon-stopped-midway.F3
-  @atip.midway.14
-  Scenario: An exit-1 code the audit table lacks, an audited code no source builds, a replaced code that returns and a class that disagrees with the name each fail the audit check
-    Given the audit table of the exit-1 codes with a code the registry holds but the table lacks, a source text no source builds an audited code in, a replaced code put back in the registry or in a source, an INCOMPLETE code classed as another class and another code named INCOMPLETE
-    When the audit check runs on each
-    Then each fault is named with its own message (not in the audit, no source builds it, still in the registry, a source still builds it, not classed INCOMPLETE, name does not end in _INCOMPLETE), and the audit as it stands passes
