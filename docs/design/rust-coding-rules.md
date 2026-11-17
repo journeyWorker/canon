@@ -54,12 +54,16 @@ status: Accepted
 - Every lint is `warn` except `unsafe_code`, which is `deny`. The CI job's
   `-D warnings` turns warnings into failures; no crate-level `#![deny]` is
   added (*Design Patterns* "`#![deny(warnings)]`").
-- The toolchain is pinned in `rust-toolchain.toml` (1.99.1, the toolchain
-  these counts were taken on). Every CI job that installs Rust, the test jobs,
-  the native builds and the publish workflow included, installs that file's
-  toolchain with rustup and fails when `rustc --version` differs. 0.30 added
-  the `clippy` job (`.github/workflows/test.yml`). When the pin moves, it moves
-  in one PR, and the lists below are re-checked in that same PR.
+- The toolchain is pinned in `rust-toolchain.toml`; `rust-version` in the
+  root `Cargo.toml` (inherited by every crate) and the Alpine image of the
+  aarch64 musl release row name the same version. Every CI job that installs
+  Rust, the test jobs, the native builds and the publish workflow included,
+  installs that file's toolchain with rustup and fails when `rustc --version`
+  differs. 0.30 added the `clippy` job (`.github/workflows/test.yml`). When
+  the pin moves, it moves in one PR, and the lists below are re-checked in
+  that same PR. 2026-11-17, moving to 1.100: the plain clippy runs went from
+  0 to 129 `map_unwrap_or` sites (clippy 1.100 widened it to
+  `.map(f).unwrap_or_default()`), all rewritten to `.map_or_default(f)`.
 - A local exception is `#[expect(lint, reason = "…")]`, never `#[allow]`
   (MS M-LINT-OVERRIDE-EXPECT), enforced by `allow_attributes*`.
 

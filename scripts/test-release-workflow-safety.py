@@ -138,6 +138,14 @@ def mutate(text: str, old: str, new: str, count: int = -1) -> str:
     return text.replace(old, new, count)
 
 
+def alpine_image(name: str) -> str:
+    """The aarch64 musl row's pinned image, as the workflow writes it: the tests mutate it and never spell a version."""
+    found = re.search(r"rust:\S+@sha256:[0-9a-f]+", workflow(name))
+    if not found:
+        raise AssertionError(f"{name} has no pinned rust image")
+    return found.group(0)
+
+
 class PrereleasePublishTests(unittest.TestCase):
     """0.35.0-rc.1 publishes under `next`; 0.35.0 publishes as it always did. Since 0.42 every package is a tarball
     packed once (`npm publish "$TARBALL"`), so the commands carry its path."""
@@ -353,18 +361,19 @@ class BuildRowTests(unittest.TestCase):
         self.assertTrue(errors)
 
     def test_the_aarch64_musl_row_must_name_an_alpine_image(self) -> None:
-        image = "            alpine_image: rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383\n"
+        image = f"            alpine_image: {alpine_image('publish.yml')}\n"
         errors = self.broken("publish.yml", image, "")
         self.assertTrue(errors)
-        errors = self.broken("build-native.yml", "alpine_image: rust:1.99.1-alpine3.24@sha256:", "alpine_image: ubuntu:26.04@sha256:")
+        errors = self.broken("build-native.yml", f"alpine_image: {alpine_image('build-native.yml').split('@')[0]}@sha256:", "alpine_image: ubuntu:26.04@sha256:")
         self.assertTrue(errors)
 
     def test_the_x86_64_row_must_not_have_an_alpine_image(self) -> None:
-        errors = self.broken("publish.yml", '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n', '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n            alpine_image: rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383\n')
+        errors = self.broken("publish.yml", '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n', f'            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n            alpine_image: {alpine_image("publish.yml")}\n')
         self.assertTrue(errors)
 
     def test_the_alpine_image_is_pinned_by_digest(self) -> None:
-        text = mutate(workflow("publish.yml"), "rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383", "rust:1.99.1-alpine3.24")
+        image = alpine_image("publish.yml")
+        text = mutate(workflow("publish.yml"), image, image.split("@")[0])
         errors = CHECKER.image_digest_errors(text, "publish.yml")
         self.assertTrue(errors)
 

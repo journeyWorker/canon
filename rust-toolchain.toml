@@ -3,13 +3,16 @@
 # `.github/actions/setup-rust`, which also fails a job whose `rustc` version
 # differs from `channel` below.
 #
-# Bumping `channel` is ONE pull request, and that same pull request re-checks
-# the lint list of the `clippy` job (the `-D` flags in
+# Bumping `channel` is ONE pull request. That pull request changes three things
+# together: `channel` here, `rust-version` in the root `Cargo.toml`'s
+# `[workspace.package]`, and the `alpine_image:` line of the aarch64 musl row in
+# `build-native.yml` and `publish.yml` (an image with the same rustc, pinned by
+# digest). It also re-checks the lint list of the `clippy` job (the `-D` flags in
 # `.github/workflows/test.yml` and `clippy.toml`): a new toolchain adds lints
 # and would turn a clean tree red with no code change.
 #
 # No `targets` here: each release matrix row adds only its own target.
 [toolchain]
-channel = "1.99.1"
+channel = "1.100.0"
 profile = "minimal"
 components = ["clippy", "rustfmt"]

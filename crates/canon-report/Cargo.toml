@@ -2,6 +2,7 @@
 name = "canon-report"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "generated-never-edited markdown status report over S2's DuckDB view layer, byte-stable `--check` drift gate + `--snapshot` Parquet export (S9)."
 

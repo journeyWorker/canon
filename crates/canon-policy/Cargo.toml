@@ -2,6 +2,7 @@
 name = "canon-policy"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "canon's CEL policy-expression engine (S13): parse/type-check/evaluate CEL predicates on upstream `cel` (the `cel-interpreter` project's current crates.io name — see src/lib.rs), bindings generated from canon-model's schema registry, with no dependency on `cel-parser` or on the donor's CEL crates."
 

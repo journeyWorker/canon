@@ -26,8 +26,7 @@ name: Test
 # the corpus: 10x the corpus may not cost more than 20x the CPU or memory.
 #
 # Caches (0.42): every cache job restores on every run, by `canon-test-<job>-deps-<hash of rust-toolchain.toml>-<hash of Cargo.lock>`, else the newest
-# `canon-test-<job>-deps-<same toolchain hash>-` one, else the newest `canon-test-<job>-cargo-` one (the whole `target/` of the time before this split; a bridge
-# for the first run, which the change that moves the toolchain deletes). Only a push to main saves one, and only when the restore was no exact match and the
+# `canon-test-<job>-deps-<same toolchain hash>-` one; a run on a new toolchain restores nothing and builds cold. Only a push to main saves one, and only when the restore was no exact match and the
 # job's build step succeeded: the dependencies' build alone, `scripts/ci-strip-workspace-build.sh` having taken the workspace crates' own output out. A pull
 # request run never saves, so it cannot fill the repository's cache quota with a copy of main's. Every job has a `timeout-minutes` (three times the longest run
 # measured, rounded up to 5) and a pull request run is cancelled by the next push to the same pull request. The runners are pinned to `ubuntu-26.04`, the image
@@ -120,7 +119,6 @@ jobs:
           key: canon-test-offline-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             canon-test-offline-deps-${{ hashFiles('rust-toolchain.toml') }}-
-            canon-test-offline-cargo-
 
       # What the restore found, in the run summary: the key (an older one when the match is not exact), and the sizes the job starts from.
       - name: What the cache restored
@@ -234,7 +232,7 @@ jobs:
           key: canon-test-offline-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
 
   # 0.30: the lint gate for rust-coding-rules.md. Every Rust job here runs the
-  # toolchain `rust-toolchain.toml` pins (1.99.1); a floating stable adds lints
+  # toolchain `rust-toolchain.toml` pins; a floating stable adds lints
   # and would turn a clean tree red with no code change. Bumping the pin
   # re-checks the lint list (the `-D` flags below and `clippy.toml`) in the same
   # change. Five steps, each fails on its own:
@@ -242,7 +240,7 @@ jobs:
   # files (compiled only with `live-pg,live-r2`), the visibility ban, and the
   # git boundary (0.39: no git call outside `canon_store::git`).
   clippy:
-    name: clippy 1.99.1 and visibility rule
+    name: clippy and visibility rule
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
@@ -263,7 +261,6 @@ jobs:
           key: canon-test-clippy-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             canon-test-clippy-deps-${{ hashFiles('rust-toolchain.toml') }}-
-            canon-test-clippy-cargo-
 
       - name: cargo fetch --locked
         run: cargo fetch --locked
@@ -337,7 +334,6 @@ jobs:
           key: canon-test-atip-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             canon-test-atip-deps-${{ hashFiles('rust-toolchain.toml') }}-
-            canon-test-atip-cargo-
 
       # The checker is the pre-built `@journeykit/atip-check` (static binaries; the npm start file runs under node): its version and the sha512 of its platform
       # packages are the lockfile in `tools/atip-check/`, outside the root workspace. The job restores no bun cache, so the install checks the integrity values.
@@ -417,7 +413,6 @@ jobs:
           key: canon-test-bench-shape-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             canon-test-bench-shape-deps-${{ hashFiles('rust-toolchain.toml') }}-
-            canon-test-bench-shape-cargo-
 
       - name: cargo fetch --locked
         run: cargo fetch --locked
@@ -536,7 +531,6 @@ jobs:
           key: canon-test-live-tier-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             canon-test-live-tier-deps-${{ hashFiles('rust-toolchain.toml') }}-
-            canon-test-live-tier-cargo-
 
       # The build of both test runs below, before the stack starts: the dependencies' build is what is saved to the cache (on main), so it must not wait for the services.
       - name: build the live-tier tests
