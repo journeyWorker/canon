@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests",
+    "role": "reviewer",
+    "session_id": "Rev43_tests"
+  },
+  "at": "2026-11-17T15:56:52.635111242Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=tier/durability.feature (tier.durability.07)",
+  "introduced_by": "2700fb60622e8159b627212310b498cdd15e8858",
+  "kind": "finding",
+  "resolution_code_tree": "4f9058b3fe7c7f6dfa87003fa86ee9912b7ebffe",
+  "resolution_sha": "37975fc509b656b71ba912bada89d2bf24807b6c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-tests",
+  "round": 1,
+  "scenario_ids": [
+    "tier.durability.07"
+  ],
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, P1] tier.durability.07's Then still says 'the legacy error reads could not write <file> and keeps its io cause'; 2700fb606 removed the 'could not write <file>' Display assertion from legacy::tests (renamed tier_durability_07_migrate_failures_keep_their_cause in ff1fbd6ea), which now asserts only that the error has a source. The text was not reworded (I2/I14). Fix: 'the legacy write fails with an error that keeps its io cause'. Not signed.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests",
+    "role": "reviewer",
+    "session_id": "Rev43_tests"
+  },
+  "at": "2026-11-17T15:56:55.986109257Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip_optionforms.rs:817",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "4f9058b3fe7c7f6dfa87003fa86ee9912b7ebffe",
+  "resolution_sha": "37975fc509b656b71ba912bada89d2bf24807b6c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-tests",
+  "round": 1,
+  "scenario_ids": [
+    "atip.daterefusals.01"
+  ],
+  "schema": 2,
+  "seq": 8,
+  "severity": "note",
+  "summary": "[standards, P3] I3 G took the count out of atip.daterefusals.01 ('the time places') and replaced places.len() == 12 with !is_empty(), but the bound test is still atip_daterefusals_01_a_leap_second_is_refused_in_the_twelve_places_... and the helper docs say 'the twelve places'; ff1fbd6ea renamed other tests whose names overstated what they assert, not this one. Rename it at the next touch (a rename re-binds the evidence and re-stales the review).",
+  "worktree_dirty": false
+}

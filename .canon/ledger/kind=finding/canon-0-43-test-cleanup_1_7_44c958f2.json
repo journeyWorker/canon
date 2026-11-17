@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests",
+    "role": "reviewer",
+    "session_id": "Rev43_tests"
+  },
+  "at": "2026-11-17T15:56:54.842761833Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/atip_check.rs:89",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "4f9058b3fe7c7f6dfa87003fa86ee9912b7ebffe",
+  "resolution_sha": "37975fc509b656b71ba912bada89d2bf24807b6c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-tests",
+  "round": 1,
+  "schema": 2,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[standards, P3] atip_check.rs:89 still asserts the fixture's contractVersion against the literal json!(\"1.6\"); the I3 F check says the '\"1.6\"' lines left are DECLARED_MINOR and fixture reads only, so a minor bump edits the constant and the fixture and nothing else. This line is a third edit at the next bump. Fix: json!(canon_cli::json_out::DECLARED_MINOR).",
+  "worktree_dirty": false
+}

@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests",
+    "role": "reviewer",
+    "session_id": "Rev43_tests"
+  },
+  "at": "2026-11-17T15:56:56.517715370Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "8c1e601081554d3e7a14ea27d040658c18ed8f9e",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=atip/daterefusals.feature:20-35",
+  "introduced_by": "af3389252eefdf3b1e98bc98617d5e5c7e8a6a78",
+  "kind": "finding",
+  "reviewed_sha": "883805daa06da3b9d09905949f2c4b43f704e2b6",
+  "reviewer": "rev-0-43-tests",
+  "round": 2,
+  "scenario_ids": [
+    "atip.daterefusals.02",
+    "atip.daterefusals.03"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, P1] atip.daterefusals.02 still says 'refused in the twelve places' and 'a message naming the day, month, hour, minute or offset that does not exist'; af3389252 removed both the places.len() == 12 count and the message checks ('day 30 does not exist in 2026-02', ...), so atip_daterefusals_02 now checks exit 2, USAGE, the field, the received value and that nothing is written. Its name still ends '..._and_says_what_does_not_exist'. atip.daterefusals.03 has the same drift: 'the twelve places' and 'refused with the 0.37 sentence that names the RFC 3339 spelling ... and the order check of --after and --before is as before', but atip_daterefusals_03 now only calls refused_in_every_place (the spelling_sentence equality was removed). By I2 and I3 G, the text drops the count and the deleted checks. Fix: reword both Then steps to the code, field, received value and no write, and drop '_and_says_what_does_not_exist' from the test name. atip.daterefusals.02 is not signed.",
+  "worktree_dirty": false
+}
