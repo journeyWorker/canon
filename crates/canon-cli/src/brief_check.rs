@@ -2218,7 +2218,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn flow_refusals_read_as_before() {
+    fn flow_refusals_are_errors() {
         let dir = tempfile::tempdir().unwrap();
         let change = ChangeId::parse("add-cart").unwrap();
         flow_tag_value(dir.path(), None, Some(&change), "F1").unwrap_err();

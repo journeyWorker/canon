@@ -344,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluation_validate_for_keeps_its_messages() {
+    fn evaluation_validate_for_refuses_a_wrong_version_or_another_candidate() {
         let candidate = candidate();
         evaluation(&candidate).validate_for(&candidate).unwrap();
 
@@ -373,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn approval_validate_for_and_verify_signature_keep_their_messages() {
+    fn approval_validate_for_and_verify_signature_refuse_a_bad_approval() {
         let candidate = candidate();
         let evaluation = evaluation(&candidate);
         let approval = || PromotionApproval::new(candidate.id, evaluation.digest(), "alice", "human", true, Utc::now());

@@ -794,7 +794,7 @@ fn context_capability_56_every_command_line_canon_generates_uses_the_bare_spelli
 
 /// context.capability.57: no option of the schema ends in -id.
 #[test]
-fn context_capability_57_the_schema_shows_no_option_ending_in_id_and_the_docs_spell_none() {
+fn context_capability_57_the_schema_shows_no_option_ending_in_id() {
     for leaf in harness::leaves() {
         for option in harness::options(leaf) {
             let name = option["name"].as_str().unwrap();

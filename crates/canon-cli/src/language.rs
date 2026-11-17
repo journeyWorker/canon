@@ -364,7 +364,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn language_refusals_read_as_before() {
+    fn language_refusals_are_errors_and_keep_their_cause() {
         Language::parse(" korean language ").unwrap_err();
         declared_from_yaml("language: k\n").unwrap_err();
         declared_from_yaml("language: [ko]\n").unwrap_err();

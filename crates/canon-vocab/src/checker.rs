@@ -238,7 +238,7 @@ mod tests {
     }
 
     #[test]
-    fn bad_enum_value_carries_the_verbatim_expected_one_of_message() {
+    fn bad_enum_value_is_reported_as_e_bad_enum() {
         let snap = snapshot_with_task_directive();
         let mut a = attrs(&[("desc", "x"), ("status", "closed")]);
         a.insert("evidence".into(), serde_yaml::to_value(std::collections::BTreeMap::from([("kind", "test-run"), ("ref", "r")])).unwrap());

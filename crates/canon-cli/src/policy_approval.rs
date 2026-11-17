@@ -385,7 +385,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_refusals_read_as_before() {
+    fn the_policy_approval_refusals_are_errors_and_keep_their_cause() {
         let dir = tempfile::tempdir().unwrap();
         record(dir.path(), " ", None, None).unwrap_err();
         record(dir.path(), "me", None, None).unwrap_err();

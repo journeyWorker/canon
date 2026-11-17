@@ -541,7 +541,7 @@ mod tests {
 
     /// tier.durability.07 (F4 failure path): a legacy write that cannot happen is an error that keeps its cause and reads as it did.
     #[test]
-    fn tier_durability_07_migrate_failures_read_as_before_and_keep_their_cause() {
+    fn tier_durability_07_migrate_failures_keep_their_cause() {
         let dir = tempfile::tempdir().unwrap();
         // A file where the parent directory belongs: `write_atomic` creates a missing parent, so only this stops the write.
         fs::write(dir.path().join("blocked"), b"").unwrap();

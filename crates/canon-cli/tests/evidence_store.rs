@@ -131,7 +131,7 @@ fn a_stored_blob_keeps_a_rewritten_report_provable_and_a_lost_one_is_stale_evide
 /// working-tree report still matches is `stale-evidence` naming the blob's
 /// actual digest.
 #[test]
-fn gate_check_24_an_altered_stored_blob_is_stale_evidence_that_says_altered_not_gone() {
+fn gate_check_24_an_altered_stored_blob_is_stale_evidence_naming_the_blobs_actual_digest() {
     let dir = setup(false);
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
@@ -246,7 +246,7 @@ fn a_marker_inside_a_path_a_file_name_a_url_or_a_longer_word_is_not_a_fabricatio
 /// way every other gate-red refusal of `evidence add` is — one line per
 /// finding, exit 2, nothing staged or committed.
 #[test]
-fn a_fabrication_marker_refusal_reads_refused_and_exits_1() {
+fn a_fabrication_marker_refusal_exits_2_and_writes_nothing() {
     let dir = setup(false);
     let repo = dir.path();
     scenario(repo, "game.run.01", None);

@@ -343,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn the_refusals_read_as_before_and_keep_their_cause() {
+    fn the_refusals_are_errors_and_keep_their_cause() {
         mode(Some("write: auto\n")).unwrap_err();
         mode(Some("write: [\n")).unwrap_err();
         let dir = tempfile::tempdir().unwrap();

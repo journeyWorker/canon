@@ -314,7 +314,7 @@ fn stale_index_status_and_gate_check_grade_a_stale_index_as_a_sync_would_leave_i
 }
 
 #[test]
-fn stale_index_a_recording_command_refreshes_it_and_says_so_in_one_line() {
+fn stale_index_a_recording_command_refreshes_it() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path());
     let argv: Vec<String> = ["artifacts", "store"].iter().map(std::string::ToString::to_string).collect();

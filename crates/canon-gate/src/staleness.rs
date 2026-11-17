@@ -1158,7 +1158,7 @@ mod tests {
     }
 
     #[test]
-    fn the_message_counts_the_cells_by_reason_names_three_subjects_and_points_a_shallow_clone_at_unshallow() {
+    fn the_items_count_the_cells_by_reason_and_a_shallow_clone_is_pointed_at_unshallow() {
         let unresolvable = Unresolvable { base_missing: 3, base_not_ancestor: 1, git_unavailable: 0, subjects: 4, first: vec!["a".into(), "b".into(), "c".into()], shallow: true };
         let message = unresolvable.message();
         assert!(message.contains("git fetch --unshallow"), "{message}");

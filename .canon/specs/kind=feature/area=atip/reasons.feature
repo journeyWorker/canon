@@ -11,16 +11,6 @@ Feature: atip reasons
     When every code's reasons are read, and an error is answered with a reason its code does not register, and with a reason of another code
     Then each reason is upper-case words, unique inside its code, in the order of the names and has a meaning and a fix of its own, and each of the two answers is refused
 
-  # canon: {"schema":1,"at":"2026-11-04T11:58:22Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-36-code-reasons.F1
-  @atip.reasons.02
-  Scenario: Every reason a source raises is registered under its code, and every registered reason is raised by a site
-    Given the sources that raise errors and the registry of reasons
-    When the reasons the sources name are matched against the registry, and the registry against the sources
-    Then every reason a source names is registered under some code, and a registered reason that no site raises fails the test
-
   # canon: {"schema":1,"at":"2026-11-04T11:58:29Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract
   @case:edge

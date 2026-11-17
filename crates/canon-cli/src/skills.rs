@@ -2120,7 +2120,7 @@ mod tests {
     }
 
     #[test]
-    fn the_skills_section_refusals_read_as_before() {
+    fn the_skills_section_refusals_are_errors() {
         configured_providers_in("skills:\n  providers: [vim]\n").unwrap_err();
         configured_providers_in("skills: 3\n").unwrap_err();
         configured_providers_in("skills: [\n").unwrap_err();

@@ -511,7 +511,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_timestamp_reads_as_before_and_keeps_its_cause() {
+    fn a_bad_timestamp_is_refused_and_keeps_its_cause() {
         let error = parse_timestamp("telemetry.started_at", "yesterday").unwrap_err();
         assert!(std::error::Error::source(&error).is_some());
     }

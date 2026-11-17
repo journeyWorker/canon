@@ -82,7 +82,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn io_and_verifier_failures_keep_their_messages_and_causes() {
+    fn io_and_verifier_failures_keep_their_causes() {
         let io = || std::io::Error::other("boom");
         let write = ApprovalError::WriteSignature(io());
         assert!(std::error::Error::source(&write).is_some());

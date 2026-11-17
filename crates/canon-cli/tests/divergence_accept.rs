@@ -166,7 +166,7 @@ fn an_accepted_divergence_ships_and_stays_listed_in_status_and_gate_check() {
 
 /// An acceptance without `--expiry` holds until new evidence and says so.
 #[test]
-fn an_acceptance_without_an_expiry_says_so() {
+fn an_acceptance_without_an_expiry_holds_until_new_evidence() {
     let dir = repo();
     assert!(accept(dir.path(), &[]).status.success());
     assert!(out(&canon(dir.path(), &["gate", "check"])).contains(&accepted_line()));

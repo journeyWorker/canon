@@ -1235,7 +1235,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn u32_out_of_range_keeps_the_type_mismatch_message_and_its_cause() {
+    fn u32_out_of_range_is_refused_and_keeps_its_cause() {
         let too_big = PolicyValue::UInt(u64::from(u32::MAX) + 1);
         let err = u32::from_policy_value(&too_big).unwrap_err();
         assert!(std::error::Error::source(&err).is_some());

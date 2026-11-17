@@ -471,7 +471,7 @@ fn subject_lifecycle_50_the_guides_show_ask_and_record_with_the_relay_option() {
 
 /// subject.lifecycle.51: `canon skills check` is clean once the guides are installed.
 #[test]
-fn subject_lifecycle_51_conditional_answers_are_revisions_and_no_guide_says_report_and_wait() {
+fn subject_lifecycle_51_skills_check_is_clean_once_the_guides_are_installed() {
     let dir = TempDir::new().unwrap();
     ok(dir.path(), &["init", "--harness", "claude", "--no-agents-md"]);
     let check = run(dir.path(), &["skills", "check"]);

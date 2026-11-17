@@ -197,7 +197,7 @@ fn an_operand_hint_names_the_typed_leaf_with_the_typed_values() {
 
 /// The 0.30 id options became bare nouns: every row's leaf has the new option and not the old one, and every row is of release 0.31.0.
 #[test]
-fn the_bare_noun_rows_cover_the_67_places_of_the_14_options() {
+fn the_bare_noun_rows_have_the_new_option_and_not_the_old_one_in_every_scope() {
     let root = tree();
     let rows: Vec<&Row> = ROWS.iter().filter(|row| row.since == canon_cli::removed_028::V31).collect();
     assert!(!rows.is_empty(), "one row per option");
