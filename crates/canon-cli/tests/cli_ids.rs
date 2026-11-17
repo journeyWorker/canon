@@ -340,7 +340,7 @@ fn contract_view(transcript: &str) -> String {
 #[test]
 fn context_capability_47_every_id_option_is_the_bare_noun_and_writes_the_record_the_old_spelling_wrote() {
     let by_name = options_by_name();
-    for noun in NOUNS.iter() {
+    for noun in &NOUNS {
         let leaves = by_name.get(*noun).unwrap_or_else(|| panic!("no command takes --{noun}"));
         assert!(!leaves.is_empty(), "--{noun} is on no command");
         assert!(!by_name.contains_key(&format!("{noun}-id")), "--{noun}-id is still an option of {:?}", by_name.get(&format!("{noun}-id")));

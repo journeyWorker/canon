@@ -880,7 +880,7 @@ aging:
     #[test]
     fn tier_retired_08_every_other_kind_stays_closed_to_purge() {
         let registry = TierRegistry::new(TierPolicy::from_yaml("").unwrap(), None, None, None, None);
-        assert!(registry.purge(RecordKind::Change, Utc::now(), true).is_err());
+        registry.purge(RecordKind::Change, Utc::now(), true).unwrap_err();
         assert_eq!((PurgeKind::parse("session"), PurgeKind::parse("run"), PurgeKind::parse("change")), (Some(PurgeKind::Retired(RetiredKind::Session)), Some(PurgeKind::Current(RecordKind::Run)), None));
         assert_eq!(PurgeKind::names(), ["run", "trajectory", "session", "event"]);
     }

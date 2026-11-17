@@ -43,7 +43,7 @@ fn format_exits_nonzero_and_lists_the_audited_failure_classes() {
         assert_eq!(mine.len(), 1, "expected exactly one `{prefix}` heading in output:\n{text}");
         assert!(mine[0].contains(&report.count_by_class(*class).to_string()), "the `{prefix}` heading carries the class's count:\n{text}");
     }
-    assert_eq!(headings.len(), observed.iter().count(), "one heading per observed class and no other:\n{text}");
+    assert_eq!(headings.len(), observed.len(), "one heading per observed class and no other:\n{text}");
 }
 
 /// `--repo <repo-dir>` combined with a repo-relative `<DIR>` resolves the

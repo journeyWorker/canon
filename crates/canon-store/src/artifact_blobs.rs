@@ -600,9 +600,9 @@ mod tests {
 
     #[test]
     fn a_backend_that_is_not_an_s3_tier_is_refused_naming_the_fix() {
-        assert!(config("artifact_store: { backend: hot }\n").is_err());
-        assert!(config("artifact_store: { backend: local, prefix: x/ }\n").is_err());
-        assert!(config("artifact_store: { backend: s3 }\n").is_err());
+        config("artifact_store: { backend: hot }\n").unwrap_err();
+        config("artifact_store: { backend: local, prefix: x/ }\n").unwrap_err();
+        config("artifact_store: { backend: s3 }\n").unwrap_err();
         for bad in ["/abs/", "a//b/", "../x/", "a/./b/"] {
             assert!(config(&format!("artifact_store: {{ backend: cold, prefix: \"{bad}\" }}\n")).is_err(), "{bad}");
         }

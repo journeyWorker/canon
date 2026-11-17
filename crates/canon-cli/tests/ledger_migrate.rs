@@ -958,7 +958,7 @@ fn ledger_migrate_09c_object_store_keys_are_rekeyed_and_restored() {
 
     let (preview, out) = repo.json(&["migrate", "--revert"]);
     assert!(out.status.success(), "{preview}");
-    assert!(effects(&preview).iter().any(|e| e["action"] == "rekey" && e["record"] == format!("s3:{new_key}").as_str() && e["detail"].as_str().is_some_and(|d| d.contains(&old_key.to_string()))), "the revert preview does not name the object's old key: {:?}", effects_of(&preview, "rekey"));
+    assert!(effects(&preview).iter().any(|e| e["action"] == "rekey" && e["record"] == format!("s3:{new_key}").as_str() && e["detail"].as_str().is_some_and(|d| d.contains(old_key.as_str()))), "the revert preview does not name the object's old key: {:?}", effects_of(&preview, "rekey"));
     let digest = preview["data"]["planDigest"].as_str().unwrap().to_string();
     let (done, out) = repo.json(&["migrate", "--revert", "--commit", "--plan-digest", &digest]);
     assert!(out.status.success() && done["ok"] == true, "{done}");
