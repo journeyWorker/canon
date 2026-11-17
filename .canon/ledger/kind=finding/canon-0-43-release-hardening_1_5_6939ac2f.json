@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-release",
+    "role": "reviewer",
+    "session_id": "ses_eb369b3c11493c96ca4c23ba"
+  },
+  "at": "2026-11-17T14:32:50.010372486Z",
+  "change_id": "canon-0-43-release-hardening",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "open",
+  "file_ref": "scripts/test-release-workflow-safety.py:717-718,986-989",
+  "introduced_by": "be48718542c1b2321b92f2e8d42273dd0ec043c1",
+  "kind": "finding",
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-release",
+  "round": 1,
+  "schema": 2,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "P2 (owner's test rule; I19 verdict-only): two new tests are echo/source-text tests, not verdicts. test_the_scenarios_are_a_tag_push_and_both_manual_runs asserts DRY_RUN_SCENARIOS' want column equals the literal it was written as (a constant echoed back). test_the_safety_job_does_not_have_to_wait_for_scope asserts the shipped build-native.yml's `safety` needs list (workflow source text; the checker does not enforce it) and repeats test_accepts_the_shipped_workflow. Fix: delete both; the verdict tests on the three dry-run cases and the shipped workflow already carry the contract.",
+  "worktree_dirty": false
+}

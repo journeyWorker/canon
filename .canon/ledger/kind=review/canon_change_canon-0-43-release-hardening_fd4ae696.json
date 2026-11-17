@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-release",
+    "role": "reviewer",
+    "session_id": "ses_eb369b3c11493c96ca4c23ba"
+  },
+  "at": "2026-11-17T14:33:23.640746648Z",
+  "change_id": "canon-0-43-release-hardening",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "kind": "review",
+  "pin": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "6656f57ca4af5dab32cbe4d4ef8c0529be29027b792dafb8045b695afe356b7a",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-release-hardening/brief.md"
+  },
+  "review_id": "01M7MYTHDR4VFKZJQC2P3QKWJ4",
+  "reviewer": "rev-0-43-release",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-opus-5-5",
+  "reviewer_provider": "anthropic",
+  "schema": 2,
+  "worktree_dirty": false
+}
