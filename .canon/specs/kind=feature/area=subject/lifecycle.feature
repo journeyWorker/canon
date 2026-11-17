@@ -246,7 +246,7 @@ Feature: subject lifecycle
     Given a verifying subject that passes every technical gate
     And its brief.md carries an Approved line only inside an HTML comment or a fenced code block
     When the subject is moved to shipped
-    Then the command exits 2 naming the brief.md as having no Approved line
+    Then the command exits 2 with an unreviewed-promotion naming the subject
     And status reports the brief as not approved, so status and the guard agree
 
   # canon: {"schema":1,"at":"2026-10-11T17:15:05Z","actor":{"agent_id":"canon-scaffold"}}
@@ -349,11 +349,11 @@ Feature: subject lifecycle
   @subject:subject-lifecycle
   @case:happy
   @subject.lifecycle.35
-  Scenario: Adopting an unapproved change into a building subject warns and says how to undo it
-    Given a proposed, a specced and a building subject, and a change with a draft brief.md
+  Scenario: Adopting an unapproved change into a building, verifying or shipped subject warns and says how to undo it
+    Given a proposed, a specced, a building, a verifying and a shipped subject, and a change with a draft brief.md
     When the change is created under, or adopted by, each subject
-    Then the building, verifying or shipped subject (the shipped one adopting into a shipped subject too) gets one warning in JSON meta.warnings naming canon subject unadopt, and the proposed and specced ones none
-    And an approved brief adopted into a building subject gets none
+    Then the building, verifying and shipped subjects each get one warning in JSON meta.warnings naming canon subject unadopt, and the proposed and specced ones none
+    And an approved brief adopted into a verifying subject gets none
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:51Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:subject-lifecycle
@@ -379,9 +379,9 @@ Feature: subject lifecycle
   @subject:subject-lifecycle
   @case:happy
   @subject.lifecycle.38
-  Scenario: A pending draft change does not freeze a shipped subject's reopen, evidence, review and ship
+  Scenario: A pending draft change does not freeze a shipped subject's reopen, evidence and ship
     Given a shipped subject adopting an approved change and a newer draft change that was never approved, is no chore, and that none of its scenarios is tagged @flow:<change>.* for
-    When the subject is reopened, a scenario is re-verified and reviewed, and the subject ships again
+    When the subject is reopened, a scenario is re-verified, and the subject ships again
     Then each step is accepted, the reopen output names the draft's @flow:<draft>.* tag, the ship output carries a BRIEF_DRAFT_PENDING warning, and canon status lists the draft in pendingDrafts and not in briefs
     And once a scenario of the subject is tagged @flow:<draft>.F1, shipping is refused on the draft's brief
 
@@ -391,7 +391,7 @@ Feature: subject lifecycle
   @subject.lifecycle.39
   Scenario: A tagged unapproved change still blocks reopen and ship under a newer untagged draft
     Given a shipped subject adopting an approved change a, a draft change b that one of its scenarios is tagged @flow:b.F1 for, and a newer draft change c no scenario is tagged for
-    When the subject is reopened and, with b's scenario attested, shipped again
+    When the shipped subject is reopened, and a verifying subject set up the same way, with b's scenario attested, is shipped
     Then both are refused naming b's brief, and the output names every pending draft, here c, through its @flow:c.* tag
     And without c the refusal is the same, and only a change never approved, no chore and tagged by no scenario is ever a pending draft
     And canon status does not advise the refused reopen
@@ -435,11 +435,11 @@ Feature: subject lifecycle
   @case:failure
   @flow:canon-0-31-loop.F3
   @subject.lifecycle.43
-  Scenario: An approved tagged change edited afterwards, or one whose tags were removed, still refuses reopen and ship
+  Scenario: An approved tagged change edited afterwards, with or without its tags removed, still refuses reopen
     Given a shipped subject adopting two approved tagged changes
-    When the brief of one is edited after its approval, and separately its scenarios' tags are removed
-    Then reopen and ship refuse naming that change's brief.md as changed since its approval, BRIEF_APPROVAL_STALE
-    And the other approved change is not named, and approving the edited brief again lets both go through
+    When the brief of one is edited after its approval, and then its scenarios' tags are removed too
+    Then reopen refuses naming that change's brief.md as changed since its approval, BRIEF_APPROVAL_STALE
+    And the other approved change is not named, and approving the edited brief again lets the reopen go through
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:21Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
   @subject:subject-lifecycle

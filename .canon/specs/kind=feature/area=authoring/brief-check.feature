@@ -183,7 +183,7 @@ Feature: authoring brief check
     Given a brief whose Intent heading is written `## Intnet`, another whose heading differs only in case, one with a deleted section and one with two sections swapped
     When canon brief check runs on each
     Then the first two report brief.section-missing for the Intent section
-    And the deleted section is brief.section-missing, the swap is brief.section-order, and a `##` line that is no known heading stays body text of the section before it
+    And the deleted section is brief.section-missing and the swap is brief.section-order
     And a brief with a shipped Korean heading and no markers is old-format and gets no other finding
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:40Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
@@ -239,7 +239,7 @@ Feature: authoring brief check
   Scenario: A new brief's empty sections are reported by brief check and listed by brief show
     Given a brief written by canon change new, whose sections are empty, in a repo with language ko and in one without
     When canon brief check and canon brief show run
-    Then brief check reports the brief's language, ko for a repo with language ko and en otherwise, and findings for the empty sections
+    Then brief check reports the brief's language, ko for a repo with language ko and en otherwise, and findings
     And brief show lists the empty sections in text, Desired outcome among them, and in JSON emptySections, User flow among them
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:46Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}

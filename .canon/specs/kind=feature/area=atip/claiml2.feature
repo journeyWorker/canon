@@ -54,4 +54,4 @@ Feature: atip canon claim l2: canon declares atip/1 (1.4 in 0.36, 1.5 in 0.37, 1
   Scenario: No command of canon reads a terminal for input, and canon init, which used to ask, asks nothing on one
     Given the sources of every crate of the workspace, and canon init run with a terminal on stdin and stderr in a repo with a .claude directory
     When the sources are scanned for /dev/tty, a prompt library, a terminal-mode call and every read of stdin, and init runs
-    Then none of the first three is found, the only read of stdin is --input - (a terminal is refused with STDIN_TTY), the source of init holds no prompt, and init finishes with success, installs for claude and records it
+    Then none of the first three is found, the only read of stdin is --input - (a terminal is refused with STDIN_TTY), the source of init holds no prompt, and init finishes with success and records claude as the harness

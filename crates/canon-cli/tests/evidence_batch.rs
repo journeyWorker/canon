@@ -257,11 +257,11 @@ fn paths_of(record: &Value) -> Vec<String> {
     paths
 }
 
-/// evidence.add.90 (0.23 D1): a suite-wide batch binds exactly the files
+/// evidence.add.42 (0.23 D1): a suite-wide batch binds exactly the files
 /// its own write names; the scenario's earlier attachments are not carried
 /// into the new record, and nothing reports a drop.
 #[test]
-fn evidence_add_90_a_batch_binds_only_what_it_names() {
+fn evidence_add_42_a_batch_binds_only_what_it_names() {
     let dir = shots_repo();
     let repo = dir.path();
 

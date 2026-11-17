@@ -920,8 +920,8 @@ fn change_drop_26_migrate_adds_the_change_state_route_line_and_the_next_plan_is_
     assert_eq!((refused.status.code(), refused_doc["error"]["code"].as_str(), refused_doc["error"]["reason"].as_str()), (Some(2), Some("CONFIG_INVALID"), Some("TIERS")), "{refused_doc}");
     assert!(refused_doc["error"]["hint"].as_str().unwrap().contains("canon migrate"), "the hint names the step: {refused_doc}");
 
-    assert_eq!(read(repo, "canon.yaml"), old, "a preview writes nothing");
     let doc = json_of(&canon(repo, &["migrate", "--json"]));
+    assert_eq!(read(repo, "canon.yaml"), old, "a preview writes nothing");
     let effects = doc["data"]["effects"].as_array().unwrap();
     assert!(effects.iter().any(|e| e["action"] == "rewrite" && e["path"] == "canon.yaml"), "the rewrite effect: {doc}");
     assert!(!effects.iter().any(|e| e["path"] == ".gitignore"), "only the route line is planned: {doc}");

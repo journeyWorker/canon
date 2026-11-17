@@ -227,7 +227,7 @@ fn a_summary_is_kept_on_scenario_only_evidence_and_still_scanned_for_fabrication
 /// eval's `pack.json/atlas` summary is kept; the same marker standing on
 /// its own is still refused.
 #[test]
-fn a_marker_inside_a_path_a_file_name_a_url_or_a_longer_word_is_not_a_fabrication_marker() {
+fn evidence_add_90_a_marker_inside_a_path_a_file_name_a_url_or_a_longer_word_is_not_a_fabrication_marker() {
     let dir = setup(false);
     let repo = dir.path();
     scenario(repo, "game.run.01", None);

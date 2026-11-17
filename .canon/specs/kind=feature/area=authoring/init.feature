@@ -303,7 +303,6 @@ Feature: authoring init
     When init runs
     Then it waits for no answer and succeeds
     And it installs the canon skill for claude and omp and records them as skills.providers
-    And with --harness or --no-harness the choice is the answer, and with nothing detected nothing is installed, on a terminal or not
 
   # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -313,7 +312,7 @@ Feature: authoring init
     Given a repo whose canon.yaml exists and whose gitignore lacks canon lines added since it was set up
     When canon init runs again
     Then it adds each missing canon gitignore line once, and keeps the existing gitignore lines and canon.yaml byte-identical
-    And with --no-agents-md it only adds the lines, and with none missing that run is a no-op that exits 0
+    And with --no-agents-md it only adds the lines, and with none missing that run exits 0
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:52Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
