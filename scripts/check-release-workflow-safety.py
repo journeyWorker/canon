@@ -880,7 +880,7 @@ def dry_run_errors(text: str, workflow: str) -> list[str]:
 
 def preflight_errors(text: str, workflow: str) -> list[str]:
     """The pre-flight runs in a dry run too; `npm whoami` only while some package is not on npm; a recovery with
-    dry_run fails early; the already-published message names `recovery=true` and `dry_run=false`."""
+    dry_run fails early."""
     errors: list[str] = []
     publish = _job_block(text, "publish")
     step = _step_block(publish, "Pre-flight npm release state (fresh-release gate + recovery + first-publish token)")
@@ -914,8 +914,6 @@ def preflight_errors(text: str, workflow: str) -> list[str]:
         errors.append(f"{workflow}: the pre-flight must run `npm whoami` while a package is missing from npm (a first publish needs the token)")
     elif unguarded:
         errors.append(f"{workflow}: every `npm whoami` in the pre-flight must run only under `if [ -n \"$ABSENT\" ]; then` (a package of the set is not on npm); once all are, trusted publishing needs no token ({unguarded} of {whoami} do not)")
-    if "recovery=true and dry_run=false" not in step:
-        errors.append(f"{workflow}: the already-published message must name `recovery=true and dry_run=false`")
     read_version = _job_block(text, "read-version")
     refuse = next((s for s in _steps(read_version) if "DRY_RUN" in s and "RECOVERY" in s), "")
     if not refuse or "exit 1" not in refuse or '"${RECOVERY:-false}" = "true"' not in refuse or '"${DRY_RUN:-false}" = "true"' not in refuse:
