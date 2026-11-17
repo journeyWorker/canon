@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:13:41.964277464Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib a_malformed_subject_tag_is_counted_but_the_scenario_is_still_indexed_without_the_join"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --lib a_malformed_subject_tag_is_counted_but_the_scenario_is_still_indexed_without_the_join: passes in the workspace nextest run at b5a805bd4 on Rust 1.100.0 (workspace nextest 3980 passed, 1 skipped)"
+  },
+  "evidence_sha": "b5a805bd41234740f676c6706fcbed82255524cb",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 449,
+  "scenario_id": "inventory.sync.09",
+  "schema": 1,
+  "staging_id": "5fd608b8",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

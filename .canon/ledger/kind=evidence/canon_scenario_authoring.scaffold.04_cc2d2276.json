@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:05:33.675234062Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib feature_new_still_writes_under_the_lone_configured_root_with_no_project_flag"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --lib feature_new_still_writes_under_the_lone_configured_root_with_no_project_flag: passes in the workspace nextest run at b5a805bd4 on Rust 1.100.0 (workspace nextest 3980 passed, 1 skipped)"
+  },
+  "evidence_sha": "b5a805bd41234740f676c6706fcbed82255524cb",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 214,
+  "scenario_id": "authoring.scaffold.04",
+  "schema": 1,
+  "staging_id": "bcb5df9b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

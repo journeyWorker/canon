@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:07:17.641647491Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib dispatch::begin_tests::an_unknown_row_fails_loud_naming_the_id_and_persists_no_manifest"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --lib dispatch::begin_tests::an_unknown_row_fails_loud_naming_the_id_and_persists_no_manifest: passes in the workspace nextest run at b5a805bd4 on Rust 1.100.0 (workspace nextest 3980 passed, 1 skipped)"
+  },
+  "evidence_sha": "b5a805bd41234740f676c6706fcbed82255524cb",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1130,
+  "scenario_id": "dispatch.manifest.05",
+  "schema": 1,
+  "staging_id": "89b7023c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

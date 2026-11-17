@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:00:27.979777177Z",
+  "attachments": [
+    {
+      "case": "read_cause::tests::atip_reasons_05_a_canon_yaml_that_cannot_be_used_is_config_invalid_with_its_reason",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_reasons_05_a_wrong_specs_section_a_wrong_policy_and_a_wrong_canon_yaml_are_config_invalid",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    }
+  ],
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3980 passed, 1 skipped) from the clean tree at b5a805bd4, --rev b5a805bd4, Rust 1.100.0"
+  },
+  "evidence_sha": "b5a805bd41234740f676c6706fcbed82255524cb",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 294,
+  "scenario_id": "atip.reasons.05",
+  "schema": 1,
+  "staging_id": "c41cf6db",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
