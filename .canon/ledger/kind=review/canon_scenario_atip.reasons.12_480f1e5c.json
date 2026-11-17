@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-r3-atip",
+    "role": "reviewer",
+    "session_id": "Rev43r3_atip"
+  },
+  "at": "2026-11-17T17:26:35.881441395Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "kind": "review",
+  "pin": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_reasons_12_a_detached_signature_the_system_fails_to_read_is_strategy_signature_unavailable",
+          "junit:atip_reasons_12_a_policy_approval_the_system_fails_to_read_refuses_the_ship_as_unavailable",
+          "junit:atip_reasons_12_dispatch_diff_names_a_records_read_the_system_failed_as_its_unavailable_warning",
+          "junit:atip_reasons_12_every_call_site_that_reads_answers_its_subjects_unavailable_code_for_an_eio",
+          "junit:atip_reasons_12_every_reader_of_the_plan_corpus_answers_by_the_cause_of_an_unreadable_canon_yaml",
+          "junit:atip_reasons_12_every_unavailable_code_is_driven_by_a_test_here_or_is_no_read",
+          "junit:atip_reasons_12_the_dispatch_manifest_the_plan_corpus_and_the_run_lock_are_unavailable_for_a_repeat",
+          "junit:atip_reasons_12_the_files_a_migrate_plan_and_its_preview_read_are_migration_unavailable_for_an_eio",
+          "junit:atip_reasons_12_the_local_artifact_store_the_system_fails_to_read_is_artifacts_store_unavailable"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "7b7caede09ee4f6570604311bae74751ba0f133e403c09f9645cee1d80c3cdb3",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-test-cleanup/brief.md"
+  },
+  "review_id": "01M7N8QP39F0F7JT9T16P46JK9",
+  "reviewer": "rev-0-43-tests-r3-atip",
+  "scenario_id": "atip.reasons.12",
+  "schema": 2,
+  "worktree_dirty": false
+}
