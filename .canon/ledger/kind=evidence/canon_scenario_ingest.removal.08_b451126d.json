@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T15:23:36.728436259Z",
+  "attachments": [
+    {
+      "case": "ingest_removal_08_the_skills_bundle_no_longer_carries_the_session_ingest_guide",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    }
+  ],
+  "code_tree": "8c1e601081554d3e7a14ea27d040658c18ed8f9e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3980 passed, 1 skipped) from the clean tree at 2c5ea809f, --rev 2c5ea809f, Rust 1.100.0"
+  },
+  "evidence_sha": "2c5ea809f9baceebd42d7a33804afcda6379223e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 136,
+  "scenario_id": "ingest.removal.08",
+  "schema": 1,
+  "staging_id": "8480eefa",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
