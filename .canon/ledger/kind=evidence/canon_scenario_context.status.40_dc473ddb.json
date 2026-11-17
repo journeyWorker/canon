@@ -1,0 +1,69 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T14:04:29.871676418Z",
+  "attachments": [
+    {
+      "case": "approve_refuses_a_repo_with_no_policy",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "a_repo_without_a_policy_gets_no_approval_advisory",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "approve_refuses_an_empty_approver",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "the_approval_file_is_never_ignored",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "approve_records_the_policy_digest_the_approver_the_time_and_the_note",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "gate_check_and_status_advise_until_the_current_policy_is_approved",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    }
+  ],
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "bound to the workspace nextest run (3980 passed, 1 skipped) at 11acda0de on Rust 1.100.0: the cases of its previous record"
+  },
+  "evidence_sha": "11acda0de760a28d1930db96b60826c66cee66a8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1027,
+  "scenario_id": "context.status.40",
+  "schema": 1,
+  "staging_id": "2b7a1c9b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

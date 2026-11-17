@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T14:03:07.136695913Z",
+  "attachments": [
+    {
+      "case": "atip_claim15_10_the_fixture_and_the_tree_say_the_minor_canon_declares",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    }
+  ],
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "bound to the workspace nextest run (3980 passed, 1 skipped) at 11acda0de on Rust 1.100.0: the one remaining test of the declared-minor agreement (its previous case atip_claim14_13 was deleted by canon-0-43-atip-0-3-2)"
+  },
+  "evidence_sha": "11acda0de760a28d1930db96b60826c66cee66a8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 496,
+  "scenario_id": "atip.claiml2.20",
+  "schema": 1,
+  "staging_id": "58f1d0cb",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

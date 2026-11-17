@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T14:16:12.201486401Z",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plans_ingest a_repository_root_source_ignores_trees_outside_openspec_changes; cargo test -p canon-ingest source_files_at_a_repository_root_never_leave_openspec_changes"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --test plans_ingest a_repository_root_source_ignores_trees_outside_openspec_changes; cargo test -p canon-ingest source_files_at_a_repository_root_never_leave_openspec_changes: passes in the workspace nextest run at 11acda0de (3980 passed, 1 skipped, Rust 1.100.0)"
+  },
+  "evidence_sha": "11acda0de760a28d1930db96b60826c66cee66a8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 204,
+  "scenario_id": "ingest.plans.10",
+  "schema": 1,
+  "staging_id": "39ffe061",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

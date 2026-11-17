@@ -1,0 +1,55 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T14:11:08.357863479Z",
+  "attachments": [
+    {
+      "case": "skills_show_full_appends_every_reference_and_is_a_no_op_elsewhere",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "skills_show_json_carries_name_text_guides_and_the_version_under_x_canon",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "skills_show_ignores_the_declared_role",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "skills_show_prints_the_embedded_guide_bytes_without_a_repo",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    }
+  ],
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "bound to the workspace nextest run (3980 passed, 1 skipped) at 11acda0de on Rust 1.100.0: the cases its previous record named by command"
+  },
+  "evidence_sha": "11acda0de760a28d1930db96b60826c66cee66a8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1353,
+  "scenario_id": "skills.install.65",
+  "schema": 1,
+  "staging_id": "3fbf71c8",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
