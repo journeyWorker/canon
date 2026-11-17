@@ -148,7 +148,7 @@ fn tree(root: &Path) -> BTreeMap<String, String> {
             if path.is_dir() {
                 walk(root, &path, out);
             } else {
-                let body = std::fs::read(&path).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+                let body = std::fs::read(&path).map_or_default(|b| String::from_utf8_lossy(&b).into_owned());
                 out.insert(rel, body.replace(root.to_string_lossy().as_ref(), "<repo>"));
             }
         }

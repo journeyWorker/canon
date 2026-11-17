@@ -415,8 +415,7 @@ fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_r
         // never a walk of the whole root (module doc).
         let files: Vec<PathBuf> = handle
             .as_ref()
-            .map(|h| entry.adapter.source_files(h))
-            .unwrap_or_default()
+            .map_or_default(|h| entry.adapter.source_files(h))
             .into_iter()
             .filter(|path| !excluded_dirs.iter().any(|dir| canonicalize_or(path).starts_with(dir)))
             .collect();
@@ -457,7 +456,7 @@ fn run_pass_for(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_r
             continue;
         }
 
-        let PlanParseOutcome { changes, tasks, unmapped, malformed } = handle.map(|h| entry.adapter.parse(&h)).unwrap_or_default();
+        let PlanParseOutcome { changes, tasks, unmapped, malformed } = handle.map_or_default(|h| entry.adapter.parse(&h));
         let changes_parsed = changes.len();
         let tasks_parsed = tasks.len();
 
@@ -567,7 +566,7 @@ fn refuse_unusable_sources(outcome: &PlansOutcome) -> Result<(), PlansError> {
     for flagged in &outcome.non_clean_sources {
         let Some(source) = outcome.sources.iter().find(|s| s.dialect == flagged.dialect && s.root == flagged.root) else { continue };
         for entry in &source.malformed {
-            let hint = entry.hint.as_deref().map(|hint| format!(" ({hint})")).unwrap_or_default();
+            let hint = entry.hint.as_deref().map_or_default(|hint| format!(" ({hint})"));
             causes.push(format!("{} source `{}`: `{}` is malformed ({}){hint}", flagged.dialect, flagged.root, entry.path, entry.reason));
         }
     }

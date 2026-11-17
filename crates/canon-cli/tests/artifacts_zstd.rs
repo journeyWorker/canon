@@ -86,7 +86,7 @@ impl Repo {
     }
 
     fn objects(&self) -> Vec<String> {
-        let mut names: Vec<String> = std::fs::read_dir(self.bucket()).map(|dir| dir.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect()).unwrap_or_default();
+        let mut names: Vec<String> = std::fs::read_dir(self.bucket()).map_or_default(|dir| dir.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect());
         names.sort();
         names
     }

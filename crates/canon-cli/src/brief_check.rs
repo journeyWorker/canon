@@ -1772,8 +1772,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
     }
     let dir = repo.join(paths::CHANGES_DIR);
     let mut live: Vec<(ChangeId, PathBuf)> = std::fs::read_dir(&dir)
-        .map(|entries| entries.filter_map(Result::ok).collect::<Vec<_>>())
-        .unwrap_or_default()
+        .map_or_default(|entries| entries.filter_map(Result::ok).collect::<Vec<_>>())
         .into_iter()
         .filter(|e| e.file_name() != "archive" && e.path().join("brief.md").is_file())
         .filter_map(|e| Some((ChangeId::parse(e.file_name().to_str()?).ok()?, e.path().join("brief.md"))))
@@ -2006,14 +2005,14 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
             println!("  note: the ledger cannot be read, so the flow-coverage rules were skipped");
         }
         for f in &ev.findings {
-            let section = f.section.as_deref().map(|s| format!(" [{s}]")).unwrap_or_default();
+            let section = f.section.as_deref().map_or_default(|s| format!(" [{s}]"));
             println!("  {} {}{section} line {}: {}", f.severity.as_str(), f.rule, f.line, f.excerpt);
             println!("    hint: {}", f.hint);
         }
         for w in &ev.waivers {
             let severity = w.severity.map_or("unknown", Severity::as_str);
             let state = if w.applied { "waived" } else { "waiver matches nothing" };
-            let only = w.match_text.as_ref().map(|m| format!(" match \"{m}\"")).unwrap_or_default();
+            let only = w.match_text.as_ref().map_or_default(|m| format!(" match \"{m}\""));
             println!("  {state}: {severity} {} [{}]{only} line {} — \"{}\"", w.rule, w.section, w.line, w.reason);
         }
     }

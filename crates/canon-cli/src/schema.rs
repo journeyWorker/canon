@@ -771,7 +771,7 @@ fn print_command(doc: &atip::doc::CommandDoc) {
     if !doc.options.is_empty() {
         println!("options:");
         for o in &doc.options {
-            let value = o.value_name.as_ref().map(|v| format!(" <{v}>")).unwrap_or_default();
+            let value = o.value_name.as_ref().map_or_default(|v| format!(" <{v}>"));
             let flag_only = if o.flag_only { "; flag only" } else { "" };
             let shown = notes(o.required, o.repeatable && o.value_type != ValueType::Count, o.possible_values.as_deref(), &o.default, o.default_note.as_deref());
             println!("  --{}{value} {}{shown}{flag_only}", o.name, o.value_type.as_str());
@@ -779,7 +779,7 @@ fn print_command(doc: &atip::doc::CommandDoc) {
     }
     println!("errors: {}", doc.errors.join(", "));
     for output in &doc.outputs {
-        println!("output: {}{}", output.schema_ref, output.when.as_ref().map(|when| format!(" (when {when})")).unwrap_or_default());
+        println!("output: {}{}", output.schema_ref, output.when.as_ref().map_or_default(|when| format!(" (when {when})")));
     }
     for example in &doc.examples {
         println!("example: {example}");

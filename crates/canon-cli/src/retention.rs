@@ -649,7 +649,7 @@ pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
                 }
                 crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &data, meta.to_json());
             } else {
-                crate::human_err!("canon export: would write {} record(s){}", rows.len(), out.map(|p| format!(" to {}", p.display())).unwrap_or_default());
+                crate::human_err!("canon export: would write {} record(s){}", rows.len(), out.map_or_default(|p| format!(" to {}", p.display())));
             }
             next_cursor_line = meta.human_line();
             return Ok(());

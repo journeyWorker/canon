@@ -40,7 +40,7 @@ fn option_of(doc: &serde_json::Value, name: &str) -> serde_json::Value {
 
 /// The names a 1.4 command document lists: a string names a tree option or a reserved option, an object is the command's own option.
 fn option_names(doc: &serde_json::Value) -> Vec<String> {
-    doc["options"].as_array().map(|list| list.iter().map(|o| o.as_str().map_or_else(|| o["name"].as_str().unwrap().to_string(), str::to_string)).collect()).unwrap_or_default()
+    doc["options"].as_array().map_or_default(|list| list.iter().map(|o| o.as_str().map_or_else(|| o["name"].as_str().unwrap().to_string(), str::to_string)).collect())
 }
 
 #[test]
@@ -99,7 +99,7 @@ fn a_command_lists_the_codes_it_can_emit_and_a_read_lists_no_writes_codes() {
         let mut args = vec!["schema"];
         args.extend_from_slice(cmd);
         args.push("--json");
-        json(&args)["errors"].as_array().map(|list| list.iter().map(|c| c.as_str().unwrap().to_string()).collect::<Vec<_>>()).unwrap_or_default()
+        json(&args)["errors"].as_array().map_or_default(|list| list.iter().map(|c| c.as_str().unwrap().to_string()).collect::<Vec<_>>())
     };
     let context = errors(&["context"]);
     let finding_list = errors(&["finding", "list"]);

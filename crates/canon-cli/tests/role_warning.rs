@@ -44,7 +44,7 @@ fn add(repo: &Path, seq: &str, role: &str) -> Value {
 fn warnings(body: &Value) -> Vec<String> {
     body["meta"]["warnings"]
         .as_array()
-        .map(|list| {
+        .map_or_default(|list| {
             list.iter()
                 .map(|w| {
                     assert_eq!(w["code"], "ROLE_UNKNOWN_RECORDED", "{w}");
@@ -52,7 +52,6 @@ fn warnings(body: &Value) -> Vec<String> {
                 })
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 #[test]

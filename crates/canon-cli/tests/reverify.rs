@@ -296,7 +296,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     let reopened: Value = serde_json::from_str(&stdout(&out)).unwrap();
     // The evidence step holds placeholders (`<unit>`, `<session>`, `<test command>`), so it is a
     // `next:` line of the human form and no `meta.next` entry.
-    let next = reopened["meta"].get("next").map(|n| n.as_array().unwrap().clone()).unwrap_or_default();
+    let next = reopened["meta"].get("next").map_or_default(|n| n.as_array().unwrap().clone());
     assert!(next.iter().all(|s| !s["command"].as_str().unwrap().contains("evidence add") && !s["command"].as_str().unwrap().contains("--to shipped")), "not ship: {next:?}");
     let steps = status_steps(r);
     assert!(steps[0]["command"].as_str().unwrap().starts_with("canon evidence add --project demo --all-scenarios"), "after the reopen: {steps:?}");

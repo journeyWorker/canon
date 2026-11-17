@@ -111,7 +111,7 @@ fn example_of(doc: &Value, source: Source, world: &World) -> Vec<String> {
 /// The digest of everything the search of `doc` from `example` reads.
 pub fn digest_of(doc: &Value, rules: &[ConstraintDoc], example: &[String], atip: &str) -> String {
     let names = names_of(rules);
-    let parsed = parse_call(doc, example).map(|parsed| parsed.text).unwrap_or_default();
+    let parsed = parse_call(doc, example).map_or_default(|parsed| parsed.text);
     let arguments: Vec<Value> = names
         .iter()
         .map(|name| {

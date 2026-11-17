@@ -357,7 +357,7 @@ fn evidence_add_102_a_legacy_subject_keeps_re_verifying_its_evidenced_scenarios(
 /// `meta.warnings`: `{code, message, field?}` objects, `[]` when the member is absent.
 fn warnings(out: &Output) -> Vec<Value> {
     let json: Value = serde_json::from_str(&stdout(out)).unwrap();
-    json["meta"].get("warnings").map(|w| w.as_array().expect("meta.warnings is an array").clone()).unwrap_or_default()
+    json["meta"].get("warnings").map_or_default(|w| w.as_array().expect("meta.warnings is an array").clone())
 }
 
 /// The steps `canon status` lists, from its human form, under `role` when given:
@@ -389,7 +389,7 @@ fn status_steps(repo: &Path, role: Option<&str>) -> Vec<Value> {
 /// The entries of `status --json`'s `meta.next`, `[]` when the member is absent.
 fn status_entries(repo: &Path) -> Vec<Value> {
     let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
-    status["meta"].get("next").map(|n| n.as_array().unwrap().clone()).unwrap_or_default()
+    status["meta"].get("next").map_or_default(|n| n.as_array().unwrap().clone())
 }
 
 /// The message of a coded adoption warning.
@@ -519,7 +519,7 @@ fn subject_lifecycle_36_unadopt_removes_the_link_on_both_sides() {
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(json["meta"]["command"], "subject unadopt");
     // The remaining steps hold placeholders, so no entry: the member is absent, never `[]`.
-    let next: Vec<Value> = json["meta"].get("next").map(|n| n.as_array().expect("meta.next is an array").clone()).unwrap_or_default();
+    let next: Vec<Value> = json["meta"].get("next").map_or_default(|n| n.as_array().expect("meta.next is an array").clone());
     let status: Vec<Value> = status_entries(repo).into_iter().filter(|s| s["reason"].as_str().unwrap().starts_with("s:")).collect();
     assert_eq!(next, status, "{json}");
     assert!(json["meta"]["next"].as_array().is_none_or(|next| !next.is_empty()), "never an empty `meta.next`: {json}");

@@ -813,7 +813,7 @@ pub fn later_human_acts(repo: &Path, backup: &Path, snapshot_dir: &str, remove: 
 
 /// The paths of the briefs and reviews a run rewrote, for a journal-aware preview of a revert.
 pub fn journal_paths(backup: &Path) -> BTreeSet<String> {
-    read_journal(backup).map(|j| j.briefs.into_iter().map(|b| b.path).chain(j.reviews.into_iter().map(|r| r.to)).collect()).unwrap_or_default()
+    read_journal(backup).map_or_default(|j| j.briefs.into_iter().map(|b| b.path).chain(j.reviews.into_iter().map(|r| r.to)).collect())
 }
 
 #[cfg(test)]

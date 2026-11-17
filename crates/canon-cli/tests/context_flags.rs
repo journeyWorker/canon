@@ -32,7 +32,7 @@ fn body(out: &Output) -> Value {
 }
 
 fn strings(value: &Value) -> Vec<&str> {
-    value.as_array().map(|items| items.iter().filter_map(Value::as_str).collect()).unwrap_or_default()
+    value.as_array().map_or_default(|items| items.iter().filter_map(Value::as_str).collect())
 }
 
 /// A repo `canon init` set up, with nothing authored in it.

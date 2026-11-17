@@ -717,7 +717,7 @@ fn distinct_files(record: &EvidenceRecord) -> Vec<&EvidenceAttachment> {
 }
 
 fn subject_of(record: &EvidenceRecord) -> String {
-    CellSubject::of(record).map(|s| s.as_str().to_string()).unwrap_or_default()
+    CellSubject::of(record).map_or_default(|s| s.as_str().to_string())
 }
 
 /// Who binds a file: a latest evidence record, or a current review.

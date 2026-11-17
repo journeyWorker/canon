@@ -554,7 +554,7 @@ fn status(repo: &Path) -> Value {
 fn red_of(repo: &Path) -> Vec<String> {
     let report = status(repo);
     let run = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "run").unwrap().clone();
-    run.get("red").map(|red| red.as_array().unwrap().iter().map(|r| r.as_str().unwrap().to_string()).collect()).unwrap_or_default()
+    run.get("red").map_or_default(|red| red.as_array().unwrap().iter().map(|r| r.as_str().unwrap().to_string()).collect())
 }
 
 /// Rewrite the committed record of `scenario` that is newest: `change` edits its body, and the file is renamed by the digest of the new body.

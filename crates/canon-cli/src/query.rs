@@ -267,7 +267,7 @@ pub(crate) fn task_number_key(task_id: &str) -> (String, Vec<u64>) {
 /// these two kinds (`format_human`'s own per-row call) — a `Task`'s
 /// own decomposition is [`task_number_key`]'s.
 fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
-    let natural_key = canon_store::partition::resolve_partition(kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
+    let natural_key = canon_store::partition::resolve_partition(kind, &raw.0).map_or_default(|p| p.natural_key);
     match kind {
         RecordKind::Task => task_number_key(&natural_key),
         _ => (natural_key, Vec::new()),
@@ -398,7 +398,7 @@ fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<
         record: RawRecord,
     }
     let candidates = records.into_iter().map(|record| {
-        let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
+        let key = canon_store::partition::resolve_partition(kind, &record.0).map_or_default(|p| p.natural_key);
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
         let digest = canon_store::partition::content_digest(&record.0);
@@ -574,7 +574,7 @@ fn kind_members(kind: RecordKind, plugin: bool) -> BTreeSet<String> {
 /// The key a cursor names a record by: `at`, id and content digest, the
 /// same three the human table shows.
 fn record_key(kind: RecordKind, raw: &RawRecord) -> String {
-    let id = canon_store::partition::resolve_partition(kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
+    let id = canon_store::partition::resolve_partition(kind, &raw.0).map_or_default(|p| p.natural_key);
     format!("{}|{id}|{}", canon_store::tier::raw_record_at(raw).to_rfc3339(), canon_store::partition::content_digest(&raw.0))
 }
 
@@ -725,7 +725,7 @@ fn dangling_of(outcome: &QueryOutcome, check: &ReferenceCheck) -> QueryDangling 
                 .iter()
                 .filter_map(|raw| {
                     let unresolved = scan.by_record.get(&record_key(outcome.kind, raw))?;
-                    let record = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
+                    let record = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_default(|p| p.natural_key);
                     Some(unresolved.iter().map(move |reference| DanglingRecord { record: record.clone(), field: reference.field, target: reference.target, id: reference.id.clone() }))
                 })
                 .flatten()

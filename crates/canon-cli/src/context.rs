@@ -586,7 +586,7 @@ fn summarize_review(policy: &PolicyResolution, kinds: &BTreeMap<String, KindSurf
     ReviewSurface {
         finding_severities: crate::finding::SEVERITY_VALUES.iter().map(std::string::ToString::to_string).collect(),
         finding_dispositions: crate::finding::DISPOSITION_VALUES.iter().map(std::string::ToString::to_string).collect(),
-        review_fields: kinds.get(canon_model::RecordKind::Review.as_str()).map(|k| k.envelope_fields.clone()).unwrap_or_default(),
+        review_fields: kinds.get(canon_model::RecordKind::Review.as_str()).map_or_default(|k| k.envelope_fields.clone()),
         require_review,
     }
 }
@@ -680,12 +680,11 @@ fn collect_kinds(registry: &SchemaRegistry) -> BTreeMap<String, KindSurface> {
         let Some(schema) = registry.get(kind) else { continue };
         let value = schema.as_value();
         let required: std::collections::BTreeSet<&str> =
-            value.get("required").and_then(|r| r.as_array()).map(|arr| arr.iter().filter_map(|v| v.as_str()).collect()).unwrap_or_default();
+            value.get("required").and_then(|r| r.as_array()).map_or_default(|arr| arr.iter().filter_map(|v| v.as_str()).collect());
         let envelope_fields: BTreeMap<String, bool> = value
             .get("properties")
             .and_then(|p| p.as_object())
-            .map(|props| props.keys().map(|name| (name.clone(), required.contains(name.as_str()))).collect())
-            .unwrap_or_default();
+            .map_or_default(|props| props.keys().map(|name| (name.clone(), required.contains(name.as_str()))).collect());
         let partition = PartitionLayout { template: kind.partition_template() };
         let schema = format!("{SCHEMA_DIR}/{}.schema.json", kind.as_str());
         kinds.insert(kind.as_str().to_string(), KindSurface { schema_version: kind.schema_version(), envelope_fields, partition, schema });

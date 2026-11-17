@@ -68,7 +68,7 @@ static COMMANDS: LazyLock<Vec<Value>> = LazyLock::new(|| {
 });
 
 fn names(value: &Value, key: &str) -> Vec<String> {
-    value[key].as_array().map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect()).unwrap_or_default()
+    value[key].as_array().map_or_default(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect())
 }
 
 fn option<'a>(doc: &'a Value, name: &str) -> &'a Value {
@@ -229,7 +229,7 @@ fn rule_problems(doc: &Value) -> Vec<String> {
         if !operand_names.is_empty() {
             wanted.insert("operands".to_string());
         }
-        let got: BTreeSet<String> = fragment["properties"].as_object().map(|properties| properties.keys().cloned().collect()).unwrap_or_default();
+        let got: BTreeSet<String> = fragment["properties"].as_object().map_or_default(|properties| properties.keys().cloned().collect());
         if got != wanted {
             say(format!("the fragment's properties are {got:?}, not {wanted:?}"));
         }

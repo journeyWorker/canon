@@ -115,7 +115,7 @@ fn check_ledger(root: &Path, report: &mut FmtReport) -> BTreeMap<PathBuf, BTreeS
             }
             check_sha_fields(&json, &["app_sha"], &rel, report);
             let present: BTreeSet<String> =
-                json.get("divergence_refs").and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                json.get("divergence_refs").and_then(|v| v.as_array()).map_or_default(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
             divergence_refs_present.insert(rel, present);
         }
     }

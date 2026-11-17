@@ -283,7 +283,7 @@ fn atip_paging_06_every_projected_output_declares_its_fields_and_the_declaration
     for (command, doc, output) in &cases {
         let command = command.as_str();
         let fields = &output["fields"];
-        let strings = |key: &str| -> Vec<String> { fields.get(key).and_then(Value::as_array).map(|list| list.iter().map(|path| path.as_str().unwrap().to_string()).collect()).unwrap_or_default() };
+        let strings = |key: &str| -> Vec<String> { fields.get(key).and_then(Value::as_array).map_or_default(|list| list.iter().map(|path| path.as_str().unwrap().to_string()).collect()) };
         let (paths, keep, default) = (strings("paths"), strings("keep"), strings("default"));
         assert!(!paths.is_empty(), "{command}");
         assert!(default.iter().all(|path| paths.contains(path)), "{command}: default is a subset of paths");

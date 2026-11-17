@@ -194,7 +194,7 @@ fn subject_lifecycle_52_a_relayed_approval_of_two_briefs_marks_both_lines_and_st
     let report = json(&ok(r, &["brief", "approve", "--json", "a", "--approver", "Ana", "--note", "Yes, approve both."]));
     assert_eq!(report["ok"], true, "a human's repeat of the answer rewrites the line without a marker: {report}");
     let status = json(&ok(r, &["status", "--json"]));
-    let briefs = status["data"]["subjects"].as_array().map(|subjects| subjects.iter().flat_map(|s| s["briefs"].as_array().cloned().unwrap_or_default()).collect::<Vec<_>>()).unwrap_or_default();
+    let briefs = status["data"]["subjects"].as_array().map_or_default(|subjects| subjects.iter().flat_map(|s| s["briefs"].as_array().cloned().unwrap_or_default()).collect::<Vec<_>>());
     let relays: Vec<&Value> = briefs.iter().filter(|b| b.get("relay").is_some()).collect();
     assert_eq!(relays.len(), 1, "b stays relayed, a was re-recorded by the human: {status}");
     assert_eq!(relays[0]["change"], "b");

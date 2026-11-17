@@ -747,7 +747,7 @@ pub(crate) fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(),
         // corpus-level failure — so an unreadable neighbouring
         // document cannot make a perfectly good task id unbindable.
         let handle = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(src.root().to_path_buf()) });
-        let parsed = handle.map(|h| entry.adapter.parse(&h)).unwrap_or_default();
+        let parsed = handle.map_or_default(|h| entry.adapter.parse(&h));
         let admitted = crate::plans::admit_source_candidates(&mut seen_change_ids, parsed.changes, parsed.tasks);
         if admitted.tasks.iter().any(|task| task.task_id == *task_id) {
             return Ok(());

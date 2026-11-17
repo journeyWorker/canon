@@ -240,7 +240,7 @@ pub fn run_show(repo: &Path, json: bool) -> u8 {
     }
     println!("policy: {}", paths::POLICY_FILE);
     println!("digest: {}", current.as_deref().unwrap_or("-"));
-    println!("approval: {name}{}", detail.map(|d| format!(" ({d})")).unwrap_or_default());
+    println!("approval: {name}{}", detail.map_or_default(|d| format!(" ({d})")));
     if let Some(a) = approval {
         println!("approved by: {}", a.approved_by);
         println!("approved at: {}", a.approved_at);

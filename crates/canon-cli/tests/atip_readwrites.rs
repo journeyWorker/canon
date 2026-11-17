@@ -366,7 +366,7 @@ fn atip_readwrites_07_artifacts_store_refused_for_an_unwritable_store_leaves_a_s
     std::fs::remove_dir_all(world.repo().join(".canon/artifacts")).unwrap();
     world.ok(&["scenario", "new", "auth.login.03", "--title", "Reset", "--feature", FEATURE]);
     let ledger_scenarios = world.scenario_index();
-    let index_before: Vec<_> = std::fs::read_dir(&ledger_scenarios).map(|entries| entries.flatten().map(|e| e.file_name()).collect()).unwrap_or_default();
+    let index_before: Vec<_> = std::fs::read_dir(&ledger_scenarios).map_or_default(|entries| entries.flatten().map(|e| e.file_name()).collect());
     let canon_dir = world.repo().join(".canon");
     let mode = std::fs::metadata(&canon_dir).unwrap().permissions().mode();
     std::fs::set_permissions(&canon_dir, std::fs::Permissions::from_mode(0o555)).unwrap();
@@ -377,6 +377,6 @@ fn atip_readwrites_07_artifacts_store_refused_for_an_unwritable_store_leaves_a_s
     std::fs::set_permissions(&canon_dir, std::fs::Permissions::from_mode(mode)).unwrap();
     assert_eq!(refused.0, Some(2), "{refused:?}: {}", String::from_utf8_lossy(&out.stdout));
     assert_eq!(after, before, "a refused artifacts store wrote");
-    let index_after: Vec<_> = std::fs::read_dir(&ledger_scenarios).map(|entries| entries.flatten().map(|e| e.file_name()).collect()).unwrap_or_default();
+    let index_after: Vec<_> = std::fs::read_dir(&ledger_scenarios).map_or_default(|entries| entries.flatten().map(|e| e.file_name()).collect());
     assert_eq!(index_after, index_before, "the scenario index was refreshed by a refused call");
 }

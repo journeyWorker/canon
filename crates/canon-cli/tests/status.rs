@@ -199,7 +199,7 @@ fn status_json(repo: &Path) -> Value {
     assert_eq!(doc["ok"], true, "{doc}");
     let mut report = doc["data"].clone();
     let (steps, omitted) = text_steps(repo);
-    let entries: Vec<Value> = doc["meta"].get("next").map(|n| n.as_array().expect("meta.next is an array").clone()).unwrap_or_default();
+    let entries: Vec<Value> = doc["meta"].get("next").map_or_default(|n| n.as_array().expect("meta.next is an array").clone());
     assert!(entries.len() <= 5, "{doc}");
     let visible: Vec<&Value> = steps.iter().filter(|s| runnable(s["command"].as_str().unwrap())).collect();
     if omitted == 0 {

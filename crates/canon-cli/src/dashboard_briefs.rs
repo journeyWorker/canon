@@ -98,8 +98,7 @@ fn adopting_subjects(repo: &Path) -> BTreeMap<String, Vec<String>> {
 pub fn list(repo: &Path) -> Reply {
     let subjects = adopting_subjects(repo);
     let mut live: Vec<(ChangeId, std::path::PathBuf)> = std::fs::read_dir(repo.join(paths::CHANGES_DIR))
-        .map(|entries| entries.filter_map(Result::ok).collect::<Vec<_>>())
-        .unwrap_or_default()
+        .map_or_default(|entries| entries.filter_map(Result::ok).collect::<Vec<_>>())
         .into_iter()
         .filter(|e| e.file_name() != "archive" && e.path().join("brief.md").is_file())
         .filter_map(|e| Some((ChangeId::parse(e.file_name().to_str()?).ok()?, e.path().join("brief.md"))))

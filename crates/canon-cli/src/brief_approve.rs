@@ -74,12 +74,12 @@ pub fn approved_text(text: &str, by: &str, when: &str, note: &str, relay: Option
 
 /// ` (relayed by …)` for a relayed approval, nothing for the human's own.
 fn relay_part(relay: Option<&ApprovalRelay>) -> String {
-    relay.map(|r| format!(" {}", crate::relay::marker(r))).unwrap_or_default()
+    relay.map_or_default(|r| format!(" {}", crate::relay::marker(r)))
 }
 
 /// ` (code tree <id>)` when the approval recorded the code tree, nothing otherwise.
 fn tree_part(tree: Option<&str>) -> String {
-    tree.map(|tree| format!(" {}", crate::brief::tree_marker(tree))).unwrap_or_default()
+    tree.map_or_default(|tree| format!(" {}", crate::brief::tree_marker(tree)))
 }
 
 /// The digest `brief approve` records for the brief `text`: what `canon brief
@@ -516,7 +516,7 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
                 (None, false) => "; no policy file, so no policy approval".to_string(),
             };
             let verb = if unchanged { "already approved, unchanged" } else { "approved" };
-            let via = approved.relay.as_ref().map(|r| format!(" ({})", crate::relay::describe(r))).unwrap_or_default();
+            let via = approved.relay.as_ref().map_or_default(|r| format!(" ({})", crate::relay::describe(r)));
             println!("canon brief approve: {} {verb} by `{}`{via} ({}){policy}", approved.brief, approved.approved_by, approved.digest);
         }
         crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(approved.change.clone()), false, json, approved);
@@ -544,9 +544,9 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
                 Outcome::Failed => "failed",
                 Outcome::Skipped => "skipped",
             };
-            println!("canon brief approve: {} {what} by `{}`{}", entry.change, report.approved_by, entry.error.as_ref().map(|e| format!(" — {e}")).unwrap_or_default());
+            println!("canon brief approve: {} {what} by `{}`{}", entry.change, report.approved_by, entry.error.as_ref().map_or_default(|e| format!(" — {e}")));
         }
-        let via = report.relay.as_ref().map(|r| format!(" ({})", crate::relay::describe(r))).unwrap_or_default();
+        let via = report.relay.as_ref().map_or_default(|r| format!(" ({})", crate::relay::describe(r)));
         println!("canon brief approve: {} change(s){via}{policy}", report.approvals.len());
     }
     if let Some(e) = many.failure {
