@@ -4,7 +4,11 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
-### Changed
+## 0.43.0 — 2026-11-18
+
+canon 0.43 is a chore release: it is not breaking for callers. canon's commands, output, exit values, records and declaration (`atip/1` 1.6) are the same as in 0.42, and a caller has nothing to change. What changes is for contributors who build canon from source: the toolchain is Rust 1.100.0 (`rust-toolchain.toml`, `rust-version`), the atip crate is `atip-crate-v0.3.2` and the checker is the pre-built `@journeykit/atip-check` 0.4.1 installed by `just atip-install` (no Rust needed for it), and the tests compare machine fields only (verdicts, codes, exit values, records), not the wording of messages, CI files or documents. The release workflows also publish tarballs by a `./` path (the `v0.42.0` tag run stopped on that), and a dry run runs the publish command.
+
+### Contributors
 
 - **Building canon from source takes Rust 1.100.0** (`canon-0-43-rust-1-100`; canon's behavior, output, exit values, records and declaration do not change). A pinned toolchain moves from 1.99.1 to 1.100.0, the workspace declares `rust-version = "1.100.0"` (the eleven crates inherit it), and the aarch64 musl release row builds in `rust:1.100.0-alpine3.24` pinned by digest. The checker is still the pre-built npm binary, so installing it needs no Rust. The CI cache no longer restores the `target/` of the time before the toolchain hash was in the key.
 
