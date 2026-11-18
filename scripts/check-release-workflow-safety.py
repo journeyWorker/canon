@@ -51,6 +51,7 @@ with).
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import pathlib
 import re
@@ -696,7 +697,7 @@ def smoke_errors(publish_text: str, build_text: str, other_texts: dict[str, str]
 
 # The GitHub Actions expression subset a publish step's `if:` may use, evaluated the way Actions does
 # (null, boolean, number, string; `==` on two different types compares them as numbers).
-_COND_TOKEN = re.compile(r"\s*(?:(?P<str>'(?:[^']|'')*')|(?P<num>\d+(?:\.\d+)?)|(?P<op>\|\||&&|==|!=|!|\(|\))|(?P<id>[A-Za-z_][\w.\-]*))")
+_COND_TOKEN = re.compile(r"\s*(?:(?P<str>'(?:[^']|'')*')|(?P<num>\d+(?:\.\d+)?)|(?P<op>\|\||&&|==|!=|!|\(|\)|,)|(?P<id>[A-Za-z_][\w.\-]*))")
 
 
 class _Cond:
@@ -774,6 +775,21 @@ class _Cond:
         if kind == "num":
             return float(text)
         if kind == "id":
+            if self.peek() == ("op", "(") and text.lower() in ("startswith", "cancelled"):
+                self.take()
+                args: list[object] = []
+                if self.peek() != ("op", ")"):
+                    args.append(self.or_expr())
+                    while self.peek() == ("op", ","):
+                        self.take()
+                        args.append(self.or_expr())
+                if self.take() != ("op", ")"):
+                    raise ValueError("a `(` is not closed")
+                if text.lower() == "cancelled":
+                    return False
+                if len(args) != 2:
+                    raise ValueError("startsWith takes two arguments")
+                return _render(args[0]).lower().startswith(_render(args[1]).lower())
             if text in ("true", "false"):
                 return text == "true"
             if text == "null":
@@ -1181,8 +1197,9 @@ def scope_errors(text: str, workflow: str) -> list[str]:
             errors.append(f"{workflow}: the `scope` job and its steps have no `if:`; a skipped `scope` skips every build job (only an explicit skip=true skips)")
         if _field(scope, "timeout-minutes") != "5":
             errors.append(f"{workflow}: the `scope` job has `timeout-minutes: 5`")
-        if not re.search(r"^    outputs:\n(?:      .*\n)*?      skip:", scope + "\n", re.MULTILINE):
-            errors.append(f"{workflow}: the `scope` job must output `skip`")
+        for output in ("skip", "mode", "exclude"):
+            if not re.search(rf"^    outputs:\n(?:      .*\n)*?      {output}:", scope + "\n", re.MULTILINE):
+                errors.append(f"{workflow}: the `scope` job must output `{output}`")
     for name in _job_names(text):
         if name in ("scope", "safety"):
             continue
@@ -1195,7 +1212,7 @@ def scope_errors(text: str, workflow: str) -> list[str]:
             continue
         for label, value, want in SCOPE_SCENARIOS:
             try:
-                got = _truthy(_Cond(_unwrap(condition), {"needs.scope.outputs.skip": value}).parse())
+                got = _truthy(_Cond(_unwrap(condition), {"needs.scope.outputs.skip": value, "needs.scope.outputs.mode": None}).parse())
             except ValueError as error:
                 errors.append(f"{workflow}: job `{name}`: the condition `{condition}` cannot be read ({error})")
                 break
@@ -1483,6 +1500,225 @@ def fetch_build_errors(text: str, workflow: str) -> list[str]:
         errors.append(f"{workflow}: `smoke-binary` must run step `{BINARY_CHECK_STEP}` with scripts/check-release-binary.py --target \"${{{{ matrix.settings.target }}}}\"")
     elif re.search(r"--page-size[ =]skip\b", smoke) or re.search(r"^\s+if:", smoke, re.MULTILINE):
         errors.append(f"{workflow}: the floor check of `smoke-binary` reads the page size and has no `if:` (it is the one place that can)")
+    return errors
+
+
+
+# ---------------------------------------------------------------------------
+# 0.44 CI optimization: build-native.yml builds by `mode`; its caches are saved by a release or a manual run only; test.yml does not test a tree a
+# green pull request already tested.
+# ---------------------------------------------------------------------------
+
+# What `mode` values the jobs of build-native.yml run in (with `skip` false): `man` and `manifest` only in a release (and in a mode this table does not name),
+# the others in every mode.
+RELEASE_ONLY_JOBS = ("man", "manifest")
+EVERY_MODE_JOBS = ("dashboard", "build")
+MODE_SCENARIOS = (("release", "release"), ("native", "native"), ("quick", "quick"), ("an unknown mode", "no-such-mode"), ("an empty mode", ""), ("no mode output", None))
+SAVE_SCENARIOS = (
+    # (label, head_ref, event, cache-hit, outcome of the clean step, saves)
+    ("an ordinary pull request", "feat/x", "pull_request", "false", "success", False),
+    ("a release pull request", "release/0.44.0", "pull_request", "false", "success", True),
+    ("a manual run", "", "workflow_dispatch", "false", "success", True),
+    ("a release pull request that restored the exact cache", "release/0.44.0", "pull_request", "true", "success", False),
+    ("a manual run that restored the exact cache", "", "workflow_dispatch", "true", "success", False),
+    ("a release pull request whose clean step failed", "release/0.44.0", "pull_request", "false", "failure", False),
+    ("a manual run whose clean step was skipped", "", "workflow_dispatch", "false", "skipped", False),
+    ("a branch that only looks like a release", "feat/release/0.44.0", "pull_request", "false", "success", False),
+)
+CACHE_JOBS = ("build", "man")
+CACHE_RESTORE = "actions/cache/restore@"
+CACHE_SAVE = "actions/cache/save@"
+
+
+def _step_id(step: str) -> str | None:
+    match = re.search(r"^\s+id:[ \t]*(\S+)[ \t]*$", step, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def mode_job_errors(text: str, workflow: str) -> list[str]:
+    """`man` and `manifest` run when `skip` is not `true` and `mode` is not `quick` or `native` (so in `release`, and in a value this workflow does not
+    name, and when there is none); `dashboard` and `build` run in every mode: a condition on `mode` there would leave a `quick` run without the app its
+    row embeds."""
+    errors: list[str] = []
+    for name in RELEASE_ONLY_JOBS + EVERY_MODE_JOBS:
+        job = _job_block(text, name)
+        if not job:
+            errors.append(f"{workflow}: no `{name}` job")
+            continue
+        condition = _field(job, "if")
+        if condition is None:
+            continue  # `scope_errors` refuses a job with no condition
+        for label, mode in MODE_SCENARIOS:
+            want = name in EVERY_MODE_JOBS or mode not in ("quick", "native")
+            try:
+                got = _truthy(_Cond(_unwrap(condition), {"needs.scope.outputs.skip": "false", "needs.scope.outputs.mode": mode}).parse())
+            except ValueError as error:
+                errors.append(f"{workflow}: job `{name}`: the condition `{condition}` cannot be read ({error})")
+                break
+            if got != want:
+                errors.append(f"{workflow}: job `{name}` must {'run' if want else 'be skipped'} for {label}")
+    return errors
+
+
+def matrix_mode_errors(text: str, workflow: str, exclude_for) -> list[str]:
+    """The rows `build` runs by mode: the `exclude` of its matrix is the list `scope` writes (`exclude_for(mode)`, scripts/build-scope.py): `quick` runs the
+    x86_64 musl row alone; `native`, `release`, a value this workflow does not name and none run all four."""
+    errors: list[str] = []
+    build = _job_block(text, "build")
+    if not re.search(r"^        exclude:[ \t]*\$\{\{\s*fromJSON\(\s*needs\.scope\.outputs\.exclude\b[^}]*\}\}[ \t]*$", build, re.MULTILINE):
+        errors.append(f"{workflow}: the `build` matrix must take its `exclude` from the `scope` output (`exclude: ${{{{ fromJSON(needs.scope.outputs.exclude || '[]') }}}}`)")
+        return errors
+    rows = matrix_rows(build)
+    for label, mode in (("quick", "quick"), ("native", "native"), ("release", "release"), ("an unknown mode", "no-such-mode"), ("an empty mode", "")):
+        try:
+            excluded = exclude_for(mode)
+        except (ValueError, TypeError) as error:
+            errors.append(f"{workflow}: the rows of mode {label} cannot be read ({error})")
+            continue
+        ran = {
+            row.get("target", "")
+            for row in rows
+            if not any(all(row.get(key) == value for key, value in (entry.get("settings") or {}).items()) for entry in excluded)
+        }
+        want = {"x86_64-unknown-linux-musl"} if mode == "quick" else set(EXPECTED_TARGETS)
+        if ran != want:
+            errors.append(f"{workflow}: mode {label} must build {sorted(want)}, the rows left are {sorted(ran)}")
+    return errors
+
+
+def cache_save_errors(text: str, workflow: str) -> list[str]:
+    """`build` and `man` restore their cache in every run and save it only in a `release/` pull request run or a manual run, when the restore was no exact
+    match, after the artifacts are uploaded and after a clean step (`id: strip`) that succeeded; both steps may fail without failing the job."""
+    errors: list[str] = []
+    for name in CACHE_JOBS:
+        job = _job_block(text, name)
+        steps = _steps(job)
+        restores = [s for s in steps if CACHE_RESTORE in s]
+        saves = [s for s in steps if CACHE_SAVE in s]
+        if any(re.search(r"uses:\s*actions/cache@", s) for s in steps):
+            errors.append(f"{workflow}: job `{name}` uses `actions/cache`, which saves in every run; it restores with `actions/cache/restore` and saves with `actions/cache/save`")
+        if len(restores) != 1 or _step_condition(restores[0]) is not None or _step_id(restores[0]) != "cache":
+            errors.append(f"{workflow}: job `{name}` must restore its cache in every run: one `actions/cache/restore` step, `id: cache`, with no `if:`")
+        if len(saves) != 1:
+            errors.append(f"{workflow}: job `{name}` must have exactly one `actions/cache/save` step (found {len(saves)})")
+            continue
+        save = saves[0]
+        strips = [s for s in steps if "ci-strip-workspace-build.sh" in s and CACHE_SAVE not in s]
+        uploads = [i for i, s in enumerate(steps) if re.search(r"^\s+(?:- )?uses:\s*actions/upload-artifact@", s, re.MULTILINE)]
+        if len(strips) != 1 or _step_id(strips[0]) != "strip":
+            errors.append(f"{workflow}: job `{name}` must clean the build with one step `id: strip` (scripts/ci-strip-workspace-build.sh) before it saves")
+            continue
+        at = steps.index(save)
+        strip_at = steps.index(strips[0])
+        if not strip_at < at:
+            errors.append(f"{workflow}: job `{name}` saves the cache before it has cleaned the build")
+        if not uploads or not min(strip_at, at) > max(uploads):
+            errors.append(f"{workflow}: job `{name}` must clean and save after the last artifact upload (cache hygiene must not stop a release)")
+        for step, what in ((strips[0], "clean"), (save, "save")):
+            if not re.search(r"^\s+continue-on-error:\s*true\s*$", step, re.MULTILINE):
+                errors.append(f"{workflow}: the {what} step of `{name}` must have `continue-on-error: true`")
+        condition = _step_condition(save)
+        if condition is None:
+            errors.append(f"{workflow}: the save step of `{name}` has no `if:`; it would save in every run")
+            continue
+        for label, head, event, hit, outcome, want in SAVE_SCENARIOS:
+            context = {
+                "github.head_ref": head,
+                "github.event_name": event,
+                "steps.cache.outputs.cache-hit": hit,
+                "steps.strip.outcome": outcome,
+            }
+            try:
+                got = _truthy(_Cond(condition, context).parse())
+            except ValueError as error:
+                errors.append(f"{workflow}: the save step of `{name}`: the condition `{condition}` cannot be read ({error})")
+                break
+            if got != want:
+                errors.append(f"{workflow}: the save step of `{name}` must {'save' if want else 'not save'} for {label}")
+    return errors
+
+
+TESTED_JOB = "tested"
+RECORD_JOB = "record"
+SEEDED_JOBS = ("offline", "clippy", "atip", "bench-shape", "live-tier")
+SKIPPED_WHEN_SEEDING = ("launcher", "platformer")
+SEED_SCENARIOS = (
+    # (label, event, ref, `tested` output, seeding)
+    ("a push to main of a tested tree", "push", "refs/heads/main", "true", True),
+    ("a push to main, not tested", "push", "refs/heads/main", "false", False),
+    ("a push to main, an empty answer", "push", "refs/heads/main", "", False),
+    ("a push to main, no answer (the job failed)", "push", "refs/heads/main", None, False),
+    ("a pull request that reads `true`", "pull_request", "refs/pull/1/merge", "true", False),
+    ("a manual run that reads `true`", "workflow_dispatch", "refs/heads/main", "true", False),
+    ("a push to another branch that reads `true`", "push", "refs/heads/other", "true", False),
+)
+
+
+def tested_errors(text: str, workflow: str) -> list[str]:
+    """test.yml: `tested` reads the artifacts API (`actions: read`) and nothing else; every other job waits for it, and runs when it failed or said nothing;
+    a run is a seeding run (the five cache jobs build no more than the cache holds; `launcher` and `platformer` do not run) only for a push to main of a tree
+    `tested` says `true` of; `record` waits for the seven jobs, runs for a pull request and is the one job that uploads `tested-<tree>`."""
+    errors: list[str] = []
+    tested = _job_block(text, TESTED_JOB)
+    if not tested:
+        return [f"{workflow}: no `{TESTED_JOB}` job"]
+    permissions = _permissions(tested)
+    if permissions.get("actions") != "read":
+        errors.append(f"{workflow}: the `{TESTED_JOB}` job needs `actions: read` (it reads another run's artifacts)")
+    for scope, access in permissions.items():
+        if access != "read":
+            errors.append(f"{workflow}: the `{TESTED_JOB}` job must only read: `{scope}: {access}`")
+    if not re.search(r"^      tested:[ \t]*\$\{\{\s*steps\.\w+\.outputs\.tested\s*\}\}", tested, re.MULTILINE):
+        errors.append(f"{workflow}: the `{TESTED_JOB}` job must output `tested`")
+    for name in SEEDED_JOBS + SKIPPED_WHEN_SEEDING:
+        job = _job_block(text, name)
+        if TESTED_JOB not in _needs(job):
+            errors.append(f"{workflow}: job `{name}` must wait for `{TESTED_JOB}` (needs: {sorted(_needs(job))})")
+        condition = _field(job, "if")
+        for label, event, ref, answer, seeding in SEED_SCENARIOS:
+            context = {"github.event_name": event, "github.ref": ref, "needs.tested.outputs.tested": answer}
+            try:
+                if name in SKIPPED_WHEN_SEEDING:
+                    if condition is None:
+                        errors.append(f"{workflow}: job `{name}` has no `if:` that skips it in a seeding run")
+                        break
+                    got = _truthy(_Cond(_unwrap(condition), {**context}).parse())
+                    if got == seeding:
+                        errors.append(f"{workflow}: job `{name}` must {'be skipped' if seeding else 'run'} for {label}")
+                else:
+                    if condition is None or not _truthy(_Cond(_unwrap(condition), {**context}).parse()):
+                        errors.append(f"{workflow}: job `{name}` must run (its steps skip themselves in a seeding run, `if:` is `!cancelled()`) for {label}")
+                    seed = re.search(r"^      SEED:[ \t]*(.*?)[ \t]*$", job, re.MULTILINE)
+                    if not seed:
+                        errors.append(f"{workflow}: job `{name}` has no `env: SEED`")
+                        break
+                    got = _truthy(_Cond(_unwrap(seed.group(1)), {**context}).parse())
+                    if got != seeding:
+                        errors.append(f"{workflow}: job `{name}`: SEED must be {'true' if seeding else 'false'} for {label}")
+            except ValueError as error:
+                errors.append(f"{workflow}: job `{name}`: a condition cannot be read ({error})")
+                break
+    record = _job_block(text, RECORD_JOB)
+    if not record:
+        errors.append(f"{workflow}: no `{RECORD_JOB}` job")
+    else:
+        missing = set(SEEDED_JOBS + SKIPPED_WHEN_SEEDING) - _needs(record)
+        if missing:
+            errors.append(f"{workflow}: the `{RECORD_JOB}` job must wait for {sorted(missing)}")
+        condition = _field(record, "if")
+        try:
+            runs = lambda event: condition is not None and _truthy(_Cond(_unwrap(condition), {"github.event_name": event}).parse())
+            ok = runs("pull_request") and not runs("push") and not runs("workflow_dispatch")
+        except ValueError:
+            ok = False
+        if not ok:
+            errors.append(f"{workflow}: the `{RECORD_JOB}` job must run for a pull request and for nothing else")
+        uploads = _uses_steps(record, "upload-artifact")
+        if not any((_with_value(step, "name") or "").startswith("tested-") and _with_value(step, "overwrite") == "true" for step in uploads):
+            errors.append(f"{workflow}: the `{RECORD_JOB}` job must upload `tested-<tree>` with `overwrite: true`")
+    for name in _job_names(text):
+        if name != RECORD_JOB and any((_with_value(step, "name") or "").startswith("tested-") for step in _uses_steps(_job_block(text, name), "upload-artifact")):
+            errors.append(f"{workflow}: job `{name}` uploads a `tested-` artifact; only `{RECORD_JOB}` does")
     return errors
 
 
@@ -1982,6 +2218,17 @@ def main(argv: list[str] | None = None) -> int:
     ERRORS.extend(fetch_build_errors(publish_text, "publish.yml"))
     ERRORS.extend(artifact_contract_errors(build_text, publish_text))
     ERRORS.extend(manifest_job_errors(build_text, "build-native.yml"))
+    # 13. 0.44 CI optimization: build-native.yml builds by `mode` and saves its caches in a release or a manual run only; test.yml does not test a tree a green
+    #     pull request tested.
+    build_scope = importlib.util.spec_from_file_location("build_scope", ROOT / "scripts/build-scope.py")
+    if build_scope is None or build_scope.loader is None:
+        fail("cannot load scripts/build-scope.py")
+    build_scope_module = importlib.util.module_from_spec(build_scope)
+    build_scope.loader.exec_module(build_scope_module)
+    ERRORS.extend(mode_job_errors(build_text, "build-native.yml"))
+    ERRORS.extend(matrix_mode_errors(build_text, "build-native.yml", build_scope_module.exclude_for))
+    ERRORS.extend(cache_save_errors(build_text, "build-native.yml"))
+    ERRORS.extend(tested_errors(other_texts["test.yml"], "test.yml"))
     ERRORS.extend(retention_errors(build_text, "build-native.yml", BUILD_RETENTION))
     ERRORS.extend(retention_errors(publish_text, "publish.yml", PUBLISH_RETENTION))
 

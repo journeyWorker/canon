@@ -1361,7 +1361,189 @@ class ManifestJobTests(unittest.TestCase):
     def test_the_job_follows_the_scope_rule(self) -> None:
         build = workflow("build-native.yml")
         self.assertTrue(CHECKER.scope_errors(mutate(build, "    needs: [scope, build, man]\n", "    needs: [build, man]\n"), "build-native.yml"))
-        self.assertTrue(CHECKER.scope_errors(mutate(build, "    needs: [scope, build, man]\n    if: needs.scope.outputs.skip != 'true'\n", "    needs: [scope, build, man]\n"), "build-native.yml"))
+        self.assertTrue(CHECKER.scope_errors(with_job_field(build, "manifest", "if", None), "build-native.yml"))
+
+
+def with_job_field(text: str, job: str, key: str, value: str | None) -> str:
+    """`text` with the one-line key of a job (4-space indent) set to `value`, or removed when `value` is None."""
+    block = CHECKER._job_block(text, job)
+    replacement = "" if value is None else f"    {key}: {value}"
+    changed = re.sub(rf"^    {re.escape(key)}:.*(?:\n|$)", replacement + ("\n" if replacement else ""), block, count=1, flags=re.MULTILINE)
+    if changed == block:
+        raise AssertionError(f"job {job} has no `{key}` to change")
+    return text.replace(block, changed, 1)
+
+
+def swap_steps(text: str, job: str, first: str, second: str) -> str:
+    """`text` with the two steps of a job that contain `first` and `second` in each other's place."""
+    block = CHECKER._job_block(text, job)
+    steps = CHECKER._steps(block)
+    a = next(i for i, step in enumerate(steps) if first in step)
+    b = next(i for i, step in enumerate(steps) if second in step)
+    steps[a], steps[b] = steps[b], steps[a]
+    return text.replace(block, "\n".join(steps), 1)
+
+
+BUILD_SCOPE_SPEC = importlib.util.spec_from_file_location("build_scope", ROOT / "build-scope.py")
+assert BUILD_SCOPE_SPEC and BUILD_SCOPE_SPEC.loader
+BUILD_SCOPE = importlib.util.module_from_spec(BUILD_SCOPE_SPEC)
+BUILD_SCOPE_SPEC.loader.exec_module(BUILD_SCOPE)
+
+
+class ModeJobTests(unittest.TestCase):
+    """`man` and `manifest` run only in a release (or an unnamed mode); `dashboard` and `build` run in every mode."""
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.mode_job_errors(text if text is not None else workflow("build-native.yml"), "build-native.yml")
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_accepts_a_condition_that_reads_the_same(self) -> None:
+        condition = "needs.scope.outputs.skip != 'true' && !(needs.scope.outputs.mode == 'quick' || needs.scope.outputs.mode == 'native')"
+        self.assertEqual(self.check(with_job_field(workflow("build-native.yml"), "man", "if", condition)), [])
+
+    def test_rejects_man_or_manifest_without_the_mode_condition(self) -> None:
+        for job in ("man", "manifest"):
+            self.assertTrue(self.check(with_job_field(workflow("build-native.yml"), job, "if", "needs.scope.outputs.skip != 'true'")), job)
+
+    def test_rejects_manifest_or_man_that_runs_in_quick_or_native_only_in_part(self) -> None:
+        for job in ("man", "manifest"):
+            for condition in (
+                "needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode != 'quick'",
+                "needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode != 'native'",
+            ):
+                self.assertTrue(self.check(with_job_field(workflow("build-native.yml"), job, "if", condition)), (job, condition))
+
+    def test_rejects_a_release_condition_that_skips_an_unknown_mode(self) -> None:
+        for job in ("man", "manifest"):
+            self.assertTrue(self.check(with_job_field(workflow("build-native.yml"), job, "if", "needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode == 'release'")), job)
+
+    def test_rejects_a_mode_condition_on_the_dashboard_or_the_build(self) -> None:
+        for job in ("dashboard", "build"):
+            self.assertTrue(self.check(with_job_field(workflow("build-native.yml"), job, "if", "needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode != 'quick'")), job)
+
+
+class MatrixModeTests(unittest.TestCase):
+    """The rows `build` runs by mode: one for `quick`, four for the others."""
+
+    NAME = "build-native.yml"
+
+    def check(self, text: str | None = None, exclude_for=BUILD_SCOPE.exclude_for) -> list[str]:
+        return CHECKER.matrix_mode_errors(text if text is not None else workflow(self.NAME), self.NAME, exclude_for)
+
+    def test_accepts_the_shipped_workflow_and_script(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_quick_run_that_builds_four_rows(self) -> None:
+        self.assertTrue(self.check(exclude_for=lambda mode: []))
+
+    def test_rejects_a_release_or_native_or_unnamed_mode_that_leaves_a_row_out(self) -> None:
+        for left_out in ("release", "native", "no-such-mode", ""):
+            self.assertTrue(self.check(exclude_for=lambda mode, left_out=left_out: BUILD_SCOPE.QUICK_EXCLUDE if mode in ("quick", left_out) else []), left_out)
+
+    def test_rejects_a_matrix_that_does_not_read_the_exclude_the_scope_writes(self) -> None:
+        text = re.sub(r"^        exclude:.*\n", "", workflow(self.NAME), flags=re.MULTILINE)
+        self.assertTrue(self.check(text))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "fromJSON(needs.scope.outputs.exclude", "fromJSON(needs.scope.outputs.other")))
+
+    def test_rejects_a_row_the_quick_run_would_also_build(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), '            quick: "false"\n', "", 1)))
+
+
+class CacheSaveTests(unittest.TestCase):
+    """`build` and `man` restore in every run and save in a `release/` pull request run or a manual run, after cleaning."""
+
+    NAME = "build-native.yml"
+    RELEASE_OR_MANUAL = "(startsWith(github.head_ref, 'release/') || github.event_name == 'workflow_dispatch')"
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.cache_save_errors(text if text is not None else workflow(self.NAME), self.NAME)
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_save_that_runs_in_every_pull_request(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), self.RELEASE_OR_MANUAL, "true")))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        if: ${{ steps.cache.outputs.cache-hit != 'true' && steps.strip.outcome == 'success' && " + self.RELEASE_OR_MANUAL + " }}\n", "")))
+
+    def test_rejects_a_save_that_leaves_out_the_manual_run(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), self.RELEASE_OR_MANUAL, "startsWith(github.head_ref, 'release/')")))
+
+    def test_rejects_a_save_that_leaves_out_the_release_pull_request(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), self.RELEASE_OR_MANUAL, "github.event_name == 'workflow_dispatch'")))
+
+    def test_rejects_a_save_that_does_not_need_the_clean_step_to_succeed(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "steps.strip.outcome == 'success' && ", "")))
+
+    def test_rejects_a_save_that_saves_over_an_exact_restore(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "steps.cache.outputs.cache-hit != 'true' && steps.strip.outcome", "steps.strip.outcome")))
+
+    def test_rejects_a_save_before_the_clean_step(self) -> None:
+        for job in ("build", "man"):
+            self.assertTrue(self.check(swap_steps(workflow(self.NAME), job, "actions/cache/save@", "ci-strip-workspace-build.sh")), job)
+
+    def test_rejects_a_clean_or_save_that_can_fail_the_job(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        continue-on-error: true\n", "", 1)))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        continue-on-error: true\n", "")))
+
+    def test_rejects_a_clean_step_the_save_cannot_read(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        id: strip\n", "        id: clean\n")))
+
+    def test_rejects_a_restore_that_does_not_run_in_every_run(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        id: cache\n", "        id: cache\n        if: github.event_name != 'pull_request'\n")))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "actions/cache/restore@", "actions/cache@")))
+
+
+class TestedTests(unittest.TestCase):
+    """test.yml: `tested` reads the artifacts, a seeding run is a push to main of a tree it says `true` of, `record` is the one uploader."""
+
+    NAME = "test.yml"
+    SEED = "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true' }}"
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.tested_errors(text if text is not None else workflow(self.NAME), self.NAME)
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_tested_job_that_cannot_read_the_artifacts_or_can_write(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "      actions: read\n", "")))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "      actions: read\n", "      actions: write\n")))
+
+    def test_rejects_a_job_that_does_not_wait_for_tested(self) -> None:
+        for job in ("offline", "launcher", "live-tier"):
+            self.assertTrue(self.check(with_job_field(workflow(self.NAME), job, "needs", "[]")), job)
+
+    def test_rejects_a_job_that_runs_in_a_seeding_run_though_it_must_not(self) -> None:
+        for job in ("launcher", "platformer"):
+            self.assertTrue(self.check(with_job_field(workflow(self.NAME), job, "if", "${{ !cancelled() }}")), job)
+
+    def test_rejects_a_job_that_does_not_run_when_the_answer_is_not_true(self) -> None:
+        for job in ("launcher", "platformer"):
+            self.assertTrue(self.check(with_job_field(workflow(self.NAME), job, "if", "${{ !cancelled() && needs.tested.outputs.tested == 'false' }}")), job)
+        self.assertTrue(self.check(with_job_field(workflow(self.NAME), "offline", "if", "${{ needs.tested.result == 'success' }}")))
+
+    def test_rejects_a_seeding_run_that_is_not_a_push_to_main_of_a_tested_tree(self) -> None:
+        build = workflow(self.NAME)
+        for seed in (
+            "${{ needs.tested.outputs.tested == 'true' }}",
+            "${{ github.event_name == 'push' && needs.tested.outputs.tested == 'true' }}",
+            "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested != 'false' }}",
+            "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}",
+        ):
+            self.assertTrue(self.check(mutate(build, "      SEED: " + self.SEED + "\n", "      SEED: " + seed + "\n", 1)), seed)
+
+    def test_rejects_a_record_that_does_not_wait_for_every_job_or_runs_for_more_than_a_pull_request(self) -> None:
+        self.assertTrue(self.check(with_job_field(workflow(self.NAME), "record", "needs", "[offline, clippy]")))
+        for condition in ("${{ github.event_name != 'workflow_dispatch' }}", "${{ always() }}", "true"):
+            self.assertTrue(self.check(with_job_field(workflow(self.NAME), "record", "if", condition)), condition)
+
+    def test_rejects_a_record_that_does_not_replace_the_marker_and_another_job_that_uploads_one(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "          overwrite: true\n", "")))
+        step = "      - name: Install workspace dependencies from the frozen lockfile\n"
+        text = mutate(workflow(self.NAME), step, "      - uses: actions/upload-artifact@x\n        with:\n          name: tested-x\n" + step, 1)
+        self.assertTrue(self.check(text))
 
 
 if __name__ == "__main__":

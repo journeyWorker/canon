@@ -4,9 +4,10 @@ name: PR Guard
 # 0.30's release PR touched so many files that the path-filtered workflows may
 # not have run, and the release then failed twice after the tag: the release
 # workflow safety check and the man-page generator build. Both are cheap here,
-# so a filter can never hide them. The release-mode man-page build stays in
-# build-native.yml behind its path filter; the debug `cargo check` below is
-# what catches a broken generator when that filter does not match.
+# so a filter can never hide them. The release-profile man-page build runs
+# in build-native.yml in a release run only (`release/*` and manual runs); the
+# debug `cargo check` below is what catches a broken generator in every other
+# pull request.
 
 on:
   pull_request:
