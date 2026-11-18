@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:35:07.811204886Z",
+  "attachments": [
+    {
+      "case": "context_capability_30_a_failure_is_an_error_object_with_code_message_hint_and_retryable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    }
+  ],
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3984 passed, 1 skipped) from the clean tree at 21c235635, --rev 21c235635, Rust 1.100.0"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1923,
+  "scenario_id": "context.capability.30",
+  "schema": 1,
+  "staging_id": "1818ffd7",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

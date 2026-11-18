@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:43:42.840273723Z",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib a_second_add_at_an_occupied_natural_key_is_refused_naming_the_key"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --lib a_second_add_at_an_occupied_natural_key_is_refused_naming_the_key: passes in the workspace nextest run at 21c235635 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 753,
+  "scenario_id": "finding.add.02",
+  "schema": 1,
+  "staging_id": "e583d9dc",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

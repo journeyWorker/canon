@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:47:08.161091042Z",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib artifact_ingest::tests::a_regime_groups_every_verdict_and_keeps_the_newest_timestamp"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --lib artifact_ingest::tests::a_regime_groups_every_verdict_and_keeps_the_newest_timestamp: passes in the workspace nextest run at 21c235635 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 97,
+  "scenario_id": "ingest.artifacts.03",
+  "schema": 1,
+  "staging_id": "cd863404",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

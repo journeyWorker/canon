@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:43:22.136758343Z",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_audit the_drop_flags_are_refused_as_unknown && cargo test -p canon-cli --test evidence_batch evidence_add_91_the_drop_flags_are_gone"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --test evidence_audit the_drop_flags_are_refused_as_unknown && cargo test -p canon-cli --test evidence_batch evidence_add_91_the_drop_flags_are_gone: passes in the workspace nextest run at 21c235635 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2494,
+  "scenario_id": "evidence.add.43",
+  "schema": 1,
+  "staging_id": "be12682e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:42:17.258680039Z",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-model --lib a_resolved_winner_whose_live_app_sha_matches_stays_resolved"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-model --lib a_resolved_winner_whose_live_app_sha_matches_stays_resolved: passes in the workspace nextest run at 21c235635 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 280,
+  "scenario_id": "divergence.lifecycle.09",
+  "schema": 1,
+  "staging_id": "3226b7d3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

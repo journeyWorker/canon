@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:41:58.049050287Z",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib dispatch::begin_tests::a_repo_with_no_plan_sources_reports_distinctly_from_an_unknown_task"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --lib dispatch::begin_tests::a_repo_with_no_plan_sources_reports_distinctly_from_an_unknown_task: passes in the workspace nextest run at 21c235635 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1164,
+  "scenario_id": "dispatch.manifest.07",
+  "schema": 1,
+  "staging_id": "eead92c3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

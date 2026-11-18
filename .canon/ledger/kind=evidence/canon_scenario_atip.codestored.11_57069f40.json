@@ -1,0 +1,69 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:35:07.811204886Z",
+  "attachments": [
+    {
+      "case": "adapter::tests::atip_codestored_11_a_response_file_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "artifacts::tests::atip_codestored_11_a_canon_yaml_the_artifact_store_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "dispatch::tests::atip_codestored_11_a_manifest_or_plan_document_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "evidence_attach::tests::atip_codestored_11_a_binding_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "read_cause::tests::atip_codestored_11_a_read_the_system_fails_for_a_repeat_to_pass_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "review::tests::atip_codestored_11_a_review_artifact_the_system_fails_to_read_is_unavailable",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    }
+  ],
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3984 passed, 1 skipped) from the clean tree at 21c235635, --rev 21c235635, Rust 1.100.0"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 365,
+  "scenario_id": "atip.codestored.11",
+  "schema": 1,
+  "staging_id": "c22582b7",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
