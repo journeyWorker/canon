@@ -6,7 +6,7 @@
 # Bumping `channel` is ONE pull request. That pull request changes three things
 # together: `channel` here, `rust-version` in the root `Cargo.toml`'s
 # `[workspace.package]`, and the `alpine_image:` line of the aarch64 musl row in
-# `build-native.yml` and `publish.yml` (an image with the same rustc, pinned by
+# `build-native.yml` (an image with the same rustc, pinned by
 # digest). It also re-checks the lint list of the `clippy` job (the `-D` flags in
 # `.github/workflows/test.yml` and `clippy.toml`): a new toolchain adds lints
 # and would turn a clean tree red with no code change.

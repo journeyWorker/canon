@@ -11,10 +11,10 @@ run-name: "release ${{ github.ref_name }}${{ github.event_name == 'workflow_disp
 # binaries are `@journeykit/canon-core-<platform>`.
 #
 # Runners are pinned images, never `-latest` (their labels written down):
-# `macos-15`, `ubuntu-26.04`, `ubuntu-26.04-arm`, `windows-2025`. macOS arm64
-# moved from `macos-26` to `macos-15` in 0.43 after `macos-26` was never
-# assigned a runner in the 0.43 dry runs (owner decision, release-hardening brief).
-# scripts/check-release-workflow-safety.py fails a job on any other label.
+# `ubuntu-26.04` and `ubuntu-26.04-arm`. This workflow builds nothing: the
+# macOS and Windows binaries come from the build-native run it fetches, which
+# keeps its own runner labels. scripts/check-release-workflow-safety.py fails a
+# job on any other label.
 #
 # Version source of truth: the root Cargo.toml's [workspace.package]
 # version (design D3) — this workflow reads it, never bumps it. A release

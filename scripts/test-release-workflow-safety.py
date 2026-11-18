@@ -1270,10 +1270,8 @@ class FetchBuildTests(unittest.TestCase):
 
     def test_rejects_an_upload_before_the_verification(self) -> None:
         publish = workflow("publish.yml")
-        upload = "      - name: Upload man pages\n"
         verify = "      - name: Verify the download against the attested manifest\n"
         self.assertTrue(self.check(mutate(publish, verify, "      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n        with:\n          name: man-pages\n          path: build/man-pages\n          retention-days: 7\n" + verify, 1)))
-        self.assertIn(upload, publish)
 
 
 class ArtifactContractTests(unittest.TestCase):
