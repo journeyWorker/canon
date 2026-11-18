@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-44",
+    "role": "reviewer",
+    "session_id": "01a1ef97-34bf-7767-be06-5477e9fd330a"
+  },
+  "at": "2026-11-18T17:26:00.072161066Z",
+  "change_id": "canon-0-44-release-build-once",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "disposition": "fixed",
+  "file_ref": "rust-toolchain.toml:6-10; .github/workflows/publish.yml:12-17",
+  "introduced_by": "c55d95011fee74af31cf5a503ff0929b614cf96a",
+  "kind": "finding",
+  "resolution_code_tree": "fd1bacef76ae2a0c9d457363cd47ecb3d3503bda",
+  "resolution_sha": "94f413f56b45dd4744b8cfc90e7cf73db9690b80",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "26b3fae5e2102b0a936fdf9127cc159f9d68472d",
+  "reviewer": "rev-0-44",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "P3, stale docs made wrong by this patch. rust-toolchain.toml still tells a toolchain bump to change the alpine_image line in build-native.yml and publish.yml, but publish.yml no longer has a build matrix or an alpine_image. The publish.yml header still lists macos-15 and windows-2025 as its pinned runners, but it now runs on ubuntu-26.04 only. Fix: drop `and publish.yml` from rust-toolchain.toml line 9, and rewrite the runner paragraph of publish.yml to name only its ubuntu labels. Blast radius: comments only.",
+  "worktree_dirty": false
+}

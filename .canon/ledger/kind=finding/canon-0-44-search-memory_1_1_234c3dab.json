@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-44",
+    "role": "reviewer",
+    "session_id": "01a1ef97-34bf-7767-be06-5477e9fd330a"
+  },
+  "at": "2026-11-18T17:25:59.614591138Z",
+  "change_id": "canon-0-44-search-memory",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=subject/lifecycle.feature:315; crates/canon-cli/tests/subject.rs:1582",
+  "introduced_by": "26b3fae5e2102b0a936fdf9127cc159f9d68472d",
+  "kind": "finding",
+  "resolution_code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "resolution_sha": "d9002e26af2f671576d0424422bfee692283f873",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "26b3fae5e2102b0a936fdf9127cc159f9d68472d",
+  "reviewer": "rev-0-44",
+  "round": 1,
+  "scenario_ids": [
+    "subject.lifecycle.31"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "P1, spec fidelity. The 0.44 re-bound evidence for subject.lifecycle.31 (impl-0-44, evidence_sha 21c235635) names only the case subject_lifecycle_31_a_reopen_needs_a_reason. That case proves the reason-required refusal and that the subject stays shipped. The third Then step (a reason on any other move is recorded with the actor, and the next move without one clears it) is proven only by subject_lifecycle_31b_any_transition_accepts_a_reason_and_records_it. The 0.43 evidence at 7068ea73b bound 31b, and the 0.44 re-bind dropped it. That is why the review is stale (the evidence names different checks). Both tests pass at 26b3fae5e (run on the box). Fix: record the evidence again for this scenario alone, with --report-case for both cases, then ask for a re-review. Blast radius: scenarios re-bound by --report-case naming (287) may have dropped a secondary case in the same way; only this one went stale, because its earlier evidence named two cases.",
+  "worktree_dirty": false
+}

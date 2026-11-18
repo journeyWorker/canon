@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "rev-0-44",
+    "role": "reviewer",
+    "session_id": "01a1ef97-34bf-7767-be06-5477e9fd330a"
+  },
+  "at": "2026-11-18T17:26:11.331721858Z",
+  "code_tree": "fd1bacef76ae2a0c9d457363cd47ecb3d3503bda",
+  "kind": "review",
+  "pin": "94f413f56b45dd4744b8cfc90e7cf73db9690b80",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:subject_lifecycle_31_a_reopen_needs_a_reason",
+          "junit:subject_lifecycle_31b_any_transition_accepts_a_reason_and_records_it"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "dc9a4c3368733757985f447d5fd990a01b24d9244f53230da50963c1ffa73e59",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/specs/kind=feature/area=subject/lifecycle.feature"
+  },
+  "review_id": "01M7QV3N43CS0NVGM22HMD0DF0",
+  "reviewer": "rev-0-44",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-opus-5-5",
+  "reviewer_provider": "anthropic",
+  "scenario_id": "subject.lifecycle.31",
+  "schema": 2,
+  "worktree_dirty": false
+}
