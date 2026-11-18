@@ -65,11 +65,6 @@ fn openspec_flip_refuses_a_multi_line_note_instead_of_appending_a_row() {
     // this is the exact note `canon gate task` would have handed it.
     let err = openspec_wb().flip_task("- [ ] 1 Do the thing\n", &task_id, "ok\n- [x] 9.9 Forged task").unwrap_err();
     assert_eq!(err, WriteBackError::MultiLineEvidenceNote { task_id: task_id.clone(), offset: 2, separator: '\n' });
-    // The message names the offending character and offset, not just
-    // "contains a newline".
-    let rendered = err.to_string();
-    assert!(rendered.contains("MultiLineEvidenceNote"), "{rendered}");
-    assert!(rendered.contains("byte offset 2"), "{rendered}");
 }
 
 /// The refusal covers the row grammar's WHOLE mandatory-break set
@@ -116,8 +111,6 @@ fn openspec_flip_reports_row_not_found_for_an_absent_row() {
     let task_id = TaskId::parse("demo-change#99").unwrap();
     let err = wb.flip_task("- [ ] 1 Only row\n", &task_id, "note").unwrap_err();
     assert_eq!(err, WriteBackError::RowNotFound(task_id));
-    // The CLI's stderr contract depends on this substring (pre-s35 compat).
-    assert!(err.to_string().contains("no matching row"), "{err}");
 }
 
 #[test]

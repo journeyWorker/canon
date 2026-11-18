@@ -1,0 +1,104 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:00:27.979777177Z",
+  "attachments": [
+    {
+      "case": "atip_constraints_07_every_validator_refuses_every_call_it_rejects",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_every_time_option_declares_the_calendar_validator_and_refuses_an_impossible_date",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_brief_approve_one_change_with_two_digests_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_brief_approve_a_relayed_approval_without_its_digest_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_evidence_add_class_audit_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_evidence_add_an_artifact_scope_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_finding_add_a_defect_without_its_origin_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_export_an_empty_window_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_evidence_audit_an_artifact_scope_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_query_a_status_foreign_to_the_kind_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "atip_constraints_07_policy_approve_a_blank_note_under_relay_is_refused_before_any_state_is_read",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    }
+  ],
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3980 passed, 1 skipped) from the clean tree at b5a805bd4, --rev b5a805bd4, Rust 1.100.0"
+  },
+  "evidence_sha": "b5a805bd41234740f676c6706fcbed82255524cb",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1008,
+  "scenario_id": "atip.constraints.07",
+  "schema": 1,
+  "staging_id": "30418317",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

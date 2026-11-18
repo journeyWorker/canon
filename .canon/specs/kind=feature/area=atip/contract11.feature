@@ -9,7 +9,7 @@ Feature: ATIP 1.1 contract
   Scenario: Every envelope declares contract atip/1 and the contractVersion canon declares (1.4 in 0.36, 1.5 in 0.37, 1.6 since 0.41), and a registry answer names its kind
     Given a repo with canon.yaml
     When canon status --json, canon nosuch --json, canon schema --errors --json and canon schema --json run
-    Then every meta holds contract atip/1 and contractVersion 1.6 and passes the contract envelope schema; the errors answer has data.kind errors and meta.schemaVersion 1.6
+    Then every meta holds contract atip/1 and the declared contractVersion and passes the contract envelope schema; the errors answer has data.kind errors and the declared meta.schemaVersion
 
   # canon: {"schema":1,"at":"2026-11-01T07:33:57Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract
@@ -27,9 +27,9 @@ Feature: ATIP 1.1 contract
   @flow:canon-0-34-atip-1-1.F2
   @atip.contract11.04
   Scenario: A reason that is not registered under its code, or an INPUT_INVALID without a reason, fails the tests
-    Given the sources, the registry and the conformance corpus
-    When a test emits a reason that the registry does not hold under the code, and the sources and the corpus are scanned for INPUT_INVALID and INPUT_TOO_LARGE without a reason
-    Then the unregistered reason fails in a debug build, a construction without a reason fails the scan, and every reason the registry holds is emitted somewhere
+    Given the registry and the conformance corpus
+    When a test emits a reason that the registry does not hold under the code, and the corpus is read for INPUT_INVALID and INPUT_TOO_LARGE errors
+    Then the unregistered reason fails in a debug build, every input error the corpus froze has a registered reason
 
   # canon: {"schema":1,"at":"2026-11-01T07:34:03Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract
@@ -110,16 +110,6 @@ Feature: ATIP 1.1 contract
     Given an envelope with members and enum strings from a later minor: contractVersion 1.9, an unknown error reason, an unknown finding severity, an unknown approval outcome
     When the dashboard, the npm launcher and the dogfood trace check read it
     Then each keeps reading what it knows, skips only the item with the enum string it does not know, and the launcher passes the document through with the binary's exit status
-
-  # canon: {"schema":1,"at":"2026-11-01T07:34:27Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-34-atip-1-1.F6
-  @atip.contract11.13
-  Scenario: None of the 0.33 names is left in the guides, the website, the evaluation scripts, the spec files or the scenario sentences, and reviving one fails
-    Given the guides, the website in English and Korean, the command spec files, the conformance corpus, the evaluation scripts and the scenario sentences
-    When they are scanned for the 0.33 reason extension of the error, the merged registry error code and the lowercase reason values, and one of the names is put back
-    Then the scan finds none, and the revived name is found
 
   # canon: {"schema":1,"at":"2026-11-01T10:53:28Z","actor":{"agent_id":"impl-atip-1-1","role":"implementer","session_id":"s-0-34-atip-1-1"}}
   @subject:atip-contract

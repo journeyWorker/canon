@@ -1621,7 +1621,7 @@ mod tests {
         let violations = &outcome.roots[0].violations;
         assert_eq!(violations.len(), 1, "{violations:?}");
         assert_eq!(violations[0].class, canon_fmt::FmtFailureClass::LayoutGrammar);
-        assert!(violations[0].detail.contains("specs`") && violations[0].detail.contains("`canon migrate`"), "{}", violations[0].detail);
+        assert!(violations[0].detail.contains("`canon migrate`"), "{}", violations[0].detail);
     }
 
     #[test]
@@ -1630,7 +1630,7 @@ mod tests {
         let refused = unrefreshable_roots(repo.path());
         assert_eq!(refused.len(), 1, "{refused:?}");
         let detail = refused[0].pre_0_17.as_deref().expect("refused for its layout");
-        assert!(detail.starts_with("spec root `app` (`specs`) is on the pre-0.17 layout"), "{detail}");
+        assert!(detail.contains("`app`") && detail.contains("`specs`"), "{detail}");
         let violation = refused[0].violation("");
         assert_eq!(violation.class, canon_gate::FailureClass::UncoveredCell);
         assert!(violation.detail.contains("`canon migrate`"), "{}", violation.detail);

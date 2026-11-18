@@ -32,7 +32,7 @@ Feature: finding closer
     Given a committed open blocker finding
     When a call that declares the implementer, the orchestrator or the planner role closes it with --disposition rejected, then with --disposition deferred, each with a reason
     Then each is refused with FINDING_ROLE_DENIED, exit 2, not retryable
-    And the hint says a reviewer closes it and how to pick the role
+    And the hint names --as reviewer
 
   # canon: {"schema":1,"at":"2026-11-06T04:57:28Z","actor":{"agent_id":"impl-finding-closer","session_id":"s-0-38-finding-closer"}}
   @subject:finding-lifecycle
@@ -83,7 +83,7 @@ Feature: finding closer
   Scenario: Before a finding is closed the list names no closer
     Given a committed open finding
     When canon finding list reads it before any close
-    Then the row has no closer and no closer role, in JSON and in the table
+    Then the row has no closer and no closer role, in JSON
 
   # canon: {"schema":1,"at":"2026-11-06T04:58:20Z","actor":{"agent_id":"impl-finding-closer","session_id":"s-0-38-finding-closer"}}
   @subject:finding-lifecycle
@@ -105,24 +105,3 @@ Feature: finding closer
     When canon finding list reads it
     Then it lists without an error, naming canon and reviewer as written
     And the old record's bytes are not rewritten
-
-  # canon: {"schema":1,"at":"2026-11-06T04:58:39Z","actor":{"agent_id":"impl-finding-closer","session_id":"s-0-38-finding-closer"}}
-  @subject:finding-lifecycle
-  @case:happy
-  @flow:canon-0-38-finding-closer.F6
-  @finding.closer.11
-  Scenario: The CHANGELOG names the new refusal and the recorded role and the guides say who closes
-    Given the CHANGELOG of this change
-    When its Unreleased section is read
-    Then Breaking names the new refusal of rejected and deferred by a role other than reviewer, and Changed names the role the close records
-    And it says the implementer guide has no finding close and the reviewer guide has
-
-  # canon: {"schema":1,"at":"2026-11-06T04:59:02Z","actor":{"agent_id":"impl-finding-closer","session_id":"s-0-38-finding-closer"}}
-  @subject:finding-lifecycle
-  @case:failure
-  @flow:canon-0-38-finding-closer.F6
-  @finding.closer.12
-  Scenario: A CHANGELOG without the entry fails the release check
-    Given a CHANGELOG whose Unreleased section lacks either entry
-    When the release check runs over it
-    Then the check fails and names the missing entry

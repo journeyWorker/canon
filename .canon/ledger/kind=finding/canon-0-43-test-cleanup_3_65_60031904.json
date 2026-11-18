@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-final",
+    "role": "reviewer",
+    "session_id": "Rev43_final"
+  },
+  "at": "2026-11-17T18:08:36.372191945Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=subject/lifecycle.feature:391-399",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "b3ce6e4fb3da2da7c6c8d4963f72bdec1a06743d",
+  "resolution_sha": "0efe92f9cbaa1b81653d7f8c9cf7d17a87ed17db",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "reviewer": "rev-0-43-tests-r3-rest",
+  "round": 3,
+  "scenario_ids": [
+    "subject.lifecycle.39"
+  ],
+  "schema": 2,
+  "seq": 65,
+  "severity": "note",
+  "summary": "[spec fidelity, P3] The When of subject.lifecycle.39 says the subject is 'with b's scenario attested, shipped again'. In subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside (crates/canon-cli/tests/brief_scope.rs:854-890), b's scenario shop.cart.03 is never attested before the refused ship, and the subject was never shipped: it ships from verifying. shipped_with_tagged_draft does not attest shop.cart.03 either. Fix: word the When as the test runs it ('and the verifying subject shipped'), or attest shop.cart.03 before the refused ship.",
+  "worktree_dirty": false
+}

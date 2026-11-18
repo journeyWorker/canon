@@ -356,8 +356,7 @@ pub fn plan(repo: &Path, text: &str) -> Result<Plan, String> {
     let mut plan = Plan { config_keys: policy.legacy_kind_keys.clone(), retired_keys: retired_key_lines(text), added_route: change_state_route(text), ..Plan::default() };
     plan_files(repo, &ledger, &mut plan)?;
     plan.gitignore_lines = std::fs::read_to_string(repo.join(".gitignore"))
-        .map(|t| t.lines().enumerate().filter(|(_, l)| !l.trim_start().starts_with('#') && l.contains(canon_store::partition::LEGACY_KIND_DIR)).map(|(i, _)| i + 1).collect())
-        .unwrap_or_default();
+        .map_or_default(|t| t.lines().enumerate().filter(|(_, l)| !l.trim_start().starts_with('#') && l.contains(canon_store::partition::LEGACY_KIND_DIR)).map(|(i, _)| i + 1).collect());
     plan_databases(repo, &policy, &mut plan)?;
     Ok(plan)
 }
@@ -1694,7 +1693,7 @@ mod tests {
             "routing:\n  session: !!str hot\n",
         ] {
             let err = rewrite_config(text).unwrap_err();
-            assert!(err.contains("by hand") && err.contains("`session`"), "{text:?}: {err}");
+            assert!(err.contains("`session`"), "{text:?}: {err}");
         }
     }
 

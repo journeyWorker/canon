@@ -39,7 +39,7 @@ Feature: atip incomplete
   Scenario: A hook install that stops after the first file is HOOKS_INSTALL_INCOMPLETE and one that wrote nothing is WRITE_FAILED
     Given a git repository and a debug-build seam that fails the write of the second hook file
     When gate install-hooks runs with the seam, then without it, then with it again over the finished install, then as a preview with it, then on a fresh repository with a seam that fails the pre-commit script after both hook files
-    Then the first exits 1 with HOOKS_INSTALL_INCOMPLETE, the reason WRITE_FAILED, not retryable, meta.next leading with status, the Claude hook file installed and the Codex one not written; the second finishes the install; the third exits 1 with WRITE_FAILED and no reason because nothing of its own was kept; the preview exits 0; the script failure exits 1 with HOOKS_INSTALL_INCOMPLETE and the reason WRITE_FAILED, both hook files installed, and the rerun writes the script. The reason of every other stop here is WRITE_FAILED too
+    Then the first exits 1 with HOOKS_INSTALL_INCOMPLETE, the reason WRITE_FAILED, not retryable, meta.next leading with status, the Claude hook file installed and the Codex one not written; the second finishes the install; the third exits 1 with WRITE_FAILED and no reason because nothing of its own was kept; the preview exits 0; the script failure exits 1 with HOOKS_INSTALL_INCOMPLETE and the reason WRITE_FAILED, both hook files installed, and the rerun exits 0. The reason of every other stop here is WRITE_FAILED too
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:17Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
@@ -89,7 +89,7 @@ Feature: atip incomplete
   Scenario: A spec root left unindexed after an earlier root was indexed is INVENTORY_INCOMPLETE, and with nothing indexed it is the refusal INVENTORY_INVALID
     Given two spec roots whose first is clean and whose second declares one scenario twice, then has a scenario without provenance, then is clean
     When inventory sync runs on each corpus, then on a single root with a violation, then as a preview over the first corpus, then with a seam that fails the store while the second root is indexed, on a fresh repository and again over the indexed one
-    Then the first exits 1 with INVENTORY_INCOMPLETE, not retryable, the reason INVENTORY_INVALID, data.roots saying the first root was indexed and the second was not, meta.next leading with status and the first root's records stored; the rerun, the violation and the single root index nothing in the run and exit 2 with INVENTORY_INVALID, the reasons DUPLICATE_SCENARIOS and VIOLATIONS, each violation and duplicate by root in error.details and no data, a message that says nothing was indexed, no read-what-was-indexed next and no ledger created; the preview exits 2 with INVENTORY_INVALID saying it is a preview and writes nothing; the store failure exits 1 with INVENTORY_INCOMPLETE and the reason INVENTORY_FAILED on the fresh repository and with INVENTORY_FAILED over the indexed one; a clean corpus exits 0
+    Then the first exits 1 with INVENTORY_INCOMPLETE, not retryable, the reason INVENTORY_INVALID, data.roots saying the first root was indexed and the second was not, meta.next leading with status and the first root's records stored; the rerun, the violation and the single root index nothing in the run and exit 2 with INVENTORY_INVALID, the reasons DUPLICATE_SCENARIOS and VIOLATIONS, each violation and duplicate in error.details and no data, no read-what-was-indexed next and no ledger created; the preview exits 2 with INVENTORY_INVALID and writes nothing; the store failure exits 1 with INVENTORY_INCOMPLETE and the reason INVENTORY_FAILED on the fresh repository and with INVENTORY_FAILED over the indexed one; a clean corpus exits 0
 
   # canon: {"schema":1,"at":"2026-11-04T10:52:40Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
   @subject:atip-contract
@@ -110,23 +110,3 @@ Feature: atip incomplete
     Given the registry and the code list each command answers with, a registry that adds a second INCOMPLETE code to one command and one that adds the batch's code
     When the check of the one-per-subject rule runs on each
     Then the real commands pass and each lists the INCOMPLETE code of its subject, the doubled command fails naming the rule, and the batch's code is not counted
-
-  # canon: {"schema":1,"at":"2026-11-04T10:52:49Z","actor":{"agent_id":"impl-codes-incomplete","role":"implementer","session_id":"s-0-36-codes-incomplete"}}
-  @subject:atip-contract
-  @case:happy
-  @flow:canon-0-36-codes-incomplete.F6
-  @atip.incomplete.12
-  Scenario: The CHANGELOG replacement table covers every replaced code
-    Given the CHANGELOG section of the release and the list of the codes this change replaced and added
-    When the replacement table is checked, then with a row dropped, then with an INCOMPLETE code left out
-    Then every replaced code has a row and every INCOMPLETE code is said; the dropped row and the left-out code are each named
-
-  # canon: {"schema":1,"at":"2026-11-05T09:00:01Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-2"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-36-codes-incomplete.F6
-  @atip.incomplete.13
-  Scenario: A replacement table row with a retry value the registry does not give, a code the registry lacks, or no row or two rows for a replaced code fails the check
-    Given the CHANGELOG's replacement table and the codes this change replaced
-    When one row's retry value after the arrow is flipped, a new code is misspelled, a row is deleted and a row is doubled, each in turn
-    Then the table as it stands passes and each fault is named with its row

@@ -155,9 +155,6 @@ fn a_docs_only_chore_needs_no_new_evidence_only_its_change_review() {
 
     let out = ship(r);
     assert_eq!(out.status.code(), Some(2), "the chore still needs its review: {}", text(&out.stderr));
-    let err = text(&out.stderr);
-    assert!(err.contains("no review of change `bump-client`"), "{err}");
-    assert!(!err.contains("no evidence recorded after"), "evidence on the unchanged code needs nothing new: {err}");
     let steps = status_steps(r);
     assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review change bump-client"), "{steps:?}");
     assert!(steps.iter().all(|s| !s["command"].as_str().unwrap().contains("evidence add")), "no evidence is asked for: {steps:?}");
@@ -179,7 +176,7 @@ fn a_chore_after_a_code_change_asks_for_every_scenario_with_one_runnable_batch_c
     let out = ship(r);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out.stderr));
     let err = text(&out.stderr);
-    assert!(err.contains("no evidence recorded after") && err.contains("`shop.cart.01`") && err.contains("`shop.cart.02`"), "{err}");
+    assert!(err.contains("`shop.cart.01`") && err.contains("`shop.cart.02`"), "{err}");
     let hint = err.lines().find(|l| l.starts_with("  hint: ")).unwrap_or_else(|| panic!("a refusal carries a hint: {err}"));
     assert!(hint.contains(&format!("`{BATCH}`")), "the hint leads with the generated batch command: {hint}");
     assert!(!err.contains("--scenario"), "never a per-scenario loop: {err}");
@@ -198,10 +195,10 @@ fn a_chore_after_a_code_change_asks_for_every_scenario_with_one_runnable_batch_c
     // The command runs as written.
     let words: Vec<&str> = BATCH.split(' ').skip(1).collect();
     ok(r, &words);
-    let out = ship(r);
-    let err = text(&out.stderr);
-    assert!(!err.contains("no evidence recorded after"), "the batch cleared the evidence gap: {err}");
-    assert!(err.contains("no review of change `bump-client`"), "what remains is the chore's review: {err}");
+    assert_eq!(ship(r).status.code(), Some(2));
+    let steps = status_steps(r);
+    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review change bump-client"), "what remains is the chore's review: {steps:?}");
+    assert!(steps.iter().all(|s| !s["command"].as_str().unwrap().contains("evidence add")), "the batch cleared the evidence gap: {steps:?}");
 }
 
 fn latest_verdicts(repo: &Path, scenario: &str) -> Vec<String> {

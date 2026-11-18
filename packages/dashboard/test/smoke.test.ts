@@ -149,9 +149,9 @@ test("renders all 6 panels from the fixture snapshot with zero third-party netwo
 
   // s42 (`close-the-open-loops`) re-review: every annotated panel
   // states, in prose, the exact computation its columns carry — the
-  // same statement `.canon/REPORT.md` prints. `panel-copy.test.ts` pins
-  // the wording; this asserts it actually REACHES the DOM, because a
-  // caveat that never renders annotates nothing. `renderTable` turns
+  // same statement `.canon/REPORT.md` prints. This asserts it actually
+  // REACHES the DOM, because a caveat that never renders annotates
+  // nothing. `renderTable` turns
   // backticked spans into `<code>`, so the rendered text is the note
   // with its backticks removed.
   //

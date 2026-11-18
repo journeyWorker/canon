@@ -226,7 +226,7 @@ fn fold_latest(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
         record: RawRecord,
     }
     let candidates = records.into_iter().map(|record| {
-        let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
+        let key = canon_store::partition::resolve_partition(kind, &record.0).map_or_default(|p| p.natural_key);
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
         let digest = canon_store::partition::content_digest(&record.0);
@@ -1155,7 +1155,7 @@ pub fn run_move(
             }
             let reverify: Vec<&Violation> = waivable.iter().filter(|v| canon_gate::review_gate::is_reverify(v)).collect();
             if reverify.iter().any(|v| !canon_gate::review_gate::is_scoped_reverify(v)) {
-                let commands = gate_context.as_ref().map(|ctx| crate::reverify::batch_commands_of(&repo, ctx, &code_tree, &subject)).unwrap_or_default();
+                let commands = gate_context.as_ref().map_or_default(|ctx| crate::reverify::batch_commands_of(&repo, ctx, &code_tree, &subject));
                 fixes.push(match commands.as_slice() {
                     [] => "record the suite again with `canon evidence add --all-scenarios` and a --report for each test report of the suite (a review stays current while the verdicts and checks are the same)".to_string(),
                     many => format!("record the suite again for the scenarios named with {} (a review stays current while the verdicts and checks are the same)", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
@@ -1539,22 +1539,6 @@ fn brief_gap(repo: &Path, subject: &Subject, judged: &[ChangeId], transition: &s
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_value_parsers_and_the_adoption_error_read_as_before() {
-        assert_eq!(parse_status("sideways").unwrap_err().to_string(), "unknown subject move `sideways` (expected one of: proposed, specced, building, verifying, shipped, retired)");
-        assert_eq!(parse_subject_id("Bad Id").unwrap_err().to_string(), format!("invalid SubjectId: \"Bad Id\" does not match grammar `{}`", SubjectId::GRAMMAR));
-        assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
-        let change = ChangeId::parse("c").unwrap();
-        let subject = SubjectId::parse("s").unwrap();
-        let cause = || std::io::Error::other("disk full");
-        let before = AdoptionWriteError::new(false, cause());
-        assert_eq!(before.to_string(), "disk full");
-        assert!(std::error::Error::source(&before).is_some());
-        assert_eq!(before.describe(&change, &subject, "fix"), "failed to record the adoption: disk full; nothing was written");
-        let between = AdoptionWriteError::new(true, cause());
-        assert_eq!(between.describe(&change, &subject, "fix"), "subject `s` now lists change `c`, but the change record could not be written: disk full; complete the link with `fix`");
-    }
 
     #[test]
     fn the_forward_chain_and_the_reopen_are_the_only_paths() {

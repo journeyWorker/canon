@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:54:24.883698298Z",
+  "attachments": [
+    {
+      "case": "subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "c07c0e39a4ed8772d929292b522524b6bf581517e89a4ce56807526e07c24ab0"
+    },
+    {
+      "case": "subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "c07c0e39a4ed8772d929292b522524b6bf581517e89a4ce56807526e07c24ab0"
+    }
+  ],
+  "code_tree": "b3ce6e4fb3da2da7c6c8d4963f72bdec1a06743d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "round-3 fix: scenario text and test names follow what the test checks, bound to the nextest run of the touched test binaries at 7068ea73b, Rust 1.100.0"
+  },
+  "evidence_sha": "7068ea73b57c4d6ce5f53cf0a89d2f7aa308b61c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1790,
+  "scenario_id": "subject.lifecycle.39",
+  "schema": 1,
+  "staging_id": "64ff4ebc",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

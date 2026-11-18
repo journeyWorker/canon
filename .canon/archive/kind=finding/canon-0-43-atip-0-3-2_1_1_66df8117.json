@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-atip-rust",
+    "role": "reviewer",
+    "session_id": "01a1e9e0-7fc8-7209-9088-91985c72b133"
+  },
+  "at": "2026-11-17T14:49:56.991487711Z",
+  "change_id": "canon-0-43-atip-0-3-2",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=atip/claiml2.feature:59-68",
+  "introduced_by": "c6dde67b6ea087369db2c45a407fdd33294c3604",
+  "kind": "finding",
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-atip-rust",
+  "round": 1,
+  "scenario_ids": [
+    "atip.claiml2.20"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "P1 (spec fidelity) atip.claiml2.20 describes a check this change deleted. Its Then: an agreement check over the declared minor, the fixture's contractVersion and the --contract of the job atip and the recipes atip and atip-deep finds a value lowered to 1.3 by name and flags a job that gives no minor. c6dde67b6 removed --contract from the job and both recipes (a job that gives no minor is now the intended state) and deleted minor_problems/contracts_in with atip_claim14_13 and atip_claim15_11. Brief I10 retires their scenarios but not this one, which has been bound to atip_claim14_13 since the 0.41 review. Its evidence is now atip_claim15_10, which asserts only fixture contractVersion == DECLARED_MINOR and tree meta.contractVersion == DECLARED_MINOR: no seeded lowering, no job or recipe, nothing named. Signing it would pin a verdict about a check that no longer exists. Fix: retire atip.claiml2.20 with the other I10 scenarios (what survives of it is atip.claim15.10), or reword it to the fixture/tree agreement, which duplicates claim15.10. Blast radius: no code; the gate counts atip-contract as covered by a scenario whose text contradicts the shipped CI job.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,36 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-r3-evidence_gate",
+    "role": "reviewer",
+    "session_id": "Rev43r3_evgate"
+  },
+  "at": "2026-11-17T17:32:10.658431981Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "kind": "review",
+  "pin": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:git::tests::gate_git_boundary_09_a_call_past_its_deadline_is_stopped",
+          "junit:git::tests::gate_git_boundary_09_a_grandchild_that_holds_the_pipes_is_not_waited_for",
+          "junit:git::tests::gate_git_boundary_09_a_limit_applies_to_each_stream_and_exactly_the_limit_is_allowed",
+          "junit:git::tests::gate_git_boundary_09_nine_mib_is_past_the_default_limit_and_inside_the_tree_listing_limit"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e31ad426b57c4da5aa877422e4238318852f3516b6ee557380ff74afc501e5d7",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-test-cleanup/brief.md"
+  },
+  "review_id": "01M7N91X12HZVKDE6GG7NZ6PH2",
+  "reviewer": "rev-0-43-tests-r3-evidence_gate",
+  "scenario_id": "gate.git-boundary.09",
+  "schema": 2,
+  "worktree_dirty": false
+}

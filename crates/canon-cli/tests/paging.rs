@@ -84,8 +84,9 @@ fn the_default_page_is_bounded_and_human_mode_names_the_next_cursor() {
 
     let rest = fixture.run_canon(&["query", "--kind", "trajectory", "--all", "--cursor", cursor]);
     assert!(rest.status.success(), "{}", stderr(&rest));
-    assert!(stdout(&rest).contains("3 record(s)"), "{}", stdout(&rest));
     assert!(!stdout(&rest).contains("next cursor"));
+    let rest = json(&fixture.run_canon(&["query", "--kind", "trajectory", "--all", "--cursor", cursor, "--json"]));
+    assert_eq!(rest["data"]["records"].as_array().unwrap().len(), 3);
 }
 
 #[test]

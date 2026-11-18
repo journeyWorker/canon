@@ -191,8 +191,7 @@ impl PinReader {
         }
         let listed = GitCall::new(&self.repo).args(["ls-tree", "-r", "--name-only", "-z", pin, "--", root]).no_lazy_fetch().tree_listing().run().ok();
         let files: Vec<String> = listed
-            .map(|out| out.stdout.split(|b| *b == 0).filter_map(|p| std::str::from_utf8(p).ok()).filter(|p| p.ends_with(".feature")).map(str::to_string).collect())
-            .unwrap_or_default();
+            .map_or_default(|out| out.stdout.split(|b| *b == 0).filter_map(|p| std::str::from_utf8(p).ok()).filter(|p| p.ends_with(".feature")).map(str::to_string).collect());
         self.trees.insert(key, files.clone());
         files
     }

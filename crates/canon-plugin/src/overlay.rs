@@ -332,7 +332,7 @@ mod tests {
         // surface_ref omitted entirely.
         let body = compose_overlay_body(&envelope, fields);
         let diags = validate_overlay_body(&coverage_decl(), &body).unwrap_err();
-        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_MISSING && d.message.contains("surface_ref")), "{diags:?}");
+        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_MISSING), "{diags:?}");
     }
 
     #[test]
@@ -345,7 +345,7 @@ mod tests {
         fields.insert("surface_ref".to_string(), json!([]));
         let body = compose_overlay_body(&envelope, fields);
         let diags = validate_overlay_body(&coverage_decl(), &body).unwrap_err();
-        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_MISSING && d.message.contains("scenario_id")), "{diags:?}");
+        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_MISSING), "{diags:?}");
     }
 
     #[test]
@@ -359,7 +359,7 @@ mod tests {
         fields.insert("notes".to_string(), json!("stray field")); // undeclared
         let body = compose_overlay_body(&envelope, fields);
         let diags = validate_overlay_body(&coverage_decl(), &body).unwrap_err();
-        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_UNDECLARED && d.message.contains("notes")), "{diags:?}");
+        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_UNDECLARED), "{diags:?}");
     }
 
     #[test]
@@ -372,7 +372,7 @@ mod tests {
         fields.insert("surface_ref".to_string(), json!([]));
         let body = compose_overlay_body(&envelope, fields);
         let diags = validate_overlay_body(&coverage_decl(), &body).unwrap_err();
-        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_TYPE && d.message.contains("covered")), "{diags:?}");
+        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_TYPE), "{diags:?}");
     }
 
     #[test]
@@ -385,7 +385,7 @@ mod tests {
         fields.insert("surface_ref".to_string(), json!([]));
         let body = compose_overlay_body(&envelope, fields);
         let diags = validate_overlay_body(&coverage_decl(), &body).unwrap_err();
-        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_TYPE && d.message.contains("scenario_id")), "{diags:?}");
+        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_TYPE), "{diags:?}");
     }
 
     #[test]
@@ -419,10 +419,7 @@ mod tests {
         fields.insert("surface_ref".to_string(), json!([]));
         let body = compose_overlay_body(&envelope, fields);
         let diags = validate_overlay_body(&coverage_decl(), &body).unwrap_err();
-        assert!(
-            diags.iter().any(|d| d.code == E_PLUGIN_BODY_KIND && d.message.contains("other.coverage") && d.message.contains("porting.coverage")),
-            "{diags:?}"
-        );
+        assert!(diags.iter().any(|d| d.code == E_PLUGIN_BODY_KIND), "{diags:?}");
     }
 
     #[test]

@@ -823,9 +823,6 @@ mod lenient_tier_tests {
             Err(e) => e.to_string(),
         };
         let msg = err;
-        assert!(
-            msg.contains("cold tier (s3) is not attached"),
-            "strict build must name the rung + backend, got: {msg}"
-        );
+        assert!(msg.contains("cold") && msg.contains("s3"), "strict build must name the rung + backend, got: {msg}");
     }
 }

@@ -76,7 +76,7 @@ Feature: evidence ci-run
   Scenario: --from-ci on a work tree that differs from HEAD (an untracked junit.xml) is refused as CI_WORKTREE_CONFLICT, and nothing is written
     Given a work tree with an untracked junit.xml, so its code differs from HEAD's
     When evidence add --all-scenarios --from-ci runs with the CI environment
-    Then it exits 2 with CI_WORKTREE_CONFLICT and a hint to use a gitignored path, .canon/ or code.exclude, and nothing is written
+    Then it exits 2 with CI_WORKTREE_CONFLICT and a hint naming .canon/ and code.exclude, and nothing is written
 
   # canon: {"schema":1,"at":"2026-11-09T10:21:59Z","actor":{"agent_id":"spec-ci-evidence","role":"planner"}}
   @subject:evidence-attestation
@@ -106,10 +106,10 @@ Feature: evidence ci-run
   @case:happy
   @flow:canon-0-40-ci-evidence.F3
   @evidence.ci-run.10
-  Scenario: Every --report batch prints one line per report with its passed, failed and skipped counts, and data.reports[] says the same, with or without --from-ci
+  Scenario: Every --report batch lists each report's passed, failed and skipped counts in data.reports[]
     Given a batch of two reports
-    When evidence add --all-scenarios --report runs, with and without --from-ci
-    Then one line per report says <path>: <passed> passed, <failed> failed, <skipped> skipped, and data.reports[] says the same numbers
+    When evidence add --all-scenarios --report runs with --json
+    Then data.reports[] has one entry per report with its path, sha256, format and passed, failed and skipped counts, and the same entries again for a batch whose records are unchanged
 
   # canon: {"schema":1,"at":"2026-11-09T10:22:37Z","actor":{"agent_id":"spec-ci-evidence","role":"planner"}}
   @subject:evidence-attestation
@@ -117,7 +117,7 @@ Feature: evidence ci-run
   @case:failure
   @flow:canon-0-40-ci-evidence.F3
   @evidence.ci-run.11
-  Scenario: A report that cannot be parsed is refused as before, without counts, and nothing is written
+  Scenario: A report that cannot be parsed is refused with exit 2, naming it, and nothing is written
     Given a batch with a report that cannot be parsed
     When evidence add --all-scenarios --report runs
-    Then it is refused as before, no count is told, and nothing is written
+    Then it is refused with exit 2 naming the report, and nothing is written

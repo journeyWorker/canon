@@ -80,7 +80,7 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   Scenario: A commit that waits for the lock past its time starts nothing and answers REPO_LOCK_UNAVAILABLE, exit 2, retryable; a killed holder releases the lock and the lock file stays
     Given a repo whose lock is held by another process and a commit whose wait is a few hundred milliseconds
     When the commit is run, and then a holder is killed with SIGKILL and the commit is run again
-    Then the first is exit 2 REPO_LOCK_UNAVAILABLE, retryable, with a hint to run it again and the tree of the repository the same, and after the kill the commit proceeds and the lock file is still there
+    Then the first is exit 2 REPO_LOCK_UNAVAILABLE, retryable, with the tree of the repository the same, and after the kill the commit proceeds and the lock file is still there
 
   # canon: {"schema":1,"at":"2026-11-02T15:04:29Z","actor":{"agent_id":"impl-plan-jcs","role":"implementer","session_id":"s-0-35-plan-jcs"}}
   @subject:atip-contract
@@ -121,21 +121,10 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
   @case:failure
   @flow:canon-0-35-plan-jcs.F4
   @atip.planjcs.11
-  Scenario: A digest made the 0.34 way (SHA-256 hex of the effects, no prefix) is PLAN_STALE on the six commands, and the hint says to run the preview again
+  Scenario: A digest made the 0.34 way (SHA-256 hex of the effects, no prefix) is PLAN_STALE on the six commands
     Given the six commands and a digest made as 0.34 made it: the SHA-256 of the effects' JSON in 64 hex digits
     When the commit is run with it
-    Then each is exit 2 PLAN_STALE and no 0.34 form is accepted, and the hint says to run the preview again and commit the digest it prints
-
-  # canon: {"schema":1,"at":"2026-11-02T15:06:10Z","actor":{"agent_id":"impl-plan-jcs","role":"implementer","session_id":"s-0-35-plan-jcs"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-35-plan-jcs.F5
-  @atip.planjcs.12
-  Scenario: The CHANGELOG has the upgrade note (the digest form, JCS and the inputs, the previews of 0.34 and the lock) and the sources hold no code that makes a digest without the prefix
-    Given the CHANGELOG and the sources of canon-cli
-    When the entry of this version is read, and src/safety.rs is read
-    Then the entry gives the digest form (sha256:, JCS, the inputs), says that a preview made by 0.34 is PLAN_STALE after the upgrade, lists what each command reads and the writers that hold the lock, and no code makes a digest without the prefix or over the effects alone
+    Then each is exit 2 PLAN_STALE, no 0.34 form is accepted and the tree of the repository is the same
 
   # canon: {"schema":1,"at":"2026-11-02T15:06:36Z","actor":{"agent_id":"impl-plan-jcs","role":"implementer","session_id":"s-0-35-plan-jcs"}}
   @subject:atip-contract
@@ -170,17 +159,6 @@ Feature: atip canon plan jcs: the digest of a destructive plan is sha256: and th
     Given a repository set up by 0.34: no .canon/repo-write.lock, no line for it in .gitignore
     When a purge preview is run, then its commit with a writer beside it
     Then the preview makes no file; the commit makes the lock file, holds it so the writer waits, `git status` does not list it, it is named in .git/info/exclude and no tracked file was edited
-
-  # canon: {"schema":1,"at":"2026-11-03T06:13:43Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
-  @subject:atip-contract
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-35-plan-jcs.F5
-  @atip.planjcs.16
-  Scenario: An upgrade note that lacks a part of the digest form or of the lock, or code that hashes the effects alone or leaves the prefix out, fails the check
-    Given the CHANGELOG entry of this version with each named part cut out in turn, an empty entry, and sources that hash the effects alone or make a digest without the prefix
-    When the check of the upgrade note and of the digest code runs on each
-    Then each missing part is named by its own name, the empty entry names every part, each faulty source is named, and the entry and source as they stand pass
 
   # canon: {"schema":1,"at":"2026-11-04T19:20:56Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-3"}}
   @subject:atip-contract

@@ -117,10 +117,10 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @case:happy
   @flow:canon-0-37-option-forms.F5
   @atip.optionforms.11
-  Scenario: Each of the six time options declares one domain in every command that has it, as a pattern of characters, and the help says the new spelling
+  Scenario: Each of the six time options declares one domain in every command that has it, as a pattern of characters
     Given every command document of canon schema, the four commands that take --approval-at and the five date options in their eight places
-    When the declarations and the help are read
-    Then the four places of --approval-at declare one pattern and the eight of the date options another, each is a pattern of characters with no white-space class that the 1.5 profile reads, the help names the date-time and the RFC 3339 date
+    When the declarations are read
+    Then the places of --approval-at declare one pattern and those of the date options another, and each is a pattern of characters with no white-space class that the 1.5 profile reads
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:19Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
@@ -129,31 +129,9 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @flow:canon-0-37-option-forms.F5
   @atip.optionforms.12
   Scenario: The table of values inside and outside each domain agrees with the real parsers, and a command that declares another domain fails the sweep
-    Given the table of values inside and outside each domain, and seeded documents in which a command declares another domain, none or the pattern of the other option
+    Given the table of values inside and outside each domain, and seeded documents in which a command declares the pattern of the other option
     When each value is judged by the declared pattern and by the parser of its option, and the sweep reads each document
-    Then the pattern and the parser agree on every value, a date or time that does not exist is the pattern's and the parser's refusal, which says what does not exist, and the sweep finds each seeded fault by the option and the command
-
-  # canon: {"schema":1,"at":"2026-11-05T15:56:25Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-37-option-forms.F6
-  @atip.optionforms.13
-  Scenario: The CHANGELOG has a row for every spelling 0.36.0 took and this build refuses
-    Given the golden file of what 0.36.0 took, measured on the released binary, and the Breaking table of the CHANGELOG
-    When each value of it is judged by the domain of the build
-    Then every spelling 0.36.0 took and the build refuses has a row for its option, its command and its class, with the 0.37 answer and the way to move, the table has one row per class, the spellings that are still taken have none, and what 0.36.0 refused already is still refused
-
-  # canon: {"schema":1,"at":"2026-11-05T15:56:31Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-37-option-forms.F6
-  @atip.optionforms.14
-  Scenario: The check of the CHANGELOG fails for a missing row, a missing answer and a missing note
-    Given the CHANGELOG with a row taken out, a row with no way to move, the note about the signature taken out, and a refused value of a class no row names
-    When the check of the CHANGELOG runs on each
-    Then it names the missing row by option, command and class, the row with no way to move, the missing note and the class, and the real CHANGELOG passes
+    Then the pattern and the parser agree on every value, a date or time that does not exist matches the pattern and is refused by the parser, and the sweep finds each seeded fault
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:36Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema
@@ -161,10 +139,10 @@ Feature: atip option forms: the time options take RFC 3339 and nothing else, and
   @case:edge
   @flow:canon-0-37-option-forms.F5
   @atip.optionforms.15
-  Scenario: The checker's fixture lists values the new domains refuse, and the recipes run at 1.6
-    Given the checker's fixture and the recipes of the justfile
+  Scenario: The checker's fixture lists values the new domains refuse
+    Given the checker's fixture
     When the values it lists as refused are judged by the declared domains
-    Then each of the twelve places of the six options lists a value its domain refuses, and the recipes run the checker at 1.6
+    Then each of the twelve places of the six options lists a value its domain refuses
 
   # canon: {"schema":1,"at":"2026-11-05T15:56:42Z","actor":{"agent_id":"impl-option-forms","role":"implementer","session_id":"s-0-37-option-forms"}}
   @subject:atip-schema

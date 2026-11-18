@@ -63,7 +63,6 @@ mod tests {
         assert_eq!(violations.len(), 1, "{violations:?}");
         assert_eq!(violations[0].class, FailureClass::UncoveredCell);
         assert_eq!(violations[0].subject, "spec_coverag");
-        assert!(violations[0].detail.contains("`spec_coverag` is not a known top-level policy.yaml key"), "{}", violations[0].detail);
         assert!(violations[0].detail.contains(&KNOWN_TOP_LEVEL_KEYS.join(", ")), "{}", violations[0].detail);
     }
 

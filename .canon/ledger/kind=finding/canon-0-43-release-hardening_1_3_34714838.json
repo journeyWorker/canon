@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-release",
+    "role": "reviewer",
+    "session_id": "ses_eb369b3c11493c96ca4c23ba"
+  },
+  "at": "2026-11-17T14:44:06.590966894Z",
+  "change_id": "canon-0-43-release-hardening",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "fixed",
+  "file_ref": "scripts/check-release-workflow-safety.py:1137-1143",
+  "introduced_by": "be48718542c1b2321b92f2e8d42273dd0ec043c1",
+  "kind": "finding",
+  "resolution_code_tree": "4b5936a80e0e068509cbd792d38efa24c6ac2306",
+  "resolution_sha": "5d5ba16f29a450b33bedacbf68b6c960245f5422",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-release",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "P2 (standards; probed): scope_errors accepts a job-level `if:` on the `scope` job (e.g. `if: github.event_name == 'pull_request'`). When `scope` is skipped, Actions skips every job that needs it (dashboard, man, build have no always()), so a manual run, or any run the condition excludes, finishes green with no build: the gate fails open to skip, against I5 (only an explicit skip=true skips). Fix: refuse any `if:` on the `scope` job (and on its deciding step). Blast radius: the shipped build-native.yml has none; the scope script itself fails open to build in every probe (shallow clone, non-merge checkout, not a repo).",
+  "worktree_dirty": false
+}

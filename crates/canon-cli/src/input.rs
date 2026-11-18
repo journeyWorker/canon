@@ -249,7 +249,7 @@ impl Leaf {
             keys,
             operands,
             operand_specs: positionals.iter().map(|a| spec_of(a)).collect(),
-            operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map(std::string::ToString::to_string).unwrap_or_default()]).collect(),
+            operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map_or_default(std::string::ToString::to_string)]).collect(),
             one_of,
         }
     }
@@ -870,7 +870,7 @@ fn assemble(leaf: &Leaf, base: &Base<'_>, settings: &[Setting], prefix: &str) ->
             None => {
                 let given = cmdline_values(base.lexed, long);
                 if !given.is_empty() {
-                    let spec = leaf.keys.iter().find(|key| key.long == *long).map(|key| key.spec.clone()).unwrap_or_default();
+                    let spec = leaf.keys.iter().find(|key| key.long == *long).map_or_default(|key| key.spec.clone());
                     if given.iter().map(|value| normalised(&spec, value)).collect::<Vec<_>>() != s.values {
                         return Err(conflict(pointer, &format!("--{long}"), &given.join(","), &s.values.join(",")));
                     }
@@ -977,7 +977,7 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     };
     if value == "-" {
         if let Some(other) = lexed.opts.iter().find(|o| o.long.as_deref() != Some("input") && o.value.as_deref().is_some_and(|v| v == "-" || v.ends_with(":-"))) {
-            let other_option = other.long.as_deref().map(|l| format!("--{l}")).unwrap_or_default();
+            let other_option = other.long.as_deref().map_or_default(|l| format!("--{l}"));
             // One stdin, two readers: the violation names the one given later on the command line (spec 5.5).
             let field = if other.span.start > input.span.start { other_option.clone() } else { "--input".to_string() };
             return fail(refused("USAGE", format!("`--input -` and `{other_option}` both read stdin"), "read one of them from a file").field(field));

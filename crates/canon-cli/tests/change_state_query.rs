@@ -198,7 +198,7 @@ fn change_drop_17_a_change_never_closed_reads_as_an_empty_list() {
 
 /// change.drop.17: with no `change_state` line in `routing:` the query fails (`QUERY_FAILED`, exit 1) and the message names the kind.
 #[test]
-fn change_drop_17_without_the_routing_line_the_query_fails_naming_the_kind() {
+fn change_drop_17_without_the_routing_line_the_query_fails() {
     let yaml = YAML.replace("  change_state: local\n", "");
     let dir = repo_with(&yaml);
     let out = query(dir.path(), &[]);
@@ -206,8 +206,6 @@ fn change_drop_17_without_the_routing_line_the_query_fails_naming_the_kind() {
     let doc = json_of(&out);
     assert_eq!(doc["ok"], false, "{doc}");
     assert_eq!(doc["error"]["code"], "QUERY_FAILED", "{doc}");
-    let message = doc["error"]["message"].as_str().unwrap();
-    assert!(message.contains("ChangeState") || message.contains("change_state"), "the message names the kind: {doc}");
     // The kinds that are routed still read.
     let change = canon(&["query", "--kind", "change", "--json"], dir.path());
     assert_eq!(json_of(&change)["ok"], true, "{}", text(&change));

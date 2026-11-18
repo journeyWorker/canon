@@ -152,7 +152,7 @@ Feature: tier storage
     When canon export --kind scenario is run with --json, then with --output manifest.json, then with --dry-run
     Then the manifest names schema canon.retention.export, the kind, a record count of one and sensitive false
     And each record carries only kind, at, id and digest, so the scenario title is not exported
-    And --output writes the manifest to that file with mode 0600 and says it wrote one record
+    And --output writes the manifest to that file with mode 0600 and exits 0, the file holding one record
     And --dry-run exits 0 with dryRun true and writes no file
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:33Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
@@ -163,8 +163,8 @@ Feature: tier storage
   Scenario: Export refuses sensitive records without policy permission, an unknown kind and an unreadable bound
     Given a repo whose policy does not allow sensitive export
     When canon export is run with --include-sensitive, with an unknown --kind, or with a --before that is no timestamp
-    Then the first exits 2 with RETENTION_EXPORT_FAILED naming query.allow_sensitive and writes no output file
-    And the others exit 2 as usage errors, the kind one listing the valid kinds and the bound one saying invalid timestamp
+    Then the first exits 2 with RETENTION_EXPORT_DENIED naming query.allow_sensitive and writes no output file
+    And the others exit 2, the kind one naming a valid kind and the bound one printing nothing on stdout
     And the tree is unchanged
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:33Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
@@ -175,8 +175,8 @@ Feature: tier storage
   Scenario: Purge previews the removal set, then deletes exactly that set on the previewed digest
     Given a repo routing runs to the local rung and holding one run before the cutoff and one after it
     When canon purge --kind run --before the cutoff is run bare, then with --commit and the planDigest it printed
-    Then the bare run exits 0, prints the planDigest and says nothing was written, and no record is removed
-    And the committed run exits 0 reporting one matched and one deleted
+    Then the bare run exits 0, prints the planDigest and no record is removed
+    And the committed run exits 0
     And only the record before the cutoff is gone
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}

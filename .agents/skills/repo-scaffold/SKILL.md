@@ -19,7 +19,8 @@ name match").
 2. Add `"crates/canon-<name>"` to the root `Cargo.toml`'s `[workspace]
    members` array, in the same change that adds the crate directory.
 3. Use `version.workspace = true`, `edition.workspace = true`,
-   `license.workspace = true` — never a crate-local version/edition/license
+   `rust-version.workspace = true`, `license.workspace = true` — never a
+   crate-local version/edition/rust-version/license
    (design D3's single-version-source discipline extends to every crate).
 4. Every library crate ships at minimum one public item and one `#[test]`
    exercising it — `cargo test --workspace` must stay meaningfully green,
@@ -37,7 +38,7 @@ Adding a target (e.g. `core-darwin-x64`) is a CI matrix row plus a new package
 directory — never a redesign of the launcher (design non-goals). A matrix row
 carries `binary_ext` (`""` or `".exe"`); the build/stage/upload steps are
 written against it, and `strip` is skipped when it is non-empty. Runner
-labels are pinned images (`macos-26`, `ubuntu-26.04`, `ubuntu-26.04-arm`,
+labels are pinned images (`macos-15`, `ubuntu-26.04`, `ubuntu-26.04-arm`,
 `windows-2025`), never `-latest`; a Linux row builds a musl target on its own
 architecture, and only the aarch64 musl row has `lg_page: "16"` (jemalloc with
 64K pages).

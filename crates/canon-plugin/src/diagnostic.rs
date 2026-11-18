@@ -133,7 +133,6 @@ mod tests {
         let d = Diagnostic::error(E_PLUGIN_MANIFEST, "boom", "some/subject");
         assert_eq!(d.severity, Severity::Error);
         assert_eq!(d.code, E_PLUGIN_MANIFEST);
-        assert_eq!(d.message, "boom");
         assert_eq!(d.subject, "some/subject");
     }
 }

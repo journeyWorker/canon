@@ -2,6 +2,7 @@
 name = "canon-learn"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "role-namespaced strategy memory (S6): trace -> verdict -> distill -> store -> retrieve -> apply, generalizing the donor harness's reasoning-bank + the donor tuning project's sweep-trajectory into a regime_key-keyed two-tier (raw Trajectory / distilled StrategyItem) store."
 

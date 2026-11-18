@@ -1,0 +1,55 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:00:27.979777177Z",
+  "attachments": [
+    {
+      "case": "migrate_names::tests::change_drop_27_forms_that_cannot_take_a_line_are_refused_naming_the_line_to_add",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "change_drop_27_a_stale_digest_is_plan_stale_and_the_file_is_untouched",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    },
+    {
+      "case": "change_drop_27_a_routing_section_that_cannot_take_a_line_is_refused_and_blocks_the_other_steps",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a141b97b4b09a2e0485ac522b16917ac3b08ece491c84ebbed9c958eb6954daf"
+    }
+  ],
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3980 passed, 1 skipped) from the clean tree at b5a805bd4, --rev b5a805bd4, Rust 1.100.0"
+  },
+  "evidence_sha": "b5a805bd41234740f676c6706fcbed82255524cb",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 144,
+  "scenario_id": "change.drop.27",
+  "schema": 1,
+  "staging_id": "3e2e9de3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

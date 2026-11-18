@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T15:32:24.291573453Z",
+  "attachments": [
+    {
+      "case": "a_known_role_and_a_policy_named_role_do_not_warn",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    },
+    {
+      "case": "a_misspelt_role_runs_and_warns_with_the_closest_known_role",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    },
+    {
+      "case": "an_unknown_role_with_nothing_close_still_runs_and_warns_without_a_suggestion",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    }
+  ],
+  "code_tree": "8c1e601081554d3e7a14ea27d040658c18ed8f9e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "bound to the cases of its previous record in the workspace nextest run at 2c5ea809f on Rust 1.100.0 (workspace nextest 3980 passed, 1 skipped)"
+  },
+  "evidence_sha": "2c5ea809f9baceebd42d7a33804afcda6379223e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1850,
+  "scenario_id": "context.capability.43",
+  "schema": 1,
+  "staging_id": "4e92b870",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

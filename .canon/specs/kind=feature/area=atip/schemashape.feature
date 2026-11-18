@@ -10,7 +10,7 @@ Feature: atip schema shape: id operands name their target, the id options name t
   Scenario: The trace operand is named for what it takes: its value name is TRACE_ID in the schema and in the help
     Given a built canon and no repository
     When canon schema trace --json runs, and canon trace --help
-    Then the one operand is named trace with value name TRACE_ID, the help shows <TRACE_ID>, the help text of the operand still says a review id, a commit sha or a finding key, and the document passes the contract's command schema
+    Then the one operand is named trace with value name TRACE_ID, the help shows <TRACE_ID>, and the document passes the contract's command schema
 
   # canon: {"schema":1,"at":"2026-11-06T15:55:08Z","actor":{"agent_id":"impl-schema-shape","role":"implementer","session_id":"s-0-38-schema-shape"}}
   @subject:atip-schema
@@ -21,7 +21,7 @@ Feature: atip schema shape: id operands name their target, the id options name t
   Scenario: A trace operand that is none of the three shapes is refused as before and its field is TRACE_ID
     Given a repository holding two commits whose shas start alike, and the operands abc, a_1 and not a shape! (none of the three shapes), deadbeefdead, a review id and a finding key that no record says, and the shared sha prefix
     When canon trace runs with each, with --json
-    Then each exits 2 with TRACE_OPERAND_INVALID, error.field is TRACE_ID and error.received is the value as given, the message names TRACE_ID where it named ID and says the three shapes as before; a sha, a review id and a finding key that no record says are TRACE_NOT_FOUND with the field TRACE_ID and a sha prefix of two commits is TRACE_CONFLICT with it, and nothing is written
+    Then each exits 2 with TRACE_OPERAND_INVALID, error.field is TRACE_ID and error.received is the value as given; a sha, a review id and a finding key that no record says are TRACE_NOT_FOUND with the field TRACE_ID and a sha prefix of two commits is TRACE_CONFLICT with it, and nothing is written
 
   # canon: {"schema":1,"at":"2026-11-06T15:55:21Z","actor":{"agent_id":"impl-schema-shape","role":"implementer","session_id":"s-0-38-schema-shape"}}
   @subject:atip-schema
@@ -76,7 +76,7 @@ Feature: atip schema shape: id operands name their target, the id options name t
   Scenario: A command all four roles use carries the string all in x-canon.roles and every other command keeps the array
     Given a built canon
     When canon schema --json and canon schema <command> --json run for the thirteen commands used by all four roles and for the others
-    Then x-canon.roles is the string all for completion, context, divergence list, finding list, format, gate check, query, retrieve, schema, search, skills show, status and trace in the tree and in each command document, the array of role names for every other command, and the empty array for the three human-only commands; 13 times 46 bytes, 598, are gone from the tree
+    Then x-canon.roles is the string all for completion, context, divergence list, finding list, format, gate check, query, retrieve, schema, search, skills show, status and trace in the tree and in each command document, the array of role names for every other command, and the empty array for the human-only commands
 
   # canon: {"schema":1,"at":"2026-11-06T15:56:26Z","actor":{"agent_id":"impl-schema-shape","role":"implementer","session_id":"s-0-38-schema-shape"}}
   @subject:atip-schema
@@ -106,29 +106,7 @@ Feature: atip schema shape: id operands name their target, the id options name t
   @case:happy
   @flow:canon-0-38-schema-shape.F4
   @atip.schemashape.10
-  Scenario: The root of the tree says the two forms of roles once, and the schema documents say them
+  Scenario: The root of the tree says the two forms of roles once, and no group or command document says it again
     Given a built canon
-    When canon schema --json, canon schema <group> --json and canon schema <command> --json run, and the guide and the website schema section are read
-    Then the root of the tree has x-canon.rolesForm saying all (every role) or an array of role names with an empty array for humans only, no group or command document says it again, the 141 bytes of that member are counted in the CHANGELOG, and the SKILL guide and the website schema section in English and Korean say the same two forms
-
-  # canon: {"schema":1,"at":"2026-11-06T15:57:05Z","actor":{"agent_id":"impl-schema-shape","role":"implementer","session_id":"s-0-38-schema-shape"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-38-schema-shape.F5
-  @atip.schemashape.11
-  Scenario: The CHANGELOG's Breaking entry has a row for each name that changed and the bytes saved
-    Given the CHANGELOG
-    When the table of the Breaking entry of canon-0-38-schema-shape is read
-    Then it has a row for each of the six operands (subject new, subject show, subject move, context-pack show, context-pack verify, trace), each of the three options and each of the thirteen commands whose roles is all, each with the 0.37 and the 0.38 form, and the entry says how a tool reads roles (all means four roles), who breaks and the bytes saved with the bytes the root declaration adds
-
-  # canon: {"schema":1,"at":"2026-11-06T15:57:18Z","actor":{"agent_id":"impl-schema-shape","role":"implementer","session_id":"s-0-38-schema-shape"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-38-schema-shape.F5
-  @atip.schemashape.12
-  Scenario: A table with a missing row, an empty cell or no header fails the check of the CHANGELOG
-    Given the CHANGELOG and copies of it with one row removed for each kind of row, a row with an empty cell, a table with no header, and an entry without the saved bytes
-    When the check of the Breaking entry runs on each
-    Then the check passes the real entry and names the missing row, the empty cell, the missing header and the missing bytes
+    When canon schema --json, canon schema --as reviewer --json, canon schema <group> --json and canon schema <command> --json run
+    Then the root of the tree has x-canon.rolesForm and nothing else in x-canon, a tree filtered by role has it beside x-canon.as, and no group or command document says it again

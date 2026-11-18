@@ -2,6 +2,7 @@
 name = "canon-gate"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "the trust spine: covered/green evidence gating (S5) — FAILURE_CLASSES, the trust ladder, PolicyResolution, and the gate-context seam wave-2 checks build against."
 
@@ -13,7 +14,6 @@ path = "src/lib.rs"
 canon-model = { workspace = true }
 canon-store = { workspace = true }
 canon-policy = { workspace = true }
-canon-fmt = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

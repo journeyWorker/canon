@@ -136,10 +136,10 @@ Feature: ledger migrate
   @case:failure
   @flow:canon-0-30-ledger-naming.F4
   @ledger.migrate.13
-  Scenario: A review that was stale before the move stays stale, and one that cannot be judged says so
+  Scenario: A review that was stale before the move stays stale, and one that cannot be judged is pinned as it stands
     Given pre-0.23 reviews whose evidence changed since, and one whose commit is not in the clone
     When the repo is migrated
-    Then the stale ones are left as they are and still stale, and the one that cannot be checked is pinned as it stands and counted
+    Then the stale ones are left as they are and still stale, and the one that cannot be checked is pinned as it stands
 
   # canon: {"schema":1,"at":"2026-10-26T16:24:46Z","actor":{"agent_id":"impl-030-ln","role":"implementer","session_id":"ln-2026-10-26"}}
   @subject:authoring-scaffold

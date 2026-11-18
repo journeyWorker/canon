@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-final",
+    "role": "reviewer",
+    "session_id": "Rev43_final"
+  },
+  "at": "2026-11-17T18:03:00.051241107Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/evidence_batch.rs:260-264; crates/canon-cli/tests/evidence_store.rs:225-230; .canon/specs/kind=feature/area=evidence/add.feature:504",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "b3ce6e4fb3da2da7c6c8d4963f72bdec1a06743d",
+  "resolution_sha": "7068ea73b57c4d6ce5f53cf0a89d2f7aa308b61c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "reviewer": "rev-0-43-tests-r3-evidence_gate",
+  "round": 3,
+  "scenario_ids": [
+    "evidence.add.90"
+  ],
+  "schema": 2,
+  "seq": 41,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, P2] evidence.add.90 (a fabrication marker inside a path, file name, URL or longer word is not a marker; n/a on its own is still refused) is bound to evidence_batch.rs::evidence_add_90_a_batch_binds_only_what_it_names, which tests a different behaviour: a suite-wide batch binds only the report, prints no carried list and records no drop (that is evidence.add.42's text). No step of evidence.add.90 is set up or asserted by its bound test. The behaviour is checked, by evidence_store.rs::a_marker_inside_a_path_a_file_name_a_url_or_a_longer_word_is_not_a_fabrication_marker, but that name carries no scenario id, so no evidence record ever binds it. reword-2_2 lists this row as UNDECIDED. Fix: rename the evidence_store.rs test to evidence_add_90_..., give the batch test the id of the scenario it checks (evidence.add.42 or another), and re-bind. Not signed.",
+  "worktree_dirty": false
+}

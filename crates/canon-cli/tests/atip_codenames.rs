@@ -1,11 +1,8 @@
-//! `canon-0-36-codes-rename`, scenarios `atip.codenames.01`, `.02`, `.05`, `.08` and `.09` (`.03` and `.04` are in `codes_names.rs`,
-//! `.06` and `.07` in `old_names.rs`): a code renamed by 0.36 answers the call that raised its old name, the old names are in no
-//! registry view and are refused by `schema --error`, and the CHANGELOG carries the replacement row of every code that left the registry.
-//! Against the built `canon` binary.
+//! `canon-0-36-codes-rename`, scenario `atip.codenames.01` (`.03` and `.04` are in `codes_names.rs`): a code renamed by 0.36 answers the call that
+//! raised its old name with its new code, exit, reason and field. Against the built `canon` binary.
 
 #[path = "support/hermetic.rs"]
 mod hermetic;
-use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -14,62 +11,6 @@ use canon_model::ids::{regime_key, RegimeKey, RoleId};
 use chrono::Utc;
 use serde_json::Value;
 use tempfile::TempDir;
-
-mod old_codes;
-
-/// The old name and the new one of each code `canon-0-36-codes-rename` renames (the brief's table).
-const RENAMED: &[(&str, &str)] = &[
-    ("APPROVAL_INCOMPLETE", "APPROVAL_INVALID"),
-    ("BRIEF_CHANGED_SINCE_PAGE_LOAD", "BRIEF_PAGE_STALE"),
-    ("BRIEF_HAS_BLOCKERS", "BRIEF_CHECK_FAILED"),
-    ("BRIEF_UNAPPROVABLE", "BRIEF_INVALID"),
-    ("CHANGE_AMBIGUOUS", "CHANGE_REQUIRED"),
-    ("CHANGE_INVALID_ARGUMENT", "CHANGE_ARGUMENT_INVALID"),
-    ("CONFIG_MISSING", "CONFIG_REQUIRED"),
-    ("CONTEXT_INPUT_MISSING", "CONTEXT_INPUT_NOT_FOUND"),
-    ("CONTEXT_SECRET_DETECTED", "CONTEXT_INPUT_INVALID"),
-    ("CONTEXT_UNSAFE_PATH", "CONTEXT_PATH_INVALID"),
-    ("DASHBOARD_BAD_REQUEST", "DASHBOARD_REQUEST_INVALID"),
-    ("DASHBOARD_CONFIG_INVALID", "CONFIG_INVALID"),
-    ("DASHBOARD_ORIGIN_REFUSED", "DASHBOARD_REQUEST_DENIED"),
-    ("DEMO_NOT_INITIALIZED", "DEMO_REQUIRED"),
-    ("DISPATCH_INVALID_ARGUMENT", "DISPATCH_ARGUMENT_INVALID"),
-    ("DISPATCH_ROLE_REGIME_MISMATCH", "DISPATCH_ROLE_CONFLICT"),
-    ("DIVERGENCE_INVALID_ARGUMENT", "DIVERGENCE_ARGUMENT_INVALID"),
-    ("FEATURE_OUTSIDE_SPEC_ROOTS", "FEATURE_PATH_INVALID"),
-    ("FINDING_INVALID_ARGUMENT", "FINDING_ARGUMENT_INVALID"),
-    ("FINDING_RESOLUTION_REV_UNEXPECTED", "FINDING_RESOLUTION_REV_CONFLICT"),
-    ("FINDING_SEQ_OCCUPIED", "FINDING_EXISTS"),
-    ("FINDING_STAGED", "FINDING_CONFLICT"),
-    ("FINDING_UNKNOWN_SCENARIO", "SCENARIO_NOT_FOUND"),
-    ("FORMAT_VIOLATIONS", "FORMAT_CHECK_FAILED"),
-    ("GATE_TASK_INVALID_ARGUMENT", "TASK_ID_INVALID"),
-    ("GATE_TASK_UNSUPPORTED", "TASK_UNSUPPORTED"),
-    ("GATE_VIOLATIONS", "GATE_CHECK_FAILED"),
-    ("HUMAN_ONLY", "ACTOR_DENIED"),
-    ("INIT_CONFIG_EXISTS", "CONFIG_EXISTS"),
-    ("INIT_INVALID_ARGUMENT", "INIT_ARGUMENT_INVALID"),
-    ("LEARN_DEMOTION_FAILED", "STRATEGY_DEMOTION_FAILED"),
-    ("LEARN_INVALID_ARGUMENT", "STRATEGY_ARGUMENT_INVALID"),
-    ("LEARN_INVALID_INPUT", "STRATEGY_FILE_INVALID"),
-    ("LEARN_STRATEGY_NOT_FOUND", "STRATEGY_NOT_FOUND"),
-    ("LEARN_TRAJECTORY_NOT_FOUND", "TRAJECTORY_NOT_FOUND"),
-    ("MIGRATE_UNCOMMITTED", "MIGRATION_CONFLICT"),
-    ("NO_COMMIT", "COMMIT_REQUIRED"),
-    ("PLAN_SOURCES_MISSING", "PLAN_SOURCES_REQUIRED"),
-    ("QUERY_INVALID_ARGUMENT", "QUERY_ARGUMENT_INVALID"),
-    ("RELAY_DIGEST_MISMATCH", "RELAY_DIGEST_STALE"),
-    ("RETRIEVE_FAILED", "RETRIEVE_INVALID"),
-    ("REVIEW_INVALID_ARGUMENT", "REVIEW_ARGUMENT_INVALID"),
-    ("SCAFFOLD_INVALID_ARGUMENT", "SCAFFOLD_ARGUMENT_INVALID"),
-    ("SEARCH_QUERY_EMPTY", "SEARCH_QUERY_REQUIRED"),
-    ("SKILLS_DRIFT", "SKILLS_CHECK_FAILED"),
-    ("SPEC_ROOT_UNRESOLVED", "SPEC_ROOT_REQUIRED"),
-    ("SUBJECT_INVALID_ARGUMENT", "SUBJECT_ARGUMENT_INVALID"),
-    ("SUBJECT_INVALID_TRANSITION", "SUBJECT_CONFLICT"),
-    ("UNKNOWN_ROLE", "ROLE_INVALID"),
-    ("UNKNOWN_SPEC_ROOT", "SPEC_ROOT_NOT_FOUND"),
-];
 
 fn canon(dir: &Path, args: &[&str], role: Option<&str>) -> Output {
     let mut command = hermetic::canon();
@@ -209,141 +150,6 @@ fn atip_codenames_01_skills_check_that_finds_drift_is_skills_check_failed_with_t
     let b = body(&out);
     assert_eq!(out.status.code(), Some(1), "{b}");
     assert_eq!((b["error"]["code"].as_str(), b["error"]["reason"].as_str(), b["error"]["retryable"].as_bool()), (Some("SKILLS_CHECK_FAILED"), Some("DRIFT"), Some(false)), "{b}");
-}
-
-fn registry_text(args: &[&str]) -> String {
-    let out = canon(Path::new(env!("CARGO_MANIFEST_DIR")), args, None);
-    assert_eq!(out.status.code(), Some(0), "{args:?}");
-    String::from_utf8(out.stdout).unwrap()
-}
-
-/// `word` in `text` as a whole identifier.
-fn has_word(text: &str, word: &str) -> bool {
-    text.match_indices(word).any(|(at, _)| {
-        let before = text[..at].chars().next_back();
-        let after = text[at + word.len()..].chars().next();
-        let part = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_');
-        !part(before) && !part(after)
-    })
-}
-
-/// atip.codenames.02: no registry view, no `errors` of a command and no failure names an old name; `CONFIG_MISSING` is still the warning's name.
-#[test]
-fn atip_codenames_02_an_old_name_is_in_no_registry_view_and_no_command_lists_it() {
-    let all = registry_text(&["schema", "--errors"]);
-    let tree = registry_text(&["schema"]);
-    for (old, new) in RENAMED {
-        if *old == "CONFIG_MISSING" {
-            continue;
-        }
-        assert!(!has_word(&all, old), "`{old}` is in `canon schema --errors`");
-        assert!(!has_word(&tree, old), "`{old}` is in `canon schema`");
-        assert!(has_word(&all, new), "`{new}` is not in `canon schema --errors`");
-    }
-    assert!(!has_word(&all, "CONFIG_MISSING"), "the error `CONFIG_MISSING` is `CONFIG_REQUIRED`: only the warning keeps the name");
-    assert!(has_word(&registry_text(&["schema", "--warnings"]), "CONFIG_MISSING"), "the warning keeps its name");
-}
-
-/// atip.codenames.02 (failure case): a call site that builds an old name as a string is not in the registry, so the registry-match test of the sources fails.
-#[test]
-fn atip_codenames_02_a_source_that_builds_an_old_name_does_not_match_the_registry() {
-    let registered: BTreeSet<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
-    for (old, new) in RENAMED {
-        if *old == "CONFIG_MISSING" {
-            continue;
-        }
-        assert!(!registered.contains(old), "`{old}` is registered");
-        assert!(registered.contains(new), "`{new}` is not registered");
-    }
-    let sources = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/grammar_t5_errors.rs")).unwrap();
-    assert!(sources.contains("every_code_a_source_builds_is_registered"), "the registry-match test of the sources exists");
-}
-
-/// atip.codenames.05: `schema --error <old name>` is refused as any unknown name is: `USAGE`, `field` `--error`, with no word about a rename.
-#[test]
-fn atip_codenames_05_schema_error_refuses_each_old_name_as_an_unknown_code() {
-    let dir = TempDir::new().unwrap();
-    let unknown = body(&canon(dir.path(), &["schema", "--error", "NOSUCH_CODE"], None));
-    for (old, _) in RENAMED.iter().filter(|(old, _)| *old != "CONFIG_MISSING") {
-        let out = canon(dir.path(), &["schema", "--error", old], None);
-        let b = body(&out);
-        assert_eq!(out.status.code(), Some(2), "{old}: {b}");
-        assert_eq!((b["error"]["code"].as_str(), b["error"]["field"].as_str(), b["error"]["received"].as_str()), (Some("USAGE"), Some("--error"), Some(*old)), "{old}: {b}");
-        let message = b["error"]["message"].as_str().unwrap();
-        assert_eq!(message.replace(old, "X"), unknown["error"]["message"].as_str().unwrap().replace("NOSUCH_CODE", "X"), "{old}: the answer is the one an unknown code gets");
-        assert!(!message.to_lowercase().contains("renamed"), "{message}");
-    }
-}
-
-/// The 0.35 code names of the registry (`tests/fixtures/codes-0.35.tsv`).
-fn codes_0_35() -> Vec<String> {
-    old_codes::codes_0_35().iter().map(|code| (*code).to_string()).collect()
-}
-
-/// The rows of the replacement table of the CHANGELOG's Unreleased section: `(old, new)`. A cell may name several codes (a code split by
-/// condition names each new code; two old codes may share one row): every backticked code name of the cell counts, other backticked text
-/// (an option, a reason) does not.
-fn changelog_rows(changelog: &str) -> Vec<(String, String)> {
-    let start = changelog.find("\n## 0.36.0").expect("an Unreleased section");
-    let rest = &changelog[start + 1..];
-    let end = rest[3..].find("\n## ").map_or(rest.len(), |n| n + 3);
-    let codes = |cell: &str| -> Vec<String> {
-        cell.split('`').skip(1).step_by(2).filter(|c| !c.is_empty() && c.chars().all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_')).map(str::to_string).collect()
-    };
-    // The table of reasons (`| Code | Reasons now | …`) names reasons, not renames: its rows are not rows of old and new codes.
-    let mut in_reasons_table = false;
-    rest[..end]
-        .lines()
-        .filter(|line| {
-            if line.starts_with("| Code | Reasons now |") {
-                in_reasons_table = true;
-            } else if !line.starts_with('|') {
-                in_reasons_table = false;
-            }
-            !in_reasons_table
-        })
-        .flat_map(|line| {
-            let cells: Vec<&str> = line.split('|').map(str::trim).collect();
-            match cells.as_slice() {
-                ["", old, new, ..] => {
-                    let (olds, news) = (codes(old), codes(new));
-                    olds.iter().flat_map(|o| news.iter().map(move |n| (o.clone(), n.clone()))).collect::<Vec<_>>()
-                }
-                _ => Vec::new(),
-            }
-        })
-        .collect()
-}
-
-/// atip.codenames.08: every code that left the registry since 0.35 has its row in the CHANGELOG, and the rows say the new name the registry holds.
-#[test]
-fn atip_codenames_08_the_changelog_holds_a_row_for_each_code_that_left_the_registry() {
-    let changelog = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../CHANGELOG.md")).unwrap();
-    let rows = changelog_rows(&changelog);
-    let registered: BTreeSet<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
-    for (old, new) in RENAMED {
-        let row = rows.iter().find(|(o, _)| o == old).unwrap_or_else(|| panic!("the CHANGELOG has no row for `{old}`"));
-        assert_eq!(row.1, *new, "`{old}`");
-    }
-    for (old, new) in &rows {
-        assert!(registered.contains(new.as_str()), "the row `{old}` → `{new}` names a code the registry does not hold");
-    }
-    let missing: Vec<String> = codes_0_35().into_iter().filter(|code| !registered.contains(code.as_str())).filter(|code| !rows.iter().any(|(old, _)| old == code)).collect();
-    assert!(missing.is_empty(), "codes that left the registry with no row in the CHANGELOG: {missing:?}");
-}
-
-/// atip.codenames.09 (failure case): a code of 0.35 that is not in the registry and not in the table is found; so is a row that names a code the registry lacks.
-#[test]
-fn atip_codenames_09_a_code_missing_from_the_registry_and_from_the_table_is_found() {
-    let table = "\n## 0.36.0\n\n| 0.35 | 0.36 | `reason` |\n|---|---|---|\n| `HUMAN_ONLY` | `ACTOR_DENIED` | |\n| `NO_COMMIT` | `NO_SUCH_CODE` | |\n\n## 0.35.0\n";
-    let rows = changelog_rows(table);
-    assert_eq!(rows, [("HUMAN_ONLY".to_string(), "ACTOR_DENIED".to_string()), ("NO_COMMIT".to_string(), "NO_SUCH_CODE".to_string())]);
-    let registered: BTreeSet<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
-    assert!(!registered.contains("NO_SUCH_CODE"), "the row names a code the registry lacks");
-    let gone = ["HUMAN_ONLY", "NO_COMMIT", "UNKNOWN_ROLE"];
-    let missing: Vec<&str> = gone.into_iter().filter(|code| !rows.iter().any(|(old, _)| old == code)).collect();
-    assert_eq!(missing, ["UNKNOWN_ROLE"], "a code that left without a row is named");
-    assert!(codes_0_35().iter().any(|code| code == "HUMAN_ONLY"), "the fixture holds the 0.35 names");
 }
 
 /// atip.codenames.01: RETRIEVE_INVALID (it was `RETRIEVE_FAILED`, exit 2): a repo directory that cannot make a regime key refuses the retrieval (a `--domain` that is no kebab

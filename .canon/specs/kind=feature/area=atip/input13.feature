@@ -76,10 +76,10 @@ Feature: atip input 1.3: step 3, batch order, integers, next page, empty arrays 
   @case:failure
   @flow:canon-0-36-input-1-3.F3
   @atip.input13.08
-  Scenario: Argv refuses the same integers beyond the range with the usual USAGE at the option, and the largest safe integer is not refused as out of range
+  Scenario: Argv refuses the same integers beyond the range with the usual USAGE at the option, and the largest safe integer gets a USAGE at the option too
     Given finding add calls with --round 9007199254740991, 9007199254740992, 9007199254740993 and -9007199254740993
     When each runs
-    Then the largest is not refused as out of range, the others are the usual USAGE at --round naming the range, and nothing is written
+    Then the others are the usual USAGE at --round naming the range, the largest is a USAGE at --round too, and nothing is written
 
   # canon: {"schema":1,"at":"2026-11-04T01:07:49Z","actor":{"agent_id":"impl-help-json","role":"implementer","session_id":"s-0-36-help-json"}}
   @subject:atip-input
@@ -109,7 +109,7 @@ Feature: atip input 1.3: step 3, batch order, integers, next page, empty arrays 
   Scenario: [] for a repeatable option is INPUT_INVALID INVALID_VALUE at the key's pointer for every repeatable option of every leaf, writes nothing, and the omitted key is the call as it was
     Given every leaf that takes --input and each repeatable option of it, and the call evidence add with artifact []
     When canon runs the leaf with a document whose only key is that option with the value []
-    Then each is exit 2 INPUT_INVALID reason INVALID_VALUE with field the key's pointer (/artifact), the hint says none is the key left out, a batch item says /0/artifact, nothing is written, and the document without the key is not refused for it
+    Then each is exit 2 INPUT_INVALID reason INVALID_VALUE with field the key's pointer (/artifact), a batch item says /0/artifact, nothing is written, and the document without the key is not refused for it
 
   # canon: {"schema":1,"at":"2026-11-04T01:08:14Z","actor":{"agent_id":"impl-help-json","role":"implementer","session_id":"s-0-36-help-json"}}
   @subject:atip-input

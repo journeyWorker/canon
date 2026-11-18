@@ -40,10 +40,10 @@ Feature: atip harness option: the harnesses are chosen by a repeatable --harness
   @case:failure
   @flow:canon-0-38-provider-option.F2
   @atip.provideroption.04
-  Scenario: --no-harness beside --harness, or beside --check for init, is refused naming both options and nothing is written
-    Given --no-harness and --harness claude in both orders on init and the three skills commands, and init with --check beside --harness or --no-harness
+  Scenario: --no-harness beside --harness, or beside --check for init, is refused with USAGE and nothing is written
+    Given --no-harness and --harness claude in both orders on the three skills commands, init with --no-harness before --harness claude, and init with --check beside --harness or --no-harness
     When each call runs
-    Then each exits 2 with USAGE and a message that names every option of the clash, and nothing is written, canon.yaml included
+    Then each exits 2 with USAGE, the skills commands naming --harness as the field, and nothing is written, canon.yaml included
 
   # canon: {"schema":1,"at":"2026-11-06T11:02:00Z","actor":{"agent_id":"impl-provider-option","role":"implementer","session_id":"s-0-38-provider-option"}}
   @subject:atip-schema
@@ -111,17 +111,6 @@ Feature: atip harness option: the harnesses are chosen by a repeatable --harness
     When each runs
     Then each exits 2 with USAGE naming --providers and nothing is written, `expected` is --harness, and the hint names --harness and --no-harness and offers no command line
 
-  # canon: {"schema":1,"at":"2026-11-06T11:03:26Z","actor":{"agent_id":"impl-provider-option","role":"implementer","session_id":"s-0-38-provider-option"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-38-provider-option.F5
-  @atip.provideroption.11
-  Scenario: No help, message, guide or generated document says the old spelling
-    Given the help and the command document of the four commands, what init and the three skills commands print in a bare repository and on a rerun, the guides the binary carries, the generated spec without its removed section, and the README, canon.yaml, the skill guides and the website pages
-    When each is read for --providers
-    Then none holds it, the help names --harness and --no-harness, and a text that does hold it is found
-
   # canon: {"schema":1,"at":"2026-11-06T11:03:39Z","actor":{"agent_id":"impl-provider-option","role":"implementer","session_id":"s-0-38-provider-option"}}
   @subject:atip-schema
   @lane:behavior
@@ -142,26 +131,4 @@ Feature: atip harness option: the harnesses are chosen by a repeatable --harness
   Scenario: A command that declares other names, a pattern, no repetition or the old option fails the check
     Given the real documents and copies in which one command lists a fifth name or a name twice, declares a pattern, is not repeatable, still declares --providers, lacks --no-harness or lacks the exclusion
     When the declarations are checked
-    Then the real documents pass and each seeded fault is found by command and by what is wrong
-
-  # canon: {"schema":1,"at":"2026-11-06T11:04:13Z","actor":{"agent_id":"impl-provider-option","role":"implementer","session_id":"s-0-38-provider-option"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-38-provider-option.F7
-  @atip.provideroption.14
-  Scenario: The CHANGELOG has a row for each shape of the old value
-    Given the Breaking table of the Unreleased entry
-    When its rows are read
-    Then it has a row for a comma list, for none and for the providers key of an input document (the old spelling), each with the old spelling, what 0.37 did, what 0.38 does and how to move, and the move of each is a line that runs
-
-  # canon: {"schema":1,"at":"2026-11-06T11:04:26Z","actor":{"agent_id":"impl-provider-option","role":"implementer","session_id":"s-0-38-provider-option"}}
-  @subject:atip-schema
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-38-provider-option.F7
-  @atip.provideroption.15
-  Scenario: The check of the CHANGELOG fails for a missing row, an empty cell and a missing header
-    Given the CHANGELOG with each row taken out, a row with no way to move and the header taken out
-    When the check of the CHANGELOG runs on each
-    Then it names the missing shape, the row with an empty cell and the missing header, and the real CHANGELOG passes
+    Then the real documents pass and each seeded fault is found

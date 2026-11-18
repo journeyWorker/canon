@@ -210,7 +210,7 @@ fn detect_depends_cycle(order: &[String], installed: &InstalledPlugins) -> Resul
         let mut stack: Vec<(String, usize)> = vec![(root.clone(), 0)];
         visiting.insert(root.clone());
         while let Some((node, mut ix)) = stack.pop() {
-            let mut deps: Vec<String> = installed.get(&node).map(|i| i.loaded.manifest.depends.iter().map(|d| d.id.clone()).collect()).unwrap_or_default();
+            let mut deps: Vec<String> = installed.get(&node).map_or_default(|i| i.loaded.manifest.depends.iter().map(|d| d.id.clone()).collect());
             deps.sort();
             let mut advanced = false;
             while ix < deps.len() {

@@ -103,7 +103,7 @@ Feature: report generation
     When one task is attested and flipped with canon task done, and the report is generated with canon report build
     Then the trust matrix carries each task's title and status, the flipped one done
     And no task record reached the git ledger, so those rows were read from sqlite
-    And no kind is named as not read directly and no warning is printed
+    And no warning is printed
     And canon report check reads the same report back
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}

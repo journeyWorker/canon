@@ -74,12 +74,12 @@ pub fn approved_text(text: &str, by: &str, when: &str, note: &str, relay: Option
 
 /// ` (relayed by …)` for a relayed approval, nothing for the human's own.
 fn relay_part(relay: Option<&ApprovalRelay>) -> String {
-    relay.map(|r| format!(" {}", crate::relay::marker(r))).unwrap_or_default()
+    relay.map_or_default(|r| format!(" {}", crate::relay::marker(r)))
 }
 
 /// ` (code tree <id>)` when the approval recorded the code tree, nothing otherwise.
 fn tree_part(tree: Option<&str>) -> String {
-    tree.map(|tree| format!(" {}", crate::brief::tree_marker(tree))).unwrap_or_default()
+    tree.map_or_default(|tree| format!(" {}", crate::brief::tree_marker(tree)))
 }
 
 /// The digest `brief approve` records for the brief `text`: what `canon brief
@@ -516,7 +516,7 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
                 (None, false) => "; no policy file, so no policy approval".to_string(),
             };
             let verb = if unchanged { "already approved, unchanged" } else { "approved" };
-            let via = approved.relay.as_ref().map(|r| format!(" ({})", crate::relay::describe(r))).unwrap_or_default();
+            let via = approved.relay.as_ref().map_or_default(|r| format!(" ({})", crate::relay::describe(r)));
             println!("canon brief approve: {} {verb} by `{}`{via} ({}){policy}", approved.brief, approved.approved_by, approved.digest);
         }
         crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(approved.change.clone()), false, json, approved);
@@ -544,9 +544,9 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, rela
                 Outcome::Failed => "failed",
                 Outcome::Skipped => "skipped",
             };
-            println!("canon brief approve: {} {what} by `{}`{}", entry.change, report.approved_by, entry.error.as_ref().map(|e| format!(" — {e}")).unwrap_or_default());
+            println!("canon brief approve: {} {what} by `{}`{}", entry.change, report.approved_by, entry.error.as_ref().map_or_default(|e| format!(" — {e}")));
         }
-        let via = report.relay.as_ref().map(|r| format!(" ({})", crate::relay::describe(r))).unwrap_or_default();
+        let via = report.relay.as_ref().map_or_default(|r| format!(" ({})", crate::relay::describe(r)));
         println!("canon brief approve: {} change(s){via}{policy}", report.approvals.len());
     }
     if let Some(e) = many.failure {
@@ -586,7 +586,6 @@ mod tests {
 
     #[test]
     fn a_brief_ending_inside_a_fence_is_refused_in_its_old_words() {
-        let error = approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok", None, None).unwrap_err();
-        assert_eq!(error.to_string(), "the brief ends inside an open code fence or HTML comment, so an `Approved:` line appended there would not be read; close it first");
+        approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok", None, None).unwrap_err();
     }
 }

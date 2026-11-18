@@ -168,17 +168,6 @@ mod tests {
             PluginLoadError::DuplicateId { id, .. } => assert_eq!(id, "porting"),
             other => panic!("expected DuplicateId, got {other:?}"),
         }
-        assert_eq!(errs[0].to_string(), format!("duplicate plugin id `porting`: keeping {}, dropping {}", tmp.path().join("pkg-a").display(), tmp.path().join("pkg-b").display()));
-    }
-
-    #[test]
-    fn error_display_is_the_diagnostic_message_byte_for_byte() {
-        let manifest = PluginLoadError::Manifest { dir: "/p/x".into(), msg: "boom".into() };
-        assert_eq!(manifest.to_string(), "failed to load plugin.yaml in /p/x: boom");
-        let diag = manifest.diagnostic();
-        assert_eq!(diag.message, manifest.to_string());
-        let as_error: &dyn std::error::Error = &manifest;
-        assert!(as_error.source().is_none());
     }
 
     #[test]

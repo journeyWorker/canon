@@ -128,10 +128,10 @@ Feature: finding close
   @subject:finding-lifecycle
   @case:happy
   @finding.close.83
-  Scenario: A rejected or deferred close records its reason on the closing version
+  Scenario: A deferred close records its reason on the closing version
     Given a committed open finding
-    When it is closed rejected, or deferred, with --reason "works as designed"
-    Then the closing version carries that reason and the raised version stays without one
+    When it is closed deferred with a --reason that has spaces around it
+    Then the closing version carries the reason without those spaces and the raised version stays without one
     And canon finding list shows the reason for that finding
 
   # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T14:16:31.626954139Z",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-store --lib registry::tests::query_fans_out_and_merges_when_a_kind_is_split_across_two_tiers"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-store --lib registry::tests::query_fans_out_and_merges_when_a_kind_is_split_across_two_tiers: passes in the workspace nextest run at 11acda0de (3980 passed, 1 skipped, Rust 1.100.0)"
+  },
+  "evidence_sha": "11acda0de760a28d1930db96b60826c66cee66a8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 327,
+  "scenario_id": "tier.storage.05",
+  "schema": 1,
+  "staging_id": "7d9be0ae",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -9,8 +9,8 @@ Feature: change drop
   Scenario: A human defers an approved chore and the decision is recorded with reason, references, approver and time
     Given an approved chore on a repo whose canon.yaml routes change_state
     When a human runs canon change defer with --reason, one --ref and --approver
-    Then one change_state record is written with state deferred, the reason as given, the references, the approver and the time
-    And the report names the change, the state, the scenarios set aside and the subjects that stop requiring it
+    Then one change_state record is written with state deferred, the reason as given, the references and the approver
+    And the report names the change, the state, the reason, the references, the approver, the time and the subjects that stop requiring it, and points to canon status and canon gate check
 
   # canon: {"schema":1,"at":"2026-11-16T05:57:20Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:subject-lifecycle
@@ -76,7 +76,7 @@ Feature: change drop
     Given an approved change, a deferred change and an unapproved draft
     When a human runs canon change drop on each
     Then each is recorded as dropped
-    And the report says the dropped change is not brought back, only a new change is
+    And the report of the first drop names the dropped change and canon change new
 
   # canon: {"schema":1,"at":"2026-11-16T05:57:45Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:subject-lifecycle
@@ -163,7 +163,7 @@ Feature: change drop
   Scenario: A shallow clone sets nothing aside and says the history is unavailable
     Given the same repository cloned with --depth 1
     When status and gate check are run there
-    Then nothing is set aside and the reason history_unavailable is said by both
+    Then nothing is set aside, gate check says the reason history_unavailable and status warns CHANGE_HISTORY_MISSING
     And the scenarios stay required while the change-level requirement is gone
 
   # canon: {"schema":1,"at":"2026-11-16T05:58:16Z","actor":{"agent_id":"canon-scaffold"}}
@@ -184,19 +184,18 @@ Feature: change drop
   @change.drop.17
   Scenario: An unknown state is a usage refusal, a change never closed is an empty answer, and a canon.yaml without the line is refused
     Given an unknown --status value, a change that was never closed and a canon.yaml without the change_state line
-    When canon query --kind change_state and canon change defer are run
-    Then the unknown value is USAGE with the three states as expected, the never closed change is an empty list, the missing line is QUERY_FAILED for query and CONFIG_INVALID TIERS for defer
-    And the CONFIG_INVALID hint says canon migrate
+    When canon query --kind change_state is run
+    Then the unknown value is USAGE with the three states as expected, the never closed change is an empty list, and the missing line is QUERY_FAILED while the routed kinds still read
 
   # canon: {"schema":1,"at":"2026-11-16T05:58:24Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:subject-lifecycle
   @case:happy
   @flow:canon-0-42-change-drop.F5
   @change.drop.18
-  Scenario: A human reopens a deferred change, it returns to its subject with its scenarios and needs a new approval
+  Scenario: A human reopens a deferred change, it returns to its subject and needs a new approval
     Given a deferred change
     When a human runs canon change reopen with --reason and --approver
-    Then a reopened record is written, the change and its set-aside scenarios are required again
+    Then a reopened record is written for the subject the change returns to
     And the earlier approval no longer counts, canon brief approve writes a new line even with the same name and answer
 
   # canon: {"schema":1,"at":"2026-11-16T05:58:27Z","actor":{"agent_id":"canon-scaffold"}}
@@ -259,33 +258,21 @@ Feature: change drop
   @case:happy
   @flow:canon-0-42-change-drop.F8
   @change.drop.24
-  Scenario: The guides, help, generated spec and conformance say how to close a change, who may, and how a closed change looks
-    Given the guides, the help, the generated spec and the conformance cases
-    When they are read
-    Then they say how a human closes a change with the relay, that six leaves are human-only, and how a closed change looks in status and gate check
-    And canon init writes the change_state routing line
-
-  # canon: {"schema":1,"at":"2026-11-16T05:58:50Z","actor":{"agent_id":"canon-scaffold"}}
-  @subject:subject-lifecycle
-  @case:failure
-  @flow:canon-0-42-change-drop.F8
-  @change.drop.25
-  Scenario: A guide command line that does not fit the schema, a human-only list that is not six, or a changelog without the caller note fails its check
-    Given a guide command line that does not fit the schema, a human-only list that is not six, or a CHANGELOG without the caller note
-    When the guide, install and release checks run
-    Then each fails its check
-    And the failure names the line
+  Scenario: canon init routes every record kind and change_state to local
+    Given a new repository
+    When canon init runs
+    Then the canon.yaml routing has a line for every record kind and for change_state, set to local
 
   # canon: {"schema":1,"at":"2026-11-16T05:58:54Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:subject-lifecycle
   @case:happy
   @flow:canon-0-42-change-drop.F9
   @change.drop.26
-  Scenario: Migrate adds the change_state line where the routing section lacks it, previews its line number, and reverts it
+  Scenario: Migrate adds the change_state line where the routing section lacks it, previews the rewrite, and reverts it
     Given a canon.yaml whose routing section has no change_state line
     When canon migrate previews and then commits with the plan digest
-    Then the preview names the line number and change_state: local, the commit adds only that line, the result equals the old document plus that key
-    And change defer runs, the next migrate plan is empty and --revert restores the file
+    Then the preview plans a rewrite of canon.yaml and no .gitignore edit and writes nothing, the commit adds only that line after the last routing entry, the result equals the old document plus that key
+    And before the migrate, change defer is refused with CONFIG_INVALID TIERS and a hint naming canon migrate; after it, change defer runs, the next migrate plan is empty and --revert restores the file
 
   # canon: {"schema":1,"at":"2026-11-16T05:58:57Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:subject-lifecycle
@@ -295,7 +282,7 @@ Feature: change drop
   Scenario: Migrate leaves a routing section it cannot add a line to, a file without routing and a stale preview unchanged
     Given a routing section written with an anchor or a flow mapping, a canon.yaml without routing, and a stale digest
     When canon migrate is run on each
-    Then the first is CONFIG_INVALID with reason CANON_YAML naming the line to add by hand, the second is left byte for byte, the third is PLAN_STALE
+    Then the first is CONFIG_INVALID with reason CANON_YAML naming the line to add, the second is left byte for byte, the third is PLAN_STALE
     And no file is changed in any case
 
   # canon: {"schema":1,"at":"2026-11-16T05:59:01Z","actor":{"agent_id":"canon-scaffold"}}

@@ -141,24 +141,24 @@ Feature: authoring init
   @subject:authoring-scaffold
   @case:happy
   @authoring.init.31
-  Scenario: A light starter policy requires evidence only and says how to raise it
+  Scenario: A light starter policy requires evidence only
     Given an empty repository
     When canon init runs with the light policy level
     Then .canon/policy.yaml opens with the light level line and requires evidence on every scenario
-    And the failure-case and review requirements are present only as commented lines that say how to raise the level and that a human approves the edit
+    And the failure-case and review requirements are present only as commented lines, and the policy names canon policy approve for a human's approval of the edit
     And the gate does not ask a golden-path-only surface for a failure case
-    And canon status reports the level as light with how to raise it
+    And canon status reports the level as light
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
   @case:happy
   @authoring.init.32
-  Scenario: A standard starter policy adds a failure case per surface and says how to reach strict
+  Scenario: A standard starter policy adds a failure case per surface
     Given an empty repository
     When canon init runs with the standard policy level
     Then .canon/policy.yaml opens with the standard level line and requires evidence and a failure case per feature surface
-    And the review requirement is present only as commented lines that say how to raise the level to strict
-    And canon status reports the level as standard with how to reach strict
+    And the review requirement is present only as commented lines under a `# strict:` line
+    And canon status reports the level as standard
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -177,7 +177,7 @@ Feature: authoring init
   Scenario: A policy level together with no-policy is refused
     Given an empty repository
     When canon init runs with a policy level and the no-policy flag together
-    Then it exits 2 saying the two cannot be used together
+    Then it exits 2 naming --no-policy
     And it writes no canon.yaml and no .canon directory
 
   # canon: {"schema":1,"at":"2026-10-11T15:01:54Z","actor":{"agent_id":"canon"}}
@@ -216,10 +216,10 @@ Feature: authoring init
   @authoring.init.81
   Scenario: A fresh repo authors, indexes and gates its scenarios under .canon/specs
     Given a repository initialized with canon init
-    Then its canon.yaml names one spec root, id root, at .canon/specs
+    Then its canon.yaml names the spec root .canon/specs
     When canon scenario new writes a scenario for an area and surface
     Then the file is .canon/specs/kind=feature/area=<area>/<surface>.feature and canon format finds it clean
-    And the next canon gate check indexes it and grades it, failing until the scenario is evidenced and clean after
+    And canon gate check grades it from the specs without writing an index record, failing until the scenario is evidenced, the evidence write indexes it, and the next canon gate check is clean
 
   # canon: {"schema":1,"at":"2026-10-12T10:34:27Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -240,7 +240,7 @@ Feature: authoring init
     When canon init runs with no terminal and neither --harness nor --no-harness
     Then it installs the canon skill for omp only and says where
     And canon.yaml ends with `skills: { providers: [omp] }` and the install lock records omp only
-    And canon init --check passes the skills section and canon skills doctor reports healthy from canon.yaml
+    And canon init --check passes the skills section and canon skills doctor reports providers omp and healthy
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -251,7 +251,7 @@ Feature: authoring init
     When canon init runs with --harness codex
     Then only .agents/skills/canon is projected and nothing is written under .claude or .codex
     And canon.yaml records `providers: [codex]`, and the policy and AGENTS.md are written as before
-    And a rerun with --harness leaves canon.yaml alone and says to run canon skills install with it instead
+    And a rerun with --harness claude exits 0 and projects nothing more
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -261,7 +261,7 @@ Feature: authoring init
     Given an empty repository with no .claude, .codex, .omp or .pi directory
     When canon init runs with no terminal and neither --harness nor --no-harness
     Then it exits 0, installs nothing and writes no install lock
-    And its output says no harness was detected and names `canon skills install --harness claude` and `--no-harness`
+    And its output names `canon skills install --no-harness`
     And canon.yaml carries the skills section only as a commented example, which init --check reports as not configured
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
@@ -272,7 +272,7 @@ Feature: authoring init
     Given an empty repository holding a .claude directory
     When canon init runs with --no-harness, and with an empty --harness
     Then canon.yaml records `providers: []` and nothing is installed for --no-harness, and the empty --harness is refused with exit 2 and writes nothing (`canon-0-38-provider-option`: a name is one of the four)
-    And canon skills check exits 0 reporting no providers from canon.yaml
+    And canon skills check exits 0 reporting no providers
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -301,9 +301,8 @@ Feature: authoring init
   Scenario: On a terminal init asks nothing and takes the detected harnesses, as it does off one
     Given detected .claude and .omp directories, neither --harness nor --no-harness, and canon run with a terminal on stdin and stderr
     When init runs
-    Then it prints no question and waits for no answer
+    Then it waits for no answer and succeeds
     And it installs the canon skill for claude and omp and records them as skills.providers
-    And with --harness or --no-harness the choice is the answer, and with nothing detected nothing is installed, on a terminal or not
 
   # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -312,8 +311,8 @@ Feature: authoring init
   Scenario: Init re-run on an existing repo adds the canon gitignore lines it lacks
     Given a repo whose canon.yaml exists and whose gitignore lacks canon lines added since it was set up
     When canon init runs again
-    Then it adds each missing canon gitignore line once under its comment, names them, and keeps the rest of the gitignore and canon.yaml byte-identical
-    And with --no-agents-md it only adds the lines, and with none missing that run is a no-op that exits 0
+    Then it adds each missing canon gitignore line once, and keeps the existing gitignore lines and canon.yaml byte-identical
+    And with --no-agents-md it only adds the lines, and with none missing that run exits 0
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:52Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -354,7 +353,7 @@ Feature: authoring init
   Scenario: init --check shows where the hot store is
     Given a canon.yaml whose hot rung is the sqlite file `.canon/hot.db`
     When canon init --check is run
-    Then a `hot-store` line names `.canon/hot.db` and says it belongs to this worktree
+    Then a `hot-store` line names `.canon/hot.db`
     And --json carries the same line in `sections`
 
   # canon: {"schema":1,"at":"2026-10-26T18:13:26Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
@@ -362,8 +361,8 @@ Feature: authoring init
   @case:failure
   @flow:canon-0-30-record-links.F5
   @authoring.init.102
-  Scenario: init --check says so when no hot store is configured and names a hot store it cannot open
+  Scenario: init --check says so when no hot store is configured and fails a hot store it cannot open
     Given a canon.yaml with no hot rung, and another whose hot file exists but is not a database
     When canon init --check is run on each
     Then the first reports `hot-store` as not configured
-    And the second fails `hot-store`, names the path it could not open, and exits 1
+    And the second fails `hot-store` and exits 1

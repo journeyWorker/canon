@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-r3-rest",
+    "role": "reviewer",
+    "session_id": "Rev43r3_rest"
+  },
+  "at": "2026-11-17T17:32:13.640070984Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "kind": "review",
+  "pin": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_status"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "659e8bc392f70f220392d679b2025a101eb3f26cd76297073f0251a90418b59d",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-test-cleanup/brief.md"
+  },
+  "review_id": "01M7N91ZY8FZB37Z32MY9FNWET",
+  "reviewer": "rev-0-43-tests-r3-rest",
+  "reviewer_harness": "omp",
+  "scenario_id": "inventory.sync.47",
+  "schema": 2,
+  "worktree_dirty": false
+}

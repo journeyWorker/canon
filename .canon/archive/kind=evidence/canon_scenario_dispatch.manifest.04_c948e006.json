@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T14:15:13.247873494Z",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib dispatch::begin_tests::validating_a_task_never_mutates_the_plan_document"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --lib dispatch::begin_tests::validating_a_task_never_mutates_the_plan_document: passes in the workspace nextest run at 11acda0de (3980 passed, 1 skipped, Rust 1.100.0)"
+  },
+  "evidence_sha": "11acda0de760a28d1930db96b60826c66cee66a8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1065,
+  "scenario_id": "dispatch.manifest.04",
+  "schema": 1,
+  "staging_id": "8a42e134",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

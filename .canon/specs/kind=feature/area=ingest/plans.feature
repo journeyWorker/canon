@@ -121,7 +121,7 @@ Feature: ingest plans
   Scenario: A plans source naming canon's own source is refused
     Given a canon.yaml whose plans sources name the canon dialect
     When plans are imported
-    Then the command fails naming .canon/changes as always read with no entry and plans.sources as listing only external plans
+    Then the command fails naming .canon/changes
     And nothing is imported
 
   # canon: {"schema":1,"at":"2026-10-27T12:05:05Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}

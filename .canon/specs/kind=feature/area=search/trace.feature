@@ -39,10 +39,10 @@ Feature: Trace chain
   @case:failure
   @flow:canon-0-31-search.F3
   @search.trace.04
-  Scenario: An unknown id, an ambiguous sha prefix and an unrecognized shape exit 2 and name the three accepted shapes
+  Scenario: An unknown id, an ambiguous sha prefix and an unrecognized shape exit 2 with their own codes
     Given a repo with a review, findings and evidence at two commits that share a prefix
     When canon trace runs with an id no record names, with a prefix both commits share, and with a word that has none of the three shapes
-    Then each exits 2 and the message lists the review id, the commit sha and the finding key forms
+    Then each exits 2 and the error code is TRACE_NOT_FOUND for the unknown id, TRACE_CONFLICT for the ambiguous prefix and TRACE_OPERAND_INVALID for the unrecognized shape
     And nothing is written apart from the index
 
   # canon: {"schema":1,"at":"2026-10-27T14:16:07Z","actor":{"agent_id":"impl-031-search","role":"implementer","session_id":"search-2026-10-27"}}

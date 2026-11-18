@@ -17,8 +17,7 @@ failure this skill is written against: a friendly label or a paraphrase
 asserting something its query never computed. Every claim below is kept
 verbatim with the prose `canon report` actually renders
 (`canon_report::render`'s `pub const *_PANEL` literals and its inline
-one-liners), and `packages/dashboard/test/panel-copy.test.ts` pins this
-file to those literals. Copy a claim; do not paraphrase it.
+one-liners). Copy a claim; do not paraphrase it.
 
 ## Generated, never hand-edited
 

@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests",
+    "role": "reviewer",
+    "session_id": "Rev43_tests"
+  },
+  "at": "2026-11-17T15:57:04.709623555Z",
+  "code_tree": "8c1e601081554d3e7a14ea27d040658c18ed8f9e",
+  "kind": "review",
+  "pin": "883805daa06da3b9d09905949f2c4b43f704e2b6",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:atip_daterefusals_01_a_leap_second_is_refused_in_every_place_and_the_second_before_and_the_next_day_are_taken"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "9fc3bd3c690d95ccbc4c2b95c3d48f8759d85212b6f178ee6038139f8414f06f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-test-cleanup/brief.md"
+  },
+  "review_id": "01M7N3KRT50XYR4M567K6AJ2Y0",
+  "reviewer": "rev-0-43-tests",
+  "scenario_id": "atip.daterefusals.01",
+  "schema": 2,
+  "worktree_dirty": false
+}

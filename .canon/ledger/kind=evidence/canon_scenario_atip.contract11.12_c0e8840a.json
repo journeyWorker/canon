@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T17:19:10.881585662Z",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "bun test packages/dashboard/test/envelope-tolerance.test.ts; bun test packages/cli/test/launcher.test.ts; python3 -m unittest evals.dogfood.test_trace_check"
+  },
+  "evidence_note": {
+    "command_result": "bun test: 4 pass 0 fail (envelope-tolerance); 14 pass 0 fail (launcher); python3 -m unittest: Ran 36 tests, OK",
+    "summary": "re-run at b5a805bd4 on Rust 1.100.0 / bun 1.3.14: dashboard envelope-tolerance 4 pass, launcher 14 pass, evals.dogfood.test_trace_check 36 tests OK"
+  },
+  "evidence_sha": "b5a805bd41234740f676c6706fcbed82255524cb",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 565,
+  "scenario_id": "atip.contract11.12",
+  "schema": 1,
+  "staging_id": "a98edb4f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

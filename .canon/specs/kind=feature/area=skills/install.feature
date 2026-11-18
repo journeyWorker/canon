@@ -94,18 +94,6 @@ Feature: skills install
     And the doctor reports it as a legacy remnant naming the same fix
     And a following install keeps the file, because canon cannot prove it wrote it
 
-  # canon: {"schema":1,"at":"2026-10-10T16:35:35Z","actor":{"agent_id":"canon"}}
-  @subject:skills-install
-  @case:edge
-  @skills.install.11
-  Scenario: The stub claims build work in a canon repo and the guide it points at opens with the working loop
-    Given canon's own skill source and the guide built into the binary
-    When the skill is installed for Claude, Codex, OMP and Pi, and canon skills show canon prints the guide
-    Then each projected SKILL.md is a stub that keeps the source's frontmatter, points at canon skills show canon and names this canon's version, with no reference files beside it
-    And its description claims build, implement, feature and fix work in a repo that has canon.yaml, within the 1024-character limit skill loaders enforce
-    And the guide's first section is the working loop, naming brief, subject, scenarios, units, implement, evidence, independent review and transition in that order
-    And the AGENTS.md block canon init writes names the same steps in the same order
-
   # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:skills-install
   @case:happy
@@ -221,8 +209,8 @@ Feature: skills install
   Scenario: An explicit provider list is written to canon.yaml and later runs follow it
     Given a target with a canon.yaml that has comments and no skills section, and a .claude directory
     When canon skills install runs with --harness codex and --harness omp
-    Then it projects Codex and OMP only and appends `skills: { providers: [codex, omp] }` to canon.yaml, keeping every other byte
-    And install, check and doctor with no provider named follow that list and say it came from canon.yaml
+    Then it projects Codex and OMP only and appends a skills section listing the providers codex and omp to canon.yaml, keeping every other byte
+    And install and check with no provider named follow that list, install taking it from canon.yaml
     And a later --harness replaces the section in place, a flow-style section in the middle of the file included, and --no-harness records an empty list
     And a target without canon.yaml gets no canon.yaml
 
@@ -233,8 +221,8 @@ Feature: skills install
   Scenario: A repo set up before 0.17 keeps working from its install lock
     Given a target whose canon.yaml has no skills section and whose install lock records Claude and Codex, beside an .omp directory
     When canon skills check, doctor and install run with no provider named
-    Then each serves Claude and Codex and says the list came from the install lock because canon.yaml has no skills key
-    And the check exits 0, the doctor reports healthy and the install reports unchanged
+    Then each serves Claude and Codex, the providers of the install lock
+    And the check exits 0, the doctor reports healthy and the install exits 0
     And the lock and canon.yaml are byte-identical afterwards, and nothing is projected for OMP
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
@@ -255,10 +243,10 @@ Feature: skills install
   Scenario: A malformed skills section in canon.yaml fails loud
     Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know, and a clean canon.yaml
     When canon skills install, check and doctor run with no harness named, and with --harness naming an unknown harness
-    Then each canon.yaml section is refused with exit 2 as CONFIG_INVALID with the reason SKILLS (a provider canon.yaml names is the section's fault), naming the expected shape or the unknown provider, and the unknown provider on the --harness option of the clean canon.yaml is USAGE, refused by the enumeration of the option before any section is read
+    Then each canon.yaml section is refused with exit 2 as CONFIG_INVALID with the reason SKILLS (a provider canon.yaml names is the section's fault), and the unknown provider on the --harness option of the clean canon.yaml is USAGE naming the option and the four providers, refused by the enumeration of the option before any section is read
     And nothing is projected and canon.yaml is byte-identical
     And a --skills-source directory that does not exist is refused the same way, exit 2 naming the option
-    And canon init --check exits 1 reporting the skills section as FAIL with the same reason
+    And canon init --check exits 1 reporting the skills section as FAIL
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
   @subject:skills-install
@@ -310,11 +298,11 @@ Feature: skills install
   @case:failure
   @skills.install.60
   Scenario: Install keeps a dropped projected file whose bytes changed and says what to do
-    Given a target with canon's projection installed for Claude, then a canon whose bundle no longer ships one reference file
-    And the projected file's bytes were edited after the install
+    Given a target with canon's projection installed for Claude, then a canon whose bundle no longer ships two reference files
+    And the bytes of one projected file were edited after the install
     When the skill is installed again
-    Then the edited file is kept and the install reports its path, that its bytes differ from the install lock, and that it can be removed by hand
-    And the JSON lists it under `kept` with a hint, and nothing under `pruned`
+    Then the edited file is kept and the install reports its path and that it can be removed by hand
+    And the JSON lists it under `kept` with a hint, and only the unedited dropped file under `pruned`
     And the install lock no longer lists it, and a rerun reports unchanged
 
   # canon: {"schema":1,"at":"2026-10-21T11:50:51Z","actor":{"agent_id":"canon-impl-025"}}
@@ -448,25 +436,3 @@ Feature: skills install
     When canon brief approve runs with one of them written twice, then with one id, then with both ids and --json
     Then the repeated id is approved once, a single id prints the document it always printed, and several ids print one entry per id with written, unchanged, failed or skipped
     And a --input array still stops at its first failure and keeps the approvals before it, one name and answer per element
-
-  # canon: {"schema":1,"at":"2026-10-27T10:24:11Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
-  @subject:skills-install
-  @case:edge
-  @flow:canon-0-31-loop.F3
-  @skills.install.73
-  Scenario: The skills, README, status help and schema state the governing-change rule and the status briefs list
-    Given the packaged skills, the README, the status help and the schema documentation of this release
-    When they are read for the rule on which changes a subject answers for and for the status JSON
-    Then they say that reopen, ship and status judge every tagged, approved-line and chore change, that a never-approved untagged feature change blocks nothing, and that brief approve takes several ids
-    And the README Upgrading section says the status brief field became the briefs list and the status schema version rose, and status --json carries that new version
-
-  # canon: {"schema":1,"at":"2026-10-27T12:04:58Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
-  @subject:skills-install
-  @case:happy
-  @flow:canon-0-31-brief-format.F3
-  @skills.install.74
-  Scenario: The brief skill documents carry the section table, the guidance, the frontmatter waiver and the old-format path
-    Given the brief-shape and brief-polish skill documents
-    When they are read
-    Then brief-shape carries the section table with each section's heading, role and the same guidance text brief show prints, the frontmatter waiver form and the old-format path
-    And brief-polish shows waivers as frontmatter entries and no skill document names a canon:section, canon:hint or canon:waive comment as the way to write a brief

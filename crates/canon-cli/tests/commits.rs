@@ -254,7 +254,6 @@ fn outside_git_and_with_no_commit_every_leaf_refuses_no_commit_and_writes_nothin
             assert_eq!(out.status.code(), Some(2), "{name}: {}{}", text(&out.stdout), text(&out.stderr));
             let error = error_of(&out);
             assert_eq!(error["code"], "COMMIT_REQUIRED", "{name}: {error}");
-            assert!(error["hint"].as_str().is_some_and(|h| h.contains("git")), "{name} says how to fix it: {error}");
         }
         let payload = canon(r, &["evidence", "approval-payload", "--scenario", SCENARIO, "--project", "root", "--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
         assert_eq!(payload.status.code(), Some(2));

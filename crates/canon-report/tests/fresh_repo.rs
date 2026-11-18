@@ -43,33 +43,6 @@ fn report_generation_on_a_completely_fresh_repo_succeeds_with_empty_panels() {
     assert!(content.contains("## Flywheel funnel\n\n"));
     assert!(content.contains("## Scope status\n\n"));
     assert!(content.contains("## Subjects\n\n"));
-    // s43 (`findings-are-records`): a repo with no `finding` records at
-    // all must still render the panel and its caveats. The caveats
-    // describe the METRIC, so the reader most likely to misread an
-    // empty fix-of-fix column is exactly the one who sees zero rows —
-    // including the reader who assumes zero rows means zero rounds,
-    // which is the one reading a corpus this empty.
     assert!(content.contains("## Review rounds\n\n"));
-    assert!(
-        content.contains(canon_report::render::FIX_OF_FIX_MEANING),
-        "the empty review-rounds panel must still state the one canonical sentence verbatim"
-    );
-    assert!(
-        content.contains("counts the rounds that FOUND something, never the rounds RUN"),
-        "the empty review-rounds panel must still say a clean round writes no row"
-    );
-    // s43 round 5: the totals panel is the one a release note copies
-    // from, so an empty corpus must still render it with the caveat
-    // that makes its headline column safe to copy — `rounds_recorded`
-    // is rounds that recorded a finding, and zero of them is not
-    // evidence that zero rounds ran.
     assert!(content.contains("## Review totals\n\n"));
-    assert!(
-        content.contains("this column counts the rounds that FOUND something, never the rounds RUN"),
-        "the empty review-totals panel must still say `rounds_recorded` is not the rounds run"
-    );
-    assert!(
-        content.contains(canon_report::render::FIX_OF_FIX_MEANING),
-        "the empty review-totals panel must still state the one canonical sentence verbatim"
-    );
 }

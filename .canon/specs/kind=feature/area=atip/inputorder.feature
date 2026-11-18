@@ -27,9 +27,10 @@ Feature: atip input order: the --input document is processed in the order of spe
   @flow:canon-0-35-input-order.F2
   @atip.inputorder.03
   Scenario: A document with two wrong keys reports both in details in the document's key order, and the first is the error's field
-    Given a finding close document {"roundd":1,"seq":"x"}
-    When canon finding close runs with it as --input
-    Then it is exit 2 INPUT_INVALID with field /roundd, and details holds two items in the document's order, /roundd UNKNOWN_KEY first and /seq INVALID_VALUE second, and the same keys in the other order give the other order
+    Given finding close documents {"seq":"x","roundd":1}, {"zeta":1,"alpha":2,"round":1} and the batch [{"round":1,"bogus":1,"seq":"x"}], and {"roundd":1,"seq":"x"} in the text form
+    When canon finding close runs with each as --input
+    Then the first is INPUT_INVALID with reason INVALID_VALUE and field /seq, and details holds the wrong keys in the document's order: /seq then /roundd, /zeta then /alpha, and /0/bogus then /0/seq in the batch, whose field is /0/bogus
+    And the text form lists a problem line for /roundd and for /seq
 
   # canon: {"schema":1,"at":"2026-11-02T07:07:38Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
   @subject:atip-input
@@ -47,9 +48,9 @@ Feature: atip input order: the --input document is processed in the order of spe
   @flow:canon-0-35-input-order.F3
   @atip.inputorder.05
   Scenario: A value outside an enumeration in a document is INPUT_INVALID INVALID_VALUE at the key, the same value on argv stays USAGE
-    Given a finding close document {"disposition":"nope"} and the argv --disposition nope
+    Given a finding close document {"disposition":3}, a batch whose second element is {"disposition":"nope"}, and the argv --disposition nope
     When each is run
-    Then the document is exit 2 INPUT_INVALID reason INVALID_VALUE with field /disposition and the valid set as expected, the argv is USAGE with field --disposition
+    Then the document is INPUT_INVALID reason INVALID_VALUE with field /disposition, the batch is exit 2 INPUT_INVALID INVALID_VALUE with field /1/disposition, and the argv is exit 2 USAGE with field --disposition
 
   # canon: {"schema":1,"at":"2026-11-02T07:07:45Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
   @subject:atip-input
@@ -57,9 +58,9 @@ Feature: atip input order: the --input document is processed in the order of spe
   @flow:canon-0-35-input-order.F4
   @atip.inputorder.06
   Scenario: A command line that does not parse answers before the conflict check, with its argv code
-    Given --round abc together with the document {"round":1}, and --disposition bogus with the same kind of document
+    Given --round abc together with the batch document [{"round":1}], and --disposition bogus with the document {"disposition":"fixed"}
     When canon finding close runs with each
-    Then each is exit 2 USAGE with the argv field (--round, --disposition) and never INPUT_CONFLICT, in a batch too
+    Then each is exit 2 USAGE with the argv field (--round, --disposition) and never INPUT_CONFLICT
 
   # canon: {"schema":1,"at":"2026-11-02T07:07:49Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
   @subject:atip-input
@@ -67,9 +68,9 @@ Feature: atip input order: the --input document is processed in the order of spe
   @flow:canon-0-35-input-order.F4
   @atip.inputorder.07
   Scenario: The same argument given differently on argv and in the document is INPUT_CONFLICT at the document pointer, and argv alone or a document alone is not checked
-    Given --round 1 on argv and the document {"round":2}, the same value on both sides, an argv alone and a document alone
+    Given --disposition rejected on argv and the document {"disposition":"fixed"}, --round 1 on argv and the batch [{"round":2}], the same value on both sides, an argv alone and a document alone
     When canon finding close runs with each
-    Then the differing pair is INPUT_CONFLICT with field /round, and the equal pair, the argv alone and the document alone are not a conflict
+    Then the differing pairs are INPUT_CONFLICT with fields /disposition and /0/round, and the equal pair, the argv alone and the document alone are not a conflict
 
   # canon: {"schema":1,"at":"2026-11-02T07:07:53Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
   @subject:atip-input

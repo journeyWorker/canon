@@ -283,7 +283,7 @@ fn atip_paging_06_every_projected_output_declares_its_fields_and_the_declaration
     for (command, doc, output) in &cases {
         let command = command.as_str();
         let fields = &output["fields"];
-        let strings = |key: &str| -> Vec<String> { fields.get(key).and_then(Value::as_array).map(|list| list.iter().map(|path| path.as_str().unwrap().to_string()).collect()).unwrap_or_default() };
+        let strings = |key: &str| -> Vec<String> { fields.get(key).and_then(Value::as_array).map_or_default(|list| list.iter().map(|path| path.as_str().unwrap().to_string()).collect()) };
         let (paths, keep, default) = (strings("paths"), strings("keep"), strings("default"));
         assert!(!paths.is_empty(), "{command}");
         assert!(default.iter().all(|path| paths.contains(path)), "{command}: default is a subset of paths");
@@ -663,12 +663,6 @@ fn atip_paging_15_the_camel_case_alias_of_a_snake_case_key_and_the_snake_case_al
     let divergence = json(&canon(repo.path(), &["divergence", "list", "--fields", "state", "--json"]));
     assert_eq!(divergence["data"]["scenarios"][0], json!({ "projectId": "root", "scenarioId": "auth.login.01", "state": "open" }));
     assert_eq!(error_of(&canon(repo.path(), &["divergence", "list", "--fields", "project_id", "--json"]))["code"], "USAGE");
-    // The help of each option says so too.
-    for command in SIX {
-        let doc = command_doc(repo.path(), command);
-        let help = doc["options"].as_array().unwrap().iter().find(|option| option["name"] == "fields").unwrap()["help"].as_str().unwrap().to_string();
-        assert!(!help.contains("camelCase and snake_case both match"), "{command}: {help}");
-    }
 }
 
 #[test]

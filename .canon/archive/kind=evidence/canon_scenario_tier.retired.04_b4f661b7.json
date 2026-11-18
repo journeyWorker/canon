@@ -1,0 +1,69 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T13:56:48.241738190Z",
+  "attachments": [
+    {
+      "case": "migrate_names::tests::tier_retired_04_only_the_direct_keys_of_routing_and_aging_count",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "migrate_names::tests::tier_retired_04_a_config_without_the_keys_is_returned_byte_for_byte",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "migrate_names::tests::tier_retired_04_the_legacy_evidence_key_is_renamed_in_the_same_pass",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "migrate_names::tests::tier_retired_04_a_section_left_without_keys_becomes_an_empty_mapping",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "migrate_names::tests::tier_retired_04_the_retired_keys_are_found_by_line_and_deleted_alone",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "tier_retired_04_migrate_deletes_exactly_the_retired_key_lines_and_revert_restores_them",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    }
+  ],
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3980 passed, 1 skipped) from the clean tree at 11acda0de, --rev 11acda0de, Rust 1.100.0"
+  },
+  "evidence_sha": "11acda0de760a28d1930db96b60826c66cee66a8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 144,
+  "scenario_id": "tier.retired.04",
+  "schema": 1,
+  "staging_id": "3e79b50f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -64,7 +64,7 @@ pub fn preview(loaded: &tiers::LoadedTiers) -> Result<Planned, TierAgeError> {
         let result = tiers::read_tier(source, loaded, &TierQuery::kind(*kind))?;
         let mut ids: Vec<String> = Vec::new();
         for raw in &result.records {
-            let id = canon_store::partition::resolve_partition(*kind, &raw.0).ok().map(|p| p.natural_key).unwrap_or_default();
+            let id = canon_store::partition::resolve_partition(*kind, &raw.0).ok().map_or_default(|p| p.natural_key);
             let id = format!("{}:{id}:{}", kind.as_str(), canon_store::partition::content_digest(&raw.0));
             scanned.push(format!("{}:{id}", source.as_str()));
             if canon_store::tier::raw_record_at(raw) < cutoff {

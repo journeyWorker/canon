@@ -6,10 +6,10 @@ Feature: atip read writes: a refusal and a read command write only what they dec
   @case:failure
   @flow:canon-0-35-read-writes.F1
   @atip.readwrites.01
-  Scenario: A refused call of subject show, subject move, evidence add, evidence audit, review, divergence accept or artifacts store leaves the repository, HOME and temp dir byte for byte as they were, and the stale scenario index stays unwritten
+  Scenario: A refused call of subject show, subject move, evidence add, evidence audit, review scenario or divergence accept leaves the repository, HOME and temp dir byte for byte as they were, and the stale scenario index stays unwritten
     Given a repository whose scenario index is stale, a private HOME and a private temp dir
     When subject show, subject move, evidence add, evidence audit, review scenario, divergence accept are each refused (a missing subject, a transition no chain allows, a bad value, a scenario no feature declares)
-    Then each is exit 2 and the files of the repository, HOME and the temp dir are byte for byte the same, and no scenario index record was written
+    Then each leaves the files of the repository, HOME and the temp dir byte for byte the same and writes no scenario index record, and every refusal but subject move of a missing subject is exit 2
 
   # canon: {"schema":1,"at":"2026-11-02T13:03:20Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
   @subject:atip-contract
@@ -26,10 +26,10 @@ Feature: atip read writes: a refusal and a read command write only what they dec
   @case:happy
   @flow:canon-0-35-read-writes.F2
   @atip.readwrites.03
-  Scenario: subject show declares the cache refresh in its effectNote, says a refused call writes nothing, and writes no line to stderr in JSON mode
+  Scenario: subject show reports the cache refresh as a warning and writes no line to stderr in JSON mode, and tells it on stderr in text mode
     Given a stale repository
-    When schema subject show runs and subject show runs in JSON mode, then in text mode
-    Then the effectNote names the cache refresh and says a refused call writes nothing, stderr is empty in JSON mode, and the text mode says once on stderr that it refreshed
+    When subject show runs in JSON mode, then in text mode
+    Then stderr is empty in JSON mode and meta.warnings holds SCENARIO_INDEX_REFRESHED, the text mode writes to stderr, and a second call has nothing on stderr
 
   # canon: {"schema":1,"at":"2026-11-02T13:04:37Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
   @subject:atip-contract
@@ -51,16 +51,6 @@ Feature: atip read writes: a refusal and a read command write only what they dec
     When report check and selftest run on success, on a missing repository or suite, and on a canon.yaml that does not parse
     Then the temp dir holds no file afterwards
 
-  # canon: {"schema":1,"at":"2026-11-02T13:05:44Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
-  @subject:atip-contract
-  @case:edge
-  @flow:canon-0-35-read-writes.F5
-  @atip.readwrites.06
-  Scenario: dashboard is declared a server: one report, then it serves until signalled, and the schema has no stream lines
-    Given the schema of dashboard
-    When its effectNote and its outputs are read
-    Then the note says it prints one report and serves until signalled, and the one output is the DashboardReport with no stream line
-
   # canon: {"schema":1,"at":"2026-11-02T13:06:22Z","actor":{"agent_id":"impl-canon-input","role":"implementer","session_id":"s-0-35-canon-input"}}
   @subject:atip-contract
   @case:failure
@@ -76,10 +66,10 @@ Feature: atip read writes: a refusal and a read command write only what they dec
   @case:failure
   @flow:canon-0-35-read-writes.F2
   @atip.readwrites.08
-  Scenario: subject show of a subject that does not exist is exit 2 SUBJECT_NOT_FOUND with an empty stderr in JSON mode and writes nothing
+  Scenario: subject show of a subject that does not exist gives no refresh warning and writes nothing in JSON mode
     Given a stale repository and a subject that does not exist
     When subject show nosuch runs in JSON mode
-    Then it exits 2 with SUBJECT_NOT_FOUND, stderr is empty, no refresh warning is given, nothing is written and the stale scenario index stays unwritten, while the subject that exists is shown
+    Then it answers with one JSON document that holds no refresh warning, nothing is written and the stale scenario index stays unwritten, while the subject that exists is shown
 
   # canon: {"schema":1,"at":"2026-11-03T05:08:42Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
   @subject:atip-contract

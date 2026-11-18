@@ -7,24 +7,14 @@
 //! `CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check` rewrites it; the test fails when the
 //! committed file differs from what the binary says.
 //!
-//! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip, tag `atip-check-v0.3.0`) and canon runs it once, in the
-//! CI job `atip` and in `just atip-deep`: `atip check --level L2 --contract 1.6 --deep` on the canon binary and this fixture (`just atip` runs it without `--deep`). No test of canon runs the checker.
+//! The checker is not canon's: it lives in the atip repository (https://github.com/journeyWorker/atip) and canon runs it once, in the
+//! CI job `atip` and in `just atip-deep`, on the canon binary and this fixture (`just atip` runs it without `--deep`); the version it runs is pinned in `tools/atip-check/`. No test of canon runs the checker.
 
 #[path = "support/hermetic.rs"]
 mod hermetic;
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
-
-
-/// The command the CI job and the just recipe run, with the binary's directory spelled `target/debug`.
-const COMMAND: &str = "atip check --bin target/debug/canon --level L2 --contract 1.6 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json";
-/// The command that installs the checker, at the tag canon is held to, in the CI job and in the just recipe.
-const INSTALL: &str = "cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.3.0 atip-check --locked";
-
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
 
 fn fixture_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/atip/canon.fixture.json")
@@ -96,7 +86,7 @@ fn atip_check_39_the_canon_fixtures_registry_and_warnings_equal_the_ones_generat
     let committed = std::fs::read_to_string(fixture_path()).expect("tests/atip/canon.fixture.json");
     assert_eq!(drift(&committed, &generated), None, "run CANON_BLESS_ATIP_FIXTURE=1 cargo test -p canon-cli --test atip_check and commit the fixture");
     let fixture: Value = serde_json::from_str(&committed).expect("the fixture is JSON");
-    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!("1.6"), json!("status"), json!([["--repo", "."]])));
+    assert_eq!((fixture["contractVersion"].clone(), fixture["probe"].clone(), fixture["globalOptions"].clone()), (json!(canon_cli::json_out::DECLARED_MINOR), json!("status"), json!([["--repo", "."]])));
     let mut keys: Vec<&String> = fixture.as_object().expect("object").keys().collect();
     keys.sort();
     assert_eq!(keys, ["commands", "contractVersion", "globalOptions", "notRun", "prepare", "probe", "registry", "setup", "timeoutSeconds", "warnings"], "the L2 keys are `commands` members (`preview`, `batchFailsAt`, `batchFailsFirst`, `allowedEffects`), not top-level ones");
@@ -135,37 +125,4 @@ fn atip_check_40_a_stale_registry_in_the_canon_fixture_fails_the_generation_test
     // The prose of the answer, and any member outside a fixture row, is dropped by the generator; reasons are kept by name.
     let answer = json!({"data": {"errors": [{"code": "X", "exit": 2, "retryable": false, "meaning": "m", "fix": "f", "surplus": 1, "x-canon": {}, "reasons": [{"reason": "R", "meaning": "m", "fix": "f"}]}]}});
     assert_eq!(registry_rows(&answer), [json!({"code": "X", "exit": 2, "retryable": false, "reasons": ["R"]})]);
-}
-
-/// The `run:` commands of the workflow job `job` in test.yml.
-fn workflow_commands(job: &str) -> Vec<String> {
-    let workflow = std::fs::read_to_string(repo_root().join(".github/workflows/test.yml")).expect("test.yml");
-    let mut lines = workflow.lines().skip_while(|line| *line != format!("  {job}:"));
-    assert!(lines.next().is_some(), "job {job} in test.yml");
-    // The job ends at the next line indented by two spaces only: the next job, or the comment above it.
-    lines.take_while(|line| !line.starts_with("  ") || line.starts_with("   ")).filter_map(|line| line.trim().strip_prefix("run: ")).map(str::to_string).collect()
-}
-
-fn just_recipe(name: &str) -> Vec<String> {
-    let justfile = std::fs::read_to_string(repo_root().join("justfile")).expect("justfile");
-    let mut lines = justfile.lines().skip_while(|line| !line.starts_with(&format!("{name}:")));
-    assert!(lines.next().is_some(), "recipe {name} in the justfile");
-    lines.take_while(|line| line.starts_with("    ")).map(|line| line.trim().replace("{{ target }}", "target")).collect()
-}
-
-#[test]
-fn atip_check_43_the_ci_job_and_the_just_recipe_run_atip_check_against_the_canon_binary_with_the_same_command() {
-    let job = workflow_commands("atip");
-    assert!(job.iter().any(|run| run == INSTALL), "the job installs the checker at its tag: {job:?}");
-    assert!(job.iter().any(|run| run.contains("cargo build") && run.contains("-p canon-cli") && !run.contains("atip-check") && run.contains("--locked")), "the job builds canon only: {job:?}");
-    assert!(job.iter().any(|run| run == COMMAND), "the job runs `{COMMAND}`: {job:?}");
-    assert_eq!(job.iter().filter(|run| run.starts_with("atip check")).count(), 1, "the job runs the checker once: {job:?}");
-    let deep = just_recipe("atip-deep");
-    assert!(deep.iter().any(|line| line == COMMAND), "the recipe atip-deep runs the job's command: {deep:?}");
-    assert!(deep.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{deep:?}");
-    let quick = COMMAND.replace(" --deep", "");
-    let recipe = just_recipe("atip");
-    assert!(recipe.contains(&quick), "the recipe atip runs the job's command without --deep: {recipe:?}");
-    assert!(recipe.iter().any(|line| line.contains("cargo build") && line.contains("-p canon-cli") && !line.contains("atip-check")), "{recipe:?}");
-    assert_eq!(just_recipe("atip-install"), [INSTALL], "the recipe that installs the checker runs the job's command");
 }

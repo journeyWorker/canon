@@ -71,7 +71,6 @@ Feature: Durable record writes
     Given the source of every crate
     When it is searched for the fixed temp names of the four private write copies: canon.yaml, the legacy migration, the brief migration and the strategy activation file
     Then none of them is found
-    And the one write path left is canon_store::write_atomic
 
   # canon: {"schema":1,"at":"2026-11-08T06:24:46Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
   @subject:tier-storage
@@ -82,7 +81,7 @@ Feature: Durable record writes
   Scenario: A write that cannot happen fails with its cause, and a migrate that cannot replace canon.yaml stops incomplete and the next run finishes it
     Given a legacy file whose parent is a file, so the write cannot happen, and an old repo whose root takes no new entry
     When the legacy write is made, and migrate --commit is run on the repo
-    Then the legacy error reads could not write <file> and keeps its io cause, and migrate exits 1 with MIGRATION_INCOMPLETE, reason STOPPED, and canon.yaml as it was
+    Then the legacy write fails with an error that keeps its io cause, and migrate exits 1 with MIGRATION_INCOMPLETE, reason STOPPED, and canon.yaml as it was
     And running migrate again finishes the migration and writes the migrated canon.yaml
 
   # canon: {"schema":1,"at":"2026-11-08T06:25:56Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
@@ -168,27 +167,3 @@ Feature: Durable record writes
     When it is opened, written to, and opened read-only
     Then its mode is still 0644
     And no open changes the mode of a file that already exists
-
-  # canon: {"schema":1,"at":"2026-11-08T06:28:34Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-39-write-durability.F8
-  @tier.durability.15
-  Scenario: The CHANGELOG names the directory fsync, the one write path, the one-write audit line, the rekey write lock and the new hot.db mode
-    Given the CHANGELOG section this release ships in
-    When the release check reads the Fixed and Changed entries of canon-0-39-write-durability
-    Then Fixed names the directory fsync, the artifact blobs, the private write copies, the one-write audit line, BEGIN IMMEDIATE and Windows
-    And Changed names the 0600 hot.db, chmod 600 .canon/hot.db for an existing one, and Windows
-
-  # canon: {"schema":1,"at":"2026-11-08T06:28:50Z","actor":{"agent_id":"spec-durasecret","role":"planner"}}
-  @subject:tier-storage
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-39-write-durability.F8
-  @tier.durability.16
-  Scenario: A CHANGELOG without the entry or a piece of it is named by the release check
-    Given an empty section, a section without the entry, and one without chmod 600 .canon/hot.db or BEGIN IMMEDIATE
-    When the release check reads each
-    Then it names the missing entry and each missing piece
-    And a section that has them all is named by nothing

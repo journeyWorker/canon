@@ -69,8 +69,9 @@ REQUIRED_ENV = ("CARGO_TERM_COLOR", "CARGO_INCREMENTAL", "MACOSX_DEPLOYMENT_TARG
 # The macOS deployment target both workflows declare (the binary's `minos`, checked by check-release-binary.py).
 MACOS_DEPLOYMENT_TARGET = "15.0"
 
-# The only runner labels a release job may use: the newest image, its label written down, never `-latest`.
-ALLOWED_RUNNERS = ("macos-26", "ubuntu-26.04", "ubuntu-26.04-arm", "windows-2025")
+# The only runner labels a release job may use: a pinned image, its label written down, never `-latest`
+# (macOS arm64 is `macos-15`: `macos-26` was not assigned a runner in the 0.43 dry runs).
+ALLOWED_RUNNERS = ("macos-15", "ubuntu-26.04", "ubuntu-26.04-arm", "windows-2025")
 
 # The scalar fields every `matrix.settings` row carries that must agree
 # across the two workflows (publish additionally carries `package_name`,
@@ -692,11 +693,6 @@ def smoke_errors(publish_text: str, build_text: str, other_texts: dict[str, str]
     for line in publish_text.splitlines():
         if "npm publish" in _source_line(line) and 'npm publish "$TARBALL"' not in line:
             errors.append(f"publish.yml: `{line.strip()}` must publish the packed tarball (npm publish \"$TARBALL\" ...)")
-    # npm reads `dir/file.tgz` as the GitHub shorthand `owner/repo` and tries `git ls-remote` (0.42.0's first
-    # tag run failed so); a path is a tarball only with `./`, `../` or `/` in front.
-    for value in re.findall(r'^\s*TARBALL="([^"]*)"', publish_text, re.MULTILINE):
-        if not value.startswith(("./", "../", "/")):
-            errors.append(f"publish.yml: TARBALL=\"{value}\" must start with ./ (npm reads a/b.tgz as a GitHub repo)")
     return errors
 
 
@@ -824,10 +820,20 @@ def _loose_equal(left: object, right: object) -> bool:
     return _number(left) == _number(right)
 
 
+# What a publish step's NPM_CONFIG_DRY_RUN must read, as the string npm gets, in each case: a tag push publishes for real
+# (`false`, not an empty string), a manual run with dry_run=true publishes nothing, a manual run with dry_run=false is real.
 DRY_RUN_SCENARIOS = (
-    ("a tag push (no inputs)", {"github.event_name": "push", "inputs.dry_run": None, "github.event.inputs.dry_run": None}, True),
-    ("a manual run with dry_run=true", {"github.event_name": "workflow_dispatch", "inputs.dry_run": True, "github.event.inputs.dry_run": "true"}, False),
-    ("a manual run with dry_run=false", {"github.event_name": "workflow_dispatch", "inputs.dry_run": False, "github.event.inputs.dry_run": "false"}, True),
+    ("a tag push (no inputs)", {"github.event_name": "push", "inputs.dry_run": None, "github.event.inputs.dry_run": None}, "false"),
+    ("a manual run with dry_run=true", {"github.event_name": "workflow_dispatch", "inputs.dry_run": True, "github.event.inputs.dry_run": "true"}, "true"),
+    ("a manual run with dry_run=false", {"github.event_name": "workflow_dispatch", "inputs.dry_run": False, "github.event.inputs.dry_run": "false"}, "false"),
+)
+# A publish step's environment entry (10 spaces: under the step's `env:`), the way npm reads `npm_config_*`: any case, `_` or `-`.
+DRY_RUN_ENV = re.compile(r"^ {10}(npm_config_dry[_-]run):[ \t]*(.*?)[ \t]*$", re.IGNORECASE)
+# Every other way to switch npm into a dry run: the variable in any spelling and place, `npm … set … dry-run` (`npm config set`,
+# `npm c set`, `npm set`, with options or a location in between) and the setting written as an `.npmrc` entry.
+DRY_RUN_SETTING = re.compile(
+    r"npm_config_dry[_-]run|\bnpm\b[^\n;&|]*?\bset\b[^\n;&|]*?\bdry[_-]run\b|npmrc[^\n]*\bdry[_-]run\b|\bdry[_-]run[^\n]*npmrc|^[\s\"']*dry[_-]run[ \t]*=",
+    re.IGNORECASE,
 )
 
 
@@ -835,14 +841,38 @@ def _step_condition(step: str) -> str | None:
     match = re.search(r"^ {8}if:[ \t]*(.*?)[ \t]*$", step, re.MULTILINE)
     if not match:
         return None
-    value = match.group(1)
+    return _unwrap(match.group(1))
+
+
+def _unwrap(value: str) -> str:
     wrapped = re.fullmatch(r"\$\{\{\s*(.*?)\s*\}\}", value)
     return wrapped.group(1) if wrapped else value
 
 
+def _render(value: object) -> str:
+    """A value as Actions writes it into an environment variable or a string."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float):
+        return str(int(value)) if value == int(value) else repr(value)
+    return str(value)
+
+
+def _uncommented(text: str) -> list[str]:
+    return [line for line in text.splitlines() if not line.lstrip().startswith("#")]
+
+
+def _publishes(step: str) -> bool:
+    return any("npm publish" in line for line in _uncommented(step))
+
+
 def dry_run_errors(text: str, workflow: str) -> list[str]:
-    """A manual run is a dry run unless told otherwise, and a dry run skips the five `npm publish` steps and nothing else.
-    The condition is read as Actions reads it: it must publish on a tag push (no inputs), skip on dry_run=true and publish on false."""
+    """A manual run is a dry run unless told otherwise, and a dry run runs the five `npm publish` commands as a release
+    does, with `NPM_CONFIG_DRY_RUN` set on those steps: no `if:` reads dry_run, no command carries `--dry-run`, and each
+    step's value, read as Actions reads it, is `false` for a tag push (no inputs), `true` for dry_run=true and `false` for
+    dry_run=false. The string `false` is truthy to Actions, so the value is compared, not its truth."""
     errors: list[str] = []
     inputs = re.search(r"^      dry_run:\n((?:        .*\n)+)", text, re.MULTILINE)
     if not inputs or not re.search(r"^        type: boolean$", inputs.group(1), re.MULTILINE) or not re.search(r"^        default: true$", inputs.group(1), re.MULTILINE):
@@ -851,36 +881,334 @@ def dry_run_errors(text: str, workflow: str) -> list[str]:
         job = _job_block(text, name)
         job_if = _field(job, "if")
         if job_if is not None and "dry_run" in job_if:
-            errors.append(f"{workflow}: job `{name}` has an `if:` on dry_run; only the `npm publish` steps may be skipped by it")
+            errors.append(f"{workflow}: job `{name}` has an `if:` on dry_run; a dry run skips nothing")
         publishes = 0
         for step in _steps(job):
             title = step.splitlines()[0].strip()
             condition = _step_condition(step)
-            if "npm publish" in step:
-                publishes += 1
-                if condition is None:
-                    errors.append(f"{workflow}: `{title}` has no `if:` that skips it on a dry run")
-                    continue
+            if condition is not None and "dry_run" in condition:
+                errors.append(f"{workflow}: `{title}` has an `if:` on dry_run; a dry run skips nothing (the publish steps carry NPM_CONFIG_DRY_RUN instead)")
+            if not _publishes(step):
+                continue
+            publishes += 1
+            if any("npm publish" in line and "--dry-run" in line for line in _uncommented(step)):
+                errors.append(f"{workflow}: `{title}` writes `--dry-run` in the command; a release runs the same command and must publish")
+            settings = [match for match in map(DRY_RUN_ENV.match, step.splitlines()) if match]
+            if not settings:
+                errors.append(f"{workflow}: `{title}` has no NPM_CONFIG_DRY_RUN in its `env:`")
+            for setting in settings:
+                value = setting.group(2)
+                expression = re.fullmatch(r"\$\{\{\s*(.*?)\s*\}\}", value)
                 for label, context, want in DRY_RUN_SCENARIOS:
                     try:
-                        got = _truthy(_Cond(condition, context).parse())
+                        got = _render(_Cond(expression.group(1), context).parse()) if expression else value.strip("\"'")
                     except ValueError as error:
-                        errors.append(f"{workflow}: `{title}`: the condition `{condition}` cannot be read ({error})")
+                        errors.append(f"{workflow}: `{title}`: `{value}` cannot be read ({error})")
                         break
                     if got != want:
-                        verb = "publish" if want else "skip"
-                        note = " (a tag push has no inputs: it is always a real release)" if want and "tag" in label else ""
-                        errors.append(f"{workflow}: `{title}`: the condition `{condition}` must {verb} for {label}{note}")
-            elif condition is not None and "dry_run" in condition:
-                errors.append(f"{workflow}: `{title}` is not a publish step; an `if:` on dry_run belongs to the `npm publish` steps only")
+                        errors.append(f"{workflow}: `{title}`: {setting.group(1)} must read `{want}` for {label}, reads `{got}`")
         if publishes and name != "publish":
             errors.append(f"{workflow}: `npm publish` belongs to the `publish` job, found in `{name}`")
     return errors
 
 
+def dry_run_setting_errors(text: str, workflow: str) -> list[str]:
+    """npm's dry run is set on the five publish steps and nowhere else: on a job or the workflow it would also stop
+    `npm install -g npm@…` from installing in a dry run; the other ways in are another step's `env:`, a write to
+    `$GITHUB_ENV`, `npm config set dry-run` (any options, any alias) and a `dry-run=` entry written into an `.npmrc`. The name is read in any case and as `dry_run` or `dry-run`."""
+    allowed: set[int] = set()
+    position = 0
+    for step in _steps(text):
+        if _publishes(step):
+            allowed.update(position + offset for offset, line in enumerate(step.split("\n")) if DRY_RUN_ENV.match(line))
+        position += step.count("\n") + 1
+    errors: list[str] = []
+    for number, line in enumerate(text.splitlines()):
+        if number not in allowed and not line.lstrip().startswith("#") and DRY_RUN_SETTING.search(line):
+            errors.append(f"{workflow}:{number + 1}: npm's dry run is set on the `npm publish` steps only: `{line.strip()}`")
+    return errors
+
+
+def _run_script(step: str) -> str:
+    """The body of a step's `run:` (block scalar or one line), comments included."""
+    lines = step.splitlines()
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)(- )?run:[ \t]*(.*)$", line)
+        if not match:
+            continue
+        key_indent = len(match.group(1)) + (2 if match.group(2) else 0)
+        if not re.fullmatch(r"[|>][+-]?\d*", match.group(3).strip()):
+            return match.group(3)
+        body: list[str] = []
+        for follow in lines[index + 1 :]:
+            if follow.strip() and len(follow) - len(follow.lstrip()) <= key_indent:
+                break
+            body.append(follow)
+        return "\n".join(body)
+    return ""
+
+
+def _whoami_calls(script: str) -> list[int]:
+    """The line (0-based) of every `npm … whoami` in a shell script, whatever its form: in a simple command an unquoted
+    `npm` word followed by a `whoami` word is a call, so an assignment, `env`, `command`, `timeout 30`, `time`, `exec` in
+    front and options (`--loglevel=error`, `--registry <url>`) in between do not matter. Text in quotes and comments is
+    not read; `$( )` and backticks are, quotes or not. Line continuations join."""
+    calls: list[int] = []
+    heredocs: list[str] = []
+    saved: list[tuple[list[tuple[str, int]], str, bool, int]] = []
+    modes = ["code"]
+    words: list[tuple[str, int]] = []
+    word = ""
+    open_word = False
+    word_line = 0
+    line = 0
+
+    def end_word() -> None:
+        nonlocal word, open_word
+        if open_word:
+            words.append((word, word_line))
+        word, open_word = "", False
+
+    def end_command() -> None:
+        nonlocal words
+        end_word()
+        for index, (first, first_line) in enumerate(words):
+            if first.rsplit("/", 1)[-1] == "npm" and any(later == "whoami" for later, _ in words[index + 1 :]):
+                calls.append(first_line)
+                break
+        words = []
+
+    def add(char: str) -> None:
+        nonlocal word, open_word, word_line
+        if not open_word:
+            open_word, word_line = True, line
+        word += char
+
+    def open_substitution(kind: str) -> None:
+        nonlocal words, word, open_word, word_line
+        saved.append((words, word, open_word, word_line))
+        words, word, open_word = [], "", False
+        modes.append(kind)
+
+    def close_substitution() -> None:
+        nonlocal words, word, open_word, word_line
+        end_command()
+        words, word, open_word, word_line = saved.pop()
+        modes.pop()
+        add("\0")
+
+    i = 0
+    while i < len(script):
+        char = script[i]
+        mode = modes[-1]
+        pair = script[i : i + 2]
+        if mode == "sq":
+            if char == "'":
+                modes.pop()
+                add("\0")
+            elif char == "\n":
+                line += 1
+        elif mode == "dq":
+            if char == '"':
+                modes.pop()
+                add("\0")
+            elif char == "\\" and i + 1 < len(script):
+                line += script[i + 1] == "\n"
+                i += 1
+            elif pair == "$(":
+                open_substitution("paren")
+                i += 1
+            elif pair == "${":
+                open_substitution("brace")
+                i += 1
+            elif char == "`":
+                open_substitution("bt")
+            elif char == "\n":
+                line += 1
+        else:
+            if char == "\\" and i + 1 < len(script):
+                if script[i + 1] == "\n":
+                    line += 1
+                else:
+                    add(script[i + 1])
+                i += 1
+            elif char == "'":
+                modes.append("sq")
+            elif char == '"':
+                modes.append("dq")
+            elif pair == "$(":
+                open_substitution("paren")
+                i += 1
+            elif pair == "${":
+                open_substitution("brace")
+                i += 1
+            elif char == "}" and mode == "brace":
+                close_substitution()
+            elif pair == "<<":
+                end_word()
+                if script[i : i + 3] == "<<<":
+                    i += 2
+                else:
+                    k = i + 2
+                    if script[k : k + 1] == "-":
+                        k += 1
+                    while k < len(script) and script[k] in " \t":
+                        k += 1
+                    delimiter = ""
+                    while k < len(script) and script[k] not in " \t\n;&|<>()":
+                        if script[k] not in "'\"\\":
+                            delimiter += script[k]
+                        k += 1
+                    heredocs.append(delimiter)
+                    i = k - 1
+            elif char in "<>":
+                end_word()
+            elif char == "`":
+                if mode == "bt":
+                    close_substitution()
+                else:
+                    open_substitution("bt")
+            elif char == "(":
+                end_command()
+                modes.append("sub")
+            elif char == ")":
+                if mode == "paren":
+                    close_substitution()
+                else:
+                    end_command()
+                    if mode == "sub":
+                        modes.pop()
+            elif char == "#" and not open_word and mode != "brace":
+                while i + 1 < len(script) and script[i + 1] != "\n":
+                    i += 1
+            elif char in " \t":
+                end_word()
+            elif char == "\n":
+                end_command()
+                line += 1
+                while heredocs:
+                    delimiter = heredocs.pop(0)
+                    j = i + 1
+                    while j < len(script):
+                        eol = script.find("\n", j)
+                        eol = len(script) if eol < 0 else eol
+                        done = script[j:eol].strip() == delimiter
+                        line += eol < len(script)
+                        j = eol + 1
+                        if done:
+                            break
+                    i = j - 1
+            elif char in ";&|":
+                end_command()
+            else:
+                add(char)
+        i += 1
+    while saved:
+        close_substitution()
+    end_command()
+    return calls
+
+
+_TARBALL_ASSIGN = re.compile(r"(?:^|[;&|(){]|\bthen\b|\bdo\b|\belse\b)[ \t]*(?:(?:export|declare|typeset|readonly|local)\b(?:[ \t]+-[A-Za-z]+)*[ \t]+)?TARBALL=(\S*)", re.MULTILINE)
+_TARBALL_OTHER_SOURCE = re.compile(r"\bfor[ \t]+TARBALL\b|\bread\b[^\n;&|]*\bTARBALL\b|\bprintf[ \t]+-v[ \t]+TARBALL\b|\b(?:mapfile|readarray)\b[^\n;&|]*\bTARBALL\b|\bTARBALL\+=")
+
+
+def tarball_errors(text: str, workflow: str) -> list[str]:
+    """npm reads `a/b.tgz` as the GitHub shorthand `owner/repo` and runs `git ls-remote` (0.42.0's tag run stopped at its first
+    publish so); a path is a tarball only with `./`, `../` or `/` in front. Each publish step of `npm publish "$TARBALL"` assigns
+    TARBALL in its own `run:` a value that starts so, whatever the quotes, `export`/`declare`/`readonly`/`local` in front.
+    A value that starts with a command substitution cannot be read and is refused; so is any other source of TARBALL: the
+    step's `env:`, `$GITHUB_ENV`, `for`, `read` and `printf -v`."""
+    errors: list[str] = []
+    for step in _steps(text):
+        title = step.splitlines()[0].strip()
+        code = "\n".join(_uncommented(step))
+        if "GITHUB_ENV" in code and "TARBALL" in code:
+            errors.append(f"{workflow}: `{title}` writes TARBALL through $GITHUB_ENV; the publish step must assign it itself")
+        if not re.search(r"\bnpm[ \t]+publish\b[^\n]*\$\{?TARBALL\b", code):
+            continue
+        if re.search(r"^\s+[\"']?TARBALL[\"']?:", code, re.MULTILINE):
+            errors.append(f"{workflow}: `{title}` takes TARBALL from its `env:`; the publish step must assign it in its script")
+        script = "\n".join(_uncommented(_run_script(step)))
+        if _TARBALL_OTHER_SOURCE.search(script):
+            errors.append(f"{workflow}: `{title}` takes TARBALL from `for`, `read`, `mapfile`, `+=` or `printf -v`; the publish step must assign it directly")
+        values = [match.group(1).lstrip("\"'") for match in _TARBALL_ASSIGN.finditer(script)]
+        if not values:
+            errors.append(f"{workflow}: `{title}` assigns TARBALL no readable value (npm reads a/b.tgz as a GitHub repo)")
+        for value in values:
+            if not value.startswith(("./", "../", "/")):
+                errors.append(f"{workflow}: `{title}`: TARBALL=\"{value}\" must start with ./, ../ or / (npm reads a/b.tgz as a GitHub repo)")
+    return errors
+
+
+# The output of the `scope` job that every other build job reads, as `needs.scope.outputs.skip` is in each case: only
+# an explicit `true` skips; no output, an empty one or the wrong word builds.
+SCOPE_SCENARIOS = (
+    ("skip=true", "true", False),
+    ("skip=false", "false", True),
+    ("an empty skip", "", True),
+    ("no skip output", None, True),
+)
+
+
+def scope_errors(text: str, workflow: str) -> list[str]:
+    """build-native.yml builds when its `scope` job says so, never by a `paths:` filter (GitHub reads the first 3,000
+    changed files only: 0.42's 4,043-file release PR skipped the build). Every job but `scope` and `safety` waits for
+    `scope` and runs unless its `skip` output is exactly `true`, so a missing output, a wrong name or an empty value builds,
+    and a job that needs a positive value to run is refused."""
+    errors: list[str] = []
+    lines = text.splitlines()
+    start = next((i for i, line in enumerate(lines) if line.rstrip() == "on:"), None)
+    if start is not None:
+        block: list[str] = []
+        for line in lines[start + 1 :]:
+            if line and not line.startswith((" ", "#")):
+                break
+            block.append(line)
+        trigger = next((i for i, line in enumerate(block) if re.match(r"^  pull_request:", line)), None)
+        if trigger is not None:
+            inline = block[trigger].split(":", 1)[1]
+            body = []
+            for line in block[trigger + 1 :]:
+                if line.strip() and not line.startswith("    "):
+                    break
+                body.append(line)
+            if re.search(r"\bpaths(?:-ignore)?\b", "\n".join([inline, *body])):
+                errors.append(f"{workflow}: `pull_request` has a `paths` or `paths-ignore` filter; the `scope` job decides what builds")
+    scope = _job_block(text, "scope")
+    if not scope:
+        errors.append(f"{workflow}: no `scope` job to decide whether the builds run")
+    else:
+        if _field(scope, "if") is not None or any(_step_condition(step) is not None for step in _steps(scope)):
+            errors.append(f"{workflow}: the `scope` job and its steps have no `if:`; a skipped `scope` skips every build job (only an explicit skip=true skips)")
+        if _field(scope, "timeout-minutes") != "5":
+            errors.append(f"{workflow}: the `scope` job has `timeout-minutes: 5`")
+        if not re.search(r"^    outputs:\n(?:      .*\n)*?      skip:", scope + "\n", re.MULTILINE):
+            errors.append(f"{workflow}: the `scope` job must output `skip`")
+    for name in _job_names(text):
+        if name in ("scope", "safety"):
+            continue
+        job = _job_block(text, name)
+        if "scope" not in _needs(job):
+            errors.append(f"{workflow}: job `{name}` must wait for `scope` (needs: {sorted(_needs(job))})")
+        condition = _field(job, "if")
+        if condition is None:
+            errors.append(f"{workflow}: job `{name}` has no `if:` that skips it when `scope` says skip")
+            continue
+        for label, value, want in SCOPE_SCENARIOS:
+            try:
+                got = _truthy(_Cond(_unwrap(condition), {"needs.scope.outputs.skip": value}).parse())
+            except ValueError as error:
+                errors.append(f"{workflow}: job `{name}`: the condition `{condition}` cannot be read ({error})")
+                break
+            if got != want:
+                errors.append(f"{workflow}: job `{name}`: the condition `{condition}` must {'build' if want else 'skip'} for {label}")
+    return errors
+
+
 def preflight_errors(text: str, workflow: str) -> list[str]:
     """The pre-flight runs in a dry run too; `npm whoami` only while some package is not on npm; a recovery with
-    dry_run fails early; the already-published message names `recovery=true` and `dry_run=false`."""
+    dry_run fails early."""
     errors: list[str] = []
     publish = _job_block(text, "publish")
     step = _step_block(publish, "Pre-flight npm release state (fresh-release gate + recovery + first-publish token)")
@@ -890,19 +1218,12 @@ def preflight_errors(text: str, workflow: str) -> list[str]:
         errors.append(f"{workflow}: the pre-flight is read-only and runs in a dry run: it has no `if:`")
     if "npm view" not in step:
         errors.append(f"{workflow}: the pre-flight must ask npm (`npm view`) whether each package exists")
+    script = _run_script(step)
     stack: list[tuple[str, bool]] = []  # (condition, in its then-branch)
-    whoami = 0
-    unguarded = 0
-    for raw in step.splitlines():
+    guarded_at: list[bool] = []  # per line of the script: inside `if [ -n "$ABSENT" ]; then`
+    for raw in script.splitlines():
         line = raw.strip()
-        if line.startswith("#"):
-            continue
-        # Every call counts: bare, `if [!] npm whoami`, `$(npm whoami)`, `VAR=$(npm whoami)`, after `;`/`&&`/`||`/`then`.
-        # An `echo "...npm whoami..."` message is text, not a call.
-        if re.search(r"(?:^|[;&|(!`]|\bif|\bthen|\bdo|\belse)\s*npm whoami\b", line):
-            whoami += 1
-            if not any(cond == '[ -n "$ABSENT" ]' and then for cond, then in stack):
-                unguarded += 1
+        guarded_at.append(any(cond == '[ -n "$ABSENT" ]' and then for cond, then in stack))
         if re.match(r"^if .*; then$", line):
             stack.append((line[3:-6].strip(), True))
         elif line.startswith("elif ") or line == "else":
@@ -910,12 +1231,12 @@ def preflight_errors(text: str, workflow: str) -> list[str]:
                 stack[-1] = (stack[-1][0], False)
         elif line == "fi" and stack:
             stack.pop()
-    if whoami == 0:
+    calls = _whoami_calls(script)
+    unguarded = [line for line in calls if not guarded_at[line]]
+    if not calls:
         errors.append(f"{workflow}: the pre-flight must run `npm whoami` while a package is missing from npm (a first publish needs the token)")
     elif unguarded:
-        errors.append(f"{workflow}: every `npm whoami` in the pre-flight must run only under `if [ -n \"$ABSENT\" ]; then` (a package of the set is not on npm); once all are, trusted publishing needs no token ({unguarded} of {whoami} do not)")
-    if "recovery=true and dry_run=false" not in step:
-        errors.append(f"{workflow}: the already-published message must name `recovery=true and dry_run=false`")
+        errors.append(f"{workflow}: every `npm whoami` in the pre-flight must run only under `if [ -n \"$ABSENT\" ]; then` (a package of the set is not on npm); once all are, trusted publishing needs no token ({len(unguarded)} of {len(calls)} do not)")
     read_version = _job_block(text, "read-version")
     refuse = next((s for s in _steps(read_version) if "DRY_RUN" in s and "RECOVERY" in s), "")
     if not refuse or "exit 1" not in refuse or '"${RECOVERY:-false}" = "true"' not in refuse or '"${DRY_RUN:-false}" = "true"' not in refuse:
@@ -1448,6 +1769,10 @@ def main(argv: list[str] | None = None) -> int:
     ERRORS.extend(smoke_errors(publish_text, build_text, other_texts))
     ERRORS.extend(dry_run_errors(publish_text, "publish.yml"))
     ERRORS.extend(preflight_errors(publish_text, "publish.yml"))
+    ERRORS.extend(scope_errors(build_text, "build-native.yml"))
+    ERRORS.extend(tarball_errors(publish_text, "publish.yml"))
+    for name, text in workflow_texts.items():
+        ERRORS.extend(dry_run_setting_errors(text, name))
 
     # 7. Repo-root hygiene. An agent-authored patch fragment landed at the
     #    repo root in s43 round 7 and was committed by a `git add -A`: a file

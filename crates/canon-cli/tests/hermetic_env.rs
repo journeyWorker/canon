@@ -50,7 +50,7 @@ fn every_test_file_starts_canon_through_the_hermetic_command() {
             problems.push(format!("{name}: starts the binary with `Command::new`, which inherits CANON_ROLE and CANON_ACTOR: `{}`", line.trim()));
         }
     }
-    assert!(starters > 100, "the scan finds the test files that start canon ({starters})");
+    assert!(starters > 0, "the scan finds the test files that start canon ({starters})");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 

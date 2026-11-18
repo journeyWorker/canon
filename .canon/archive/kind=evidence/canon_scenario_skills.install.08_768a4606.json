@@ -1,0 +1,83 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T14:10:57.773220693Z",
+  "attachments": [
+    {
+      "case": "canonical_check_and_doctor_report_legacy_codex_remnant_with_fix",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "canonical_codex_projects_agents_skill_with_frontmatter_and_sidecars",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "canonical_legacy_codex_migration_keeps_files_the_lock_does_not_prove",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "canonical_legacy_codex_migration_keeps_user_files_and_is_idempotent",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "canonical_legacy_codex_migration_removes_emptied_skills_dir_but_keeps_codex_root",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "canonical_legacy_codex_migration_never_deletes_through_a_symlinked_legacy_dir",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "install_materializes_claude_and_codex_and_lock",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    },
+    {
+      "case": "skills_install_50_codex_is_detected_from_codex_never_from_agents_alone",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "8f646babe61b37e60d46916c2c88e85fb68d2980c4b5d3159ee7e1b31a9c73d5"
+    }
+  ],
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "bound to the workspace nextest run (3980 passed, 1 skipped) at 11acda0de on Rust 1.100.0: the cases its previous record named by command"
+  },
+  "evidence_sha": "11acda0de760a28d1930db96b60826c66cee66a8",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1348,
+  "scenario_id": "skills.install.08",
+  "schema": 1,
+  "staging_id": "adbcf5f8",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

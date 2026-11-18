@@ -58,7 +58,7 @@ impl Acceptance {
             Some(expiry) => format!("expires {}", expiry.format("%Y-%m-%d")),
             None => "no expiry".to_string(),
         };
-        let relayed = self.relay.as_ref().map(|r| format!(" (relayed by {} {} via {})", r.role, r.actor, r.tool)).unwrap_or_default();
+        let relayed = self.relay.as_ref().map_or_default(|r| format!(" (relayed by {} {} via {})", r.role, r.actor, r.tool));
         format!("accepted-divergence {} — {} ({expires}){relayed}", self.scenario_id.as_str(), self.tracking)
     }
 }

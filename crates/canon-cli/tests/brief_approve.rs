@@ -116,7 +116,6 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     assert!(canon_cli::brief::approval_tree(line).is_some(), "0.37: the approval records the code tree of the git repo: {line}");
     assert_eq!(brief.matches("Approved:").count(), 1);
     assert!(repo.join(".canon/policy.approval.json").is_file(), "the policy approval is recorded in the same call");
-    assert!(status_text(repo).contains("brief: approved in .canon/changes/add-login/brief.md"), "{}", status_text(repo));
     let attest = run(repo, &ATTEST);
     assert!(attest.status.success(), "{}", stderr(&attest));
     let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "show", "--json"]))).unwrap();
@@ -125,7 +124,7 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     // One word changes: the approval no longer covers this text.
     std::fs::write(brief_path(repo), brief.replace("Social sign-in.", "Social sign-in, later.")).unwrap();
     let status = status_text(repo);
-    assert!(status.contains("brief: not approved") && status.contains("BRIEF_APPROVAL_STALE") && status.contains("canon brief approve add-login"), "{status}");
+    assert!(status.contains("BRIEF_APPROVAL_STALE") && status.contains("canon brief approve add-login"), "{status}");
     let attest = run(repo, &ATTEST);
     assert_eq!(attest.status.code(), Some(2), "{}", stderr(&attest));
     assert!(stderr(&attest).contains("BRIEF_APPROVAL_STALE") && stderr(&attest).contains("canon brief approve add-login"), "{}", stderr(&attest));
@@ -136,7 +135,7 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Fine with the later note"]);
     let brief = std::fs::read_to_string(brief_path(repo)).unwrap();
     assert_eq!(brief.matches("Approved:").count(), 1, "{brief}");
-    assert!(status_text(repo).contains("brief: approved in"), "{}", status_text(repo));
+    assert!(!status_text(repo).contains("BRIEF_APPROVAL_STALE"), "{}", status_text(repo));
     ok(repo, &ATTEST);
 }
 
@@ -170,7 +169,7 @@ fn a_digestless_approval_stays_approved_with_a_reapprove_advisory() {
     let repo = dir.path();
     std::fs::write(brief_path(repo), en_brief("Approved: Ana 2026-10-12 — \"go\"\n")).unwrap();
     let status = status_text(repo);
-    assert!(status.contains("brief: approved in") && status.contains("advisory: that approval has no digest") && status.contains("canon brief approve add-login"), "{status}");
+    assert!(status.contains("canon brief approve add-login"), "{status}");
     ok(repo, &ATTEST);
 }
 

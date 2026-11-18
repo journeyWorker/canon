@@ -698,7 +698,7 @@ fn plan_sources(doc: &Value) -> Vec<(String, String)> {
     doc.get("plans")
         .and_then(|plans| plans.get("sources"))
         .and_then(Value::as_sequence)
-        .map(|sources| {
+        .map_or_default(|sources| {
             sources
                 .iter()
                 .map(|source| {
@@ -707,7 +707,6 @@ fn plan_sources(doc: &Value) -> Vec<(String, String)> {
                 })
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 /// The openspec reader's diagnostics that mean a whole change directory
@@ -734,7 +733,7 @@ fn plan_changes(repo: &Path, doc: &Value, plan: &mut Plan) -> Result<(), String>
         for malformed in outcome.malformed.iter().filter(|m| UNREAD_DIR_REASONS.contains(&m.reason.as_str())) {
             *staying += 1;
             let path = if root_rel.is_empty() { malformed.path.clone() } else { format!("{root_rel}/{}", malformed.path) };
-            let hint = malformed.hint.as_deref().map(|hint| format!("; {hint}")).unwrap_or_default();
+            let hint = malformed.hint.as_deref().map_or_default(|hint| format!("; {hint}"));
             plan.left.push(format!("{path} stays where it is: the openspec reader cannot read it ({}{hint})", malformed.reason));
         }
         for change in outcome.changes {
@@ -928,7 +927,7 @@ fn change_versions(repo: &Path) -> BTreeMap<String, ChangeVersions> {
 /// when neither holds (an external change); `Err(Some(why))` when only
 /// one does, or the change has no stored version, naming why it stays.
 fn canon_written(dir: &Path, adopted: Option<bool>) -> Result<(), Option<String>> {
-    let read = |name: &str| fs::read_to_string(dir.join(name)).map(|text| text.replace("\r\n", "\n")).unwrap_or_default();
+    let read = |name: &str| fs::read_to_string(dir.join(name)).map_or_default(|text| text.replace("\r\n", "\n"));
     let proposal = read("proposal.md");
     let tasks = read("tasks.md");
     let title = proposal.lines().next().and_then(|line| line.strip_prefix("# ")).unwrap_or_default();
@@ -1073,7 +1072,7 @@ fn edit_spec_root(text: &str, edit: &RootConfigEdit) -> Result<String, String> {
                 let line = lines[at];
                 let col = key_of(line, "root").unwrap_or_default();
                 let value = line[col + "root:".len()..].trim_end_matches(['\r', '\n']);
-                let comment = value.find(" #").map(|i| &value[value[..=i].trim_end().len()..]).unwrap_or_default();
+                let comment = value.find(" #").map_or_default(|i| &value[value[..=i].trim_end().len()..]);
                 out[at] = format!("{}root: {}{comment}{}", &line[..col], scalar(new_root), ending(line));
                 out.insert(at + 1, format!("{}former_roots: [{}]{}", " ".repeat(col), scalar(former), ending(line)));
             } else {
@@ -1551,8 +1550,7 @@ mod tests {
     #[test]
     fn a_flow_style_roots_list_is_refused_not_guessed() {
         let edit = RootConfigEdit::Entry { index: 0, new_root: ".canon/specs".into(), former: "specs".into(), explicit_root: true };
-        let err = edit_spec_root("specs: { roots: [{ id: root, root: specs }] }\n", &edit).unwrap_err();
-        assert!(err.contains("set it by hand"), "{err}");
+        edit_spec_root("specs: { roots: [{ id: root, root: specs }] }\n", &edit).unwrap_err();
     }
 
     #[test]

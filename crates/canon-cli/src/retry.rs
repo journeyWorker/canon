@@ -186,7 +186,7 @@ impl RepeatCorpus {
         }
         if let Some(matches) = followed_by {
             let stored_at = at_of(stored);
-            let later = self.later.get_or_init(|| self.later_source.as_ref().map(|(root, kind)| records_under(root, kind)).unwrap_or_default());
+            let later = self.later.get_or_init(|| self.later_source.as_ref().map_or_default(|(root, kind)| records_under(root, kind)));
             if later.iter().any(|(_, later)| matches(later) && at_of(later) > stored_at) {
                 return None;
             }

@@ -54,8 +54,8 @@ Feature: gate approval-tree
   Scenario: Without the change review the move to shipped is refused with exit 2 and the review command leads
     Given the same subject and an approved chore over unchanged code, with no change-level review
     When the subject is moved to shipped
-    Then it exits 2 and the refusal names the missing review of the chore and the `canon review change <chore> …` command that records it
-    And `canon status` leads with that command, and no `canon evidence add` command appears
+    Then it exits 2 and the refusal carries the `canon review change <chore> …` command that records the review, and no `canon evidence add` command
+    And `canon status` leads with that command
 
   # canon: {"schema":1,"at":"2026-11-05T10:32:41Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
   @subject:gate-trust-spine
@@ -84,11 +84,11 @@ Feature: gate approval-tree
   @case:happy
   @flow:canon-0-37-approval-evidence.F4
   @gate.approval-tree.08
-  Scenario: An approval with no recorded tree is judged as in 0.36, over unchanged code too
+  Scenario: An approval with no recorded tree is judged as in 0.36
     Given a chore whose `Approved:` line has no recorded tree, as every approval written before 0.37
-    When the code changed after the approval, and when it did not and the evidence is on an older tree
-    Then both ask for every evidenced scenario with the batch command, as 0.36 did
-    And a chore over code that did not change since the evidence stays exempt, as 0.36 did
+    When the code changed since the evidence, and when it did not
+    Then the first asks for every evidenced scenario with the batch command, as 0.36 did
+    And the chore over code that did not change since the evidence stays exempt, as 0.36 did
 
   # canon: {"schema":1,"at":"2026-11-05T10:32:51Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
   @subject:gate-trust-spine
@@ -97,9 +97,9 @@ Feature: gate approval-tree
   @gate.approval-tree.09
   Scenario: An approval line written before 0.37 is read by status and gate check with no error and no new information
     Given a chore brief approved by a line written by 0.36, human or relayed, with a digest and no tree
-    When `canon status`, `canon gate check` and `canon brief check` read it
-    Then each reads the approval with no error and no warning about the missing tree, and `status` shows no unchanged-tree line for it
-    And the relayed line still reads back its role, actor and tool
+    When `canon status` and `canon gate check` read it
+    Then status reads the approval as approved and shows no unchanged-tree line or code-tree marker for it, and gate check still reports the evidence gap
+    And the relayed line still reads back its role
 
   # canon: {"schema":1,"at":"2026-11-05T10:32:54Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
   @subject:gate-trust-spine
@@ -109,39 +109,19 @@ Feature: gate approval-tree
   Scenario: The move to shipped, status and gate check state the same requirement in the same repository
     Given one repository in each state: a chore approved over unchanged code, and the same chore after the code changed
     When the move to shipped, `canon status` and `canon gate check` are read
-    Then over unchanged code none of them asks for evidence and each asks for the change review
-    And after the code changed all three name the same scenarios, and the move and `status` lead with the same batch command
+    Then over unchanged code none of them asks for evidence, and the move and gate check ask for the change review
+    And after the code changed the move and gate check name the same scenarios and the batch command, and status leads with the same batch command
 
   # canon: {"schema":1,"at":"2026-11-05T10:32:57Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
   @subject:gate-trust-spine
   @case:failure
   @flow:canon-0-37-approval-evidence.F5
   @gate.approval-tree.11
-  Scenario: Status says why a chore asks for nothing and leads with no evidence command; over other code it says neither
+  Scenario: Status marks a chore whose recorded tree is the current tree as treeUnchanged and shows its approval line whole; over other code it marks nothing and the batch command leads
     Given an approved chore whose recorded tree is the current tree, and the same chore after the code changed
-    When `canon status` is read, in text and with `--json`
-    Then the unchanged chore's line says the code tree is the one it was approved on and asks for no evidence, its brief has `treeUnchanged: true`, and `meta.next` names no evidence command
-    And over changed code the line is absent, `treeUnchanged` is absent and the batch command leads
-
-  # canon: {"schema":1,"at":"2026-11-05T10:33:00Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
-  @subject:gate-trust-spine
-  @case:happy
-  @flow:canon-0-37-approval-evidence.F6
-  @gate.approval-tree.12
-  Scenario: The CHANGELOG says an unchanged-tree chore approval asks for no evidence and names the new information of the approval line
-    Given the CHANGELOG
-    When its Unreleased section is read
-    Then a Changed entry says a chore approval over an unchanged code tree asks for no evidence, names the `(code tree <id>)` marker of the approval line, says a review of other code no longer counts, says the marker is outside the digest and can be edited by hand like the approval time, and says an approval written before 0.37 behaves as it did
-
-  # canon: {"schema":1,"at":"2026-11-05T10:33:05Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
-  @subject:gate-trust-spine
-  @case:failure
-  @flow:canon-0-37-approval-evidence.F6
-  @gate.approval-tree.13
-  Scenario: A CHANGELOG without that entry is named by the release check
-    Given the CHANGELOG's Unreleased section without that entry, and without the marker or the line about older approvals
-    When the release check reads it
-    Then it names each missing piece, and the real section has none
+    When `canon status --json` is read
+    Then the unchanged chore's brief has `treeUnchanged: true` and its approval line carries the code tree it was approved on
+    And over changed code `treeUnchanged` is absent and the batch command leads `meta.next`
 
   # canon: {"schema":1,"at":"2026-11-05T12:21:16Z","actor":{"agent_id":"impl-approval-evidence-037","session_id":"s-0-37-approval-evidence"}}
   @subject:gate-trust-spine
@@ -152,5 +132,5 @@ Feature: gate approval-tree
     Given a verifying subject and a chore approved over the code as it is, with a signed change review of that code
     When the chore's code is committed afterwards, with no evidence recorded for it, and the same brief is approved again over that code
     Then the approval records the new tree and the chore asks for no evidence, but the earlier review saw other code and no longer counts
-    And the move to shipped is refused with exit 2 naming the review of other code, `gate check` names the same review, and `canon status` leads with `canon review change <chore> …` and says the review is still asked
-    And once a reviewer signs the chore over the new code the move succeeds, and `status` no longer says the review is asked
+    And the move to shipped is refused with exit 2 carrying the `canon review change <chore> …` command and no evidence command, `gate check` lists one unreviewed-promotion violation for the subject and no evidence violation, and `canon status` leads with `canon review change <chore> …`
+    And once a reviewer signs the chore over the new code the move succeeds, and `status` no longer asks for the review

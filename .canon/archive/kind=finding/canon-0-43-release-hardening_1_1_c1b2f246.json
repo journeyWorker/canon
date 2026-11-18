@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-release",
+    "role": "reviewer",
+    "session_id": "ses_eb369b3c11493c96ca4c23ba"
+  },
+  "at": "2026-11-17T14:32:46.875590867Z",
+  "change_id": "canon-0-43-release-hardening",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "open",
+  "file_ref": "scripts/check-release-workflow-safety.py:1033-1060",
+  "introduced_by": "be48718542c1b2321b92f2e8d42273dd0ec043c1",
+  "kind": "finding",
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-release",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "P2 (standards; probed on mutated publish.yml): _whoami_calls still passes unguarded calls that I13 says count whatever the form: `npm whoami>/dev/null` and `npm whoami</dev/null` (`<`/`>` are not word breaks, so the word is `whoami>/dev/null`), `X=${Y:-$(npm whoami)}` unquoted (the `${` branch jumps to the first `}` and skips the substitution), and any call after a heredoc whose body has an apostrophe (`can't`, read as an open single quote). Fix: end the word on `<` and `>` in code mode, scan `${...}` with nesting and its `$(`/backticks, and skip heredoc bodies. Blast radius: the shipped pre-flight passes; only a future edit of the pre-flight is exposed.",
+  "worktree_dirty": false
+}

@@ -87,7 +87,7 @@ fn subject_of(record: &EvidenceRecord) -> String {
 /// proves the root loaded successfully once for this same
 /// `GateContext`, so this should not realistically fail independently.
 fn raw_evidence(ledger_root: &Path) -> Vec<canon_model::RawRecord> {
-    GitTier::new(ledger_root).read_history(RecordKind::Evidence).map(|read| read.records).unwrap_or_default()
+    GitTier::new(ledger_root).read_history(RecordKind::Evidence).map_or_default(|read| read.records)
 }
 
 /// Every well-formed ledger [`Review`], indexed for [`TrustRung::classify`]'s

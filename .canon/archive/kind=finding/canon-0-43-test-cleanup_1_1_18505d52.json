@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests",
+    "role": "reviewer",
+    "session_id": "Rev43_tests"
+  },
+  "at": "2026-11-17T14:48:06.193942683Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=atip/contract11.feature:30",
+  "introduced_by": "af3389252eefdf3b1e98bc98617d5e5c7e8a6a78",
+  "kind": "finding",
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-tests",
+  "round": 1,
+  "scenario_ids": [
+    "atip.contract11.04"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, P1] atip.contract11.04's reworded Then still says 'every reason the registry holds is emitted somewhere', but no remaining test asserts it: af3389252 deleted atip_contract11_04_no_source_emits_input_invalid_or_input_too_large_without_a_registered_reason (the only check of 'registered and emitted nowhere' for INPUT_INVALID/INPUT_TOO_LARGE) and ff1fbd6ea retired atip.reasons.02 (the same check for every code). The two bound tests check registry uniqueness, the reserved lists, the debug refusal of an unregistered reason and the corpus's frozen input errors only. I2/I16: a scenario whose check was deleted is reworded, and the reviewer refuses text that names a deleted check. Fix: drop the clause from the Then (or keep a check for it). Not signed. Blast radius: no other scenario claims dead-reason detection now that atip.reasons.02 is retired.",
+  "worktree_dirty": false
+}

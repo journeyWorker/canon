@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests",
+    "role": "reviewer",
+    "session_id": "Rev43_tests"
+  },
+  "at": "2026-11-17T15:56:49.208053305Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=context/capability.feature (context.capability.57)",
+  "introduced_by": "af3389252eefdf3b1e98bc98617d5e5c7e8a6a78",
+  "kind": "finding",
+  "resolution_code_tree": "4f9058b3fe7c7f6dfa87003fa86ee9912b7ebffe",
+  "resolution_sha": "37975fc509b656b71ba912bada89d2bf24807b6c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-tests",
+  "round": 1,
+  "scenario_ids": [
+    "context.capability.57"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, P1] context.capability.57 keeps 'And the skill guide states the rule once: an option that takes an id is the bare noun, and a JSON key is that name without Id' (and 'no option ends in -id' in the docs), but af3389252 cut the guide and old-spelling assertions out of the bound test and ff1fbd6ea renamed it to context_capability_57_the_schema_shows_no_option_ending_in_id; no test asserts the guide sentence. The text was not reworded (I2: a remaining scenario whose check was deleted is reworded) and the scenario was not on the I16 list. Fix: drop the And step. Not signed.",
+  "worktree_dirty": false
+}

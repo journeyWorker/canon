@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-release",
+    "role": "reviewer",
+    "session_id": "ses_eb369b3c11493c96ca4c23ba"
+  },
+  "at": "2026-11-17T14:32:49.308049965Z",
+  "change_id": "canon-0-43-release-hardening",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "open",
+  "file_ref": "scripts/check-release-workflow-safety.py:1071-1072",
+  "introduced_by": "be48718542c1b2321b92f2e8d42273dd0ec043c1",
+  "kind": "finding",
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-release",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "P3 (standards; probed): tarball_errors misses three sources I14 says are all refused: an assignment in a `case` arm (`*-*) TARBALL=tarballs/x.tgz ;;`, `)` is not in the regex's lead-in set), `mapfile -t TARBALL`, and a quoted YAML env key (`\"TARBALL\": tarballs/x.tgz` on the step). Fix: add `)` to the lead-in alternation, `mapfile|readarray` to _TARBALL_OTHER_SOURCE, and accept optional quotes in the env-key regex.",
+  "worktree_dirty": false
+}

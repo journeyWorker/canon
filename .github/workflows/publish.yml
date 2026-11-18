@@ -10,8 +10,10 @@ run-name: "release ${{ github.ref_name }}${{ github.event_name == 'workflow_disp
 # friendly invocation while the installed bin stays `canon`; platform
 # binaries are `@journeykit/canon-core-<platform>`.
 #
-# Runners are pinned images, never `-latest` (the newest image, its label
-# written down): `macos-26`, `ubuntu-26.04`, `ubuntu-26.04-arm`, `windows-2025`.
+# Runners are pinned images, never `-latest` (their labels written down):
+# `macos-15`, `ubuntu-26.04`, `ubuntu-26.04-arm`, `windows-2025`. macOS arm64
+# moved from `macos-26` to `macos-15` in 0.43 after `macos-26` was never
+# assigned a runner in the 0.43 dry runs (owner decision, release-hardening brief).
 # scripts/check-release-workflow-safety.py fails a job on any other label.
 #
 # Version source of truth: the root Cargo.toml's [workspace.package]
@@ -21,9 +23,22 @@ run-name: "release ${{ github.ref_name }}${{ github.event_name == 'workflow_disp
 # is verified against Cargo.toml before anything publishes.
 #
 # Dry run: a manual run (`workflow_dispatch`) takes `dry_run`, true by default.
-# It builds, checks, smokes and packs exactly as a release does and skips only
-# the five `npm publish` steps; a tag push has no input and always publishes.
-# Run it on the version-bump commit before the tag.
+# It builds, checks, smokes, packs and runs the five `npm publish` commands
+# exactly as a release does, each with NPM_CONFIG_DRY_RUN=true so npm publishes
+# nothing; a tag push has no input and always publishes. Run it on the
+# version-bump commit before the tag. It cannot prove what `npm publish
+# --dry-run` never touches: the token's write access, trusted publishing
+# (OIDC), the provenance signature, a version already on npm.
+#
+# If a build row never starts (macOS arm64 capacity): the job shows `cancelled`
+# after about 15 minutes with no steps run, and its annotation says `The job
+# was not acquired by Runner of type hosted even after multiple attempts`.
+# Run `gh run rerun <run id> --failed`: only that job and the jobs after it
+# (smokes, package, publish) run again, and the other rows' artifacts are
+# reused. Do not retag. Nothing was published (the publish job never started),
+# so a rerun of a tag run goes on to publish for real and its pre-flight runs
+# as at the first time. A longer `timeout-minutes` does not help: it counts
+# from the moment a runner takes the job.
 #
 # Prereleases: a version with a hyphen (`0.35.0-rc.1`, tag `v0.35.0-rc.1`)
 # publishes under the `next` dist-tag in every `npm publish` step
@@ -209,7 +224,7 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-26
+          - host: macos-15
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             package_name: "@journeykit/canon-core-darwin-arm64"
@@ -225,7 +240,7 @@ jobs:
             package_name: "@journeykit/canon-core-linux-arm64"
             binary_ext: ""
             lg_page: "16"
-            alpine_image: rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383
+            alpine_image: rust:1.100.0-alpine3.24@sha256:de1e0058543a81ed7b046629167db587c67a94bdf37cce14eb27f0ec83baaffb
           - host: windows-2025
             target: x86_64-pc-windows-msvc
             package_dir: core-win32-x64
@@ -698,13 +713,16 @@ jobs:
       # (its optionalDependencies point at the platform packages, which
       # must already resolve on npm). Each step is idempotent: a re-run /
       # a recovery pass skips whatever already shipped at $VERSION.
-      # A dry run skips these five steps and no other.
+      # A dry run runs these five steps too, with the same commands: each sets NPM_CONFIG_DRY_RUN (true for a manual
+      # run with dry_run, false for a tag push and for dry_run=false), and the publish then writes nothing to the
+      # registry. The variable lives on these five steps only: set on the job, it would also stop the
+      # `npm install -g npm` above in a dry run. scripts/check-release-workflow-safety.py reads all of this.
       - name: Publish @journeykit/canon-core-linux-arm64 (idempotent)
-        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
           PACKAGE: "@journeykit/canon-core-linux-arm64"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           set -euo pipefail
           TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
@@ -718,11 +736,11 @@ jobs:
           fi
 
       - name: Publish @journeykit/canon-core-darwin-arm64 (idempotent)
-        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
           PACKAGE: "@journeykit/canon-core-darwin-arm64"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           set -euo pipefail
           TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
@@ -736,11 +754,11 @@ jobs:
           fi
 
       - name: Publish @journeykit/canon-core-linux-x64 (idempotent)
-        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
           PACKAGE: "@journeykit/canon-core-linux-x64"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           set -euo pipefail
           TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
@@ -754,11 +772,11 @@ jobs:
           fi
 
       - name: Publish @journeykit/canon-core-win32-x64 (idempotent)
-        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
           PACKAGE: "@journeykit/canon-core-win32-x64"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           set -euo pipefail
           TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"
@@ -772,11 +790,11 @@ jobs:
           fi
 
       - name: Publish @journeykit/canon launcher (idempotent)
-        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           VERSION: ${{ needs.read-version.outputs.version }}
           PACKAGE: "@journeykit/canon"
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           set -euo pipefail
           TARBALL="./tarballs/$(echo "${PACKAGE#@}" | tr / -)-$VERSION.tgz"

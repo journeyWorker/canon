@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests",
+    "role": "reviewer",
+    "session_id": "Rev43_tests"
+  },
+  "at": "2026-11-17T15:56:53.758961326Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "c3f3f7c271120eb5372352773b42a933a34c569e",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/schema_doc.rs:1048-1073",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "4f9058b3fe7c7f6dfa87003fa86ee9912b7ebffe",
+  "resolution_sha": "37975fc509b656b71ba912bada89d2bf24807b6c",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "52e0967ac42a22746716da4652536f425bf1f95b",
+  "reviewer": "rev-0-43-tests",
+  "round": 1,
+  "scenario_ids": [
+    "atip.schemadoc.13"
+  ],
+  "schema": 2,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "[standards, P2] atip_schemadoc_13 still compares the checked-in docs/cli/canon.cli.json with prose: file.tree == described.tree() (line 1048) and each answer's data == the file's document (1073), summaries and help included. Probe at 52e0967ac: rewording the change new summary, its --subject help, the CHANGE_EXISTS message and hint and one status next-step reason left atip_contract11, change, cli_spec, conformance_corpus_replays and docs_generated green, and failed atip_schemadoc_13 at schema_doc.rs:1048. So cli_spec's prose stripping is undone by this second spec-equality test, against I3 F (spec equality lives in cli_spec only) and the I14 check (a reworded summary passes the tests this change touched). The I14 table described the test as comparing two outputs of one generator, but it also reads the file. Fix: compare the file through prose::spec_document, or keep only the binary-answer-versus-in-process comparison and leave the file to cli_spec.",
+  "worktree_dirty": false
+}

@@ -5,7 +5,7 @@ name: Build Native (Test Only)
 # target 15.0), Linux x64 and arm64 as static musl binaries (jemalloc is
 # their allocator; glibc is not a floor), Windows x64 msvc with a static C
 # runtime. Every row builds on a host that natively matches the target (the
-# runners are pinned images, never `-latest`: macos-26, ubuntu-26.04,
+# runners are pinned images, never `-latest`: macos-15, ubuntu-26.04,
 # ubuntu-26.04-arm, windows-2025), so no cross-compilation toolchain (zig /
 # cargo-zigbuild) is needed for any row.
 # The x86_64 musl row links on the host with `musl-tools`
@@ -26,16 +26,6 @@ name: Build Native (Test Only)
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - "crates/**"
-      - "packages/dashboard/**"
-      - ".cargo/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - ".github/workflows/**"
-      - ".github/actions/**"
-      - "scripts/**"
 
 env:
   CARGO_TERM_COLOR: always
@@ -52,6 +42,30 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Whether the builds below run. A `paths:` filter on `pull_request` cannot say: GitHub reads only the first 3,000
+  # changed files, and a release PR that changes 4,000 skips the workflow when none of them is in the filter
+  # (0.42's did). `scripts/build-scope.py` reads the whole change; a manual run, a pull request from `release/...` and
+  # a change it cannot list all build. Only an explicit `skip == 'true'` skips the four builds (their `if:` below);
+  # a skipped run is green. `safety` does not wait for it.
+  scope:
+    name: Decide whether to build
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.scope.outputs.skip }}
+    steps:
+      # The merge commit and its first parent (the base): `git diff` between them is the pull request's change.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Decide from the changed files
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: python3 scripts/build-scope.py --event "$EVENT" --head-ref "$HEAD_REF"
+
   safety:
     name: Release workflow safety check
     runs-on: ubuntu-26.04
@@ -71,7 +85,8 @@ jobs:
   # keeps both workflows doing exactly this.
   dashboard:
     name: Build dashboard app
-    needs: safety
+    needs: [safety, scope]
+    if: needs.scope.outputs.skip != 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
@@ -101,7 +116,8 @@ jobs:
   # (`directories.man`). One platform-independent build; no dashboard needed.
   man:
     name: Generate man pages
-    needs: safety
+    needs: [safety, scope]
+    if: needs.scope.outputs.skip != 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
@@ -133,13 +149,14 @@ jobs:
   build:
     name: Build - ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
-    needs: [safety, dashboard]
+    needs: [safety, scope, dashboard]
+    if: needs.scope.outputs.skip != 'true'
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-26
+          - host: macos-15
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             binary_ext: ""
@@ -152,7 +169,7 @@ jobs:
             package_dir: core-linux-arm64
             binary_ext: ""
             lg_page: "16"
-            alpine_image: rust:1.99.1-alpine3.24@sha256:44819b27be4c97b0e4d7203bd2e02c4820f97700211b6a37fb4c246a2de59383
+            alpine_image: rust:1.100.0-alpine3.24@sha256:de1e0058543a81ed7b046629167db587c67a94bdf37cce14eb27f0ec83baaffb
           - host: windows-2025
             target: x86_64-pc-windows-msvc
             package_dir: core-win32-x64

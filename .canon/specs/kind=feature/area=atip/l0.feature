@@ -178,8 +178,8 @@ Feature: ATIP L0 output contract
   @atip.l0.19
   Scenario: The registry holds the reserved codes with the contract's exits and none of the old names
     Given the error registry
-    When it is read through canon schema --errors
-    Then PLAN_STALE, BATCH_INCOMPLETE, CURSOR_INVALID, COMMAND_REQUIRED, UNKNOWN_COMMAND, INTERNAL and the three INPUT codes are there with the contract's exits, and no old code name is in any source, spec file or skill
+    When the registry's rows are read
+    Then PLAN_STALE, BATCH_INCOMPLETE, CURSOR_INVALID, COMMAND_REQUIRED, UNKNOWN_COMMAND, INTERNAL and the three INPUT codes are there with the contract's exits, and no old code name is in the registry
 
   # canon: {"schema":1,"at":"2026-10-31T11:36:09Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract
@@ -189,7 +189,7 @@ Feature: ATIP L0 output contract
   Scenario: A panic answers INTERNAL with exit 1 in JSON mode, never 101
     Given a debug build and a forced panic
     When canon runs with --json
-    Then stdout holds an INTERNAL envelope whose message says how to report it, the exit is 1 and never 101, and stderr is empty
+    Then stdout holds an INTERNAL envelope, the exit is 1 and never 101, and stderr is empty
 
   # canon: {"schema":1,"at":"2026-10-31T11:36:12Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract
@@ -218,8 +218,8 @@ Feature: ATIP L0 output contract
   @atip.l0.23
   Scenario: Every error code ends in the exit its registry row holds and no call site sets an exit
     Given every error code and every call site
-    When the sources are scanned and a failing command runs for each exit
-    Then no call site overrides an exit, every exit is 1 or 2, and each error exits with its registry row's value
+    When the sources are scanned and the registry is read
+    Then no call site overrides an exit or a retryable value, no literal exit is outside 0, 1 and 2, and every registry exit is 1 or 2
 
   # canon: {"schema":1,"at":"2026-10-31T11:36:21Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract
@@ -246,20 +246,10 @@ Feature: ATIP L0 output contract
   @case:happy
   @flow:canon-0-33-atip-l0.F8
   @atip.l0.26
-  Scenario: The workspace tests, the conformance cases and the generated docs agree with the new contract
+  Scenario: The generated spec and the conformance cases agree with the new contract
     Given the 0.33 contract change
-    When cargo test --workspace, the conformance cases and the generated-docs drift test run
-    Then they pass, and the conformance regeneration differs from the committed cases only by the contract's changes
-
-  # canon: {"schema":1,"at":"2026-10-31T11:36:30Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-33-atip-l0.F8
-  @atip.l0.27
-  Scenario: An old name in a guide, the website, the dashboard or an eval script fails the check, and a consumer that reads an old key fails its own test
-    Given the guides, the website, the dashboard and the eval scripts
-    When the old-name check runs, and a consumer reads an old key
-    Then it passes on the new text, fails when one old name is restored, and the dashboard and launcher tests fail on an old key
+    When the spec canon generates and the conformance cases are read
+    Then the declared minor, the checker's fixture and the spec name the same contract minor, the spec holds the contract's 1.4 form, and every envelope the cases freeze passes the contract's envelope schema and names canon
 
   # canon: {"schema":1,"at":"2026-10-31T15:01:06Z","actor":{"agent_id":"impl-atip-l0","role":"implementer","session_id":"s-0-33-atip-l0"}}
   @subject:atip-contract

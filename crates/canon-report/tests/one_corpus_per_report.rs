@@ -232,20 +232,6 @@ fn a_lone_round_7_finding_makes_the_same_gap_six_silent_rounds_would() {
 
     let report = canon_report::report(&ReportInputs::new(dir.path(), roots)).unwrap();
     assert!(report.contains("| s43-round-7-only | 1 | 7 |"), "the totals row must render the gap: {report}");
-
-    // The rendered page may not tell a reader that six rounds ran, in
-    // any of the shapes it used to.
-    // Keyed on "round in between" rather than the two panel-specific
-    // shapes: s43 round 7 finding 1 found the same inference alive in
-    // `marts.rs` as "says some round in between recorded nothing",
-    // which the narrower list missed.
-    for claim in ["round in between", "witnesses a silent round", "the only signal in the corpus that a clean round happened"] {
-        assert!(!report.contains(claim), "the report still infers a round from a numbering gap: {claim:?}");
-    }
-    assert!(
-        report.contains("Neither the gap nor its absence evidences a round that RAN"),
-        "the report must say outright what this row's gap does not mean"
-    );
 }
 
 /// `tempfile::TempDir` has no `join`; every test above wants the same

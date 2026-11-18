@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-final",
+    "role": "reviewer",
+    "session_id": "Rev43_final"
+  },
+  "at": "2026-11-17T18:02:00.581645842Z",
+  "code_tree": "b3ce6e4fb3da2da7c6c8d4963f72bdec1a06743d",
+  "kind": "review",
+  "pin": "911d218444bdfc01c502ab3c614cb3fa2ada183b",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:change_drop_26_an_existing_line_is_skipped_and_its_value_kept",
+          "junit:change_drop_26_migrate_adds_the_change_state_route_line_and_the_next_plan_is_empty",
+          "junit:change_drop_26_revert_restores_the_canon_yaml_bytes",
+          "junit:migrate_names::tests::change_drop_26_a_key_with_any_value_or_no_routing_section_is_left_byte_identical",
+          "junit:migrate_names::tests::change_drop_26_the_route_line_is_added_last_in_the_indentation_of_the_entry_before_it"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "0aac68d01305bcc42988eb62bf00fabbe667ed0f67d4d59eeb56d8ed30e3245f",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-43-test-cleanup/brief.md"
+  },
+  "review_id": "01M7NARH05FTDRQRBHXJM881XA",
+  "reviewer": "rev-0-43-tests-final",
+  "scenario_id": "change.drop.26",
+  "schema": 2,
+  "worktree_dirty": false
+}

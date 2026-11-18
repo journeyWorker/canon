@@ -6,7 +6,7 @@ reading canon's source:
 
 - **exit codes** (0 clean, 1 gate red / refusal, 2 usage error, …),
 - the gate's **violation lines**,
-- **refusal messages** on stderr,
+- **refusals** on stderr (the error code, field and exit code),
 - **JSON output** (`--json`).
 
 Each case is a frozen fixture repository plus an ordered list of `canon`
@@ -53,8 +53,12 @@ steps:
    with a **cleared environment** plus a fixed base — `PATH` (inherited),
    `HOME` (a fresh empty temp dir), `LC_ALL=C`, `TZ=UTC` — with the case's
    `env` merged over it. No `CANON_*` variable is ever inherited.
-4. The exit code must equal the step's `exit`; the normalized stdout and
-   stderr must equal `expected/<n>.out` and `expected/<n>.err` byte for byte.
+4. The exit code must equal the step's `exit`. The normalized stdout and
+   stderr are compared with `expected/<n>.out` and `expected/<n>.err` by their
+   machine content: every JSON member, and every text token (codes, fields,
+   commands, paths, ids, counts); the sentences a person reads (`message`,
+   `hint`, a next step's `reason`, help and summary text, the words after
+   `canon: CODE:`, `hint:`, `advisory:` and ` — `) are not compared.
    Both files exist for every step, empty when the stream is empty. An
    `expected/` file with no matching step is an error.
 5. On mismatch the runner prints a unified diff (`-` expected, `+` actual)

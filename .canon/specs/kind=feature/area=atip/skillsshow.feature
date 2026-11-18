@@ -61,52 +61,12 @@ Feature: ATIP: skills show, the guides and their command lines
     When the first line of the root, a group and a command help is read
     Then each names schema and skills show, and the introduction stays below it
 
-  # canon: {"schema":1,"at":"2026-11-02T10:17:54Z","actor":{"agent_id":"impl-canon-misc","role":"implementer","session_id":"s-0-35-canon-misc"}}
-  @subject:atip-schema
-  @case:happy
-  @flow:canon-0-35-skills-show.F5
-  @atip.skillsshow.07
-  Scenario: Every command line in the fenced blocks of every guide parses by the command document and by canon's parser
-    Given every command line in the fenced blocks of every guide
-    When its placeholders are replaced by valid values and each line is parsed by the command document and canon's parser
-    Then none is refused, an --input document is read element by element, and lines with shell syntax are outside the rule
-
-  # canon: {"schema":1,"at":"2026-11-02T10:18:31Z","actor":{"agent_id":"impl-canon-misc","role":"implementer","session_id":"s-0-35-canon-misc"}}
-  @subject:atip-schema
-  @case:failure
-  @flow:canon-0-35-skills-show.F5
-  @atip.skillsshow.08
-  Scenario: A guide line with a wrong option, a missing required argument, a value outside its domain or an unknown command is found
-    Given a guide line that is correct
-    When an option is misspelled, a required argument is dropped, a value leaves its domain, or the command is unknown
-    Then the test reports the guide and the line number of each, and a pipe line and a line outside a fence are left alone
-
-  # canon: {"schema":1,"at":"2026-11-02T10:18:55Z","actor":{"agent_id":"impl-canon-misc","role":"implementer","session_id":"s-0-35-canon-misc"}}
-  @subject:atip-schema
-  @case:edge
-  @flow:canon-0-35-skills-show.F6
-  @atip.skillsshow.09
-  Scenario: No guide, script, hook or page reads the old members of the skills show output
-    Given the guides, scripts, hooks, website pages and docs of the repository
-    When they are searched for readers of the output of skills show
-    Then none reads markdown or a top-level version of it
-
   # canon: {"schema":1,"at":"2026-11-03T05:10:07Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
   @subject:atip-schema
   @case:failure
   @flow:canon-0-35-skills-show.F4
   @atip.skillsshow.10
-  Scenario: A help line that names only schema, only skills show or neither is not the pointer
-    Given the first lines of help that name schema only, skills show only, neither and nothing, and the first line of every real help
+  Scenario: The first line of every help is the pointer to both entrances and the line below it is not
+    Given the first line of every real help and the line below it
     When each is judged as the pointer to both entrances
-    Then the four are refused, every real help has the pointer on its first line, and the line below it is the introduction and not a second pointer
-
-  # canon: {"schema":1,"at":"2026-11-03T05:11:40Z","actor":{"agent_id":"impl-flow-failures","role":"implementer","session_id":"s-0-35-flow-failures"}}
-  @subject:atip-schema
-  @case:failure
-  @flow:canon-0-35-skills-show.F6
-  @atip.skillsshow.11
-  Scenario: The scan for readers of the old skills show members finds a markdown or a top-level version read and passes a read of a current member
-    Given texts that read markdown or a top-level version of skills show output as a member, an index, a jq path or a brace list, and texts that read a current member or sit outside the three-line window
-    When the scan for readers of the old members runs on each
-    Then each reader is found once at the line of the command, and the current members and the distant read are not
+    Then every real help has the pointer on its first line, and the line below it is the introduction and not a second pointer

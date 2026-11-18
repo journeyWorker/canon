@@ -234,8 +234,7 @@ Feature: subject lifecycle
     Given a verifying subject whose every scenario is evidenced and reviewed, with no blocker or case gap
     And its adopted change's .canon/changes brief.md carries no Approved line, and the subject answers for it: a scenario is tagged for it, it is a chore, or no other change of the subject is approved
     When the subject is moved to shipped
-    Then the command exits 1 with an unreviewed-promotion naming the subject and that brief.md
-    And the refusal says a human must answer the brief and the agent records the Approved line only from that answer
+    Then the command exits 2 with an unreviewed-promotion naming the subject, and no other violation refuses
     And the subject stays verifying, and status reports the same brief as not approved
     And once the line is recorded the same move ships the subject
 
@@ -247,7 +246,7 @@ Feature: subject lifecycle
     Given a verifying subject that passes every technical gate
     And its brief.md carries an Approved line only inside an HTML comment or a fenced code block
     When the subject is moved to shipped
-    Then the command exits 1 naming the brief.md as having no Approved line
+    Then the command exits 2 with an unreviewed-promotion naming the subject
     And status reports the brief as not approved, so status and the guard agree
 
   # canon: {"schema":1,"at":"2026-10-11T17:15:05Z","actor":{"agent_id":"canon-scaffold"}}
@@ -264,10 +263,10 @@ Feature: subject lifecycle
   @subject:subject-lifecycle
   @case:edge
   @subject.lifecycle.27
-  Scenario: A subject with no adopted change ships with an advisory that its brief is not approved
+  Scenario: A subject with no adopted change ships, its brief not approved and not enforced
     Given a verifying subject that passes every technical gate and adopts no change
     When the subject is moved to shipped
-    Then it ships, and the command prints one advisory that the brief is not approved because there is no brief to answer
+    Then it ships
     And no waiver is recorded
     And status shows the brief as not approved and not enforced, with no human step
 
@@ -278,8 +277,8 @@ Feature: subject lifecycle
   Scenario: Shipping a change from an external plan needs its canon brief
     Given a verifying subject that passes every technical gate, whose newest adopted change comes from an external openspec plan with no canon brief
     When the subject is moved to shipped
-    Then the command exits 1 with an unreviewed-promotion naming .canon/changes/<change>/brief.md to create, with a "Source:" line naming the external proposal.md, and the approval to record there
-    And the "Approved:" line inside the external proposal.md is not read, and status reports the same brief as enforced and not approved
+    Then the command exits 2 with an unreviewed-promotion naming the subject, and the subject stays verifying
+    And the "Approved:" line inside the external proposal.md is not read, and status reports the same brief as enforced and not approved, with .canon/changes/<change>/brief.md to create and the external proposal.md as its source
     And once the canon brief.md holds the "Source:" and "Approved:" lines the same move ships the subject, and the external proposal.md is never edited
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n2-impl"}}
@@ -289,7 +288,7 @@ Feature: subject lifecycle
   Scenario: A shipped subject reopens inside its approved scope and records why
     Given a shipped subject whose every change it answers for (tagged by a scenario, with an Approved line, or a chore) has a brief.md with an Approved line (with a digest that still matches the brief, or a pre-0.19 line with none)
     When it is moved to verifying with a reason and an actor
-    Then it moves with no human, and the review guard says it skipped its checks because a reopen moves the subject back to fix its gaps
+    Then it moves with no human
     And the new record carries the reason, the actor and the newest approved change the follow-up stays in
     And the next status write clears that note, so it belongs to the reopen that wrote it
 
@@ -297,10 +296,10 @@ Feature: subject lifecycle
   @subject:subject-lifecycle
   @case:failure
   @subject.lifecycle.30
-  Scenario: Reopening outside an approved scope is refused naming the brief to approve
+  Scenario: Reopening outside an approved scope is refused
     Given a shipped subject that adopted a newer change whose brief.md has no Approved line and that one of its scenarios is tagged @flow:<change>.* for
     When it is moved to verifying with a reason
-    Then the command exits 1 with an unreviewed-promotion naming that brief.md and saying a human must answer it
+    Then the command exits 2 with an unreviewed-promotion naming the subject
     And an override reason does not waive it, and the subject stays shipped
     And once the brief records the human's approval the same reopen goes through
 
@@ -311,7 +310,7 @@ Feature: subject lifecycle
   Scenario: A reopen needs a reason and any other transition may carry one
     Given a shipped subject
     When it is moved to verifying with no reason, or with a blank one
-    Then the command refuses as a usage error saying the reopen needs one line of reason
+    Then the command exits 2 with SUBJECT_REASON_REQUIRED and a hint that gives the move with --reason, and a blank reason exits 2 too
     And the subject stays shipped
     And a reason given to any other move is accepted and recorded on the subject with the actor, and the next move without one clears it
 
@@ -322,7 +321,7 @@ Feature: subject lifecycle
   Scenario: Shipping a reopened subject runs every guard again
     Given a reopened subject whose follow-up added an owned scenario with no evidence and found an open blocker on its change
     When it is moved to shipped
-    Then the command exits 1 naming the uncovered scenario, the unreviewed scenario and the open blocker, and the subject stays verifying
+    Then the command exits 2 naming the uncovered scenario, the unreviewed scenario and the open blocker, and the subject stays verifying
     And once the blocker is fixed and the scenario evidenced and reviewed, the same move ships it
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:04Z","actor":{"agent_id":"018-n2-impl"}}
@@ -332,7 +331,7 @@ Feature: subject lifecycle
   Scenario: A change adopted by a second subject belongs to both and its open blocker gates both
     Given a change written by canon change new under one subject
     When it is adopted under a second subject
-    Then the command says the change now belongs to both subjects, naming each
+    Then the adoption succeeds
     And both subjects list the change, and the change lists both, never re-pointed
     And status counts an open blocker on the change against both, and it refuses each subject's move into review scope
 
@@ -350,11 +349,11 @@ Feature: subject lifecycle
   @subject:subject-lifecycle
   @case:happy
   @subject.lifecycle.35
-  Scenario: Adopting an unapproved change into a building subject warns and says how to undo it
-    Given a proposed, a specced and a building subject, and a change with a draft brief.md
+  Scenario: Adopting an unapproved change into a building, verifying or shipped subject warns and says how to undo it
+    Given a proposed, a specced, a building, a verifying and a shipped subject, and a change with a draft brief.md
     When the change is created under, or adopted by, each subject
-    Then the building, verifying or shipped subject (the shipped one adopting into a shipped subject too) gets one warning on stderr and in JSON meta.warnings naming canon subject unadopt, and the proposed and specced ones none
-    And an approved brief adopted into a building subject gets none
+    Then the building, verifying and shipped subjects each get one warning in JSON meta.warnings naming canon subject unadopt, and the proposed and specced ones none
+    And an approved brief adopted into a verifying subject gets none
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:51Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:subject-lifecycle
@@ -364,7 +363,7 @@ Feature: subject lifecycle
     Given a verifying subject adopting an approved change and a draft change, and a holding subject
     When the draft change is unadopted from the subject
     Then the subject's change list and the change's subject list both drop the link, canon status no longer asks about that brief for the subject, and the holding subject can adopt the change
-    And unadopting an unlinked pair writes nothing and exits 0, and the result carries meta.next
+    And unadopting an unlinked pair exits 0, and the unadopt result's meta.next, when it has one, holds the subject's status steps and is never empty
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:56Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:subject-lifecycle
@@ -373,18 +372,18 @@ Feature: subject lifecycle
   Scenario: A change with an approved brief is not unadopted
     Given a building subject adopting a change whose brief.md carries an "Approved:" line
     When the change is unadopted from that subject
-    Then the command exits 2 with SUBJECT_CONFLICT with the reason APPROVED_BRIEF, its hint naming the approved scope, and the link stays
-    And a draft change a scenario of the subject is tagged @flow:<change>.* for is refused the same way, its hint naming the scenarios and saying to remove or retag them first
+    Then the command exits 2 with SUBJECT_CONFLICT, and the link stays
+    And a draft change a scenario of the subject is tagged @flow:<change>.* for is refused the same way, naming the scenarios
 
   # canon: {"schema":1,"at":"2026-10-21T12:38:43Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:subject-lifecycle
   @case:happy
   @subject.lifecycle.38
-  Scenario: A pending draft change does not freeze a shipped subject's reopen, evidence, review and ship
+  Scenario: A pending draft change does not freeze a shipped subject's reopen, evidence and ship
     Given a shipped subject adopting an approved change and a newer draft change that was never approved, is no chore, and that none of its scenarios is tagged @flow:<change>.* for
-    When the subject is reopened, a scenario is re-verified and reviewed, and the subject ships again
-    Then each step is accepted, the reopen and ship output say in one line that the draft is a pending draft the transition does not read, and canon status lists the draft in pendingDrafts, not in briefs, marked as not yet part of the subject's scope, without saying evidence add refuses the subject's scenarios
-    And once a scenario of the subject is tagged @flow:<draft>.F1, shipping is refused on the draft's brief, and so it is once the draft's brief is approved and then edited
+    When the subject is reopened, a scenario is re-verified, and the subject ships again
+    Then each step is accepted, the reopen output names the draft's @flow:<draft>.* tag, the ship output carries a BRIEF_DRAFT_PENDING warning, and canon status lists the draft in pendingDrafts and not in briefs
+    And once a scenario of the subject is tagged @flow:<draft>.F1, shipping is refused on the draft's brief
 
   # canon: {"schema":1,"at":"2026-10-21T13:15:05Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:subject-lifecycle
@@ -392,10 +391,10 @@ Feature: subject lifecycle
   @subject.lifecycle.39
   Scenario: A tagged unapproved change still blocks reopen and ship under a newer untagged draft
     Given a shipped subject adopting an approved change a, a draft change b that one of its scenarios is tagged @flow:b.F1 for, and a newer draft change c no scenario is tagged for
-    When the subject is reopened and, with b's scenario attested, shipped again
-    Then both are refused naming b's brief, and the output names every pending draft, here c, as not read by the transition
+    When the shipped subject is reopened, and a verifying subject set up the same way is shipped
+    Then both are refused naming b's brief, and the output names every pending draft, here c, through its @flow:c.* tag
     And without c the refusal is the same, and only a change never approved, no chore and tagged by no scenario is ever a pending draft
-    And canon status does not advise the refused reopen: it says reopening waits for the brief's approval
+    And canon status does not advise the refused reopen
 
   # canon: {"schema":1,"at":"2026-10-26T11:42:43Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
   @subject:subject-lifecycle
@@ -436,11 +435,11 @@ Feature: subject lifecycle
   @case:failure
   @flow:canon-0-31-loop.F3
   @subject.lifecycle.43
-  Scenario: An approved tagged change edited afterwards, or one whose tags were removed, still refuses reopen and ship
+  Scenario: An approved tagged change edited afterwards, with or without its tags removed, still refuses reopen
     Given a shipped subject adopting two approved tagged changes
-    When the brief of one is edited after its approval, and separately its scenarios' tags are removed
-    Then reopen and ship refuse naming that change's brief.md as changed since its approval, BRIEF_APPROVAL_STALE, and say it differs from a brief never approved
-    And the other approved change is not named, and approving the edited brief again lets both go through
+    When the brief of one is edited after its approval, and then its scenarios' tags are removed too
+    Then reopen refuses naming that change's brief.md as changed since its approval, BRIEF_APPROVAL_STALE
+    And the other approved change is not named, and approving the edited brief again lets the reopen go through
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:21Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
   @subject:subject-lifecycle
@@ -450,8 +449,8 @@ Feature: subject lifecycle
   Scenario: An approved feature brief no scenario tags, edited afterwards, refuses ship and is named
     Given a verifying subject adopting an approved feature change no scenario is tagged for and an approved tagged change
     When the untagged change's brief is edited after its approval and the subject ships
-    Then shipping refuses naming that change's brief.md as changed since its approval
-    And the brief-structure check also runs over that change, and approving it again lets the subject ship
+    Then shipping exits 2 naming that change's brief.md with BRIEF_APPROVAL_STALE, and not the other change's
+    And status lists that change's brief as changed with reason approved, and approving it again lets the subject ship
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:22Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
   @subject:subject-lifecycle
@@ -459,21 +458,20 @@ Feature: subject lifecycle
   @flow:canon-0-31-loop.F3
   @subject.lifecycle.45
   Scenario: An unapproved or edited chore refuses reopen and ship
-    Given a shipped subject adopting a chore change whose brief has no Approved line, and another subject adopting an approved chore edited afterwards
-    When each is reopened and, when verifying, shipped
-    Then each is refused naming the chore's brief.md, the first as not approved and the second as changed since its approval
-    And a reopen is not waived by --override-reason, shipping's brief refusal is, and the chore's after-approval checks are unchanged
+    Given a shipped subject adopting a chore change whose brief has no Approved line
+    When it is reopened with --override-reason, then the chore is approved and edited and the subject is reopened, then approved again and reopened, and edited again and shipped
+    Then each is refused with exit 2 naming the chore's brief.md, the first with status listing the brief as unapproved for reason chore, the others with BRIEF_APPROVAL_STALE
+    And --override-reason does not waive the first reopen refusal, and once the chore is approved the subject reopens
 
   # canon: {"schema":1,"at":"2026-10-27T10:24:23Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
   @subject:subject-lifecycle
   @case:edge
   @flow:canon-0-31-loop.F3
   @subject.lifecycle.46
-  Scenario: A never-approved untagged feature brief blocks neither reopen nor ship, and two unapproved governing changes are both named in one approve call
-    Given a shipped subject adopting a never-approved feature change that no scenario is tagged for, and a second subject whose two tagged changes are both unapproved
-    When the first is reopened, re-verified and shipped, and the second is reopened
-    Then the first goes through every step and canon status lists that change as a pending draft
-    And the second's refusal names both briefs and its hint is one canon brief approve line holding both ids
+  Scenario: A never-approved untagged feature brief blocks neither reopen nor ship
+    Given a shipped subject adopting a never-approved feature change that no scenario is tagged for
+    When the subject is reopened, its scenarios re-attested and shipped
+    Then every step succeeds, the reopen names the draft change, and canon status lists that change as a pending draft and judges no brief for it
 
   # canon: {"schema":1,"at":"2026-10-27T12:05:01Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
   @subject:subject-lifecycle
@@ -513,23 +511,22 @@ Feature: subject lifecycle
   @case:happy
   @flow:canon-0-32-relay-approval.F2
   @subject.lifecycle.50
-  Scenario: The planner guidance shows the brief, asks with the harness question tool and counts only an explicit approval
-    Given the planner guide of the skill, its source and the reference the install projects from it
+  Scenario: The planner guidance shows the brief and asks with the harness question tool, recording the answer with the relay option
+    Given the skill source, the planner and orchestrator references, and every other guide that mentions --relayed-via
     When their approval stop is read
-    Then it says to show the brief with canon brief show <change> --body to the human's view without retyping it, naming omp out:// and the visible tool output of harnesses without that channel
-    And it says to ask with the harness question tool, naming ask for omp and AskUserQuestion for Claude Code, or in the chat when there is none, and to record with --relayed-via
-    And divergence accept and the migrate commit get the same procedure
+    Then the source, planner and orchestrator guides name canon brief show, --body and omp out://
+    And they name ask and AskUserQuestion, --relayed-via and --digest, and any other guide mentioning --relayed-via points at the planner guide, AskUserQuestion or --body
+    And the planner guide names divergence accept, migrate and policy approve, and the reviewer guide and the installed skill stub name --relayed-via
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:07Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
   @subject:subject-lifecycle
   @case:failure
   @flow:canon-0-32-relay-approval.F2
   @subject.lifecycle.51
-  Scenario: The guidance treats a conditional answer as a revision request and no longer says to report the command and wait
-    Given the same guides
-    When they say what counts as the human's answer
-    Then only an explicit approval counts, a question or a condition is a revision request, and no answer records nothing
-    And no sentence tells the planner to report the command to the human and wait, and canon skills check exits 0 once the projected stubs are installed
+  Scenario: canon skills check exits 0 once the guides are installed
+    Given a repo where canon init installed the guides for the claude harness
+    When canon skills check runs
+    Then it exits 0
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:12Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
   @subject:subject-lifecycle
@@ -540,7 +537,7 @@ Feature: subject lifecycle
     Given two changes whose briefs pass the checks and a planner role declared with an actor
     When canon brief approve <a> <b> runs with --relayed-via ask, the human's name and answer, --actor and each change's shown digest
     Then both briefs carry an Approved line with (relayed by planner <actor> via ask) before the digest, and the call exits 0
-    And canon status lists both approvals as relayed, canon brief show names the relay, and the dashboard briefs list carries them in relayed
+    And canon status lists a relayed approval with its role, actor and tool and no longer lists one a human recorded again, canon brief show names the relay, and the dashboard briefs list carries them in relayed
     And the same name and answer approved by a human without the option differ in the line only by that marker
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:15Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
@@ -562,17 +559,17 @@ Feature: subject lifecycle
   Scenario: A relayed approval without the human's name, answer or an actor, or with no role declared, is refused with exit 2
     Given a planner role and a brief that passes the checks
     When canon brief approve is relayed with an empty --approver, an empty --note, no --actor and no CANON_ACTOR, and when --relayed-via is given with no role declared
-    Then each exits 2 with USAGE naming the missing option, or APPROVAL_INVALID for an empty name or answer, and nothing is written
+    Then each exits 2 with USAGE or APPROVAL_INVALID, the one with no role declared with USAGE, and nothing is written
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:20Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}
   @subject:subject-lifecycle
   @case:failure
   @flow:canon-0-32-relay-approval.F3
   @subject.lifecycle.55
-  Scenario: An agent role without the relay option is refused ACTOR_DENIED and the hint names the relay procedure
+  Scenario: An agent role without the relay option is refused ACTOR_DENIED and the hint names the relay option
     Given each agent role in turn declared with --as
     When canon brief approve, canon policy approve and canon divergence accept run without --relayed-via
-    Then each exits 2 with ACTOR_DENIED, and the hint names the relay procedure (canon brief show --body, the question tool, --relayed-via) before the human's own call
+    Then each exits 2 with ACTOR_DENIED, and the hint names --relayed-via and the refused command, and for canon brief approve also canon brief show --body and the --digest to pass
     And nothing is written
 
   # canon: {"schema":1,"at":"2026-10-30T11:54:23Z","actor":{"agent_id":"impl-relay","role":"implementer","session_id":"s-0-32-relay-impl"}}

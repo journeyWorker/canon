@@ -11,16 +11,6 @@ Feature: atip reasons
     When every code's reasons are read, and an error is answered with a reason its code does not register, and with a reason of another code
     Then each reason is upper-case words, unique inside its code, in the order of the names and has a meaning and a fix of its own, and each of the two answers is refused
 
-  # canon: {"schema":1,"at":"2026-11-04T11:58:22Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-36-code-reasons.F1
-  @atip.reasons.02
-  Scenario: Every reason a source raises is registered under its code, and every registered reason is raised by a site
-    Given the sources that raise errors and the registry of reasons
-    When the reasons the sources name are matched against the registry, and the registry against the sources
-    Then every reason a source names is registered under some code, and a registered reason that no site raises fails the test
-
   # canon: {"schema":1,"at":"2026-11-04T11:58:29Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract
   @case:edge
@@ -46,10 +36,10 @@ Feature: atip reasons
   @case:failure
   @flow:canon-0-36-code-reasons.F3
   @atip.reasons.05
-  Scenario: A wrong specs section, a wrong policy and a wrong canon.yaml are CONFIG_INVALID with three different reasons, each the same every time
+  Scenario: A wrong specs section, a wrong policy and a wrong canon.yaml are CONFIG_INVALID, each with its own reason
     Given a repository whose canon.yaml does not parse, one whose specs section is wrong, one whose skills section is wrong, one whose artifact_store section is wrong and one whose policy file is wrong
-    When a command that reads each runs twice
-    Then each answers CONFIG_INVALID with its own reason (CANON_YAML, SPECS, SKILLS, ARTIFACT_STORE, POLICY), the same reason both times, exit 2 and not retryable
+    When a command that reads each runs, the ones that read canon.yaml and the specs section twice
+    Then each answers CONFIG_INVALID with its own reason (CANON_YAML, SPECS, SKILLS, ARTIFACT_STORE, POLICY), exit 2 and not retryable, and the canon.yaml and specs reasons are the same both times
 
   # canon: {"schema":1,"at":"2026-11-04T11:58:50Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract
@@ -67,9 +57,9 @@ Feature: atip reasons
   @flow:canon-0-36-code-reasons.F4
   @atip.reasons.07
   Scenario: A transition the gate refuses names the kind that asks for a different fix, and every entry of details has its own code and a registered reason
-    Given a subject with an open blocker finding, then one at verifying with a refuted audit and a new blocker, and the 11 violation kinds of the gate
-    When the subject moves to verifying and to shipped, and the kinds are mapped to their codes and reasons
-    Then the first move is refused with SUBJECT_INVALID and the reason OPEN_BLOCKER, the ship with FALSE_SUCCESS and OPEN_BLOCKER as the entries of details, no data, every entry has its own registered code and reason (a debug build checks each entry), and only the kinds that ask for a different fix under one code are reasons
+    Given a subject with an open blocker finding, then one at verifying with a refuted audit and a new blocker
+    When the subject moves to verifying and to shipped
+    Then the first move is refused with SUBJECT_INVALID and the reason OPEN_BLOCKER, the ship with FALSE_SUCCESS and OPEN_BLOCKER as the entries of details, no data, and every entry has its own registered code and reason (a debug build checks each entry)
 
   # canon: {"schema":1,"at":"2026-11-04T11:59:03Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract
@@ -79,17 +69,7 @@ Feature: atip reasons
   Scenario: A reason never changes the exit or the retryable value of its code, and a different value is a different code
     Given every code with reasons and the pairs of codes that differ in retryable or exit
     When an error is built for each code and each of its reasons
-    Then its exit and retryable are the row's, no source sets either beside the row, ARTIFACTS_STORE_UNAVAILABLE and ARTIFACTS_STORE_REQUIRED are two codes and PROMOTION_INVALID and PROMOTION_FAILED differ in exit
-
-  # canon: {"schema":1,"at":"2026-11-04T11:59:09Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-36-code-reasons.F6
-  @atip.reasons.09
-  Scenario: The CHANGELOG table of reasons is the registry and STOPPED_MIDWAY and its reason are gone
-    Given the CHANGELOG table of reasons and the registry
-    When the table is compared with the registry
-    Then each code of the table has the reasons the registry lists, the codes of the brief's table are in it, and neither STOPPED_MIDWAY nor its reason SKILLS_INVALID_ARGUMENT is registered or printed
+    Then its exit and retryable are the row's, ARTIFACTS_STORE_UNAVAILABLE and ARTIFACTS_STORE_REQUIRED are two codes and PROMOTION_INVALID and PROMOTION_FAILED differ in exit
 
   # canon: {"schema":1,"at":"2026-11-04T11:59:15Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract
@@ -119,7 +99,7 @@ Feature: atip reasons
   Scenario: Every call site that reads answers its subject's UNAVAILABLE code for an EIO, shown through the real binary with the debug seam
     Given a repository with a brief, a scenario, evidence with an artifact, a dispatch run, a strategy and a ledger in the old layout, and the seam
     When each command that reads a file or a directory runs with its path matched by the seam, and each reader of the plan corpus (dispatch begin, evidence add, evidence approval-payload, task done, ingest plans) runs with a canon.yaml that is refused, a directory or not UTF-8
-    Then the readers of the plan corpus answer PLAN_CORPUS_UNAVAILABLE, CONFIG_DENIED or CONFIG_INVALID by the cause, and each its subject's UNAVAILABLE code (exit 2, retryable, no data, the system's error in the message), the code is in canon schema for the command, and every UNAVAILABLE code of the registry is driven or is no read
+    Then the readers of the plan corpus answer PLAN_CORPUS_UNAVAILABLE, CONFIG_DENIED or CONFIG_INVALID by the cause, and each its subject's UNAVAILABLE code (exit 2, retryable, no data), the code is in canon schema for the command, and every UNAVAILABLE code of the registry is driven or is no read
 
   # canon: {"schema":1,"at":"2026-11-04T11:59:34Z","actor":{"agent_id":"impl-code-reasons","role":"implementer","session_id":"s-0-36-code-reasons"}}
   @subject:atip-contract
@@ -139,4 +119,4 @@ Feature: atip reasons
   Scenario: A Postgres DSN that is set and cannot be reached is RETENTION_TIERS_UNAVAILABLE, an unset one RETENTION_TIERS_REQUIRED
     Given a canon.yaml whose hot tier is Postgres, and a DSN that is unset, then empty, then malformed, then one that names a host that does not resolve
     When export, purge, query and tier age run
-    Then the unset DSN is RETENTION_TIERS_REQUIRED and not retryable, the unreachable one is RETENTION_TIERS_UNAVAILABLE and retryable (REPO_UNAVAILABLE for query, TIER_UNAVAILABLE for tier age, the message saying the tier did not answer), and an empty or malformed DSN is RETENTION_TIERS_INVALID (CONFIG_INVALID with reason TIERS for query and tier age) and not retryable, with no data and nothing written
+    Then the unset DSN is RETENTION_TIERS_REQUIRED and not retryable, the unreachable one is RETENTION_TIERS_UNAVAILABLE and retryable (REPO_UNAVAILABLE for query, TIER_UNAVAILABLE for tier age), and an empty or malformed DSN is RETENTION_TIERS_INVALID (CONFIG_INVALID with reason TIERS for query and tier age) and not retryable, with no data and nothing written

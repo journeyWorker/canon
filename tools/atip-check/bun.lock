@@ -1,0 +1,21 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "canon-atip-check",
+      "dependencies": {
+        "@journeykit/atip-check": "0.4.1",
+      },
+    },
+  },
+  "packages": {
+    "@journeykit/atip-check": ["@journeykit/atip-check@0.4.1", "", { "optionalDependencies": { "@journeykit/atip-check-darwin-arm64": "0.4.1", "@journeykit/atip-check-linux-arm64": "0.4.1", "@journeykit/atip-check-linux-x64": "0.4.1" }, "os": [ "linux", "darwin", ], "bin": { "atip": "bin.js" } }, "sha512-krmGHaR9LPWee0//z9q5+BErEiOPA+K4BUkeSO7L8pBtXMUt7TAukNdsyzMFkePCFqlJoQ3hMbPk6YXcxEplUQ=="],
+
+    "@journeykit/atip-check-darwin-arm64": ["@journeykit/atip-check-darwin-arm64@0.4.1", "", { "os": "darwin", "cpu": "arm64" }, "sha512-zbYj3TtxduSG4g6vNwPoKkv6+j3BjK8lFKVFNR4imMq/ey1UqQVcBNmolvCy6XaWf0a1trJuVYaXg9Am57+7Nw=="],
+
+    "@journeykit/atip-check-linux-arm64": ["@journeykit/atip-check-linux-arm64@0.4.1", "", { "os": "linux", "cpu": "arm64" }, "sha512-jd8RvZSF4UsPcDc7/F6+dIPPGndPya0QOCTMAr5cbejod5NebFMi3gh07OQ1ZKRQLUUSIevjlwZXrVw+ngsqlQ=="],
+
+    "@journeykit/atip-check-linux-x64": ["@journeykit/atip-check-linux-x64@0.4.1", "", { "os": "linux", "cpu": "x64" }, "sha512-HOs9K59Pg5BrbNztBqqLS4XoxNEHL5A4zCe1fEKJvL1frJA/aCPpfTrXog5oGJHWB4FBKO4bSUmRDpylzBIDsw=="],
+  }
+}

@@ -2,6 +2,7 @@
 name = "canon-fmt"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "the artifact-family format authority (S11): canon fmt --check over an external consumer-repo corpus (e.g. a donor project's spec/**), never canon's own storage tiers (that is canon-store's job)."
 

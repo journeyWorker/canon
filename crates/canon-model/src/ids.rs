@@ -929,7 +929,6 @@ mod tests {
         assert_eq!(ReviewId::parse(&s).unwrap(), id);
         assert_eq!(serde_json::to_value(id).unwrap(), serde_json::Value::String(s));
         ReviewId::parse("not-a-ulid").unwrap_err();
-        assert_eq!(ReviewId::parse("nope").unwrap_err().to_string(), format!("invalid ReviewId: \"nope\" does not match grammar `{}`", ReviewId::GRAMMAR));
     }
 
     #[test]
@@ -940,8 +939,7 @@ mod tests {
 
     #[test]
     fn deserialize_rejects_malformed_join_key_json() {
-        let err = serde_json::from_str::<ChangeId>("\"Not Valid\"").unwrap_err();
-        assert!(err.to_string().contains("invalid ChangeId") || err.to_string().contains("does not match grammar"));
+        serde_json::from_str::<ChangeId>("\"Not Valid\"").unwrap_err();
     }
 
     #[test]

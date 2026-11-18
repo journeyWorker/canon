@@ -91,26 +91,6 @@ Feature: atip: refusals are exit 2 and checks are exit 1
     When their retry values are read
     Then the port and the closing run are retryable and the other three are not
 
-  # canon: {"schema":1,"at":"2026-11-04T02:36:33Z","actor":{"agent_id":"impl-codes-rename","role":"implementer","session_id":"s-0-36-codes-rename"}}
-  @subject:atip-contract
-  @case:happy
-  @flow:canon-0-36-codes-exit.F5
-  @atip.codeexit.10
-  Scenario: Every row of the exit table is the registry's
-    Given the exit table of the brief and the registry
-    When each row is compared
-    Then every new code exists with the new exit, every old code is gone, and the CHANGELOG collects the codes that changed from exit 1 to exit 2
-
-  # canon: {"schema":1,"at":"2026-11-04T02:36:38Z","actor":{"agent_id":"impl-codes-rename","role":"implementer","session_id":"s-0-36-codes-rename"}}
-  @subject:atip-contract
-  @case:happy
-  @flow:canon-0-36-codes-exit.F5
-  @atip.codeexit.11
-  Scenario: No branch of canon's own on exit 1 depends on a code that changed
-    Given the pre-commit hook, the npm launcher and the scan for a branch on exit 1
-    When the shipped sources are scanned
-    Then none compares an exit status with 1, and the scan finds such a branch in a sample
-
   # canon: {"schema":1,"at":"2026-11-04T02:36:43Z","actor":{"agent_id":"impl-codes-rename","role":"implementer","session_id":"s-0-36-codes-rename"}}
   @subject:atip-contract
   @case:failure

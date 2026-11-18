@@ -53,7 +53,7 @@ fn a_policy_weakened_after_approval_fails_the_gate_and_the_ship_guard() {
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "{}{}", String::from_utf8_lossy(&gate.stdout), String::from_utf8_lossy(&gate.stderr));
     let text = format!("{}{}", String::from_utf8_lossy(&gate.stdout), String::from_utf8_lossy(&gate.stderr));
-    assert!(text.contains("policy changed since approval"), "{text}");
+    assert!(text.contains("unreviewed-promotion policy"), "{text}");
 
     for extra in [&[][..], &["--override-reason", "ship it"][..]] {
         let mut args = vec!["subject", "move", "checkout", "--to", "shipped", "--json"];
@@ -69,7 +69,7 @@ fn a_policy_weakened_after_approval_fails_the_gate_and_the_ship_guard() {
     // Restoring the approved bytes lifts it (the approved policy's own review check still applies).
     std::fs::write(repo.join(".canon/policy.yaml"), POLICY_WITH_REVIEW).unwrap();
     let restored = canon(repo, &["gate", "check"]);
-    assert!(!String::from_utf8_lossy(&restored.stdout).contains("policy changed since approval"), "{}", String::from_utf8_lossy(&restored.stdout));
+    assert!(!String::from_utf8_lossy(&restored.stdout).contains("unreviewed-promotion policy"), "{}", String::from_utf8_lossy(&restored.stdout));
     let ship = canon(repo, &["subject", "move", "checkout", "--to", "shipped", "--json"]);
     assert_eq!(err_of(&ship)["code"], "SUBJECT_APPROVAL_REQUIRED", "the approved policy requires a review the repo lacks");
 }
@@ -93,7 +93,8 @@ fn a_policy_never_approved_stays_advisory() {
     std::fs::write(repo.join(".canon/policy.yaml"), POLICY_WEAKENED).unwrap();
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(0), "{}", String::from_utf8_lossy(&gate.stderr));
-    assert!(String::from_utf8_lossy(&gate.stdout).contains("policy not approved"));
+    let status = serde_json::from_slice::<Value>(&canon(repo, &["status", "--json"]).stdout).unwrap();
+    assert!(status["meta"]["warnings"].as_array().into_iter().flatten().any(|w| w["code"] == "POLICY_NOT_APPROVED"), "{status}");
     let ship = canon(repo, &["subject", "move", "checkout", "--to", "shipped"]);
     assert_eq!(ship.status.code(), Some(0), "{}", String::from_utf8_lossy(&ship.stderr));
 }

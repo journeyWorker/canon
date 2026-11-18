@@ -1,0 +1,32 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-final",
+    "role": "reviewer",
+    "session_id": "Rev43_final"
+  },
+  "at": "2026-11-17T18:02:57.821979129Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "8c1e601081554d3e7a14ea27d040658c18ed8f9e",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs (atip/l0.feature:192, atip/planjcs.feature:127, atip/codestored.feature:113, atip/input13.feature:112, context/capability.feature:492)",
+  "introduced_by": "af3389252eefdf3b1e98bc98617d5e5c7e8a6a78",
+  "kind": "finding",
+  "resolution_code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "resolution_sha": "b5a805bd41234740f676c6706fcbed82255524cb",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "883805daa06da3b9d09905949f2c4b43f704e2b6",
+  "reviewer": "rev-0-43-tests",
+  "round": 2,
+  "scenario_ids": [
+    "atip.l0.20",
+    "atip.planjcs.11",
+    "atip.codestored.13",
+    "atip.input13.11",
+    "context.capability.48"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec fidelity, P1] The I14 sentence sweep removed message and hint assertions inside tests that kept their names. Their case sets did not change, so their reviews did not go stale, they were not on the I16 list, and their text was not reworded (I2). Confirmed: atip.l0.20 'whose message says how to report it' (af3389252 removed hint.contains(\"report\")); atip.planjcs.11 'the hint says to run the preview again'; atip.codestored.13 'each hint says what to do'; atip.input13.11 'the hint says none is the key left out'; context.capability.48 'the message says the option was removed in 0.31.0'. None of their tests checks that now. A heuristic scan of Then/And lines that mention a message, hint or sentence, whose bound tests lost such an assertion in this change, lists about 25 more candidates; some still check a token and are fine (for example finding.closer.03 checks --as reviewer). Among them: ledger.naming.19, subject.lifecycle.55, evidence.add.130, dispatch.secret-scan.13, report.dashboard.02, atip.codesplit.07, context.capability.49 and .51, atip.optionforms.12, authoring.brief-check.02/06/08/09/10. Fix: for every test whose body lost a message, hint or sentence assertion in af3389252 or 2700fb606, compare the scenario's Then steps with what remains, and reword the steps that name text no test checks. This is the per-scenario comparison I16 asks the implementer for, extended to scenarios whose case names did not change. Those rewords re-stale the scenarios' reviews; review them in the next round.",
+  "worktree_dirty": false
+}

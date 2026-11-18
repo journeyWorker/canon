@@ -3,9 +3,8 @@
 #
 # The workspace crates' own build output is most of `target/` (the test binaries alone are 60% of a debug build) and is rebuilt on every change
 # of the crates anyway; a cache that held it would also keep every earlier version's test binaries, which cargo never cleans up. This removes the
-# build output of every workspace package (`cargo clean -p`, which knows the test binaries of the integration test files), then the files
-# that still carry a workspace crate's name: the units of another path's copy of the workspace (the job `grammar-mutation` builds one) have other
-# package ids and are not found by `cargo clean -p`.
+# build output of every workspace package (`cargo clean -p`, which knows the test binaries of the integration test files). Measured on 1.100.0
+# (2026-11-17): nothing that carries a workspace crate's name is left in `target/` after it.
 #
 # Usage: scripts/ci-strip-workspace-build.sh [--release]
 # `--release` cleans `target/release` instead of `target/debug`. When GITHUB_STEP_SUMMARY is set, the sizes of what is saved are written there
@@ -15,10 +14,8 @@ cd "$(dirname "$0")/.."
 
 profile=()
 target="${CARGO_TARGET_DIR:-target}"
-dir="$target/debug"
 if [ "${1:-}" = "--release" ]; then
   profile=(--release)
-  dir="$target/release"
 fi
 
 size() { if [ -e "$1" ]; then du -sh "$1" | cut -f1; else echo "none"; fi; }
@@ -35,12 +32,6 @@ for name in "${names[@]}"; do
   packages+=(-p "$name")
 done
 cargo clean --locked --offline ${profile[@]+"${profile[@]}"} "${packages[@]}"
-
-for name in "${names[@]}"; do
-  under="${name//-/_}"
-  find "$dir/deps" -maxdepth 1 \( -name "$under-*" -o -name "lib$under-*" \) -delete 2>/dev/null || true
-  find "$dir/.fingerprint" "$dir/build" -maxdepth 1 -name "$name-*" -exec rm -rf {} + 2>/dev/null || true
-done
 
 echo "saved cache: target/ $(size "$target") (was $before), ~/.cargo $(size "$HOME/.cargo")"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

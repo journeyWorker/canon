@@ -1,0 +1,62 @@
+{
+  "actor": {
+    "agent_id": "impl-0-43",
+    "role": "implementer",
+    "session_id": "s-0-43-impl"
+  },
+  "at": "2026-11-17T15:23:36.728436259Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_10_a_retrieve_with_no_scope_hints_a_template_and_not_prose_that_starts_with_canon",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_in_the_sources_is_a_command_line_a_template_or_prose",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    },
+    {
+      "case": "atip_contract11_10_the_rule_catches_prose_after_a_command_and_a_lowercase_placeholder",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_the_conformance_corpus_froze_follows_the_same_rule",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_option_follows_the_rule",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "eba4c39c2fd7773b8bbb5d76dd9a32d3aa88260c57a18d3cd3117e2f970b5547"
+    }
+  ],
+  "code_tree": "8c1e601081554d3e7a14ea27d040658c18ed8f9e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3980 passed, 1 skipped) from the clean tree at 2c5ea809f, --rev 2c5ea809f, Rust 1.100.0"
+  },
+  "evidence_sha": "2c5ea809f9baceebd42d7a33804afcda6379223e",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 544,
+  "scenario_id": "atip.contract11.10",
+  "schema": 1,
+  "staging_id": "5e04c273",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

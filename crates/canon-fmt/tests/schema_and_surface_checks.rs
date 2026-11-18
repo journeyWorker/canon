@@ -51,7 +51,6 @@ fn an_unrecognized_kind_string_reports_no_registered_schema() {
     let hit = report.violations.iter().find(|v| {
         v.class == FmtFailureClass::SchemaViolation
             && v.path.ends_with("20260709T093000-unit-2745ca4c8-cccccc.json")
-            && v.detail.contains("no registered schema for kind")
     });
     assert!(hit.is_some(), "expected a `no registered schema for kind` violation, got: {report:#?}");
 }

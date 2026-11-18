@@ -127,8 +127,7 @@ fn kind_word(kind: &str) -> String {
 fn operand_cell(leaf: &Value) -> String {
     let parts: Vec<String> = leaf["operands"]
         .as_array()
-        .map(std::vec::Vec::as_slice)
-        .unwrap_or_default()
+        .map_or_default(std::vec::Vec::as_slice)
         .iter()
         .map(|o| {
             let word = kind_word(o["valueName"].as_str().unwrap_or("value"));
@@ -154,7 +153,7 @@ fn option_syntax(o: &Value) -> String {
 }
 
 fn required_cell(leaf: &Value) -> String {
-    let mut parts: Vec<String> = leaf["options"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter(|o| o["required"] == true).map(option_syntax).collect();
+    let mut parts: Vec<String> = leaf["options"].as_array().map_or_default(std::vec::Vec::as_slice).iter().filter(|o| o["required"] == true).map(option_syntax).collect();
     for group in relations(leaf).required_one_of {
         let names: Vec<String> = group.iter().map(|n| format!("`--{n}`")).collect();
         parts.push(format!("one of {}", names.join(" or ")));
@@ -194,7 +193,7 @@ pub fn cli_table(spec: &Value, group: &str, ko: bool) -> String {
 const SHARED: [&str; 4] = ["repo", "json", "input", "as"];
 
 fn options_of(leaf: &Value) -> &[Value] {
-    leaf["options"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default()
+    leaf["options"].as_array().map_or_default(std::vec::Vec::as_slice)
 }
 
 fn find_option<'a>(leaf: &'a Value, name: &str) -> Option<&'a Value> {
@@ -207,7 +206,7 @@ fn atom(o: &Value) -> String {
     if matches!(o["valueType"].as_str(), Some("switch" | "count")) {
         return format!("--{name}");
     }
-    let set: Vec<&str> = o["possibleValues"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).collect();
+    let set: Vec<&str> = o["possibleValues"].as_array().map_or_default(std::vec::Vec::as_slice).iter().filter_map(Value::as_str).collect();
     if set.is_empty() { format!("--{name} <{}>", o["valueName"].as_str().unwrap_or("VALUE")) } else { format!("--{name} <{}>", set.join("|")) }
 }
 
@@ -221,10 +220,10 @@ fn is_required(relations: &atip::project::Relations, o: &Value) -> bool {
 /// block's header (`--input` is flagged on the lines that take it).
 fn syntax_line(leaf: &Value) -> String {
     let relations = relations(leaf);
-    let conflicts = |name: &str| -> Vec<&str> { relations.conflicts_with.get(name).map(|names| names.iter().map(String::as_str).collect()).unwrap_or_default() };
-    let needs = |name: &str| -> Vec<&str> { relations.requires.get(name).map(|names| names.iter().map(String::as_str).collect()).unwrap_or_default() };
+    let conflicts = |name: &str| -> Vec<&str> { relations.conflicts_with.get(name).map_or_default(|names| names.iter().map(String::as_str).collect()) };
+    let needs = |name: &str| -> Vec<&str> { relations.requires.get(name).map_or_default(|names| names.iter().map(String::as_str).collect()) };
     let mut parts: Vec<String> = vec![format!("canon {}", leaf["command"].as_str().expect("command"))];
-    for o in leaf["operands"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
+    for o in leaf["operands"].as_array().map_or_default(std::vec::Vec::as_slice) {
         let word = format!("<{}>", o["valueName"].as_str().unwrap_or("VALUE"));
         let (required, repeatable) = (o["required"] == true, o["variadic"] == true);
         parts.push(match (required, repeatable) {
@@ -321,7 +320,7 @@ pub fn removed_table(spec: &Value, since: &str) -> String {
         }
         let old = row["old"].as_str().expect("old");
         let new = row["new"].as_str().expect("new");
-        let scope: Vec<&str> = row["scope"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).collect();
+        let scope: Vec<&str> = row["scope"].as_array().map_or_default(std::vec::Vec::as_slice).iter().filter_map(Value::as_str).collect();
         let (old, new) = match row["kind"].as_str() {
             Some("option") => {
                 let on = scope.iter().map(|s| format!("`canon {s}`")).collect::<Vec<_>>().join(", ");
@@ -381,6 +380,83 @@ pub fn splice(text: &str, mdx: bool, ko: bool, spec: &Value) -> Result<String, S
         }
     }
     Ok(out)
+}
+
+/// The cells of a table row, split at the `|` that are not escaped (`\|`); the first and last are the empty pieces outside the row's bars.
+fn row_cells(row: &str) -> Vec<&str> {
+    let (mut cells, mut start, mut escaped) = (Vec::new(), 0, false);
+    for (at, c) in row.char_indices() {
+        match c {
+            '\\' => escaped = !escaped,
+            '|' if !escaped => {
+                cells.push(&row[start..at]);
+                start = at + 1;
+            }
+            _ => escaped = false,
+        }
+    }
+    cells.push(&row[start..]);
+    cells
+}
+
+/// What block `name` says that a reader copying a command depends on, without the sentences the spec's `summary` lines supply (0.43 I14).
+///
+/// - `commands-<role>`: the `usage:` lines, the example invocations and the fences between them; not the `# …` comment lines and not the
+///   introduction before the first fence.
+/// - `cli-<group>`: every table row, each `Effect` cell cut to its effect word (`read`, `write`, ...); not the introduction before the table.
+/// - `removed`, `removed-031`: the old and the new spelling of each row, in order; not the `What changed` column.
+///
+/// Any other block is kept whole.
+fn machine_block(name: &str, body: &str) -> String {
+    let mut out = String::new();
+    if name.starts_with("commands-") {
+        let mut fenced = false;
+        for line in body.lines() {
+            fenced |= line.starts_with("```");
+            if fenced && !line.starts_with('#') {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+    } else if name.starts_with("cli-") {
+        for row in body.lines().filter(|line| line.starts_with('|')) {
+            let mut cells = row_cells(row);
+            if let Some(effect) = cells.get_mut(4) {
+                *effect = effect.split_once(':').map_or(*effect, |(word, _)| word);
+            }
+            out.push_str(&cells.join("|"));
+            out.push('\n');
+        }
+    } else if name == "removed" || name == "removed-031" {
+        for row in body.lines().filter(|line| line.starts_with('|')) {
+            out.push_str(&row_cells(row).into_iter().take(3).collect::<Vec<_>>().join("|"));
+            out.push('\n');
+        }
+    } else {
+        out.push_str(body);
+    }
+    out
+}
+
+/// `text` with the body of every generated block cut down to its machine content ([`machine_block`]); the hand-written text stays whole.
+pub fn machine(text: &str, mdx: bool) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut lines = text.split_inclusive('\n');
+    while let Some(line) = lines.next() {
+        out.push_str(line);
+        let Some(name) = begin_name(line, mdx) else { continue };
+        let end = marker(name, "end", mdx);
+        let mut body = String::new();
+        for inner in lines.by_ref() {
+            if inner.trim() == end {
+                out.push_str(&machine_block(name, &body));
+                out.push_str(inner);
+                break;
+            }
+            body.push_str(inner);
+        }
+    }
+    out
 }
 
 /// The generated blocks a file must carry, by repo-relative path.

@@ -18,7 +18,7 @@ Feature: authoring brief check
   Scenario: A configured language overrides the detected one and a disagreeing text is noted in one line
     Given a repo whose canon.yaml sets a language, and a brief whose prose reads as another language
     When canon brief check runs
-    Then the configured language decides, the findings are judged with its rules, and the text output prints one line, "language: en (configured; the text reads as ko)"
+    Then the configured language decides, the findings are judged with its rules, and the text output prints one language line
     And the JSON carries languageSource "configured" and a languageNote, and a configured language the text agrees with carries no note
     And the configured language decides which phrase lists run, but a date is language-independent: with en configured a Korean sentence with a date draws one prose.decision-history finding for the date, and a Korean decision phrase with no date draws none
 
@@ -59,17 +59,17 @@ Feature: authoring brief check
   Scenario: A code citation is flagged with what it matched, and a Source line is exempt
     Given a brief citing a file with a line, a code identifier in a span, a plain file path, and the same file on a Source line
     When canon brief check runs
-    Then each citation in a sentence is one prose.code-citation finding whose hint names what matched and says to put provenance on one Source line
+    Then the citations in a sentence are one prose.code-citation finding whose matched field holds what matched
     And a Source line inside a judged section, a quoted UI label, a command, a slash between words, a product name such as Next.js or iPhone (App.js is a file and is flagged) and a src/dst pair are not flagged
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
   @case:failure
   @authoring.brief-check.07
-  Scenario: Parenthetical asides above the density are flagged with their count and threshold
+  Scenario: Parenthetical asides above the density are flagged
     Given a brief with a section carrying three or more parenthetical asides at more than four per 1000 characters
     When canon brief check runs
-    Then one prose.parenthetical finding names the section, its first aside, the count of asides and characters, and the threshold
+    Then one prose.parenthetical finding names the section and its first aside
     And fewer asides, or labels such as (F1) and (30초), report nothing
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
@@ -80,7 +80,7 @@ Feature: authoring brief check
     Given a brief with ISO, Korean and English dates, undated decision phrases (결정했다, 기로 했다, we decided), behavior sentences that use a meeting, an approval or a decision field (회의에서 나가면, approved by a manager, decision on the request, decided to leave), dates next to 부터, 이후 or after, a quoted label next to a date, and a decision note in a question
     When canon brief check runs
     Then each such sentence is one prose.decision-history finding, naming the matched date or phrase, in normative sections, Intent and table cells but not in a question
-    And there is no boundary or verb gating, so a date that is part of the behavior (an effective date) or a quoted label is a finding too, and the hint says to keep it and waive it with a reason
+    And there is no boundary or verb gating, so a date that is part of the behavior (an effective date) or a quoted label is a finding too, to be waived with a reason
     And a sentence with a date and a phrase is one finding, a waiver clears it, and sentences with no date and no listed phrase (a conditional 합의하면, the behavior sentences above, "agreed to the terms", 결정 버튼) report nothing
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
@@ -107,10 +107,10 @@ Feature: authoring brief check
   @subject:authoring-scaffold
   @case:failure
   @authoring.brief-check.11
-  Scenario: A section or brief over its character budget is flagged with the measured value and the budget
+  Scenario: A section or brief over its character budget is flagged
     Given a Korean brief with an Intent over its section budget, and another with the sum of its sections over the brief budget
     When canon brief check runs
-    Then prose.length names the section with the measured characters and the budget, and the whole-brief finding has no section and names its budget
+    Then prose.length names the section, and the whole-brief finding has no section
     And out of scope has no budget of its own, and an English brief over the Korean budget but under the English one is flagged only when ko is configured
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
@@ -140,7 +140,7 @@ Feature: authoring brief check
   Scenario: canon status counts the findings of the detected language
     Given a repo with no language set, a subject adopting a change whose brief is written in Korean with prose advisories
     When canon status runs
-    Then the brief line counts the same advisories canon brief check reports, judged in the detected language
+    Then the brief entry of status counts the same advisories canon brief check reports, judged in the detected language
 
   # canon: {"schema":1,"at":"2026-10-21T17:10:01Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -179,12 +179,12 @@ Feature: authoring brief check
   @case:failure
   @flow:canon-0-31-brief-format.F1
   @authoring.brief-check.18
-  Scenario: A misspelt or differently cased heading is named with the nearest heading, and a deleted or moved section is reported
+  Scenario: A misspelt or differently cased heading is reported as a missing section, and a deleted or moved section is reported
     Given a brief whose Intent heading is written `## Intnet`, another whose heading differs only in case, one with a deleted section and one with two sections swapped
     When canon brief check runs on each
-    Then the first two report brief.section-missing for the section and name the nearest heading, `Intent` or the right case, in the hint
-    And the deleted section is brief.section-missing, the swap is brief.section-order, and a `##` line that is no known heading stays body text of the section before it
-    And a brief with a shipped Korean heading and no markers is old-format and gets no near-heading hint
+    Then the first two report brief.section-missing for the Intent section
+    And the deleted section is brief.section-missing and the swap is brief.section-order
+    And a brief with a shipped Korean heading and no markers is old-format and gets no other finding
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:40Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
   @subject:authoring-scaffold
@@ -236,11 +236,11 @@ Feature: authoring brief check
   @case:happy
   @flow:canon-0-31-brief-format.F3
   @authoring.brief-check.23
-  Scenario: brief show prints each empty section's guidance in the brief's language and check reports each empty section
+  Scenario: A new brief's empty sections are reported by brief check and listed by brief show
     Given a brief written by canon change new, whose sections are empty, in a repo with language ko and in one without
     When canon brief check and canon brief show run
-    Then brief check reports brief.placeholder for each empty section with that section's guidance in the hint, and Intent holding the title is not empty
-    And brief show lists the guidance of each empty section in Korean for ko and in English otherwise, in text and in JSON emptySections
+    Then brief check reports the brief's language, ko for a repo with language ko and en otherwise, and findings
+    And brief show lists the empty sections in text, Desired outcome among them, and in JSON emptySections, User flow among them
 
   # canon: {"schema":1,"at":"2026-10-27T12:04:46Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
   @subject:authoring-scaffold
@@ -260,5 +260,5 @@ Feature: authoring brief check
   Scenario: A 0.30 brief gets one old-format blocker and its waiver comments are not read
     Given a brief in the 0.30 format with canon:section comments and a canon:waive comment
     When canon brief check runs
-    Then it reports one blocker, brief.old-format, naming canon migrate, no section rule is applied and the waiver comment is not read
+    Then it reports one blocker, brief.old-format, no section rule is applied and the waiver comment is not read
     And brief show says old-format and its first next step is migrate

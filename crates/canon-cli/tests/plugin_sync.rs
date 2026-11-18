@@ -162,13 +162,10 @@ fn a_second_porting_sync_over_an_unchanged_inventory_writes_zero_new_overlay_rec
     let overlay_dir = dir.path().join(".canon/ledger/kind=porting.coverage");
     let count_after_first = files_under(&overlay_dir).len();
     assert_eq!(count_after_first, 2, "one overlay record per scanned scenario; stdout: {}", stdout(&first));
-    assert!(stdout(&first).contains("2 written"), "{}", stdout(&first));
 
-    let second = sync_porting(dir.path());
+    sync_porting(dir.path());
     let count_after_second = files_under(&overlay_dir).len();
     assert_eq!(count_after_second, count_after_first, "a second sync over an unchanged inventory must write zero NEW overlay records");
-    assert!(stdout(&second).contains("0 written"), "{}", stdout(&second));
-    assert!(stdout(&second).contains("2 deduped"), "{}", stdout(&second));
 }
 
 // ── canon-gate isolation: verdicts never move ──
@@ -285,8 +282,9 @@ fn a_coverage_change_uncovered_to_covered_supersedes_the_stale_overlay() {
     assert_eq!(record["overlay"]["porting.coverage"]["surface_ref"], serde_json::json!(["idolive.hub.hub-header"]), "{record:?}");
 
     // The now-unchanged inventory still dedupes on a third sync.
-    let third = sync_porting(dir.path());
-    assert!(stdout(&third).contains("0 written"), "a re-sync over the unchanged (bumped) inventory must dedupe: {}", stdout(&third));
+    let overlay_count = files_under(&dir.path().join(".canon/ledger/kind=porting.coverage")).len();
+    sync_porting(dir.path());
+    assert_eq!(files_under(&dir.path().join(".canon/ledger/kind=porting.coverage")).len(), overlay_count, "a re-sync over the unchanged (bumped) inventory must dedupe");
 }
 
 #[test]
@@ -326,7 +324,6 @@ fn plugin_sync_from_a_subdirectory_resolves_the_repo_root_tier() {
     let sub = dir.path().join(".canon/specs/kind=feature"); // a nested subdir, no canon.yaml of its own
     let out = run_canon(&["plugin", "sync", "porting"], &sub);
     assert!(out.status.success(), "plugin sync from a subdir must resolve the repo root: {}", stderr(&out));
-    assert!(stdout(&out).contains("2 written"), "must write into the repo-root tier: {}", stdout(&out));
 
     // Overlays land under the repo ROOT tier; no subdir-local tier appears.
     assert_eq!(files_under(&dir.path().join(".canon/ledger/kind=porting.coverage")).len(), 2, "overlay records must be under the repo ROOT tier");

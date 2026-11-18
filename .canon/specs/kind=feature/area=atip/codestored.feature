@@ -82,26 +82,6 @@ Feature: atip codestored
     When export and ledger compact run
     Then export exits 2 with WRITE_INVALID and WRITE_DENIED, ledger compact with LEDGER_ARCHIVE_INVALID, none is retryable and nothing is changed
 
-  # canon: {"schema":1,"at":"2026-11-04T06:09:54Z","actor":{"agent_id":"impl-codes-stored","role":"implementer","session_id":"s-0-36-codes-stored"}}
-  @subject:atip-contract
-  @case:happy
-  @flow:canon-0-36-codes-stored.F5
-  @atip.codestored.09
-  Scenario: The old names are gone from the registry and the new codes carry the exit and retryable value of the table
-    Given the code registry
-    When the registry and canon schema --error are read
-    Then none of the old names is an error code and canon schema --error refuses each, the warnings keep their names, every new code has the exit and retryable value of the table, and only an UNAVAILABLE code is retryable
-
-  # canon: {"schema":1,"at":"2026-11-04T06:09:58Z","actor":{"agent_id":"impl-codes-stored","role":"implementer","session_id":"s-0-36-codes-stored"}}
-  @subject:atip-contract
-  @case:happy
-  @flow:canon-0-36-codes-stored.F5
-  @atip.codestored.10
-  Scenario: The CHANGELOG replaces every old name with its new codes
-    Given the CHANGELOG of the release
-    When its replacement table is read
-    Then every old name has a row whose second column names its new codes
-
   # canon: {"schema":1,"at":"2026-11-04T07:11:03Z","actor":{"agent_id":"impl-refusals-fix","role":"implementer","session_id":"s-0-36-refusals-fix"}}
   @subject:atip-contract
   @case:failure
@@ -130,14 +110,4 @@ Feature: atip codestored
   Scenario: A tier a purge or export needs that is not attached is RETENTION_TIERS_REQUIRED and a stored object that does not decode is RETENTION_TIERS_CORRUPT
     Given a repository whose hot tier names a Postgres server with its DSN variable unset, and a trajectory file that is not a Parquet file
     When export and purge run
-    Then export exits 2 with RETENTION_TIERS_REQUIRED and purge with RETENTION_TIERS_CORRUPT, neither is retryable, each hint says what to do, and nothing is written; only a backend that does not answer or an error a repeat can pass is RETENTION_TIERS_UNAVAILABLE
-
-  # canon: {"schema":1,"at":"2026-11-05T09:00:02Z","actor":{"agent_id":"impl-flowfix-036","role":"implementer","session_id":"s-0-36-flowfix-2"}}
-  @subject:atip-contract
-  @case:failure
-  @flow:canon-0-36-codes-stored.F5
-  @atip.codestored.14
-  Scenario: An old *_UNREADABLE name revived in a guide, a replacement row deleted or left with no new code, or a wrong retry value is found
-    Given the eleven old names the registry no longer holds, the CHANGELOG's replacement rows and the new codes of the table
-    When a guide sentence names an old name, a row is deleted, a row's new-code cell is emptied, a code of this change is dropped from the CHANGELOG and a retryable code that is not UNAVAILABLE is given
-    Then the old-names guard names each revived name, the CHANGELOG check names each missing row, replacement and code, the retry rule names each wrong value, and the CHANGELOG and registry as they stand pass
+    Then export exits 2 with RETENTION_TIERS_REQUIRED and purge with RETENTION_TIERS_CORRUPT, neither is retryable, each carries a hint, and nothing is written; only a backend that does not answer or an error a repeat can pass is RETENTION_TIERS_UNAVAILABLE

@@ -455,7 +455,7 @@ fn build_meta(command: &str, schema_version: String, output: Option<String>, aft
             warnings.push(said);
         }
     }
-    let mut next: Vec<NextEntry> = after.map(After::entries).unwrap_or_default();
+    let mut next: Vec<NextEntry> = after.map_or_default(After::entries);
     let mut pushed_out = 0;
     let first = std::mem::take(&mut *FIRST_NEXT.lock().expect("the first-step list is not poisoned"));
     if !first.is_empty() {

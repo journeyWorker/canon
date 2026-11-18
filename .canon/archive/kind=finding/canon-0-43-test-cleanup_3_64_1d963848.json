@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-43-tests-r3-rest",
+    "role": "reviewer",
+    "session_id": "Rev43r3_rest"
+  },
+  "at": "2026-11-17T17:31:12.276692713Z",
+  "change_id": "canon-0-43-test-cleanup",
+  "code_tree": "ad066d7d085083f115628358ef1dea11c03ee9d5",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=subject/lifecycle.feature:381-388",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "239d36b1e5c75268859371b70c13720023fc50b4",
+  "reviewer": "rev-0-43-tests-r3-rest",
+  "round": 3,
+  "scenario_ids": [
+    "subject.lifecycle.38"
+  ],
+  "schema": 2,
+  "seq": 64,
+  "severity": "note",
+  "summary": "[spec fidelity, P3] The When of subject.lifecycle.38 says 'a scenario is re-verified and reviewed' and the Then says 'each step is accepted'. subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject (crates/canon-cli/tests/brief_scope.rs:689-746) only records evidence (attest, which is `evidence add`) and writes no review, so no review step is accepted or checked. Fix: drop 'and reviewed', or review the scenario in the test.",
+  "worktree_dirty": false
+}

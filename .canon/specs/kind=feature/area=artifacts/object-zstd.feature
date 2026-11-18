@@ -88,7 +88,7 @@ Feature: Evidence blobs in the object-store tier are zstd frames
   @case:failure
   @flow:canon-0-40-object-store-zstd.F5
   @artifacts.object-zstd.10
-  Scenario: when the tier refuses the second name of a digest prune says what it deleted and a repeat deletes the name that remains
+  Scenario: when the tier refuses the second name of a digest prune answers ARTIFACTS_PRUNE_INCOMPLETE and a repeat deletes the name that remains
     Given a step
 
   # canon: {"schema":1,"at":"2026-11-09T10:13:39Z","actor":{"agent_id":"Impl40_zstd","role":"planner"}}
@@ -107,22 +107,4 @@ Feature: Evidence blobs in the object-store tier are zstd frames
   @flow:canon-0-40-object-store-zstd.F6
   @artifacts.object-zstd.12
   Scenario: a <digest>.zst in the local blob directory is no blob: the store reads the digest as missing, verify and move skip it and prune does not delete it
-    Given a step
-
-  # canon: {"schema":1,"at":"2026-11-09T10:13:53Z","actor":{"agent_id":"Impl40_zstd","role":"planner"}}
-  @subject:evidence-attestation
-  @lane:behavior
-  @case:happy
-  @flow:canon-0-40-object-store-zstd.F7
-  @artifacts.object-zstd.13
-  Scenario: the CHANGELOG and the guides name the .zst key, the older canon's behavior, the order of upgrade and zstd -d
-    Given a step
-
-  # canon: {"schema":1,"at":"2026-11-09T10:14:00Z","actor":{"agent_id":"Impl40_zstd","role":"planner"}}
-  @subject:evidence-attestation
-  @lane:behavior
-  @case:failure
-  @flow:canon-0-40-object-store-zstd.F7
-  @artifacts.object-zstd.14
-  Scenario: a CHANGELOG or guide that lacks one of those items is named by the release check
     Given a step

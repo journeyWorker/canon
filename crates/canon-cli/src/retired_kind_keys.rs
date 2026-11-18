@@ -16,7 +16,7 @@ use crate::status::{NextStep, StepActor};
 /// (the command that needs the config reports that).
 pub fn found(repo: &Path) -> Vec<String> {
     let Ok(text) = std::fs::read_to_string(repo.join("canon.yaml")) else { return Vec::new() };
-    canon_store::policy::TierPolicy::from_yaml_at(&text, repo).map(|policy| policy.retired_kind_keys).unwrap_or_default()
+    canon_store::policy::TierPolicy::from_yaml_at(&text, repo).map_or_default(|policy| policy.retired_kind_keys)
 }
 
 /// The warning's message for `keys`.

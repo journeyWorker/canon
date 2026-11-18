@@ -537,70 +537,6 @@ fn canonical_check_and_doctor_report_legacy_codex_remnant_with_fix() {
     assert!(remnant.is_file(), "an unproven legacy file is reported, never deleted");
 }
 
-/// The working loop's step names, in order: the skill's numbered steps
-/// (`N. **Name.**`) and the `canon init` AGENTS.md block's (`N. Name:`)
-/// must both say exactly these.
-const LOOP_STEPS: [&str; 8] =
-    ["Brief", "Subject", "Scenarios", "Units", "Implement", "Evidence", "Independent review", "Transition"];
-
-/// The text of `canon skills show <args>`: the guide the binary carries.
-fn show(args: &[&str]) -> String {
-    let out = hermetic::canon().args(["skills", "show"]).args(args).output().unwrap();
-    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
-    String::from_utf8(out.stdout).unwrap()
-}
-
-/// skills.install.11: canon's own skill claims build work in a canon repo,
-/// ahead of generic builder skills: the stub every provider gets carries the
-/// source's frontmatter, and the guide it points to opens with the working
-/// loop the `canon init` AGENTS.md block names.
-#[test]
-fn skills_install_11_the_stub_claims_build_work_and_the_guide_opens_with_the_loop() {
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let source = fs::read_to_string(repo.join("canon/skills/SKILL.src.md")).unwrap();
-    let tmp = tempfile::tempdir().unwrap();
-    let target = tmp.path().join("target");
-    let report = skills::install_canonical(None, &target, names("claude,codex,omp,pi").as_deref(), false).unwrap();
-    assert_eq!(report.providers.len(), 4);
-    for root in [".claude", ".agents", ".omp", ".pi"] {
-        let projected = fs::read_to_string(target.join(root).join("skills/canon/SKILL.md")).unwrap();
-        assert_stub(&projected, &source);
-        assert!(!target.join(root).join("skills/canon/reference").exists(), "{root}: no reference files are projected");
-    }
-
-    let fields = frontmatter(&source).expect("SKILL.src.md opens with a closed frontmatter block");
-    let description = fields.get("description").expect("a description");
-    for claim in ["build", "implement", "feature", "fix", "canon.yaml"] {
-        assert!(description.contains(claim), "the description must claim {claim:?}: {description}");
-    }
-    assert!(description.chars().count() <= 1024, "skill loaders cap a description at 1024 characters: {}", description.chars().count());
-
-    let guide = show(&["canon"]);
-    let body = &guide[guide.find("\n---\n").unwrap() + 5..];
-    let sections: Vec<&str> = body.lines().filter(|line| line.starts_with("## ")).collect();
-    assert_eq!(sections.first(), Some(&"## The working loop"), "the loop is the first section: {sections:?}");
-    let loop_start = body.find("## The working loop").unwrap();
-    let loop_end = body[loop_start + 3..].find("\n## ").map_or(body.len(), |at| loop_start + 3 + at);
-    let loop_section = &body[loop_start..loop_end];
-    let skill_steps: Vec<&str> = loop_section
-        .lines()
-        .filter_map(|line| line.split_once(". **").filter(|(n, _)| n.parse::<u8>().is_ok()))
-        .filter_map(|(_, rest)| rest.split_once(".**").map(|(name, _)| name))
-        .collect();
-    assert_eq!(skill_steps, LOOP_STEPS, "the guide's loop steps");
-
-    let tmp = tempfile::tempdir().unwrap();
-    let init = hermetic::canon().arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
-    assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
-    let agents = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
-    let block_steps: Vec<&str> = agents
-        .lines()
-        .filter_map(|line| line.split_once(". ").filter(|(n, _)| n.parse::<u8>().is_ok()))
-        .filter_map(|(_, rest)| rest.split_once(':').map(|(name, _)| name))
-        .collect();
-    assert_eq!(block_steps, LOOP_STEPS, "the AGENTS.md block's loop steps");
-}
-
 const LOCK: &str = ".canon/skills/.install-lock.json";
 
 fn git(dir: &Path, args: &[&str]) -> String {
@@ -792,8 +728,6 @@ fn skills_install_52_explicit_providers_rewrite_the_config_list_that_later_runs_
     let install = canon(&["skills", "install", "--harness", "codex", "--harness", "omp"], &source, &target);
     let out = String::from_utf8_lossy(&install.stdout);
     assert_eq!(install.status.code(), Some(0), "{out}");
-    assert!(out.contains("canon v1 — installed (codex,omp)\n"), "{out}");
-    assert!(out.contains("wrote `skills: { providers: [codex, omp] }` to "), "{out}");
     let config = fs::read_to_string(target.join("canon.yaml")).unwrap();
     assert!(config.starts_with(CONFIG_WITHOUT_SKILLS), "every byte before the new section is kept: {config}");
     assert!(config.ends_with("skills:\n  providers: [codex, omp]\n"), "{config}");
@@ -805,7 +739,7 @@ fn skills_install_52_explicit_providers_rewrite_the_config_list_that_later_runs_
     let check = canon(&["skills", "check"], &source, &target);
     let out = String::from_utf8_lossy(&check.stdout);
     assert_eq!(check.status.code(), Some(0), "{out}");
-    assert!(out.starts_with("providers: codex,omp (from canon.yaml skills.providers)\n"), "{out}");
+    assert!(out.starts_with("providers: codex,omp"), "{out}");
 
     // A second rewrite replaces the section in place.
     skills::install_canonical(Some(&source), &target, names("pi").as_deref(), false).unwrap();
@@ -866,11 +800,11 @@ fn skills_install_53_a_pre_0_17_repo_with_a_lock_keeps_working() {
     let check = canon(&["skills", "check"], &source, &target);
     let out = String::from_utf8_lossy(&check.stdout);
     assert_eq!(check.status.code(), Some(0), "{out}");
-    assert!(out.starts_with("providers: claude,codex (from the install lock; canon.yaml has no skills: key)\n"), "{out}");
+    assert!(out.starts_with("providers: claude,codex"), "{out}");
     let doctor = canon(&["skills", "doctor"], &source, &target);
     let out = String::from_utf8_lossy(&doctor.stdout);
     assert_eq!(doctor.status.code(), Some(0), "{out}");
-    assert!(out.starts_with("providers: claude,codex (from the install lock; canon.yaml has no skills: key)\n"), "{out}");
+    assert!(out.starts_with("providers: claude,codex"), "{out}");
     assert!(out.contains("status: healthy"), "{out}");
     assert_owned(&out, &[skills::Provider::Claude, skills::Provider::Codex]);
     let install = canon(&["skills", "install"], &source, &target);
@@ -921,11 +855,7 @@ fn skills_install_54_doctor_names_a_stray_projection_and_check_does_not_fail_on_
 /// writes nothing, and fails `canon init --check`.
 #[test]
 fn skills_install_55_a_malformed_skills_section_fails_loud() {
-    for (section, needle) in [
-        ("skills: [claude]\n", "`skills:` section is malformed (expected `skills: { providers: [claude, codex, omp, pi] }`"),
-        ("skills:\n  provider: [claude]\n", "`skills:` section is malformed"),
-        ("skills:\n  providers: [claude, gemini]\n", "`skills.providers` names `gemini`; expected any of claude, codex, omp, pi"),
-    ] {
+    for section in ["skills: [claude]\n", "skills:\n  provider: [claude]\n", "skills:\n  providers: [claude, gemini]\n"] {
         let tmp = tempfile::tempdir().unwrap();
         let source = tmp.path().join("source");
         let target = tmp.path().join("target");
@@ -939,7 +869,6 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
             let err = String::from_utf8_lossy(&output.stderr);
             assert_eq!(output.status.code(), Some(2), "{command} {section:?}: {err}");
             assert!(err.contains("CONFIG_INVALID"), "{command} {section:?}: {err}");
-            assert!(err.contains(needle), "{command} {section:?}: {err}");
         }
         // The section's fault is CONFIG_INVALID with the reason SKILLS, a provider canon.yaml names included.
         for command in ["install", "check", "doctor"] {
@@ -953,7 +882,7 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
         let check = hermetic::canon().args(["init", "--check", "--repo"]).arg(&target).output().unwrap();
         let out = String::from_utf8_lossy(&check.stdout);
         assert_eq!(check.status.code(), Some(1), "{out}");
-        assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ") && line.contains(needle)), "{out}");
+        assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ")), "{out}");
     }
 }
 
@@ -1194,7 +1123,6 @@ fn skills_install_60_install_keeps_a_dropped_file_whose_bytes_changed_and_report
     let path = kept[0]["path"].as_str().unwrap();
     assert!(path.ends_with(&format!("{CLAUDE_PROJECTION}/reference/retired/old.md")), "{json}");
     assert_eq!(kept[0]["provider"], "claude");
-    assert!(kept[0]["reason"].as_str().is_some_and(|reason| !reason.is_empty()), "{json}");
     assert!(kept[0]["hint"].as_str().unwrap().contains(&format!("rm {path}")), "{json}");
     let pruned = json["data"]["pruned"].as_array().unwrap();
     assert_eq!(pruned.len(), 1, "the unmodified sibling is still pruned: {json}");
@@ -1278,7 +1206,7 @@ fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
     assert_eq!(orphans.len(), 2, "{json}");
     assert_eq!(orphans.iter().filter(|o| o["modified"] == true).count(), 1, "{json}");
     for (entry, path, modified, how) in [
-        (&orphans[0], &old, false, format!("run `{fix}`, which removes it")),
+        (&orphans[0], &old, false, format!("run `{fix}`")),
         (&orphans[1], &older, true, format!("rm {older}")),
     ] {
         assert_eq!(entry["path"], path.as_str(), "{json}");

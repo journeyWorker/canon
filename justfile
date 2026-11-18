@@ -7,6 +7,9 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # Cargo's build output directory; the gate and bench recipes run the binaries from here.
 target := env("CARGO_TARGET_DIR", "target")
 
+# The checker `just atip-install` installs; the recipes call it by path, never from PATH.
+atip_bin := "tools/atip-check/node_modules/.bin/atip"
+
 # The live tier's environment contract (see the README).
 live_env := "CANON_REQUIRE_LIVE=1 CANON_PG_DSN=postgres://canon:canon@127.0.0.1:55432/canon_v1 CANON_S3_ENDPOINT=http://127.0.0.1:59000 CANON_S3_BUCKET=canon CANON_S3_ACCESS_KEY=canon CANON_S3_SECRET_KEY=canoncanon"
 
@@ -26,12 +29,13 @@ install:
 test:
     cargo test --workspace --locked
 
-# The unit tests of the workspace under three callers: none, an implementer with an actor, and an unknown role. A unit test that reads the declared role
+# The unit tests of canon-cli under three callers: none, an implementer with an actor, and an unknown role. A unit test that reads the declared role
 # or actor from the environment (`closing_role` once did) answers differently in two of them and fails here; `tests/hermetic_env.rs` covers the tests that start the binary.
+# Only canon-cli has such tests (canon-model has one comment); `test` already runs every other crate's lib tests without a caller.
 test-callers:
-    env -u CANON_ROLE -u CANON_ACTOR cargo test --workspace --lib --locked
-    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test --workspace --lib --locked
-    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test --workspace --lib --locked
+    env -u CANON_ROLE -u CANON_ACTOR cargo test -p canon-cli --lib --locked
+    env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test -p canon-cli --lib --locked
+    env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test -p canon-cli --lib --locked
 
 # The three clippy runs of test.yml `clippy`, and its git boundary scan (every git call goes through `canon_store::git`).
 lint:
@@ -65,12 +69,13 @@ rule-calls-check:
 conformance:
     conformance/regenerate.sh
 
-# The release-workflow safety check and its test, and the release binary check's test.
+# The release-workflow safety check and its test, the release binary check's test, and the build-scope script's test.
 # On a binary: `python3 scripts/check-release-binary.py --target <triple> <canon>` (see its header).
 release-check:
     python3 scripts/check-release-workflow-safety.py
     python3 scripts/test-release-workflow-safety.py
     python3 scripts/test-check-release-binary.py
+    python3 scripts/test-build-scope.py
 
 # The npm launcher's tests (test.yml `launcher`).
 launcher:
@@ -107,19 +112,20 @@ live:
     env {{ live_env }} cargo test -p canon-store --features live-pg,live-r2 --locked
     env {{ live_env }} cargo test -p canon-cli --test ledger_pg_live --locked
 
-# Install the checker canon is held to: the atip repo's `atip check`, at the tag the CI job `atip` installs.
+# Install the checker canon is held to: the pre-built `@journeykit/atip-check` (atip repo, `atip check`) from the lockfile in `tools/atip-check/`, which pins its
+# version and the sha512 of its platform packages. The CI job `atip` runs the same command.
 atip-install:
-    cargo install --git https://github.com/journeyWorker/atip --tag atip-check-v0.3.0 atip-check --locked
+    cd tools/atip-check && bun install --frozen-lockfile
 
-# atip check on the canon binary, interface checks only (seconds): L2, contract 1.6. Needs the checker: `just atip-install`.
+# atip check on the canon binary, interface checks only (seconds): L2, at the contract the fixture declares. Needs the checker: `just atip-install`.
 atip:
     cargo build --locked -p canon-cli
-    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.6 --fixture crates/canon-cli/tests/atip/canon.fixture.json
+    {{ atip_bin }} check --bin {{ target }}/debug/canon --level L2 --jobs 4 --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # The same with `--deep` (declaration against behaviour, about two minutes): what CI's `atip` job runs; run it once before a release.
 atip-deep:
     cargo build --locked -p canon-cli
-    atip check --bin {{ target }}/debug/canon --level L2 --contract 1.6 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
+    {{ atip_bin }} check --bin {{ target }}/debug/canon --level L2 --jobs 4 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
 # Every CI check that needs no docker.
 ci: release-check lint test test-callers gate launcher platformer atip-deep

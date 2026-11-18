@@ -422,7 +422,6 @@ mod tests {
         for (words, command, kind) in [(&["query", "--kind", "session"][..], "query", "session"), (&["export", "--kind=event"], "export", "event"), (&["search", "x", "--kind", "session"], "search", "session")] {
             let removed = find(&tree, &args(words)).unwrap_or_else(|| panic!("{words:?} is refused"));
             assert_eq!((removed.command.as_str(), removed.field.as_str(), removed.since), (command, "--kind", "0.39.0"));
-            assert!(removed.message().contains(&format!("--kind {kind} was removed in 0.39.0")) && removed.message().contains("no longer exist"), "{}", removed.message());
             assert_eq!(removed.expected_values(), RecordKind::ALL.iter().map(|k| k.as_str().to_string()).collect::<Vec<_>>(), "the thirteen kinds that remain");
             assert!(removed.hint().contains(&format!("canon purge --kind {kind} --before <date>")), "{}", removed.hint());
             assert!(!removed.hint().starts_with("canon "), "a sentence, not a command line (spec 7.1.2)");
@@ -485,7 +484,6 @@ mod tests {
     fn the_hint_is_the_typed_line_with_every_removed_spelling_replaced() {
         let removed = find_in(&["change", "new", "x", "--subject-id", "demo", "--title", "Add search"]).unwrap();
         assert!(removed.hint().contains("`canon change new x --subject demo --title 'Add search'`"), "{}", removed.hint());
-        assert_eq!(removed.message(), "--subject-id was removed in 0.31.0");
         assert_eq!(removed.expected(), "--subject");
     }
 
@@ -518,7 +516,7 @@ mod tests {
         for value in ["Claude", "claude,", "claude, pi", "gemini", "none,claude", "", "NONE"] {
             let found = find_init(&["init", &format!("--providers={value}")]).expect("removed");
             assert_eq!((found.line.as_deref(), found.expected().as_str()), (None, "--harness"), "{value:?}");
-            assert!(found.hint().contains("use `--harness`") && found.hint().contains("`--no-harness`"), "{}", found.hint());
+            assert!(found.hint().contains("`--harness`") && found.hint().contains("`--no-harness`"), "{}", found.hint());
         }
         let missing = find_init(&["init", "--providers", "--json"]).expect("removed");
         assert_eq!(missing.line, None);

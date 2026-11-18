@@ -1,6 +1,6 @@
 //! The CLI conformance corpus replay: `conformance/` freezes the contracts
 //! external consumers of `canon` rely on — exit codes, gate violation lines,
-//! refusal messages, JSON output — and this file is CI's enforcement of it
+//! refusal codes, JSON output — and this file is CI's enforcement of it
 //! (`conformance/README.md` is the human-facing contract).
 //!
 //! Each case is `conformance/cases/<name>/`: a `case.yaml` (description,
@@ -9,7 +9,10 @@
 //! copies `repo/` into a fresh temp dir, `git init`s it, runs every step's
 //! `args` against the actually-built binary (`env!("CARGO_BIN_EXE_canon")`)
 //! with a cleared environment plus a fixed base, and compares the exit code
-//! and the normalized stdout/stderr byte for byte.
+//! exactly and the normalized stdout/stderr by their machine content: a JSON
+//! line is parsed with its sentences (`message`, `hint`, `reason` of a next
+//! step, help, summaries) emptied, a text line is reduced to what a program
+//! reads (`support/prose.rs`). The expectation files hold the full output.
 //!
 //! Cases are **discovered, never listed**: a new directory with a
 //! `case.yaml` is replayed the moment it lands, and discovering zero cases
@@ -22,6 +25,8 @@
 
 #[path = "support/hermetic.rs"]
 mod hermetic;
+#[path = "support/prose.rs"]
+mod prose;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -534,9 +539,11 @@ fn run_case(case: &Case, bless: bool) -> Result<(), String> {
                 continue;
             }
             match std::fs::read_to_string(&path) {
-                Ok(expected) if &expected == actual => {}
                 Ok(expected) => {
-                    let _ = writeln!(failures, "step {n} (`{invocation}`): std{stream} differs from expected/{n}.{stream}\n{}", unified_diff(&expected, actual));
+                    let (expected, actual) = (prose::output(&expected), prose::output(actual));
+                    if expected != actual {
+                        let _ = writeln!(failures, "step {n} (`{invocation}`): std{stream} differs from expected/{n}.{stream} (sentences left out)\n{}", unified_diff(&expected, &actual));
+                    }
                 }
                 Err(e) => {
                     let _ = writeln!(failures, "step {n} (`{invocation}`): cannot read expected/{n}.{stream}: {e}\nactual std{stream}:\n{actual}");
@@ -592,7 +599,7 @@ fn check_no_orphan_expectations(expected_dir: &Path, steps: usize) -> Result<(),
 }
 
 #[test]
-fn conformance_corpus_replays_byte_exact() {
+fn conformance_corpus_replays() {
     let cases = discover_cases().unwrap_or_else(|e| panic!("conformance: {e}"));
     assert!(
         !cases.is_empty(),

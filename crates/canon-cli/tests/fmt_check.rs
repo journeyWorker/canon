@@ -37,12 +37,13 @@ fn format_exits_nonzero_and_lists_the_audited_failure_classes() {
         assert!(observed.iter().any(|c| c.as_str() == class), "the audited fixture must still observe `{class}`");
     }
     let headings: Vec<&str> = text.lines().filter(|line| line.starts_with('[')).collect();
-    let expected: Vec<String> =
-        observed.iter().map(|class| format!("[{}] {} occurrence(s)", class.as_str(), report.count_by_class(*class))).collect();
-    for heading in &expected {
-        assert_eq!(headings.iter().filter(|line| *line == heading).count(), 1, "expected exactly one `{heading}` heading in output:\n{text}");
+    for class in &observed {
+        let prefix = format!("[{}]", class.as_str());
+        let mine: Vec<&&str> = headings.iter().filter(|line| line.starts_with(&prefix)).collect();
+        assert_eq!(mine.len(), 1, "expected exactly one `{prefix}` heading in output:\n{text}");
+        assert!(mine[0].contains(&report.count_by_class(*class).to_string()), "the `{prefix}` heading carries the class's count:\n{text}");
     }
-    assert_eq!(headings.len(), expected.len(), "one heading per observed class and no other:\n{text}");
+    assert_eq!(headings.len(), observed.len(), "one heading per observed class and no other:\n{text}");
 }
 
 /// `--repo <repo-dir>` combined with a repo-relative `<DIR>` resolves the

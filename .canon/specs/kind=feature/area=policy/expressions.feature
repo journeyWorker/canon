@@ -147,7 +147,7 @@ Feature: policy expressions
     When canon policy show is run, with and without --json
     Then it exits 0 with state unapproved, the policy path, a sha256 policyDigest and no approver
     And once the human has approved it, state is approved and the approver, time, note and approved digest are shown, the approved digest equal to the policy digest
-    And once the policy is edited after the approval, state is changed, the policy digest follows the new bytes, the approved digest keeps the old ones and the human form says the gate fails closed
+    And once the policy is edited after the approval, state is changed, the policy digest follows the new bytes, the approved digest keeps the old ones and the human form shows approval: changed
     And a repo with no policy file shows state none and no digest
     And policy show writes nothing
 

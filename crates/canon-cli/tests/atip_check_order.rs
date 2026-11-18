@@ -263,7 +263,7 @@ fn atip_checkorder_03_a_missing_required_argument_is_answered_after_a_failure_to
             for name in &missing {
                 assignment.remove(name);
             }
-            let expected = missing.iter().filter_map(|name| needed.iter().position(|candidate| candidate == name)).min().map(|at| field_for(doc, &needed[at])).unwrap_or_default();
+            let expected = missing.iter().filter_map(|name| needed.iter().position(|candidate| candidate == name)).min().map_or_default(|at| field_for(doc, &needed[at]));
             let words = render(doc, &assignment, false);
             let alone = run(doc, &assignment, &words);
             *pairs.lock().expect("count") += 1;

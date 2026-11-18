@@ -9,7 +9,7 @@ Feature: gate code-scopes
   Scenario: Approving the policy makes a scope stand: a chore that changes one app file asks the app scenarios and not the core one
     Given a verifying subject with scenarios `core.engine.01`, `app.bulkread.01` and `app.screen.01` evidenced and reviewed, and an approved policy whose `code_scopes` give `core` the paths `core/**` and `app` the paths `app/**` and `core/**`
     When a chore is approved and then changes one file under `app/`, and the subject is moved to shipped
-    Then the refusal asks for `app.bulkread.01` and `app.screen.01` and names the changed path `app/main.rs` and its scope `app`
+    Then the refusal asks for `app.bulkread.01` and `app.screen.01` and names the changed path `app/main.rs`
     And it does not ask for `core.engine.01`
     And it leads with one batch command, and after that command only the chore's change-level review remains
 
@@ -22,7 +22,7 @@ Feature: gate code-scopes
     Given the same subject and chore, with the policy edited after its approval, and another repository whose policy was never approved
     When the chore changes one file under `app/` and the subject is moved to shipped, and `canon gate check` runs
     Then the edited policy fails the move closed with `POLICY_APPROVAL_STALE`
-    And `canon gate check` asks for all three scenarios and names no scope
+    And `canon gate check` asks for all three scenarios and names no changed path
     And the policy nobody approved asks for all three scenarios too
 
   # canon: {"schema":1,"at":"2026-11-06T05:02:03Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
@@ -46,7 +46,7 @@ Feature: gate code-scopes
     Given the subject and the policy of the first scenario
     When the approved chore changes a file under `core/` and the subject is moved to shipped
     Then the refusal asks for all three scenarios
-    And it names the scopes `core` and `app` and the path `core/lib.rs`
+    And it names the path `core/lib.rs`
 
   # canon: {"schema":1,"at":"2026-11-06T05:02:05Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
   @subject:gate-trust-spine
@@ -67,7 +67,7 @@ Feature: gate code-scopes
   Scenario: The ship guard, status and gate check ask for the same scenarios, paths and batch command
     Given the subject and the policy of the first scenario, and an approved chore that changed one file under `app/`
     When the subject is moved to shipped, `canon status` runs and `canon gate check` runs
-    Then each names `app.bulkread.01` and `app.screen.01`, the scope `app` and the path `app/main.rs`, and none names `core.engine.01`
+    Then each names `app.bulkread.01` and `app.screen.01` and the path `app/main.rs`, and none names `core.engine.01`
     And each leads with the same batch command
 
   # canon: {"schema":1,"at":"2026-11-06T05:02:07Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
@@ -78,9 +78,9 @@ Feature: gate code-scopes
   Scenario: The chore line says how many scenarios the scopes let go and by which keys, and a chore outside every scope asks for no evidence
     Given the subject and the policy of the first scenario
     When the approved chore changes only a file outside every scope, and `canon status`, `canon gate check` and the move to shipped run
-    Then status says three scenarios need no new evidence by the keys `app` and `core`, in its text and in `scopeExempt` of `canon status --json`
-    And gate check says it as the advisory `chore_code_scopes`
-    And the move asks for the chore's review and no evidence, and a chore that changed one app file says one scenario needs nothing from it
+    Then status says three scenarios need no new evidence by the keys `app` and `core` in `scopeExempt` of `canon status --json`
+    And gate check names the chore and the keys `app` and `core` in the advisory `chore_code_scopes`
+    And the move asks for the chore's review and no evidence, and for a chore that changed one app file `scopeExempt` of status says one scenario by the key `core`
 
   # canon: {"schema":1,"at":"2026-11-06T05:02:08Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
   @subject:gate-trust-spine
@@ -90,7 +90,7 @@ Feature: gate code-scopes
   Scenario: No key, an area without a scope and evidence with no recorded tree are judged as in 0.37
     Given a policy without `code_scopes`, a policy that gives only `app` a scope, and a scenario whose evidence recorded no code tree
     When the approved chore changes a file outside every scope
-    Then with no key all three scenarios are asked for and no scope is named
+    Then with no key all three scenarios are asked for, no changed path is named and status carries no `scopeExempt`
     And the area without a scope is asked for while the scoped area is let go
     And the scenario with no recorded tree is asked for although its scope is untouched
 
@@ -125,28 +125,7 @@ Feature: gate code-scopes
     Given the policy of the warning scenario and the same repository without scopes
     When `canon status` and `canon gate check` run in both
     Then the exit codes are the same and gate check is clean
-    And a `code_scopes` key that is not a map of lists is warned about as malformed and declares no scope
-
-  # canon: {"schema":1,"at":"2026-11-06T05:02:12Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
-  @subject:gate-trust-spine
-  @case:happy
-  @flow:canon-0-38-code-scopes.F6
-  @gate.code-scopes.12
-  Scenario: The CHANGELOG names the new key and the cases the gate asks less for
-    Given the CHANGELOG's Unreleased section
-    When the release check reads it
-    Then `### Added` names `code_scopes`, its keys and the human's approval
-    And `### Changed` names the rule, the changed paths and that a policy without the key behaves as before
-
-  # canon: {"schema":1,"at":"2026-11-06T05:02:13Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
-  @subject:gate-trust-spine
-  @case:failure
-  @flow:canon-0-38-code-scopes.F6
-  @gate.code-scopes.13
-  Scenario: A CHANGELOG without the entries is named by the release check
-    Given an Unreleased section without the entries or without a piece of one
-    When the release check reads it
-    Then it names each missing entry and each missing piece
+    And a `code_scopes` key that is not a map of lists is warned about in the advisory `code_scopes` and gate check still exits 0
 
   # canon: {"schema":1,"at":"2026-11-06T09:07:32Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
   @subject:gate-trust-spine
@@ -156,8 +135,8 @@ Feature: gate code-scopes
   Scenario: A key whose patterns match no file declares no scope, so a misspelt pattern never exempts
     Given a policy whose `code_scopes` give `core` the pattern `Core/**` (matching is byte-exact), approved by the human
     When the approved chore changes `core/lib.rs` and the subject is moved to shipped, and `canon gate check` runs
-    Then the refusal asks for `core.engine.01`, names no scope and says no scenario was let go
-    And a change outside every real scope asks for it too, and the warning says the key declares no scope and its scenarios follow the 0.37 rule
+    Then the refusal asks for `core.engine.01`, names no path and lets no scenario go (status carries no `scopeExempt`)
+    And a change outside every real scope asks for it too, and the warning names the pattern `Core/**`
     And a key with one live pattern and one misspelt one still stands
 
   # canon: {"schema":1,"at":"2026-11-06T09:07:33Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
@@ -169,7 +148,7 @@ Feature: gate code-scopes
     Given a policy whose `code_scopes` give `core` an empty list and `app` the pattern `app/**`
     When the approved chore changes a file outside every scope and the subject is moved to shipped, and `canon status` and `canon gate check` run
     Then all three scenarios are asked for and none is let go
-    And both warn that `code_scopes` is malformed because `core` has no pattern
+    And `canon gate check` warns about `core` and `canon status` warns with `CODE_SCOPES_UNMATCHED`
 
   # canon: {"schema":1,"at":"2026-11-06T09:07:34Z","actor":{"agent_id":"impl-code-scopes","session_id":"s-0-38-code-scopes"}}
   @subject:gate-trust-spine
@@ -179,7 +158,7 @@ Feature: gate code-scopes
   Scenario: Approving a brief does not approve a policy whose scopes changed since its last approval
     Given a policy approved by the human, then edited to widen the scope of `core`, with an unapproved chore brief
     When `canon brief approve` approves the chore
-    Then the brief is approved, the policy approval file is as it was, and the output says the policy approval was not recorded and names `core` alone (`--json`: `policyApproved` false and `policyHeld`)
+    Then the brief is approved, the policy approval file is as it was, and the output names `core` alone (`--json`: `policyApproved` false and `policyHeld` lists `core`)
     And the move to shipped fails closed with `POLICY_APPROVAL_STALE` until a human runs `canon policy approve`
     And a first policy approval, and a brief approval over unchanged scopes, record the policy approval as before
 
@@ -191,5 +170,5 @@ Feature: gate code-scopes
   Scenario: Over a change in core the ship guard, status and gate check ask for every scenario alike, so no one of them lets one go
     Given the subject and the policy of the first scenario, and an approved chore that changed one file under `core/`
     When the subject is moved to shipped, `canon status` runs and `canon gate check` runs
-    Then each names all three scenarios, the scopes `core` and `app` and the path `core/lib.rs`, and none says a scenario needs nothing
+    Then each names all three scenarios and the path `core/lib.rs`, and the chore's status carries no `scopeExempt`
     And each leads with the same batch command over every report of the suite

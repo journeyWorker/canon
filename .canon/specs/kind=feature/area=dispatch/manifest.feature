@@ -93,7 +93,7 @@ Feature: dispatch manifest
     Given a repo with no adapter_capabilities in its policy and a well-formed response declaring a read-only filesystem
     When canon adapter authorize --response names that file
     Then it exits 1 with ADAPTER_AUTHORIZATION_FAILED, and data keeps the report with executionAuthorized false and executionPerformed false
-    And data.reasons names runtime_enforced=false and the filesystem capability exceeding the policy budget
+    And data.reasons names runtime_enforced=false
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:01Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
   @subject:dispatch-manifest
@@ -222,7 +222,7 @@ Feature: dispatch manifest
   Scenario: prompt add refuses an operand that is not NAME@VERSION and writes nothing
     Given a prompt manifest and an operand that has no @VERSION part
     When canon prompt add runs with that operand
-    Then it exits 2 with USAGE on field <NAME@VERSION> saying the bundle must be NAME@VERSION
+    Then it exits 2 with USAGE on field <NAME@VERSION>
     And the repo tree is identical to before the call
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:04Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -254,7 +254,7 @@ Feature: dispatch manifest
   Scenario: prompt show on an unregistered bundle is refused
     Given a repo where no bundle is registered under the name and version
     When canon prompt show runs with that NAME@VERSION
-    Then it exits 2 with PROMPT_BUNDLE_INVALID saying the version is not registered
+    Then it exits 2 with PROMPT_BUNDLE_INVALID
     And the repo tree is identical to before the call
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:04Z","actor":{"agent_id":"impl-030-sb-f1","role":"implementer","session_id":"sb-f1-2026-10-26"}}
@@ -309,7 +309,7 @@ Feature: dispatch manifest
   Scenario: context-pack show on a malformed pack id is a usage error
     Given a repo and the ids sha256:abc, an upper-case sha256 id and an empty id
     When canon context-pack show runs with each
-    Then each exits 2 with USAGE naming the pack id operand
+    Then each exits 2 with USAGE
     And the repo tree is identical to before each call
 
   # canon: {"schema":1,"at":"2026-10-27T10:48:56Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
@@ -320,7 +320,7 @@ Feature: dispatch manifest
   Scenario: context-pack verify on a malformed pack id is a usage error
     Given a repo and the ids sha256:abc, an upper-case sha256 id and an empty id
     When canon context-pack verify runs with each
-    Then each exits 2 with USAGE naming the pack id operand
+    Then each exits 2 with USAGE
     And the repo tree is identical to before each call
 
   # canon: {"schema":1,"at":"2026-10-27T10:48:57Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
@@ -331,7 +331,7 @@ Feature: dispatch manifest
   Scenario: adapter authorize on a response whose envelope breaks a rule is refused as a fixable invocation
     Given an adapter response whose telemetry cost is negative, and a policy file that is not valid YAML
     When canon adapter authorize --response names that file, then runs with the broken policy
-    Then the first exits 2 with ADAPTER_FILE_INVALID naming telemetry.cost_usd and the second with CONFIG_INVALID and the reason POLICY, hinting to fix the policy file
+    Then the first exits 2 with ADAPTER_FILE_INVALID naming telemetry.cost_usd and the second with CONFIG_INVALID
     And authorize still exits 1 with ADAPTER_AUTHORIZATION_FAILED for a policy that sets no budget
     And no file is created or changed in the repo
 
@@ -342,6 +342,6 @@ Feature: dispatch manifest
   @dispatch.manifest.32
   Scenario: schema --error ADAPTER_FILE_INVALID states the exit of each adapter call
     Given any directory
-    When canon schema --error ADAPTER_FILE_INVALID runs, and canon schema adapter authorize lists its exit codes
-    Then the error table gives validate a rule-breaking envelope exit 1, and an unreadable response file or any authorize refusal exit 2
-    And the authorize exit table says exit 1 is only ADAPTER_AUTHORIZATION_FAILED and exit 2 includes ADAPTER_FILE_INVALID
+    When canon schema --error is read for ADAPTER_FILE_INVALID, ADAPTER_AUTHORIZATION_FAILED and ADAPTER_VALIDATION_FAILED, and canon schema adapter authorize and canon schema adapter validate list their error codes
+    Then the error table gives ADAPTER_FILE_INVALID exit 2, and ADAPTER_AUTHORIZATION_FAILED and ADAPTER_VALIDATION_FAILED exit 1
+    And authorize lists ADAPTER_FILE_INVALID and ADAPTER_AUTHORIZATION_FAILED, and validate lists ADAPTER_FILE_NOT_FOUND and ADAPTER_VALIDATION_FAILED

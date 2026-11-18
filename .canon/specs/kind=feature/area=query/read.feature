@@ -121,8 +121,8 @@ Feature: query read
   Scenario: A query marks a reference to a source that is not committed and counts them
     Given a finding for a change that has no directory under `.canon/changes`, no plan source entry and no committed change record, and a finding for a change that has one
     When canon query --kind finding --json is run
-    Then `dangling` lists the missing change with the record, the field, the kind it points at and its id, and counts it under `finding.change_id`
-    And the human table marks the same row
+    Then `dangling` lists the missing change with the kind it points at and its id, and counts it under `finding.change_id`
+    And the human table names the same change
 
   # canon: {"schema":1,"at":"2026-10-26T18:13:19Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
   @subject:query-reads

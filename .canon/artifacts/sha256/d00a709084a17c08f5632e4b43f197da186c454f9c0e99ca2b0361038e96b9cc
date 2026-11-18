@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="27" skipped="0" failures="0" errors="0" uuid="276bb250-f68a-457e-9e10-0c520b832dcd" timestamp="2026-11-17T17:55:16.718+00:00" time="7.647">
+    <testsuite name="canon-cli" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="migrate_names::tests::change_drop_26_a_key_with_any_value_or_no_routing_section_is_left_byte_identical" classname="canon-cli" timestamp="2026-11-17T17:55:16.721+00:00" time="0.056"/>
+        <testcase name="migrate_names::tests::change_drop_26_the_route_line_is_added_last_in_the_indentation_of_the_entry_before_it" classname="canon-cli" timestamp="2026-11-17T17:55:16.721+00:00" time="0.070"/>
+    </testsuite>
+    <testsuite name="canon-cli::migrate" tests="25" skipped="0" errors="0" failures="0">
+        <testcase name="authoring_migrate_03_a_dirty_path_it_moves_is_refused" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="1.313"/>
+        <testcase name="authoring_migrate_02_another_root_only_drops_its_features_level" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="1.336"/>
+        <testcase name="authoring_migrate_04_an_existing_destination_is_refused" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="1.530"/>
+        <testcase name="authoring_migrate_08_a_canon_yaml_it_cannot_edit_safely_is_refused" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="1.549"/>
+        <testcase name="authoring_migrate_06_an_ambiguous_change_stays_and_is_named" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="1.679"/>
+        <testcase name="authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_approval" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.783+00:00" time="1.870"/>
+        <testcase name="authoring_migrate_13_adds_the_derived_directory_lines_to_an_existing_block_once" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:18.081+00:00" time="2.204"/>
+        <testcase name="authoring_migrate_14_a_kept_comment_gets_its_missing_line_and_no_second_comment" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:18.254+00:00" time="2.042"/>
+        <testcase name="authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_finished" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.795+00:00" time="4.030"/>
+        <testcase name="change_drop_26_an_existing_line_is_skipped_and_its_value_kept" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:18.275+00:00" time="2.551"/>
+        <testcase name="authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by_the_next" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="4.489"/>
+        <testcase name="authoring_migrate_05_an_external_approval_moves_into_a_pointer_brief" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="4.552"/>
+        <testcase name="authoring_migrate_12_unread_openspec_material_keeps_the_source" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:18.041+00:00" time="3.283"/>
+        <testcase name="change_drop_27_a_canon_yaml_without_routing_is_left_byte_identical" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:20.288+00:00" time="1.355"/>
+        <testcase name="change_drop_26_revert_restores_the_canon_yaml_bytes" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:18.655+00:00" time="3.441"/>
+        <testcase name="authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="5.553"/>
+        <testcase name="change_drop_26_migrate_adds_the_change_state_route_line_and_the_next_plan_is_empty" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:18.402+00:00" time="4.067"/>
+        <testcase name="authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="5.909"/>
+        <testcase name="change_drop_27_a_routing_section_that_cannot_take_a_line_is_refused_and_blocks_the_other_steps" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:20.299+00:00" time="2.823"/>
+        <testcase name="change_drop_27_a_stale_digest_is_plan_stale_and_the_file_is_untouched" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:20.827+00:00" time="2.550"/>
+        <testcase name="change_drop_28_a_plan_that_also_re_binds_an_approval_is_still_human_only" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:20.826+00:00" time="2.663"/>
+        <testcase name="migrate_previews_by_default_and_commits_only_the_previewed_plan" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:21.276+00:00" time="2.421"/>
+        <testcase name="tier_durability_07_a_canon_yaml_that_cannot_be_replaced_stops_the_migrate_incomplete_and_the_next_run_finishes" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:21.329+00:00" time="2.380"/>
+        <testcase name="atip_incomplete_10_a_migrate_that_stopped_after_it_began_is_incomplete_with_the_reason_where_it_stopped" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:16.721+00:00" time="7.338"/>
+        <testcase name="change_drop_28_an_agent_role_runs_the_route_step_without_a_human_answer" classname="canon-cli::migrate" timestamp="2026-11-17T17:55:21.213+00:00" time="3.151"/>
+    </testsuite>
+</testsuites>

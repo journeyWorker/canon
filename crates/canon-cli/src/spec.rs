@@ -111,7 +111,7 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
 }
 
 
-/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --contract 1.6 --deep`
+/// The conformance level the tree claims (spec 3.4, 10.3.3). `canon` claims it because `atip check --level L2 --deep` (at the contract the fixture declares)
 /// passes on the build: the check runs in CI beside the tests that build these documents (`just atip-deep`, the `atip` job).
 pub const LEVEL: &str = "L2";
 

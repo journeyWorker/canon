@@ -1,0 +1,8 @@
+{
+  "name": "canon-atip-check",
+  "version": "0.43.0",
+  "private": true,
+  "dependencies": {
+    "@journeykit/atip-check": "0.4.1"
+  }
+}

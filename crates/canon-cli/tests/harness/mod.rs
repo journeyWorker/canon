@@ -54,7 +54,7 @@ pub fn option<'a>(node: &'a Value, name: &str) -> Option<&'a Value> {
 }
 
 pub fn strings(value: &Value) -> Vec<String> {
-    value.as_array().map(|a| a.iter().filter_map(|s| s.as_str().map(str::to_string)).collect()).unwrap_or_default()
+    value.as_array().map_or_default(|a| a.iter().filter_map(|s| s.as_str().map(str::to_string)).collect())
 }
 
 /// Splits an example into words: whitespace separates; single and double quotes group.
