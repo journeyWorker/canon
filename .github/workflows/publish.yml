@@ -23,22 +23,25 @@ run-name: "release ${{ github.ref_name }}${{ github.event_name == 'workflow_disp
 # is verified against Cargo.toml before anything publishes.
 #
 # Dry run: a manual run (`workflow_dispatch`) takes `dry_run`, true by default.
-# It builds, checks, smokes, packs and runs the five `npm publish` commands
+# It fetches the binaries, checks, smokes, packs and runs the five `npm publish` commands
 # exactly as a release does, each with NPM_CONFIG_DRY_RUN=true so npm publishes
 # nothing; a tag push has no input and always publishes. Run it on the
 # version-bump commit before the tag. It cannot prove what `npm publish
 # --dry-run` never touches: the token's write access, trusted publishing
 # (OIDC), the provenance signature, a version already on npm.
 #
-# If a build row never starts (macOS arm64 capacity): the job shows `cancelled`
-# after about 15 minutes with no steps run, and its annotation says `The job
-# was not acquired by Runner of type hosted even after multiple attempts`.
-# Run `gh run rerun <run id> --failed`: only that job and the jobs after it
-# (smokes, package, publish) run again, and the other rows' artifacts are
-# reused. Do not retag. Nothing was published (the publish job never started),
-# so a rerun of a tag run goes on to publish for real and its pre-flight runs
-# as at the first time. A longer `timeout-minutes` does not help: it counts
-# from the moment a runner takes the job.
+# This workflow compiles nothing: build-native.yml is the one place the release binaries are built, and `fetch-build`
+# takes them from its run of the tree this run checked out (a pull request's run, or one started by hand). With no such
+# run, `fetch-build` fails with a verdict and the command to run, nothing is published, and the jobs after it are
+# skipped: `gh workflow run build-native.yml --ref <branch or tag>`, and when it has finished
+# `gh run rerun <this run> --failed`. Do not retag. The rerun fetches again and the jobs after it
+# (smokes, package, publish) run; a rerun of a tag run goes on to publish for real and its pre-flight runs as at the
+# first time. Runs of build-native.yml are kept 14 days: after that, run it again.
+#
+# What npm's provenance says, and what it does not: the `--provenance` of the five publish steps attests this run (this
+# workflow at the tag's commit published these tarballs). It does not say where the binaries were compiled. That is
+# `fetch-build`'s job summary (the build-native run it took them from) and the attestation of that run's manifest,
+# which `fetch-build` verified (`gh attestation verify`, the signer workflow build-native.yml).
 #
 # Prereleases: a version with a hyphen (`0.35.0-rc.1`, tag `v0.35.0-rc.1`)
 # publishes under the `next` dist-tag in every `npm publish` step
@@ -52,11 +55,10 @@ run-name: "release ${{ github.ref_name }}${{ github.event_name == 'workflow_disp
 # publishes those files (`npm publish "$TARBALL"`), never a second pack.
 #
 # Fail-closed (native-release-pipeline spec, "Missing platform binary
-# fails the workflow, not the consumer"): `publish` only runs if `build`'s
-# entire matrix and every smoke succeeded — GitHub Actions does not start a
-# job that `needs` a matrix job until every row of that matrix has passed — so
-# a single failed row blocks every publish step, never just its own
-# platform package.
+# fails the workflow, not the consumer"): `publish` only runs if `fetch-build`
+# verified all four binaries and every smoke succeeded — GitHub Actions does not
+# start a job that `needs` another until it has passed — so a missing or
+# altered binary blocks every publish step, never just its own platform package.
 
 on:
   push:
@@ -75,12 +77,6 @@ on:
 
 permissions:
   contents: read
-
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 0
-  # The macOS binary's floor: its `minos` is exactly this (scripts/check-release-binary.py fails any other).
-  MACOSX_DEPLOYMENT_TARGET: "15.0"
 
 jobs:
   read-version:
@@ -137,222 +133,158 @@ jobs:
             exit 1
           fi
 
-  # The dashboard app is built ONCE and every platform row below embeds this
-  # same build in its binary (`CANON_DASHBOARD_DIST`, crates/canon-cli/build.rs),
-  # so `canon dashboard` runs in any repo. scripts/check-release-workflow-safety.py
-  # keeps both workflows doing exactly this.
-  dashboard:
-    name: Build dashboard app
+  # Nothing here compiles. The binaries, the man pages and the manifest come from ONE run of build-native.yml: the run
+  # that built the tree this run checked out (`scripts/release-build.py find`, by the artifact `build-manifest-<tree>`).
+  # A pull request's run builds its merge ref and the merge commit cannot be read after the merge, so the tree is the
+  # key and the manifest, attested by build-native.yml, is the proof (`verify`). A tree with no such run is refused
+  # (`no_run`, `in_progress`, `tree_mismatch`, `expired`, ...), the job fails and nothing is published; its log says
+  # which command to run. The files are checked against their checksums, each target's floor is read
+  # from its binary, and only then are they uploaded again, under the names the jobs below download.
+  fetch-build:
+    name: Fetch the binaries of the build-native run
     needs: read-version
     runs-on: ubuntu-26.04
-    timeout-minutes: 5
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      attestations: read
     steps:
+      # The merge commit and its two parents: a release PR's run is found by the commit of the PR head.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
+          fetch-depth: 2
 
-      - name: Install workspace dependencies from the frozen lockfile
-        run: bun install --frozen-lockfile
+      - name: Find the build-native run that built this tree
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release-build.py find --repo "$GITHUB_REPOSITORY"
 
-      - name: Build the dashboard app
-        run: bun run --cwd packages/dashboard build
+      - name: Download the darwin-arm64 binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canon-binary-aarch64-apple-darwin
+          path: build/canon-binary-aarch64-apple-darwin
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
 
-      - name: Upload dashboard app
+      - name: Download the linux-arm64 binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canon-binary-aarch64-unknown-linux-musl
+          path: build/canon-binary-aarch64-unknown-linux-musl
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Download the linux-x64 binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canon-binary-x86_64-unknown-linux-musl
+          path: build/canon-binary-x86_64-unknown-linux-musl
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Download the win32-x64 binary
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: canon-binary-x86_64-pc-windows-msvc
+          path: build/canon-binary-x86_64-pc-windows-msvc
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Download man pages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: man-pages
+          path: build/man-pages
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Download the build manifest
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: build-manifest-${{ steps.find.outputs.tree }}
+          path: build/manifest
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Verify the download against the attested manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.find.outputs.run_id }}
+          TREE: ${{ steps.find.outputs.tree }}
+        run: python3 scripts/release-build.py verify --repo "$GITHUB_REPOSITORY" --run-id "$RUN_ID" --tree "$TREE" --dir build
+
+      # The floor each binary promises, read from the file just downloaded: Linux static with jemalloc, macOS minos
+      # 15.0, Windows with no VC runtime DLL. The aarch64 musl row's page size is read by running the binary, which
+      # this x64 runner cannot: `smoke-binary` reads it on its arm runner. A failure stops the release here.
+      - name: Check the binary keeps the floor of its platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x build/canon-binary-x86_64-unknown-linux-musl/canon
+          python3 scripts/check-release-binary.py --target aarch64-apple-darwin build/canon-binary-aarch64-apple-darwin/canon
+          python3 scripts/check-release-binary.py --target x86_64-unknown-linux-musl build/canon-binary-x86_64-unknown-linux-musl/canon
+          python3 scripts/check-release-binary.py --target aarch64-unknown-linux-musl --page-size skip build/canon-binary-aarch64-unknown-linux-musl/canon
+          python3 scripts/check-release-binary.py --target x86_64-pc-windows-msvc build/canon-binary-x86_64-pc-windows-msvc/canon.exe
+
+      - name: Upload the darwin-arm64 binary
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: dashboard-app
-          path: packages/dashboard/dist
+          name: canon-binary-aarch64-apple-darwin
+          path: build/canon-binary-aarch64-apple-darwin
           if-no-files-found: error
+          retention-days: 7
+          overwrite: true
 
-  # The man pages are generated from the clap tree (`clap_mangen`, the
-  # `man` feature of canon-cli: never built into the shipped binary) and
-  # shipped in the @journeykit/canon launcher package, which links them
-  # (`directories.man`). One platform-independent build; no dashboard needed.
-  man:
-    name: Generate man pages
-    needs: read-version
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Cache cargo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Upload the linux-arm64 binary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: canon-cli-man-cargo-${{ hashFiles('Cargo.lock') }}
+          name: canon-binary-aarch64-unknown-linux-musl
+          path: build/canon-binary-aarch64-unknown-linux-musl
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
 
-      - name: Generate man pages
-        run: cargo run --locked --release -p canon-cli --features man --example canon-man -- man-pages
+      - name: Upload the linux-x64 binary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canon-binary-x86_64-unknown-linux-musl
+          path: build/canon-binary-x86_64-unknown-linux-musl
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+      - name: Upload the win32-x64 binary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canon-binary-x86_64-pc-windows-msvc
+          path: build/canon-binary-x86_64-pc-windows-msvc
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
 
       - name: Upload man pages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: man-pages
-          path: man-pages
+          path: build/man-pages
           if-no-files-found: error
-
-  # Every row builds on a host that is natively its target (no cross
-  # compilation): macOS and Windows as before, Linux x86_64 as a static musl
-  # binary linked on `ubuntu-26.04` with `musl-tools`
-  # (.github/actions/setup-rust), and Linux aarch64 as a static musl binary
-  # built on `ubuntu-26.04-arm` inside a digest-pinned `rust:alpine` image
-  # (`alpine_image`): Ubuntu's musl-gcc wrapper cannot compile jemalloc's
-  # atomics there (tikv-jemalloc-sys: `atomic_memory_order_relaxed
-  # undeclared`), Alpine's gcc on musl can. The host job keeps the JS actions
-  # (checkout, cache, upload) and mounts the workspace into the container.
-  # `lg_page` and `alpine_image` are the per-row settings beyond the triple,
-  # both on the aarch64 musl row alone: it builds jemalloc for 64K pages
-  # (`JEMALLOC_SYS_WITH_LG_PAGE=16`), so the binary runs on 4K, 16K (Asahi,
-  # Raspberry Pi 5) and 64K (RHEL) kernels; the x86_64 row has neither field.
-  build:
-    name: Build - ${{ matrix.settings.target }}
-    needs: [read-version, dashboard]
-    runs-on: ${{ matrix.settings.host }}
-    timeout-minutes: 50
-    strategy:
-      fail-fast: false
-      matrix:
-        settings:
-          - host: macos-15
-            target: aarch64-apple-darwin
-            package_dir: core-darwin-arm64
-            package_name: "@journeykit/canon-core-darwin-arm64"
-            binary_ext: ""
-          - host: ubuntu-26.04
-            target: x86_64-unknown-linux-musl
-            package_dir: core-linux-x64
-            package_name: "@journeykit/canon-core-linux-x64"
-            binary_ext: ""
-          - host: ubuntu-26.04-arm
-            target: aarch64-unknown-linux-musl
-            package_dir: core-linux-arm64
-            package_name: "@journeykit/canon-core-linux-arm64"
-            binary_ext: ""
-            lg_page: "16"
-            alpine_image: rust:1.100.0-alpine3.24@sha256:de1e0058543a81ed7b046629167db587c67a94bdf37cce14eb27f0ec83baaffb
-          - host: windows-2025
-            target: x86_64-pc-windows-msvc
-            package_dir: core-win32-x64
-            package_name: "@journeykit/canon-core-win32-x64"
-            binary_ext: ".exe"
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install Rust
-        if: matrix.settings.alpine_image == ''
-        uses: ./.github/actions/setup-rust
-        with:
-          target: ${{ matrix.settings.target }}
-
-      - name: Cache cargo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: canon-cli-${{ matrix.settings.target }}-cargo-${{ hashFiles('Cargo.lock') }}
-
-      - name: Download dashboard app
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: dashboard-app
-          path: dashboard-app
-
-      - name: Build canon-cli binary
-        shell: bash
-        env:
-          CANON_DASHBOARD_DIST: ${{ github.workspace }}/dashboard-app
-          JEMALLOC_SYS_WITH_LG_PAGE: ${{ matrix.settings.lg_page }}
-          ALPINE_IMAGE: ${{ matrix.settings.alpine_image }}
-          TARGET: ${{ matrix.settings.target }}
-        run: |
-          set -euo pipefail
-          # Only the aarch64 musl row has a page size: an empty variable is no variable.
-          [ -n "$JEMALLOC_SYS_WITH_LG_PAGE" ] || unset JEMALLOC_SYS_WITH_LG_PAGE
-          if [ -z "$ALPINE_IMAGE" ]; then
-            cargo build --locked --release -p canon-cli --target "$TARGET"
-          else
-            # The workspace and the cargo caches are mounted at the paths the host
-            # steps see; the container runs as root and hands the files back.
-            mkdir -p "$HOME/.cargo/registry" "$HOME/.cargo/git"
-            docker run --rm -i \
-              -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
-              -v "$HOME/.cargo/registry:/usr/local/cargo/registry" \
-              -v "$HOME/.cargo/git:/usr/local/cargo/git" \
-              -e CANON_DASHBOARD_DIST -e JEMALLOC_SYS_WITH_LG_PAGE -e CARGO_TERM_COLOR -e CARGO_INCREMENTAL \
-              -e TARGET -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
-              "$ALPINE_IMAGE" sh -s <<'ALPINE_BUILD'
-          set -eu
-          trap 'chown -R "$HOST_UID:$HOST_GID" target /usr/local/cargo/registry /usr/local/cargo/git' EXIT
-          apk add --no-cache make
-          want=$(sed -n 's/^channel[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' rust-toolchain.toml)
-          rustc --version
-          got=$(rustc --version | cut -d' ' -f2)
-          if [ -z "$want" ] || [ "$got" != "$want" ]; then
-            echo "::error::rustc is '$got', rust-toolchain.toml pins '$want'" >&2
-            exit 1
-          fi
-          cargo build --locked --release -p canon-cli --target "$TARGET"
-          ALPINE_BUILD
-          fi
-
-      - name: Strip binary
-        if: matrix.settings.binary_ext == ''
-        run: strip "target/${{ matrix.settings.target }}/release/canon"
-
-      # The floor this row promises, read from the binary it just built:
-      # Linux static with jemalloc (and 64K pages on aarch64), macOS minos
-      # 15.0, Windows with no VC runtime DLL. A failure stops the release here.
-      - name: Check the binary keeps the floor of its platform
-        shell: bash
-        run: |
-          set -euo pipefail
-          PY=$(command -v python3 || command -v python)
-          "$PY" scripts/check-release-binary.py --target "${{ matrix.settings.target }}" "target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}"
-
-      - name: Create binary checksum handoff
-        shell: bash
-        run: |
-          set -euo pipefail
-          BIN="canon${{ matrix.settings.binary_ext }}"
-          BIN_PATH="target/${{ matrix.settings.target }}/release/$BIN"
-          (
-            cd "$(dirname "$BIN_PATH")"
-            if [ "${{ runner.os }}" = "macOS" ]; then
-              shasum -a 256 "$BIN" > "$BIN.sha256"
-            else
-              sha256sum "$BIN" > "$BIN.sha256"
-            fi
-          )
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: canon-binary-${{ matrix.settings.target }}
-          path: |
-            target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}
-            target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}.sha256
-          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
 
   # Packs every package ONCE: the tarballs below are what `smoke-install`
   # installs and what `publish` publishes, byte for byte.
   package:
     name: Pack the npm packages
-    needs: [read-version, build, man]
+    needs: [read-version, fetch-build]
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
@@ -463,6 +395,7 @@ jobs:
           name: npm-tarballs
           path: tarballs
           if-no-files-found: error
+          retention-days: 30
 
   # Smokes (design I9, I13, I15): they run here, in the release workflow, and nowhere else.
   # A release without them does not publish: `publish` needs all three.
@@ -470,7 +403,7 @@ jobs:
   # debian:12 is glibc 2.36, the image 0.41's glibc 2.39 floor killed.
   smoke-binary:
     name: Smoke the binary - ${{ matrix.settings.target }} in ${{ matrix.settings.image_name }}
-    needs: [read-version, build]
+    needs: [read-version, fetch-build]
     runs-on: ${{ matrix.settings.runner }}
     timeout-minutes: 15
     strategy:
@@ -504,6 +437,14 @@ jobs:
         with:
           name: canon-binary-${{ matrix.settings.target }}
           path: smoke-bin
+
+      # The aarch64 musl row's page size is read here, on the arm runner that can run it; every row reads its own floor.
+      - name: Check the binary keeps the floor of its platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x smoke-bin/canon
+          python3 scripts/check-release-binary.py --target "${{ matrix.settings.target }}" smoke-bin/canon
 
       - name: Run the binary in the image
         env:
@@ -563,7 +504,7 @@ jobs:
   # fake key. No real secret: the postgres password is made up for the run.
   smoke-network:
     name: Smoke the network path - ${{ matrix.settings.target }} in ${{ matrix.settings.image_name }}
-    needs: [read-version, build]
+    needs: [read-version, fetch-build]
     runs-on: ${{ matrix.settings.runner }}
     timeout-minutes: 15
     env:

@@ -9,11 +9,11 @@ identical, with no native cross-file consistency check" risk the moment
 `.github/workflows/build-native.yml` (test matrix) and `publish.yml`
 (release matrix) both declare a per-target `matrix.settings` table.
 
-This script fails CI the instant one matrix (or the shared env, or a
+This script fails CI the instant the build matrix (or its env, or a
 platform package's `package.json` name, or `@journeykit/canon`'s
-`optionalDependencies` set) drifts from the others — closing the drift
-hole BEFORE a broken release rather than discovering it via a failed
-publish.
+`optionalDependencies` set) drifts from the others, or publish.yml stops
+fetching exactly what build-native.yml uploads — closing the drift
+hole BEFORE a broken release rather than discovering it via a failed publish.
 
 It also performs deterministic supply-chain checks over tracked textual release
 surfaces, excluding binary assets and fixture artifacts. External GitHub
@@ -61,22 +61,18 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD_WF = ROOT / ".github/workflows/build-native.yml"
 PUBLISH_WF = ROOT / ".github/workflows/publish.yml"
 
-# The env vars both workflows MUST declare identically (a mismatched
-# CARGO_INCREMENTAL/… between the test build and the release build means
-# the release binary was built under different flags than CI proved).
+# The env vars build-native.yml MUST declare: the flags the release binary is built under, and the macOS
+# deployment target (the binary's `minos`, checked by check-release-binary.py). publish.yml compiles nothing and
+# declares none of them.
 REQUIRED_ENV = ("CARGO_TERM_COLOR", "CARGO_INCREMENTAL", "MACOSX_DEPLOYMENT_TARGET")
 
-# The macOS deployment target both workflows declare (the binary's `minos`, checked by check-release-binary.py).
 MACOS_DEPLOYMENT_TARGET = "15.0"
 
 # The only runner labels a release job may use: a pinned image, its label written down, never `-latest`
 # (macOS arm64 is `macos-15`: `macos-26` was not assigned a runner in the 0.43 dry runs).
 ALLOWED_RUNNERS = ("macos-15", "ubuntu-26.04", "ubuntu-26.04-arm", "windows-2025")
 
-# The scalar fields every `matrix.settings` row carries that must agree
-# across the two workflows (publish additionally carries `package_name`,
-# checked separately against the manifests).
-SHARED_MATRIX_FIELDS = ("host", "target", "package_dir", "lg_page", "alpine_image")
+# publish.yml compiles nothing: see `no_compile_errors` (the build rules above are build-native.yml's alone).
 
 
 def read(path: pathlib.Path) -> str:
@@ -560,15 +556,17 @@ def _tokens(text: str, pattern: str) -> set[str]:
 def package_set_errors(
     publish_text: str,
     rows: list[dict[str, str]],
+    package_names: dict[str, str],
     launcher_name: str,
     bun_lock: str,
     optional_keys: set[str],
 ) -> list[str]:
     """The platform packages are one set everywhere: build, download, checksum, executable bit, version, pack, the
-    pre-flight, the publish steps, `optionalDependencies`, bun.lock. A place that lacks one names it."""
+    pre-flight, the publish steps, `optionalDependencies`, bun.lock. A place that lacks one names it. The rows are
+    build-native.yml's; a package's name is the `name` of its own package.json (`package_names`, by directory)."""
     errors: list[str] = []
     dirs = {row["package_dir"] for row in rows if row.get("package_dir")}
-    names = {row["package_name"] for row in rows if row.get("package_name")}
+    names = {package_names[directory] for directory in dirs if directory in package_names}
     package = _job_block(publish_text, "package")
     publish = _job_block(publish_text, "publish")
 
@@ -611,7 +609,7 @@ def package_set_errors(
     compare("publish.yml: npm publish steps", set(published), names | {launcher_name})
     if len(published) != len(set(published)):
         errors.append(f"publish.yml: a package is published by two steps: {published}")
-    arm = next((row["package_name"] for row in rows if row.get("package_dir") == "core-linux-arm64"), None)
+    arm = package_names.get("core-linux-arm64")
     if published and (published[0] != arm or published[-1] != launcher_name):
         errors.append(
             f"publish.yml: publish order must put {arm} first (its first publish needs the token, so a failure stops before any other "
@@ -1256,6 +1254,238 @@ def timeout_errors(text: str, workflow: str) -> list[str]:
     return errors
 
 
+# ---------------------------------------------------------------------------
+# 0.44 build once: build-native.yml is the one place anything is compiled; publish.yml fetches the artifacts of its run
+# (`fetch-build`), checks them against the attested manifest and uploads them again for its own jobs.
+# ---------------------------------------------------------------------------
+
+FETCH_JOB = "fetch-build"
+MANIFEST_JOB = "manifest"
+MAN_ARTIFACT = "man-pages"
+MANIFEST_ARTIFACT = "build-manifest-"
+BINARY_ARTIFACT = "canon-binary-"
+ATTEST_ACTION = "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8"
+COMPILE_WORD = re.compile(r"\b(?:cargo|rustup|rustc)\b|setup-rust")
+BUILD_RETENTION = ((BINARY_ARTIFACT, 14), (MAN_ARTIFACT, 14), (MANIFEST_ARTIFACT, 14), ("dashboard-app", 1))
+PUBLISH_RETENTION = ((BINARY_ARTIFACT, 7), (MAN_ARTIFACT, 7), ("npm-tarballs", 30))
+
+
+def _permissions(job: str) -> dict[str, str]:
+    """A job's own `permissions:` block (4-space indent) as scope: access."""
+    lines = job.splitlines()
+    for index, line in enumerate(lines):
+        if re.match(r"^    permissions:\s*$", line):
+            found: dict[str, str] = {}
+            for follow in lines[index + 1 :]:
+                item = re.match(r"^      ([\w-]+):\s*(\S+)\s*$", follow)
+                if not item:
+                    break
+                found[item.group(1)] = item.group(2)
+            return found
+    return {}
+
+
+def _uses_steps(job: str, action: str) -> list[str]:
+    return [step for step in _steps(job) if re.search(rf"^\s+(?:- )?uses:\s*actions/{action}@", step, re.MULTILINE)]
+
+
+def _with_value(step: str, key: str) -> str | None:
+    match = re.search(rf"^\s+{re.escape(key)}:[ \t]*(.*?)[ \t]*$", step, re.MULTILINE)
+    return match.group(1).strip("\"'") if match else None
+
+
+def _artifact_names(job: str, action: str) -> set[str]:
+    """The artifact names a job's upload or download steps use; `${{ matrix.settings.target }}` is every target."""
+    names: set[str] = set()
+    for step in _uses_steps(job, action):
+        name = _with_value(step, "name")
+        if name is None:
+            continue
+        if "${{ matrix.settings.target }}" in name:
+            names |= {name.replace("${{ matrix.settings.target }}", target) for target in EXPECTED_TARGETS}
+        else:
+            names.add(name)
+    return names
+
+
+def no_compile_errors(text: str, workflow: str) -> list[str]:
+    """publish.yml compiles nothing: no cargo, rustup, rustc, setup-rust, dashboard build, `host:` matrix row, build job
+    (`dashboard`, `man`, `build`), and no `CARGO_*` or `MACOSX_DEPLOYMENT_TARGET` in its top-level env."""
+    errors: list[str] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        source = _source_line(line)
+        if COMPILE_WORD.search(source):
+            errors.append(f"{workflow}:{number}: this workflow compiles nothing (build-native.yml does); `{source.strip()}`")
+        if DASHBOARD_BUILD_CMD in source:
+            errors.append(f"{workflow}:{number}: the dashboard app is built by build-native.yml only")
+        if re.match(r"^\s*(?:-\s*)?host:", source):
+            errors.append(f"{workflow}:{number}: a `host:` matrix row is a build row; builds belong to build-native.yml")
+    for job in ("dashboard", "man", "build"):
+        if _job_block(text, job):
+            errors.append(f"{workflow}: job `{job}` is a build job; builds belong to build-native.yml")
+    for key in top_level_env(text):
+        if key.startswith("CARGO_") or key == "MACOSX_DEPLOYMENT_TARGET":
+            errors.append(f"{workflow}: env {key} is a build setting; it belongs to build-native.yml")
+    return errors
+
+
+def artifact_contract_errors(build_text: str, publish_text: str) -> list[str]:
+    """What build-native.yml uploads and what publish.yml downloads from it are one set of names: per target
+    `canon-binary-<target>`, `man-pages` and a `build-manifest-` name; and every binary or man pages download of the
+    other jobs of publish.yml is a name `fetch-build` uploaded again."""
+    errors: list[str] = []
+    uploads = _artifact_names(build_text, "upload-artifact")
+    fetch = _job_block(publish_text, FETCH_JOB)
+    downloads = _artifact_names(fetch, "download-artifact")
+    wanted = [f"{BINARY_ARTIFACT}{target}" for target in EXPECTED_TARGETS] + [MAN_ARTIFACT]
+    for name in wanted:
+        if name not in uploads:
+            errors.append(f"build-native.yml: no upload of `{name}`")
+        if name not in downloads:
+            errors.append(f"publish.yml: `{FETCH_JOB}` does not download `{name}`")
+    if not any(name.startswith(MANIFEST_ARTIFACT) for name in uploads):
+        errors.append(f"build-native.yml: no upload named `{MANIFEST_ARTIFACT}<tree>`")
+    if not any(name.startswith(MANIFEST_ARTIFACT) for name in downloads):
+        errors.append(f"publish.yml: `{FETCH_JOB}` does not download a `{MANIFEST_ARTIFACT}<tree>` artifact")
+    for name in sorted(downloads):
+        prefix = name.split("${{", 1)[0]
+        found = any(up.startswith(prefix) for up in uploads) if "${{" in name else name in uploads
+        if not found:
+            errors.append(f"publish.yml: `{FETCH_JOB}` downloads `{name}`, which build-native.yml does not upload")
+    reuploaded = _artifact_names(fetch, "upload-artifact")
+    for job_name in _job_names(publish_text):
+        if job_name == FETCH_JOB:
+            continue
+        for name in sorted(_artifact_names(_job_block(publish_text, job_name), "download-artifact")):
+            if (name.startswith(BINARY_ARTIFACT) or name == MAN_ARTIFACT) and name not in reuploaded:
+                errors.append(f"publish.yml: job `{job_name}` downloads `{name}`, which `{FETCH_JOB}` does not upload again")
+    return errors
+
+
+def retention_errors(text: str, workflow: str, rules: tuple[tuple[str, int], ...]) -> list[str]:
+    """Every `upload-artifact` step sets `retention-days` (the 90-day default piled up 10GB), by the rule of its name."""
+    errors: list[str] = []
+    for step in _uses_steps(text, "upload-artifact"):
+        name = _with_value(step, "name") or "?"
+        value = _with_value(step, "retention-days")
+        if value is None or not value.isdigit():
+            errors.append(f"{workflow}: the upload of `{name}` has no `retention-days`")
+            continue
+        for prefix, days in rules:
+            if name.startswith(prefix) and int(value) != days:
+                errors.append(f"{workflow}: the upload of `{name}` keeps {value} days; the rule is {days}")
+    return errors
+
+
+def manifest_job_errors(text: str, workflow: str) -> list[str]:
+    """build-native.yml's `manifest` job waits for `build` and `man`, records and attests the manifest (skipped for a
+    pull request from a fork), uploads it under `build-manifest-<tree>`; the attestation permissions are its alone."""
+    errors: list[str] = []
+    job = _job_block(text, MANIFEST_JOB)
+    if not job:
+        return [f"{workflow}: no `{MANIFEST_JOB}` job (the manifest publish.yml finds the build by)"]
+    missing = {"build", "man"} - _needs(job)
+    if missing:
+        errors.append(f"{workflow}: the `{MANIFEST_JOB}` job must wait for {sorted(missing)}")
+    permissions = _permissions(job)
+    for scope in ("id-token", "attestations"):
+        if permissions.get(scope) != "write":
+            errors.append(f"{workflow}: the `{MANIFEST_JOB}` job needs `{scope}: write` to attest the manifest")
+    for name in _job_names(text):
+        if name != MANIFEST_JOB and {"id-token", "attestations"} & {scope for scope, access in _permissions(_job_block(text, name)).items() if access == "write"}:
+            errors.append(f"{workflow}: job `{name}` has an attestation permission; only `{MANIFEST_JOB}` does")
+    if re.search(r"^\s+(?:id-token|attestations):", text.split("\njobs:", 1)[0], re.MULTILINE):
+        errors.append(f"{workflow}: the workflow-level permissions must not grant attestation (only `{MANIFEST_JOB}` does)")
+    attest = [step for step in _steps(job) if ATTEST_ACTION in step]
+    if not attest:
+        errors.append(f"{workflow}: the `{MANIFEST_JOB}` job must attest the manifest with `{ATTEST_ACTION}`")
+    elif any(not re.search(r"^\s+if:", step, re.MULTILINE) for step in attest):
+        errors.append(f"{workflow}: the attest step must skip a pull request from a fork (an `if:`): a fork has no id-token")
+    if "release-build.py record" not in job:
+        errors.append(f"{workflow}: the `{MANIFEST_JOB}` job must write the manifest with scripts/release-build.py record")
+    if not any((_with_value(step, "name") or "").startswith(MANIFEST_ARTIFACT) for step in _uses_steps(job, "upload-artifact")):
+        errors.append(f"{workflow}: the `{MANIFEST_JOB}` job must upload an artifact named `{MANIFEST_ARTIFACT}<tree>`")
+    return errors
+
+
+def _floor_targets(step: str) -> dict[str, bool]:
+    """target -> whether its check line carries `--page-size skip`, for each `check-release-binary.py` line of a step."""
+    found: dict[str, bool] = {}
+    for line in step.splitlines():
+        source = _source_line(line)
+        if "check-release-binary.py" in source:
+            target = re.search(r"--target (\S+)", source)
+            if target:
+                found[target.group(1)] = bool(re.search(r"--page-size[ =]skip\b", source))
+    return found
+
+
+def fetch_build_errors(text: str, workflow: str) -> list[str]:
+    """The `fetch-build` job of publish.yml: finds the run, downloads with the run id and a token, verifies before it
+    uploads, reads every target's floor (the page size of the aarch64 musl row aside, which `smoke-binary` reads on its
+    arm runner), and the jobs after it wait for it."""
+    errors: list[str] = []
+    job = _job_block(text, FETCH_JOB)
+    if not job:
+        return [f"{workflow}: no `{FETCH_JOB}` job (it fetches the binaries build-native.yml built)"]
+    if _field(job, "runs-on") != "ubuntu-26.04":
+        errors.append(f"{workflow}: `{FETCH_JOB}` runs on ubuntu-26.04")
+    if "read-version" not in _needs(job):
+        errors.append(f"{workflow}: `{FETCH_JOB}` must wait for `read-version`")
+    if _field(job, "timeout-minutes") != "10":
+        errors.append(f"{workflow}: `{FETCH_JOB}` has `timeout-minutes: 10`")
+    permissions = _permissions(job)
+    for scope in ("contents", "actions", "attestations"):
+        if permissions.get(scope) != "read":
+            errors.append(f"{workflow}: `{FETCH_JOB}` needs `{scope}: read` (found {permissions.get(scope)!r})")
+    for scope, access in permissions.items():
+        if access != "read":
+            errors.append(f"{workflow}: `{FETCH_JOB}` must only read: `{scope}: {access}`")
+    steps = _steps(job)
+    for step in _uses_steps(job, "download-artifact"):
+        name = _with_value(step, "name") or "?"
+        for key in ("run-id", "github-token", "repository"):
+            if _with_value(step, key) is None:
+                errors.append(f"{workflow}: the download of `{name}` in `{FETCH_JOB}` has no `{key}` (it reads another run's artifact)")
+        mismatch = _with_value(step, "digest-mismatch")
+        if mismatch not in (None, "error"):
+            errors.append(f"{workflow}: the download of `{name}` sets `digest-mismatch: {mismatch}`; only `error` (the default) is allowed")
+    positions = {key: [i for i, step in enumerate(steps) if marker in step] for key, marker in (
+        ("find", "release-build.py find"), ("verify", "release-build.py verify"), ("floor", f"- name: {BINARY_CHECK_STEP}"),
+    )}
+    for key, found in positions.items():
+        if len(found) != 1:
+            errors.append(f"{workflow}: `{FETCH_JOB}` must have exactly one `{key}` step (found {len(found)})")
+    floor = _step_block(job, BINARY_CHECK_STEP)
+    if re.search(r"^\s+if:", floor, re.MULTILINE):
+        errors.append(f"{workflow}: step `{BINARY_CHECK_STEP}` in `{FETCH_JOB}` must run for every target, with no `if:`")
+    targets = _floor_targets(floor)
+    for target in EXPECTED_TARGETS:
+        if target not in targets:
+            errors.append(f"{workflow}: step `{BINARY_CHECK_STEP}` in `{FETCH_JOB}` does not read {target}")
+        elif targets[target] != (target == LG_PAGE_TARGET):
+            errors.append(f"{workflow}: `--page-size skip` belongs to {LG_PAGE_TARGET} alone (its page size is read by `smoke-binary` on the arm runner); {target} has {'it' if targets[target] else 'not'}")
+    if all(len(found) == 1 for found in positions.values()):
+        find_at, verify_at, floor_at = positions["find"][0], positions["verify"][0], positions["floor"][0]
+        downloads = [i for i, step in enumerate(steps) if re.search(r"^\s+(?:- )?uses:\s*actions/download-artifact@", step, re.MULTILINE)]
+        if not downloads or not (find_at < min(downloads) and max(downloads) < verify_at):
+            errors.append(f"{workflow}: `{FETCH_JOB}` must find the run, then download, then verify")
+        for i, step in enumerate(steps):
+            if re.search(r"^\s+(?:- )?uses:\s*actions/upload-artifact@", step, re.MULTILINE) and not (i > verify_at and i > floor_at):
+                errors.append(f"{workflow}: `{FETCH_JOB}` uploads before it has verified and read the floor of the binaries")
+                break
+    for name in ("package", "smoke-binary", "smoke-network"):
+        needs = _needs(_job_block(text, name))
+        if FETCH_JOB not in needs or "build" in needs:
+            errors.append(f"{workflow}: job `{name}` must wait for `{FETCH_JOB}`, not `build` (needs: {sorted(needs)})")
+    smoke = _step_block(_job_block(text, "smoke-binary"), BINARY_CHECK_STEP)
+    if not smoke or "check-release-binary.py" not in smoke or '--target "${{ matrix.settings.target }}"' not in smoke:
+        errors.append(f"{workflow}: `smoke-binary` must run step `{BINARY_CHECK_STEP}` with scripts/check-release-binary.py --target \"${{{{ matrix.settings.target }}}}\"")
+    elif re.search(r"--page-size[ =]skip\b", smoke) or re.search(r"^\s+if:", smoke, re.MULTILINE):
+        errors.append(f"{workflow}: the floor check of `smoke-binary` reads the page size and has no `if:` (it is the one place that can)")
+    return errors
+
+
 ERRORS: list[str] = []
 
 
@@ -1606,60 +1836,35 @@ def main(argv: list[str] | None = None) -> int:
     build_text = read(BUILD_WF)
     publish_text = read(PUBLISH_WF)
 
-    # 1. Shared env parity.
+    # 1. build-native.yml declares the env the release binary is built under. publish.yml compiles nothing and
+    #    declares none of it (`no_compile_errors`).
     build_env = top_level_env(build_text)
-    publish_env = top_level_env(publish_text)
     for key in REQUIRED_ENV:
         check(key in build_env, f"build-native.yml env missing {key}")
-        check(key in publish_env, f"publish.yml env missing {key}")
-        if key in build_env and key in publish_env:
-            check(
-                build_env[key] == publish_env[key],
-                f"env {key} drift: build-native={build_env[key]!r} vs publish={publish_env[key]!r}",
-            )
 
-    # 2. Matrix parity on the shared fields.
+    # 2. The build matrix is build-native.yml's alone.
     build_rows = matrix_rows(_job_block(build_text, "build"))
-    publish_rows = matrix_rows(_job_block(publish_text, "build"))
     check(len(build_rows) >= 1, "build-native.yml has no matrix rows")
-    check(
-        len(build_rows) == len(publish_rows),
-        f"matrix row count drift: build-native={len(build_rows)} vs publish={len(publish_rows)}",
-    )
 
-    def key_of(row: dict[str, str]) -> tuple[str, ...]:
-        return tuple(row.get(f, "<missing>") for f in SHARED_MATRIX_FIELDS)
-
-    build_keys = sorted(key_of(r) for r in build_rows)
-    publish_keys = sorted(key_of(r) for r in publish_rows)
-    check(
-        build_keys == publish_keys,
-        f"matrix (host/target/package_dir) drift:\n  build-native={build_keys}\n  publish     ={publish_keys}",
-    )
-
-    # 3. Every publish row's package_name matches its platform package's
-    #    package.json `name`, and its package_dir exists.
-    platform_names: set[str] = set()
-    for row in publish_rows:
+    # 3. A platform package's `name` is the one in its own package.json (no second copy in a matrix); each row's
+    #    package_dir exists.
+    package_names: dict[str, str] = {}
+    for row in build_rows:
         pkg_dir = row.get("package_dir")
-        pkg_name = row.get("package_name")
-        check(pkg_name is not None, f"publish matrix row {row.get('target')} lacks package_name")
         if not pkg_dir:
             continue
         manifest = ROOT / "packages" / pkg_dir / "package.json"
         if not manifest.is_file():
-            ERRORS.append(f"publish row {row.get('target')}: packages/{pkg_dir}/package.json is missing")
+            ERRORS.append(f"build row {row.get('target')}: packages/{pkg_dir}/package.json is missing")
             continue
         actual = json.loads(manifest.read_text(encoding="utf-8")).get("name")
-        check(
-            actual == pkg_name,
-            f"package name drift for {pkg_dir}: matrix={pkg_name!r} vs package.json={actual!r}",
-        )
-        if pkg_name:
-            platform_names.add(pkg_name)
+        check(isinstance(actual, str) and bool(actual), f"packages/{pkg_dir}/package.json has no `name`")
+        if isinstance(actual, str) and actual:
+            package_names[pkg_dir] = actual
+    platform_names = set(package_names.values())
 
     # 4. @journeykit/canon's optionalDependencies keys are EXACTLY the set of
-    #    platform package names the publish matrix ships (no orphan dep,
+    #    platform package names the build matrix ships (no orphan dep,
     #    no unshipped platform).
     cli_manifest = ROOT / "packages/cli/package.json"
     if cli_manifest.is_file():
@@ -1667,7 +1872,7 @@ def main(argv: list[str] | None = None) -> int:
         opt_keys = set(opt.keys())
         check(
             opt_keys == platform_names,
-            f"@journeykit/canon optionalDependencies drift:\n  optionalDependencies={sorted(opt_keys)}\n  publish matrix names ={sorted(platform_names)}",
+            f"@journeykit/canon optionalDependencies drift:\n  optionalDependencies={sorted(opt_keys)}\n  platform package names ={sorted(platform_names)}",
         )
     else:
         ERRORS.append("packages/cli/package.json is missing")
@@ -1728,9 +1933,9 @@ def main(argv: list[str] | None = None) -> int:
         + ", ".join(f"{v} in {sorted(files)}" for v, files in sorted(bun_pins.items())),
     )
 
-    # 9. Every platform row embeds the one dashboard build, in both workflows.
+    # 9. Every platform row embeds the one dashboard build (build-native.yml; publish.yml builds none: see
+    #    `no_compile_errors`).
     ERRORS.extend(dashboard_embed_errors(build_text, "build-native.yml"))
-    ERRORS.extend(dashboard_embed_errors(publish_text, "publish.yml"))
     # 10. Every `npm publish` step splits stable from prerelease: a hyphenated
     #    version publishes `--tag next`, never `latest`.
     ERRORS.extend(prerelease_publish_errors(publish_text, "publish.yml"))
@@ -1744,28 +1949,25 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("build-native.yml", "publish.yml"):
         ERRORS.extend(runner_label_errors(workflow_texts[name], name))
         ERRORS.extend(image_digest_errors(workflow_texts[name], name))
-        ERRORS.extend(macos_target_errors(top_level_env(workflow_texts[name]), name))
+    # The build rules are build-native.yml's alone: it is the one place that compiles.
+    ERRORS.extend(macos_target_errors(top_level_env(build_text), "build-native.yml"))
     ERRORS.extend(build_row_errors(build_rows, "build-native.yml"))
-    ERRORS.extend(build_row_errors(publish_rows, "publish.yml"))
     cargo_toml = read(ROOT / "crates/canon-cli/Cargo.toml")
     main_rs = read(ROOT / "crates/canon-cli/src/main.rs")
     binary_checker = read(ROOT / "scripts/check-release-binary.py")
-    for name in ("build-native.yml", "publish.yml"):
-        ERRORS.extend(jemalloc_errors(workflow_texts[name], name, cargo_toml, main_rs))
-    for name in ("build-native.yml", "publish.yml"):
-        ERRORS.extend(alpine_build_errors(workflow_texts[name], name))
+    ERRORS.extend(jemalloc_errors(build_text, "build-native.yml", cargo_toml, main_rs))
+    ERRORS.extend(alpine_build_errors(build_text, "build-native.yml"))
     ERRORS.extend(binary_check_errors(build_text, "build-native.yml", build_rows, binary_checker))
-    ERRORS.extend(binary_check_errors(publish_text, "publish.yml", publish_rows, binary_checker))
     ERRORS.extend(crt_static_errors(read(ROOT / ".cargo/config.toml"), {"build-native.yml": build_text, "publish.yml": publish_text, **other_texts}))
     platform_manifests = {
         directory.name: json.loads((directory / "package.json").read_text(encoding="utf-8"))
         for directory in sorted((ROOT / "packages").glob("core-*"))
         if (directory / "package.json").is_file()
     }
-    ERRORS.extend(launcher_errors(read(ROOT / "packages/cli/src/index.ts"), publish_rows, platform_manifests))
+    ERRORS.extend(launcher_errors(read(ROOT / "packages/cli/src/index.ts"), build_rows, platform_manifests))
     launcher_name = json.loads(cli_manifest.read_text(encoding="utf-8")).get("name", "") if cli_manifest.is_file() else ""
     optional_keys = set(json.loads(cli_manifest.read_text(encoding="utf-8")).get("optionalDependencies", {})) if cli_manifest.is_file() else set()
-    ERRORS.extend(package_set_errors(publish_text, publish_rows, launcher_name, read(ROOT / "bun.lock"), optional_keys))
+    ERRORS.extend(package_set_errors(publish_text, build_rows, package_names, launcher_name, read(ROOT / "bun.lock"), optional_keys))
     ERRORS.extend(smoke_errors(publish_text, build_text, other_texts))
     ERRORS.extend(dry_run_errors(publish_text, "publish.yml"))
     ERRORS.extend(preflight_errors(publish_text, "publish.yml"))
@@ -1773,6 +1975,15 @@ def main(argv: list[str] | None = None) -> int:
     ERRORS.extend(tarball_errors(publish_text, "publish.yml"))
     for name, text in workflow_texts.items():
         ERRORS.extend(dry_run_setting_errors(text, name))
+
+    # 12. 0.44 build once: publish.yml compiles nothing and fetches what build-native.yml built, by the manifest
+    #     that run attests; both keep their artifacts for a bounded time.
+    ERRORS.extend(no_compile_errors(publish_text, "publish.yml"))
+    ERRORS.extend(fetch_build_errors(publish_text, "publish.yml"))
+    ERRORS.extend(artifact_contract_errors(build_text, publish_text))
+    ERRORS.extend(manifest_job_errors(build_text, "build-native.yml"))
+    ERRORS.extend(retention_errors(build_text, "build-native.yml", BUILD_RETENTION))
+    ERRORS.extend(retention_errors(publish_text, "publish.yml", PUBLISH_RETENTION))
 
     # 7. Repo-root hygiene. An agent-authored patch fragment landed at the
     #    repo root in s43 round 7 and was committed by a `git add -A`: a file
