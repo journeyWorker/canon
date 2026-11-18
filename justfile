@@ -76,6 +76,7 @@ release-check:
     python3 scripts/test-release-workflow-safety.py
     python3 scripts/test-check-release-binary.py
     python3 scripts/test-build-scope.py
+    python3 scripts/test-ci-tested.py
     python3 scripts/test-release-build.py
 
 # The npm launcher's tests (test.yml `launcher`).
