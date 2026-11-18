@@ -346,6 +346,23 @@ fn search_index_06_a_record_input_that_cannot_be_read_exits_1_with_the_cause_and
     }
 }
 
+/// An archived version the search cannot read is the same refusal as a record it cannot read: exit 1.
+#[cfg(unix)]
+#[test]
+fn an_archive_file_that_cannot_be_read_exits_1_and_writes_no_index() {
+    let l = the_loop();
+    let r = l.dir.path();
+    let archive = r.join(".canon/archive/kind=evidence");
+    assert!(archive.is_dir(), "the older evidence version is in the archive");
+    std::os::unix::fs::symlink(r.join(".canon/specs"), archive.join("linked.json")).unwrap();
+    for args in [&["search", "token", "--json"][..], &["trace", "abcdef1", "--json"][..]] {
+        let out = canon(args, r);
+        assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+        assert_eq!(json_of(&out)["error"]["code"], "SEARCH_INDEX_FAILED");
+        assert!(!r.join(".canon/index/search.db").exists());
+    }
+}
+
 /// search.index.07
 #[test]
 fn search_index_07_a_full_rebuild_of_a_stale_index_over_2300_records_finishes_within_five_seconds() {

@@ -206,6 +206,12 @@ type Loaded = Result<Arc<RawRecord>, EvidenceViolation>;
 type FileMemo = std::sync::Mutex<std::collections::HashMap<(PathBuf, RecordKind), (FileStamp, Loaded)>>;
 static FILE_MEMO: std::sync::LazyLock<FileMemo> = std::sync::LazyLock::new(Default::default);
 
+/// One file read and validated, uncached.
+fn read_validated(kind: RecordKind, candidate: &Candidate) -> Result<Result<RawRecord, EvidenceViolation>, StoreError> {
+    let bytes = crate::eio::read(&candidate.absolute)?;
+    Ok(validate_file(kind, &candidate.relative, &bytes))
+}
+
 fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, StoreError> {
     let key = (candidate.absolute.clone(), kind);
     if let Some(stamp) = candidate.stamp {
@@ -216,30 +222,32 @@ fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, Sto
             }
         }
     }
-    let bytes = crate::eio::read(&candidate.absolute)?;
-    let loaded = validate_file(kind, &candidate.relative, &bytes).map(Arc::new);
+    let loaded = read_validated(kind, candidate)?.map(Arc::new);
     if let Some(stamp) = candidate.stamp {
         FILE_MEMO.lock().expect("file memo lock poisoned").insert(key, (stamp, loaded.clone()));
     }
     Ok(loaded)
 }
 
-/// Read and validate every candidate, in order. The files are independent,
-/// so a large kind is read by several threads; the first read error in
-/// path order is the one returned.
-fn load_candidates(kind: RecordKind, candidates: Vec<Candidate>) -> Result<Vec<(PathBuf, Loaded)>, StoreError> {
+/// `load` of every candidate, in order. The files are independent, so a large batch is read by several
+/// threads.
+fn load_each<T: Send>(candidates: &[Candidate], load: impl Fn(&Candidate) -> Result<T, StoreError> + Sync) -> Vec<Result<T, StoreError>> {
     const PARALLEL_FROM: usize = 32;
     let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get).min(8);
-    let results: Vec<Result<Loaded, StoreError>> = if candidates.len() < PARALLEL_FROM || threads < 2 {
-        candidates.iter().map(|candidate| load_candidate(kind, candidate)).collect()
-    } else {
-        let chunk = candidates.len().div_ceil(threads);
-        std::thread::scope(|scope| {
-            let handles: Vec<_> =
-                candidates.chunks(chunk).map(|part| scope.spawn(move || part.iter().map(|candidate| load_candidate(kind, candidate)).collect::<Vec<_>>())).collect();
-            handles.into_iter().flat_map(|handle| handle.join().expect("a record reader thread does not panic")).collect()
-        })
-    };
+    if candidates.len() < PARALLEL_FROM || threads < 2 {
+        return candidates.iter().map(&load).collect();
+    }
+    let chunk = candidates.len().div_ceil(threads);
+    let load = &load;
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = candidates.chunks(chunk).map(|part| scope.spawn(move || part.iter().map(load).collect::<Vec<_>>())).collect();
+        handles.into_iter().flat_map(|handle| handle.join().expect("a record reader thread does not panic")).collect()
+    })
+}
+
+/// Read and validate every candidate, in order. The first read error in path order is the one returned.
+fn load_candidates(kind: RecordKind, candidates: Vec<Candidate>) -> Result<Vec<(PathBuf, Loaded)>, StoreError> {
+    let results = load_each(&candidates, |candidate| load_candidate(kind, candidate));
     candidates.into_iter().zip(results).map(|(candidate, loaded)| Ok((candidate.relative, loaded?))).collect()
 }
 
@@ -311,20 +319,13 @@ impl GitTier {
         Ok((found.into_iter().map(|(relative, raw)| (relative, Arc::unwrap_or_clone(raw))).collect(), violations))
     }
 
-    /// [`Self::scan_kind_where`] without copying: each record is the
-    /// `Arc` the per-process file cache holds, so a repeat scan of an
-    /// unchanged kind allocates the row list and nothing else.
-    fn scan_kind_shared(
-        &self,
-        kind: RecordKind,
-        keep: impl Fn(chrono::DateTime<chrono::Utc>) -> bool,
-    ) -> Result<SharedScanResult, StoreError> {
+    /// The record files under `kind={kind}/` in path order, none when the directory is missing or is not
+    /// one. A symlink (the directory or any entry) is refused.
+    fn candidates(&self, kind: RecordKind) -> Result<Vec<Candidate>, StoreError> {
         let kind_dir = self.absolute(Path::new(&format!("kind={}", kind.as_str())));
-        let mut records = Vec::new();
-        let mut violations = Vec::new();
         let kind_metadata = match std::fs::symlink_metadata(&kind_dir) {
             Ok(metadata) => metadata,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok((records, violations)),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(err) => return Err(err.into()),
         };
         if kind_metadata.file_type().is_symlink() {
@@ -332,7 +333,7 @@ impl GitTier {
             return Err(StoreError::Policy(format!("refusing to traverse symlink `{}`", relative.display())));
         }
         if !kind_metadata.is_dir() {
-            return Ok((records, violations));
+            return Ok(Vec::new());
         }
         let mut candidates: Vec<Candidate> = Vec::new();
         for entry in walkdir::WalkDir::new(&kind_dir).sort_by_file_name().into_iter() {
@@ -350,8 +351,20 @@ impl GitTier {
             let stamp = entry.metadata().ok().and_then(|metadata| FileStamp::of(&metadata));
             candidates.push(Candidate { absolute, relative, stamp });
         }
+        Ok(candidates)
+    }
 
-        for (relative, loaded) in load_candidates(kind, candidates)? {
+    /// [`Self::scan_kind_where`] without copying: each record is the
+    /// `Arc` the per-process file cache holds, so a repeat scan of an
+    /// unchanged kind allocates the row list and nothing else.
+    fn scan_kind_shared(
+        &self,
+        kind: RecordKind,
+        keep: impl Fn(chrono::DateTime<chrono::Utc>) -> bool,
+    ) -> Result<SharedScanResult, StoreError> {
+        let mut records = Vec::new();
+        let mut violations = Vec::new();
+        for (relative, loaded) in load_candidates(kind, self.candidates(kind)?)? {
             let raw = match loaded {
                 Ok(raw) => raw,
                 Err(violation) => {
@@ -376,6 +389,28 @@ impl GitTier {
         let since = query.since;
         let (found, violations) = self.scan_kind_shared(query.kind, move |at| since.is_none_or(|s| at >= s))?;
         Ok(SharedRead { records: found.into_iter().map(|(_, raw)| raw).collect(), violations })
+    }
+
+    /// [`Tier::read`]'s scan, validation and `since` filter, but each record is handed to `each` as soon as
+    /// it is read and validated, in path order, and kept by nothing here: no body outlives its call, and
+    /// the per-process file cache neither holds the record nor is consulted. For a reader that wants a few
+    /// fields of many records (the archive's old versions). The violations are returned, as [`Tier::read`]
+    /// returns them; a symlink or an unreadable file or directory is the same `Err`.
+    pub fn visit(&self, query: &TierQuery, mut each: impl FnMut(RawRecord)) -> Result<Vec<EvidenceViolation>, StoreError> {
+        /// Files read ahead of the visit: bounds the bodies alive at once.
+        const BATCH: usize = 256;
+        let kind = query.kind;
+        let mut violations = Vec::new();
+        for batch in self.candidates(kind)?.chunks(BATCH) {
+            for loaded in load_each(batch, |candidate| read_validated(kind, candidate)) {
+                match loaded? {
+                    Ok(raw) if query.since.is_none_or(|since| crate::tier::raw_record_at(&raw) >= since) => each(raw),
+                    Ok(_) => {}
+                    Err(violation) => violations.push(violation),
+                }
+            }
+        }
+        Ok(violations)
     }
 
     /// Whether a staging read would refuse `body` as a record of `kind`: the answer of [`GitTier::read_at`] for the file a write of
@@ -988,6 +1023,61 @@ mod tests {
         assert_eq!(first.records.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(), owned.records.iter().collect::<Vec<_>>());
         assert!(first.records.iter().zip(&second.records).all(|(a, b)| Arc::ptr_eq(a, b)), "a repeat scan shares the cached rows");
         assert_eq!(second.into_owned().records, owned.records);
+    }
+
+    /// The versions a reader sees, as a sorted list that keeps duplicates: digest and `at` of each record.
+    fn versions_of(records: impl IntoIterator<Item = RawRecord>) -> Vec<(String, chrono::DateTime<chrono::Utc>)> {
+        let mut versions: Vec<_> = records.into_iter().map(|raw| (crate::partition::content_digest(&raw.0), crate::tier::raw_record_at(&raw))).collect();
+        versions.sort();
+        versions
+    }
+
+    fn visited(tier: &GitTier, kind: RecordKind) -> Result<(Vec<RawRecord>, Vec<EvidenceViolation>), StoreError> {
+        let mut records = Vec::new();
+        let violations = tier.visit(&TierQuery::kind(kind), |raw| records.push(raw))?;
+        Ok((records, violations))
+    }
+
+    /// A visit hands out the versions `read` returns, across the batches a large kind is read in.
+    #[test]
+    fn a_visit_yields_the_versions_a_read_returns() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = GitTier::new(dir.path());
+        for n in 0..300 {
+            tier.write(&change_named(&format!("change-{n:03}"))).unwrap();
+        }
+        let read = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();
+        let (records, violations) = visited(&tier, RecordKind::Change).unwrap();
+        assert_eq!(records.len(), 300);
+        assert!(violations.is_empty() && read.violations.is_empty());
+        assert_eq!(versions_of(records), versions_of(read.records));
+    }
+
+    /// A file a scan reports instead of returning is reported by a visit too, and the visit succeeds.
+    #[test]
+    fn a_visit_reports_a_file_a_read_refuses_and_goes_on() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = GitTier::new(dir.path());
+        for id in ["first-change", "second-change"] {
+            tier.write(&change_named(id)).unwrap();
+        }
+        std::fs::write(dir.path().join("kind=change/not-a-record.json"), b"{ not json").unwrap();
+        let read = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();
+        let (records, violations) = visited(&tier, RecordKind::Change).unwrap();
+        assert_eq!((read.violations.len(), violations.len()), (1, 1));
+        assert_eq!(versions_of(records), versions_of(read.records));
+    }
+
+    /// A link is refused by a visit as by a scan: an error, never a skipped file.
+    #[cfg(unix)]
+    #[test]
+    fn a_visit_refuses_a_symlink_as_a_scan_does() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = GitTier::new(dir.path());
+        let location = tier.write(&change_named("linked-change")).unwrap().location;
+        std::os::unix::fs::symlink(dir.path().join(&location), dir.path().join("kind=change/link.json")).unwrap();
+        assert!(matches!(tier.read(&TierQuery::kind(RecordKind::Change)), Err(StoreError::Policy(_))));
+        assert!(matches!(visited(&tier, RecordKind::Change), Err(StoreError::Policy(_))));
     }
 
     /// A kind big enough to be read by several threads comes back in
