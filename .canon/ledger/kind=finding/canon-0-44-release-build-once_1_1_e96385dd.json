@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-44",
+    "role": "reviewer",
+    "session_id": "01a1ef97-34bf-7767-be06-5477e9fd330a"
+  },
+  "at": "2026-11-18T17:09:03.472244262Z",
+  "change_id": "canon-0-44-release-build-once",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "disposition": "open",
+  "file_ref": ".canon/changes/canon-0-44-release-build-once/brief.md:131-132",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "26b3fae5e2102b0a936fdf9127cc159f9d68472d",
+  "reviewer": "rev-0-44",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "P2, evidence gap. The two live Checks are only half met. Publish dry run 44312231152 picked build-native 44308449917 (find and verify pass, no cargo). The run then concluded failure: all four smoke-binary jobs failed at release-smoke.sh `canon gate check`, because the ledger at c55d95011 had no evidence after the approval. The publish job, with its five (dry-run) steps, was skipped. Reject run 44312805333 gave tree_mismatch, not no_run. Its recovery leg (build-native 44312929087 on scratch/0.44-no-run) lost the macOS row to cancellation, so `gh run rerun --failed` never passed. Fix: on the 0.44.0 release PR, record one green publish dry run end to end (publish job included). Blast radius: the publish job and smoke-install are unchanged by this patch, but no run has yet exercised them with fetched binaries.",
+  "worktree_dirty": false
+}

@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-0-44",
+    "role": "reviewer",
+    "session_id": "01a1ef97-34bf-7767-be06-5477e9fd330a"
+  },
+  "at": "2026-11-18T17:12:17.396924354Z",
+  "change_id": "canon-0-44-search-memory",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "kind": "review",
+  "pin": "26b3fae5e2102b0a936fdf9127cc159f9d68472d",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "f092bda8e02f5a1c476da7f90e783e0d574b3f8edf20a97a98c6970cd7e6dcd2",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-44-search-memory/brief.md"
+  },
+  "review_id": "01M7QTA6QMTDENG7VRSZYWRTRM",
+  "reviewer": "rev-0-44",
+  "reviewer_harness": "omp",
+  "reviewer_model": "claude-opus-5-5",
+  "reviewer_provider": "anthropic",
+  "schema": 2,
+  "worktree_dirty": false
+}
