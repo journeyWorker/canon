@@ -30,8 +30,10 @@ size() { if [ -e "$1" ]; then du -sh "$1" | cut -f1; else echo "none"; fi; }
 before="$(size "$target")"
 
 names=()
+# jq on the Windows runner ends lines with CRLF; a `\r` left in a name makes `cargo clean -p` refuse it.
 while read -r name; do
-  names+=("$name")
+  name="${name%$'\r'}"
+  [ -n "$name" ] && names+=("$name")
 done < <(cargo metadata --no-deps --locked --offline --format-version 1 | jq -r '.packages[].name')
 [ "${#names[@]}" -gt 0 ] || { echo "no workspace package found" >&2; exit 1; }
 
