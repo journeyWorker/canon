@@ -34,6 +34,9 @@ BUILD_PATHS = (
     "rust-toolchain.toml",
     ".github/workflows/",
     ".github/actions/",
+    "canon/skills/",
+    "bun.lock",
+    "package.json",
     "scripts/",
 )
 RELEASE_PREFIX = "release/"

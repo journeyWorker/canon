@@ -63,6 +63,9 @@ class PathTests(unittest.TestCase):
             "rust-toolchain.toml",
             ".github/workflows/test.yml",
             ".github/actions/setup-rust/action.yml",
+            "canon/skills/repo-scaffold/SKILL.md",
+            "bun.lock",
+            "package.json",
             "scripts/build-scope.py",
         ):
             self.assertTrue(SCOPE.touches_build(path), path)
