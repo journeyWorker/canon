@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.44.0 — 2026-11-19
+
+canon 0.44 is not breaking for callers: `canon search` and `canon trace` return the same results, exit values and records as in 0.43 and use far less memory (on canon's own repository, `search approval --json` peaks at 118 MB instead of 596 MB with a fresh index, and `trace <sha> --json` at 137 MB instead of 613 MB), and an index built by 0.43 is reused as it is. A caller has nothing to change. What changes is for contributors: CI and the release build once. A push to main no longer re-runs `test.yml` on a tree a green pull request already tested, an ordinary pull request builds one release row instead of four, and `publish.yml` no longer compiles anything: it finds the successful `build-native.yml` run of the tree it publishes, verifies that run's artifacts against an attested manifest and packages them (a tree no run built is refused with a verdict and the command that fixes it).
+
 ### Changed
 
 - **`canon search` and `canon trace` hold far less memory** (`canon-0-44-search-memory`; results, exit values, records and the index file do not change). The two commands now read the archive's old versions one at a time and keep only their key, digest, time and review-loop fields, keep one copy of each current record, and no longer copy bodies into the trace's items. Peak memory on canon's own repository (`.canon` 269 MB, Linux release build): `search approval --json` 596 MB → 118 MB with a fresh index and 890 MB → 188 MB with none, `trace <sha> --json` 613 MB → 137 MB with a fresh index; `status` is unchanged (116 MB → 114 MB). An index built by 0.43 is reused as it is, and the reverse.
