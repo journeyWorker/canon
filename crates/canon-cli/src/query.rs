@@ -16,6 +16,7 @@
 //! resolved (`PluginQueryOutcome::projections` non-empty), and otherwise
 //! uses the core formatter path.
 
+use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -301,7 +302,7 @@ fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
 /// MUST be added here or its `canon query` result regresses to
 /// N-independent-versions. The hot-routed set is asserted to equal this
 /// list by `fold_list_matches_pg_routing` (tests/query.rs).
-fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
+fn fold_pg_routed_kind<R: Borrow<RawRecord>>(kind: RecordKind, records: Vec<R>) -> Vec<R> {
     if !matches!(kind, RecordKind::Task | RecordKind::Handoff | RecordKind::Run) {
         return records;
     }
@@ -310,7 +311,7 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 
 /// The current records of `kind` among `records`, every version a store holds: what `canon query` shows
 /// without `--history`, in the same fold (`canon search` indexes exactly these).
-pub(crate) fn current_of(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
+pub(crate) fn current_of<R: Borrow<RawRecord>>(kind: RecordKind, records: Vec<R>) -> Vec<R> {
     fold_rewritten_kind(kind, fold_pg_routed_kind(kind, records))
 }
 
@@ -361,7 +362,7 @@ pub(crate) fn current_of(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRe
 /// commits are two records under one key prefix, told apart by digest —
 /// both are history to read, not versions of one. Folding by key would
 /// silently drop every attestation but the newest.
-fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
+fn fold_rewritten_kind<R: Borrow<RawRecord>>(kind: RecordKind, records: Vec<R>) -> Vec<R> {
     if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario | RecordKind::Change | RecordKind::ChangeState) {
         return records;
     }
@@ -369,7 +370,7 @@ fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
     if kind != RecordKind::Scenario {
         return folded;
     }
-    folded.into_iter().filter(|record| record.0.get("removed").and_then(Value::as_bool) != Some(true)).collect()
+    folded.into_iter().filter(|record| record.borrow().0.get("removed").and_then(Value::as_bool) != Some(true)).collect()
 }
 
 /// The shared fold-to-latest-per-natural-key body (design D11/s21 D3,
@@ -389,19 +390,20 @@ fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 /// Before the `schema` rung, the lexicographic digest decided that tie,
 /// which meant `canon query --kind task` surfaced a newly-parsed field
 /// on an ARBITRARY SUBSET of rows from one file, with no diagnostic.
-fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
-    struct Candidate {
+fn fold_latest_by_natural_key<R: Borrow<RawRecord>>(kind: RecordKind, records: Vec<R>) -> Vec<R> {
+    struct Candidate<R> {
         key: String,
         at: DateTime<Utc>,
         schema: u32,
         digest: String,
-        record: RawRecord,
+        record: R,
     }
     let candidates = records.into_iter().map(|record| {
-        let key = canon_store::partition::resolve_partition(kind, &record.0).map_or_default(|p| p.natural_key);
-        let at = canon_store::tier::raw_record_at(&record);
-        let schema = canon_store::tier::raw_record_schema(&record);
-        let digest = canon_store::partition::content_digest(&record.0);
+        let raw: &RawRecord = record.borrow();
+        let key = canon_store::partition::resolve_partition(kind, &raw.0).map_or_default(|p| p.natural_key);
+        let at = canon_store::tier::raw_record_at(raw);
+        let schema = canon_store::tier::raw_record_schema(raw);
+        let digest = canon_store::partition::content_digest(&raw.0);
         Candidate { key, at, schema, digest, record }
     });
     fold_latest_by_key(

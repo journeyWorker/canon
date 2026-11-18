@@ -49,22 +49,26 @@ architecture, and only the aarch64 musl row has `lg_page: "16"` (jemalloc with
 2. Add a `bin/.gitkeep` (the actual binary is staged by CI at build/publish
    time — never committed; see the root `.gitignore`'s `packages/core-*/
    bin/*` rule).
-3. Add the new target as a matrix row in both `.github/workflows/
-   build-native.yml` and `.github/workflows/publish.yml`'s `build` job
-   (`host`, `target`, `package_dir`, `binary_ext` — `package_name` too, in
-   `publish.yml`), and teach `scripts/check-release-binary.py` the target's
-   floor (its `TARGETS` table).
+3. Add the new target as a matrix row in `.github/workflows/build-native.yml`
+   (`host`, `target`, `package_dir`, `binary_ext`): it is the one place a
+   release binary is built, and `publish.yml` fetches the artifacts of its
+   run (`canon-binary-<target>`). Teach `scripts/check-release-binary.py` the
+   target's floor (its `TARGETS` table) and `scripts/release-build.py` the
+   target (its `TARGETS` table, the manifest's schema).
 4. Add the new platform package to `packages/cli/package.json`'s
    `optionalDependencies` as `"@journeykit/canon-core-<platform>": "workspace:*"`
    and refresh `bun.lock` (`bun install`).
 5. Extend `packages/cli/src/index.ts`'s `resolveTargetPackageName` /
    `resolveRustTargetTriple` (there is no libc detection: a platform and an
    arch name one package).
-6. Add the platform package to `publish.yml`'s binary download, checksum,
-   executable, version, `npm pack` and pre-flight lists and give it an
-   `npm publish` step (a new package's first publish needs `NPM_TOKEN`: put it
-   first among the platform packages). `scripts/check-release-workflow-safety.py`
-   names every place that lacks the package.
+6. Add the platform package to `publish.yml`'s binary download (`fetch-build`
+   downloads it from the `build-native.yml` run and the floor check reads
+   it, and `package` downloads it again), checksum, executable, version,
+   `npm pack` and pre-flight lists and give it an `npm publish` step (a new
+   package's first publish needs `NPM_TOKEN`: put it first among the platform
+   packages). The package's name is the `name` of its own `package.json`, in
+   no matrix. `scripts/check-release-workflow-safety.py` names every place
+   that lacks the package.
 
 ## Run `canon skills install` locally
 

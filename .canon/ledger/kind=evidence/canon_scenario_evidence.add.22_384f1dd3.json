@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:43:17.970456548Z",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store a_case_that_mentions_another_scenario_id_binds_only_to_its_own; cargo test -p canon-cli --lib a_case_binds_to_its_leading_scenario_id_never_to_one_it_mentions"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --test evidence_store a_case_that_mentions_another_scenario_id_binds_only_to_its_own; cargo test -p canon-cli --lib a_case_binds_to_its_leading_scenario_id_never_to_one_it_mentions: passes in the workspace nextest run at 21c235635 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2492,
+  "scenario_id": "evidence.add.22",
+  "schema": 1,
+  "staging_id": "cb5683e5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

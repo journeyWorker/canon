@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-0-44",
+    "role": "reviewer",
+    "session_id": "01a1ef97-34bf-7767-be06-5477e9fd330a"
+  },
+  "at": "2026-11-18T17:26:00.537954336Z",
+  "change_id": "canon-0-44-release-build-once",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "disposition": "fixed",
+  "file_ref": "scripts/test-release-workflow-safety.py:1276",
+  "introduced_by": "c55d95011fee74af31cf5a503ff0929b614cf96a",
+  "kind": "finding",
+  "resolution_code_tree": "fd1bacef76ae2a0c9d457363cd47ecb3d3503bda",
+  "resolution_sha": "94f413f56b45dd4744b8cfc90e7cf73db9690b80",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "26b3fae5e2102b0a936fdf9127cc159f9d68472d",
+  "reviewer": "rev-0-44",
+  "round": 1,
+  "schema": 2,
+  "seq": 4,
+  "severity": "note",
+  "summary": "P3, I16 and the owner rule (verdict-only tests). test_rejects_an_upload_before_the_verification ends with `self.assertIn(upload, publish)`. That asserts the shipped publish.yml contains the literal step name `- name: Upload man pages`, which is a check on workflow source text with no verdict behind it: renaming the step turns the test red while the checker's verdict is unchanged. `mutate` already fails when its anchor is missing. Fix: delete that line and the unused `upload` variable. Blast radius: test only.",
+  "worktree_dirty": false
+}

@@ -1,7 +1,10 @@
-name: Build Native (Test Only)
+name: Build Native
 
-# Adapted from the vendored upstream release pipeline's build workflow (design
-# D3), and the same four rows publish.yml releases: macOS arm64 (deployment
+# The one place the release binaries are compiled (design D3, adapted from the
+# vendored upstream release pipeline's build workflow): publish.yml compiles
+# nothing, it fetches the artifacts of the run of this workflow that built the
+# tree it publishes (`fetch-build`, found by the `build-manifest-<tree>` artifact
+# of the `manifest` job). Four rows: macOS arm64 (deployment
 # target 15.0), Linux x64 and arm64 as static musl binaries (jemalloc is
 # their allocator; glibc is not a floor), Windows x64 msvc with a static C
 # runtime. Every row builds on a host that natively matches the target (the
@@ -21,7 +24,30 @@ name: Build Native (Test Only)
 # alone: it builds jemalloc for 64K pages. Each row reads its binary
 # with scripts/check-release-binary.py (static, jemalloc, minos 15.0, no VC
 # runtime DLL), and the smokes that run those binaries in containers belong to
-# publish.yml only.
+# publish.yml only. The artifacts are kept 14 days: a release PR and its tag
+# are days apart at most, and an expired one is rebuilt with
+# `gh workflow run build-native.yml --ref <ref>`.
+#
+# What a run builds (0.44, `canon-0-44-ci-optimize`): the binary of a pull request run is never published, so an ordinary pull request builds no more than
+# its change can break. The `scope` job (`scripts/build-scope.py`) writes the output `mode`:
+#
+#   mode      when                                                            rows                 man pages, manifest
+#   release   a manual run, a `release/` head branch, a change that cannot    four                 yes
+#             be listed, any value this table does not name
+#   native    a pull request that touches Cargo.lock, a build.rs or .cargo/   four                 no
+#   quick     any other pull request that touches a path the build reads      x86_64 musl only     no
+#   skip      a pull request that touches none (`skip` is `true`)             none                 no
+#
+# The dashboard app is built by every run that is not `skip` (16 seconds, and every row embeds it). A `quick` run leaves the other three rows out of the
+# matrix with `exclude`, a list `scope` writes from the `quick` field of the rows; no other mode excludes a row. A `release` run is what `publish.yml` needs:
+# the four binaries, the man pages and the `manifest` it finds the run by. `pr-guard.yml` checks the man-page generator and this workflow's safety check on
+# every pull request.
+#
+# Caches: `build` and `man` restore their cache on every run, by `canon-cli-<target>-cargo-<hash of Cargo.lock>`. Only a `release/` pull request run or a manual
+# run saves one, only when the restore was no exact match, and after the artifacts are uploaded: `scripts/ci-strip-workspace-build.sh` first takes the
+# workspace crates' own build out (the host's build scripts and the target's, `--target`), and a cache is saved only when that succeeded. Both steps may fail
+# without failing the run: cache hygiene does not stop a release. A cache is saved per ref, so an ordinary pull request that saved one would pile up a copy
+# of it per pull request (11 GB against a 10 GB quota); its `quick` row builds from the start.
 
 on:
   workflow_dispatch:
@@ -42,10 +68,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Whether the builds below run. A `paths:` filter on `pull_request` cannot say: GitHub reads only the first 3,000
+  # Whether and how much the builds below run. A `paths:` filter on `pull_request` cannot say: GitHub reads only the first 3,000
   # changed files, and a release PR that changes 4,000 skips the workflow when none of them is in the filter
   # (0.42's did). `scripts/build-scope.py` reads the whole change; a manual run, a pull request from `release/...` and
-  # a change it cannot list all build. Only an explicit `skip == 'true'` skips the four builds (their `if:` below);
+  # a change it cannot list build everything (`mode`: see the top of this file). Only an explicit `skip == 'true'` skips the builds (their `if:` below);
   # a skipped run is green. `safety` does not wait for it.
   scope:
     name: Decide whether to build
@@ -53,6 +79,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       skip: ${{ steps.scope.outputs.skip }}
+      mode: ${{ steps.scope.outputs.mode }}
+      exclude: ${{ steps.scope.outputs.exclude }}
     steps:
       # The merge commit and its first parent (the base): `git diff` between them is the pull request's change.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -72,17 +100,17 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Cross-workflow drift guard (the upstream release pipeline's lesson,
-      # recommended action #1): fails the moment this workflow's build
-      # matrix / env drifts from publish.yml's, or from the platform
-      # package manifests. Dependency-free (stdlib python3).
+      # Drift guard (the upstream release pipeline's lesson, recommended
+      # action #1): fails the moment this workflow's build matrix or env drifts
+      # from the platform package manifests, or publish.yml drifts from what
+      # this workflow uploads. Dependency-free (stdlib python3).
       - name: Check release workflow safety
         run: python3 scripts/check-release-workflow-safety.py
 
   # The dashboard app is built ONCE and every platform row below embeds this
   # same build in its binary (`CANON_DASHBOARD_DIST`, crates/canon-cli/build.rs),
   # so `canon dashboard` runs in any repo. scripts/check-release-workflow-safety.py
-  # keeps both workflows doing exactly this.
+  # keeps this workflow doing exactly this. It is used by this run only.
   dashboard:
     name: Build dashboard app
     needs: [safety, scope]
@@ -109,6 +137,7 @@ jobs:
           name: dashboard-app
           path: packages/dashboard/dist
           if-no-files-found: error
+          retention-days: 1
 
   # The man pages are generated from the clap tree (`clap_mangen`, the
   # `man` feature of canon-cli: never built into the shipped binary) and
@@ -117,7 +146,7 @@ jobs:
   man:
     name: Generate man pages
     needs: [safety, scope]
-    if: needs.scope.outputs.skip != 'true'
+    if: needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode != 'quick' && needs.scope.outputs.mode != 'native'
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
@@ -126,8 +155,9 @@ jobs:
       - name: Install Rust
         uses: ./.github/actions/setup-rust
 
-      - name: Cache cargo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
@@ -145,6 +175,28 @@ jobs:
           name: man-pages
           path: man-pages
           if-no-files-found: error
+          retention-days: 14
+
+      # A release or manual run, no exact cache restored: the dependencies' build alone is saved (see the top of this file).
+      - name: Keep only the dependency build
+        id: strip
+        if: ${{ steps.cache.outputs.cache-hit != 'true' && (startsWith(github.head_ref, 'release/') || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
+        env:
+          CACHE_KEY: canon-cli-man-cargo-${{ hashFiles('Cargo.lock') }}
+        run: scripts/ci-strip-workspace-build.sh --release
+
+      - name: Save cargo cache
+        if: ${{ steps.cache.outputs.cache-hit != 'true' && steps.strip.outcome == 'success' && (startsWith(github.head_ref, 'release/') || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-cli-man-cargo-${{ hashFiles('Cargo.lock') }}
 
   build:
     name: Build - ${{ matrix.settings.target }}
@@ -160,20 +212,26 @@ jobs:
             target: aarch64-apple-darwin
             package_dir: core-darwin-arm64
             binary_ext: ""
+            quick: "false"
           - host: ubuntu-26.04
             target: x86_64-unknown-linux-musl
             package_dir: core-linux-x64
             binary_ext: ""
+            quick: "true"
           - host: ubuntu-26.04-arm
             target: aarch64-unknown-linux-musl
             package_dir: core-linux-arm64
             binary_ext: ""
             lg_page: "16"
             alpine_image: rust:1.100.0-alpine3.24@sha256:de1e0058543a81ed7b046629167db587c67a94bdf37cce14eb27f0ec83baaffb
+            quick: "false"
           - host: windows-2025
             target: x86_64-pc-windows-msvc
             package_dir: core-win32-x64
             binary_ext: ".exe"
+            quick: "false"
+        # `quick` leaves out the rows that say `quick: "false"`; every other mode leaves none (`scope` writes the list).
+        exclude: ${{ fromJSON(needs.scope.outputs.exclude || '[]') }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -184,8 +242,9 @@ jobs:
         with:
           target: ${{ matrix.settings.target }}
 
-      - name: Cache cargo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Restore cargo cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index/
@@ -252,7 +311,7 @@ jobs:
           PY=$(command -v python3 || command -v python)
           "$PY" scripts/check-release-binary.py --target "${{ matrix.settings.target }}" "target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}"
 
-      - name: Stage into platform package (local verification only — not committed)
+      - name: Stage into the platform package and run it
         shell: bash
         run: |
           set -euo pipefail
@@ -279,3 +338,108 @@ jobs:
             target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}
             target/${{ matrix.settings.target }}/release/canon${{ matrix.settings.binary_ext }}.sha256
           if-no-files-found: error
+          retention-days: 14
+
+      # A release or manual run, no exact cache restored: the dependencies' build alone is saved (see the top of this file). The workspace crates' output is taken
+      # out of both halves of the build, the host's and `--target`'s; the aarch64 musl row has no cargo on the host, so it runs the clean in its image (`bash` and `jq`
+      # are not in it) and hands the files back.
+      - name: Keep only the dependency build
+        id: strip
+        if: ${{ steps.cache.outputs.cache-hit != 'true' && (startsWith(github.head_ref, 'release/') || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
+        shell: bash
+        env:
+          ALPINE_IMAGE: ${{ matrix.settings.alpine_image }}
+          TARGET: ${{ matrix.settings.target }}
+          CACHE_KEY: canon-cli-${{ matrix.settings.target }}-cargo-${{ hashFiles('Cargo.lock') }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ALPINE_IMAGE" ]; then
+            bash scripts/ci-strip-workspace-build.sh --release --target "$TARGET"
+          else
+            docker run --rm -i \
+              -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
+              -v "$HOME/.cargo/registry:/usr/local/cargo/registry" \
+              -v "$HOME/.cargo/git:/usr/local/cargo/git" \
+              -v "$GITHUB_STEP_SUMMARY:$GITHUB_STEP_SUMMARY" \
+              -e GITHUB_STEP_SUMMARY -e CACHE_KEY -e CARGO_TERM_COLOR -e CARGO_INCREMENTAL \
+              -e TARGET -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+              "$ALPINE_IMAGE" sh -s <<'ALPINE_STRIP'
+          set -eu
+          trap 'chown -R "$HOST_UID:$HOST_GID" target /usr/local/cargo/registry /usr/local/cargo/git' EXIT
+          apk add --no-cache bash jq
+          bash scripts/ci-strip-workspace-build.sh --release --target "$TARGET"
+          ALPINE_STRIP
+          fi
+
+      - name: Save cargo cache
+        if: ${{ steps.cache.outputs.cache-hit != 'true' && steps.strip.outcome == 'success' && (startsWith(github.head_ref, 'release/') || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-cli-${{ matrix.settings.target }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+  # What this run built, written down: the tree of the checked-out ref (a pull request's merge ref, which no one can
+  # read after the merge, so only this run can say what it was), the sha256 of the four binaries and of every man page,
+  # attested by this workflow. publish.yml `fetch-build` finds the run of the tree it publishes by this artifact's
+  # name and trusts nothing else of it (scripts/release-build.py). It runs only when `build` and `man` all succeeded.
+  manifest:
+    name: Record what this run built
+    needs: [scope, build, man]
+    if: needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode != 'quick' && needs.scope.outputs.mode != 'native'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read the tree this run built
+        id: tree
+        run: echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - name: Download the binaries
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: canon-binary-*
+          path: built
+
+      - name: Download man pages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: man-pages
+          path: man-pages
+
+      - name: Write the build manifest
+        env:
+          TREE: ${{ steps.tree.outputs.tree }}
+          COMMIT: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: >-
+          python3 scripts/release-build.py record --tree "$TREE" --commit "$COMMIT" --event "$EVENT"
+          --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --artifacts built --man man-pages --out build-manifest.json
+
+      # A pull request from a fork has no id-token: its manifest carries no attestation and publish.yml refuses it.
+      - name: Attest the manifest
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: build-manifest.json
+
+      - name: Upload the manifest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-manifest-${{ steps.tree.outputs.tree }}
+          path: build-manifest.json
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true

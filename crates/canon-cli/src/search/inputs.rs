@@ -17,8 +17,9 @@
 
 use std::collections::BTreeSet;
 use std::path::Path;
+use std::sync::Arc;
 
-use canon_model::{paths, RecordKind};
+use canon_model::{paths, RawRecord, RecordKind};
 use canon_store::git_tier::GitTier;
 use canon_store::policy::{BackendConfig, TierPolicy};
 use canon_store::sqlite_tier::SqliteTier;
@@ -57,7 +58,9 @@ pub struct Version {
     pub at: String,
     /// Whether this is a version `canon query` reads (and so a node of the graph), not an archived one.
     pub current: bool,
-    pub body: Value,
+    /// The record's body: whole for a current version, one copy shared with the file cache; only
+    /// [`LOOP_FIELDS`] for an archived one.
+    pub body: Arc<RawRecord>,
 }
 
 /// One section, or one flow step, of a change's brief.
@@ -128,7 +131,7 @@ pub fn load(repo: &Path) -> Result<Corpus, InputError> {
     match crate::references::Sources::load(repo) {
         Ok(sources) => {
             for version in versions.iter().filter(|v| v.current && crate::references::is_checked(v.kind)) {
-                for found in sources.unresolved(version.kind, &version.body) {
+                for found in sources.unresolved(version.kind, &version.body.0) {
                     dangling.push(Dangling { kind: version.kind, key: version.key.clone(), digest: version.digest.clone(), field: found.field, target: found.target, id: found.id });
                 }
             }
@@ -167,28 +170,48 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// The fields of a record the review loop reads ([`super::graph`]'s `round_of`, `covers`, `about_same_scenario`
+/// and the items' columns): all an archived version, and an item, keeps of its body.
+const LOOP_FIELDS: [&str; 13] =
+    ["pin", "review_id", "evidence_sha", "reviewed_sha", "introduced_by", "resolution_sha", "disposition", "change_id", "round", "seq", "scenario_id", "project_id", "scenario_ids"];
+
+/// `body` cut down to [`LOOP_FIELDS`].
+pub fn loop_fields(body: &Value) -> Value {
+    Value::Object(LOOP_FIELDS.iter().filter_map(|field| body.get(*field).map(|value| ((*field).to_string(), value.clone()))).collect())
+}
+
+/// An archived version: its identity and [`LOOP_FIELDS`], the rest of the body dropped.
+fn archived_version(kind: RecordKind, raw: &RawRecord) -> Option<Version> {
+    let partition = canon_store::partition::resolve_partition(kind, &raw.0).ok()?;
+    let at = canon_store::tier::raw_record_at(raw).to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+    Some(Version { kind, key: partition.natural_key, digest: canon_store::partition::content_digest(&raw.0), at, current: false, body: Arc::new(RawRecord(loop_fields(&raw.0))) })
+}
+
 /// The ledger and hot-store records of every kind, and the archive's old versions of the traced kinds.
 fn read_records(repo: &Path, policy: &TierPolicy, unread: &mut BTreeSet<String>) -> Result<Vec<Version>, InputError> {
     let mut out = Vec::new();
     for kind in RecordKind::ALL {
         let Ok(rungs) = crate::tiers::tiers_needed_for(policy, kind) else { continue };
-        let mut rows: Vec<canon_model::RawRecord> = Vec::new();
-        let mut archived: Vec<canon_model::RawRecord> = Vec::new();
+        let mut rows: Vec<Arc<RawRecord>> = Vec::new();
+        let mut archived: Vec<Version> = Vec::new();
         for rung in rungs {
             let query = TierQuery::kind(kind);
             match policy.tiers.get(&rung) {
                 Some(BackendConfig::Git(cfg)) => {
                     let tier = GitTier::new(repo.join(&cfg.root));
-                    rows.extend(tier.read(&query).map_err(|e| unreadable(&format!("the `{}` records of the ledger at `{}`", kind.as_str(), tier.root().display()), e))?.records);
+                    rows.extend(tier.read_shared(&query).map_err(|e| unreadable(&format!("the `{}` records of the ledger at `{}`", kind.as_str(), tier.root().display()), e))?.records);
                     if TRACED_KINDS.contains(&kind) {
                         if let Some(archive) = tier.archive_tier() {
-                            archived.extend(archive.read(&query).map_err(|e| unreadable(&format!("the `{}` records of the archive at `{}`", kind.as_str(), archive.root().display()), e))?.records);
+                            // One version at a time: an archived body is not kept past its own fields.
+                            archive
+                                .visit(&query, |raw| archived.extend(archived_version(kind, &raw)))
+                                .map_err(|e| unreadable(&format!("the `{}` records of the archive at `{}`", kind.as_str(), archive.root().display()), e))?;
                         }
                     }
                 }
                 Some(BackendConfig::Sqlite(cfg)) => {
                     let tier = SqliteTier::connect_read_only(&cfg.path).map_err(|e| unreadable(&format!("the sqlite hot store at `{}`", cfg.path.display()), e))?;
-                    rows.extend(tier.read(&query).map_err(|e| unreadable(&format!("the `{}` records of the sqlite hot store at `{}`", kind.as_str(), cfg.path.display()), e))?.records);
+                    rows.extend(tier.read(&query).map_err(|e| unreadable(&format!("the `{}` records of the sqlite hot store at `{}`", kind.as_str(), cfg.path.display()), e))?.records.into_iter().map(Arc::new));
                 }
                 Some(other) => {
                     unread.insert(other.backend().as_str().to_string());
@@ -197,13 +220,14 @@ fn read_records(repo: &Path, policy: &TierPolicy, unread: &mut BTreeSet<String>)
             }
         }
         let current: BTreeSet<String> = crate::query::current_of(kind, rows.clone()).iter().map(|raw| canon_store::partition::content_digest(&raw.0)).collect();
-        for (raw, is_current) in rows.into_iter().map(|raw| (raw, None)).chain(archived.into_iter().map(|raw| (raw, Some(false)))) {
+        for raw in rows {
             let Ok(partition) = canon_store::partition::resolve_partition(kind, &raw.0) else { continue };
             let digest = canon_store::partition::content_digest(&raw.0);
-            let current = is_current.unwrap_or_else(|| current.contains(&digest));
+            let current = current.contains(&digest);
             let at = canon_store::tier::raw_record_at(&raw).to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
-            out.push(Version { kind, key: partition.natural_key, digest, at, current, body: raw.0 });
+            out.push(Version { kind, key: partition.natural_key, digest, at, current, body: raw });
         }
+        out.extend(archived);
     }
     Ok(out)
 }

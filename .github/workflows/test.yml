@@ -31,6 +31,14 @@ name: Test
 # request run never saves, so it cannot fill the repository's cache quota with a copy of main's. Every job has a `timeout-minutes` (three times the longest run
 # measured, rounded up to 5) and a pull request run is cancelled by the next push to the same pull request. The runners are pinned to `ubuntu-26.04`, the image
 # every time and size measured here comes from (the floating label moves to it between 2026-10-19 and 2026-11-19).
+#
+# Tested trees (0.44, `canon-0-44-ci-optimize`): a pull request run whose seven jobs (`offline`, `clippy`, `atip`, `bench-shape`, `launcher`, `platformer`,
+# `live-tier`) are all green ends with the job `record`, which uploads the artifact `tested-<tree of the merge ref>` (14 days). The first job `tested`
+# runs on every run; on a push to main it asks `scripts/ci-tested.py` whether that artifact exists for the tree of the pushed commit and came from a green
+# `pull_request` run of this repository's test.yml, and says so in its output `tested`. Only `true` (not `false`, not empty, not a failed job) makes the run a
+# seeding run: `launcher` and `platformer` do not run, and the five cache jobs restore their cache and, when the exact key was restored, end there; when it
+# was not, they build the dependencies and save them as above, and run none of the tests, the checks, the gate, the measurement or the docker stack
+# (`SEED` in each job's `env`). A pull request, a tree no pull request tested (a direct push, a base that moved on) and a manual run run everything.
 
 # `push` to main is included because canon's releases land as direct
 # pushes: a PR-only trigger never ran on them.
@@ -55,6 +63,7 @@ on:
       - "scripts/check_git_boundary.py"
       - ".github/workflows/test.yml"
       - "scripts/ci-strip-workspace-build.sh"
+      - "scripts/ci-tested.py"
       - "tools/atip-check/**"
   pull_request:
     paths:
@@ -75,6 +84,7 @@ on:
       - "scripts/check_git_boundary.py"
       - ".github/workflows/test.yml"
       - "scripts/ci-strip-workspace-build.sh"
+      - "scripts/ci-tested.py"
       - "tools/atip-check/**"
   workflow_dispatch:
 
@@ -92,9 +102,47 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Whether a green pull request run already tested the tree of this commit (see the top of this file). It never fails the run: an answer it cannot
+  # read is `false` and the tests run.
+  tested:
+    name: Is this tree already tested
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      tested: ${{ steps.tested.outputs.tested }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Ask for the record of this tree
+        id: tested
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          set -uo pipefail
+          if [ "$EVENT" = push ] && [ "$REF" = refs/heads/main ]; then
+            tree=$(git rev-parse 'HEAD^{tree}') || tree=
+            if [ -n "$tree" ]; then
+              python3 scripts/ci-tested.py --repo "$REPO" --tree "$tree" || echo "tested=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "tested=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "tested=false" >> "$GITHUB_OUTPUT"
+          fi
+
   offline:
     name: cargo test --workspace (offline)
     runs-on: ubuntu-26.04
+    needs: tested
+    if: ${{ !cancelled() }}
+    env:
+      SEED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true' }}
     # The longest run measured was 36.5 minutes; the limit is three times that, rounded up to 5.
     timeout-minutes: 110
     steps:
@@ -155,6 +203,7 @@ jobs:
       # (`query.rs` documents v1.5): a stale 1.1.3 pin made `canon report`
       # see zero result sets for a multi-statement batch and fail.
       - name: Install duckdb CLI
+        if: env.SEED != 'true'
         run: |
           set -euo pipefail
           DUCKDB_SHA256=6e89deac1ebbc36eed0291caf8b567b030c7b86ac35998f71854e22b3c5d5e2f
@@ -170,18 +219,33 @@ jobs:
       # (any Cargo.lock change) the cache is empty and resolution fails
       # before a single test runs, so fetch the locked set first.
       - name: cargo fetch --locked
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         run: cargo fetch --locked
 
       # The build of every test of the workspace, apart from the run: what is saved to the cache (on main) waits for this step and not for the tests,
       # so a failing test still leaves the dependencies' build behind. The run below finds everything built. A failed `cargo fetch` stops before it.
       - name: cargo test --workspace --no-run (build the tests)
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         id: build
         run: cargo test --workspace --locked --offline --no-run
 
+      # Canon gates its own spec corpus, before the tests: the gate reads the repository's `.canon` records and history, not what the tests write. Scenario
+      # records are regenerable (gitignored) so they are synced from `.canon/specs/` and `examples/platformer/specs/` first; evidence,
+      # findings, and subjects are tracked. This is the step that would have caught nine specced-but-unattested scenarios sitting red for
+      # two weeks while every test passed. A red gate stops the job before the tests run.
+      - name: canon gate check (canon's own corpus)
+        if: env.SEED != 'true'
+        run: |
+          set -euo pipefail
+          cargo build --locked --offline -p canon-cli
+          ./target/debug/canon inventory sync
+          ./target/debug/canon gate check
+
       # `CANON_WITNESS_DIR`: a debug `canon` records each JSON document it prints there (T9),
-      # and the next step holds the recording against the outputs the spec declares.
+      # and the witness step below holds the recording against the outputs the spec declares.
       # The tests of the checker (`atip check`) are the atip repo's: the `atip` crate and the checker are dependencies of canon, no member of this workspace.
       - name: cargo test --workspace
+        if: env.SEED != 'true'
         env:
           CANON_WITNESS_DIR: ${{ runner.temp }}/canon-witness
         run: |
@@ -191,28 +255,17 @@ jobs:
       # The unit tests under three callers (none, an implementer with an actor, an unknown role): a test that reads CANON_ROLE or CANON_ACTOR fails in one of them.
       # Only canon-cli has such tests, so only its lib runs here; the step above already runs every other crate's lib tests, which read no caller.
       - name: unit tests under three callers
+        if: env.SEED != 'true'
         run: |
           env -u CANON_ROLE -u CANON_ACTOR cargo test -p canon-cli --lib --locked --offline
           env CANON_ROLE=implementer CANON_ACTOR=impl-someone cargo test -p canon-cli --lib --locked --offline
           env -u CANON_ACTOR CANON_ROLE=no-such-role cargo test -p canon-cli --lib --locked --offline
 
       - name: every declared output was emitted by the suite (witness)
+        if: env.SEED != 'true'
         env:
           CANON_WITNESS_DIR: ${{ runner.temp }}/canon-witness
         run: cargo test -p canon-cli --locked --offline --test grammar_t9_witness -- --ignored
-
-      # Canon gates its own spec corpus. Scenario records are regenerable
-      # (gitignored) so they are synced from `.canon/specs/` and
-      # `examples/platformer/specs/` first; evidence,
-      # findings, and subjects are tracked. This is the step that would
-      # have caught nine specced-but-unattested scenarios sitting red for
-      # two weeks while every test passed.
-      - name: canon gate check (canon's own corpus)
-        run: |
-          set -euo pipefail
-          cargo build --locked --offline -p canon-cli
-          ./target/debug/canon inventory sync
-          ./target/debug/canon gate check
 
       # Main only, when no cache of this exact key was restored, and only after the build step succeeded: a failed test does not stop it, a failed
       # `cargo fetch` (before the build) does (see the top of this file).
@@ -245,6 +298,10 @@ jobs:
     name: clippy and visibility rule
     runs-on: ubuntu-26.04
     timeout-minutes: 10
+    needs: tested
+    if: ${{ !cancelled() }}
+    env:
+      SEED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -265,22 +322,28 @@ jobs:
             canon-test-clippy-deps-${{ hashFiles('rust-toolchain.toml') }}-
 
       - name: cargo fetch --locked
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         run: cargo fetch --locked
 
       - name: clippy, whole workspace with tests
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: clippy, libraries and binaries without unwrap
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         run: cargo clippy --workspace --lib --bins --locked -- -D warnings -D clippy::unwrap_used
 
       - name: clippy, canon-store live-tier tests
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         id: build
         run: cargo clippy -p canon-store --all-targets --features live-pg,live-r2 --locked -- -D warnings
 
       - name: no pub(super) or pub(in ..) in crate sources
+        if: env.SEED != 'true'
         run: scripts/check_visibility.sh
 
       - name: every git call goes through canon_store::git
+        if: env.SEED != 'true'
         run: python3 scripts/check_git_boundary.py
 
       # Main only, when no cache of this exact key was restored, and only after the last clippy run (the one that builds the most) succeeded (see the top of this file).
@@ -318,6 +381,10 @@ jobs:
     name: atip check --deep L2 (canon)
     runs-on: ubuntu-26.04
     timeout-minutes: 25
+    needs: tested
+    if: ${{ !cancelled() }}
+    env:
+      SEED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -340,30 +407,37 @@ jobs:
       # The checker is the pre-built `@journeykit/atip-check` (static binaries; the npm start file runs under node): its version and the sha512 of its platform
       # packages are the lockfile in `tools/atip-check/`, outside the root workspace. The job restores no bun cache, so the install checks the integrity values.
       - name: Setup Bun
+        if: env.SEED != 'true'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
 
       - name: Setup Node
+        if: env.SEED != 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "26"
 
       - name: Install the checker from the frozen lockfile
+        if: env.SEED != 'true'
         working-directory: tools/atip-check
         run: bun install --frozen-lockfile
 
       - name: The checker version
+        if: env.SEED != 'true'
         run: tools/atip-check/node_modules/.bin/atip --version
 
       - name: cargo fetch --locked
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         run: cargo fetch --locked
 
       - name: build the canon binary
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         id: build
         run: cargo build --locked --offline -p canon-cli
 
       - name: atip check, canon at L2
+        if: env.SEED != 'true'
         run: tools/atip-check/node_modules/.bin/atip check --bin target/debug/canon --level L2 --jobs 4 --deep --fixture crates/canon-cli/tests/atip/canon.fixture.json
 
       # Main only, when no cache of this exact key was restored, and only after the build step succeeded: a failed check does not stop it (see the top of this file).
@@ -397,6 +471,10 @@ jobs:
     name: corpus-size cost shape (release binary)
     runs-on: ubuntu-26.04
     timeout-minutes: 30
+    needs: tested
+    if: ${{ !cancelled() }}
+    env:
+      SEED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -417,22 +495,26 @@ jobs:
             canon-test-bench-shape-deps-${{ hashFiles('rust-toolchain.toml') }}-
 
       - name: cargo fetch --locked
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         run: cargo fetch --locked
 
       - name: cargo build --release -p canon-cli --bin canon
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         id: build
         run: cargo build --release --locked --offline -p canon-cli --bin canon
 
       - name: measure the small grid
+        if: env.SEED != 'true'
         env:
           TMPDIR: ${{ runner.temp }}
         run: python3 scripts/bench/run.py --canon target/release/canon --grid small --out "$RUNNER_TEMP/bench.tsv"
 
       - name: the shape holds (10x corpus costs at most 20x)
+        if: env.SEED != 'true'
         run: python3 scripts/bench/check_shape.py "$RUNNER_TEMP/bench.tsv" --max-factor 20
 
       - name: Upload the measurements
-        if: always()
+        if: ${{ always() && env.SEED != 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bench-shape-tsv
@@ -462,6 +544,8 @@ jobs:
     name: "@journeykit/canon launcher (bun test)"
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+    needs: tested
+    if: ${{ !cancelled() && !(github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -490,6 +574,8 @@ jobs:
     name: examples/platformer (vitest, one test per scenario)
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+    needs: tested
+    if: ${{ !cancelled() && !(github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -515,6 +601,10 @@ jobs:
     name: cargo test -p canon-store --features live-pg,live-r2 (docker-compose)
     runs-on: ubuntu-26.04
     timeout-minutes: 30
+    needs: tested
+    if: ${{ !cancelled() }}
+    env:
+      SEED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -535,20 +625,38 @@ jobs:
             canon-test-live-tier-deps-${{ hashFiles('rust-toolchain.toml') }}-
 
       # The build of both test runs below, before the stack starts: the dependencies' build is what is saved to the cache (on main), so it must not wait for the services.
-      - name: build the live-tier tests
+      # The images the stack needs are prepared at the same time (`postgres` is pulled, `minio` and `minio-init` are built from their Dockerfiles: a Go build), and
+      # the step waits for both at its end and fails when either failed. A seeding run (see the top of this file) prepares no images.
+      - name: build the live-tier tests and prepare the service images
         id: build
+        if: ${{ env.SEED != 'true' || steps.cache.outputs.cache-hit != 'true' }}
         run: |
           set -euo pipefail
+          pids=()
+          if [ "$SEED" != "true" ]; then
+            docker compose pull postgres &
+            pids+=($!)
+            docker compose build minio minio-init &
+            pids+=($!)
+          fi
           cargo test -p canon-store --features live-pg,live-r2 --locked --no-run
           cargo test -p canon-cli --test ledger_pg_live --locked --no-run
+          failed=0
+          for pid in ${pids[@]+"${pids[@]}"}; do
+            wait "$pid" || failed=1
+          done
+          exit "$failed"
 
       - name: docker compose up (postgres + minio)
+        if: env.SEED != 'true'
         run: docker compose up -d --wait postgres minio
 
       - name: docker compose up minio-init (create the `canon` bucket)
+        if: env.SEED != 'true'
         run: docker compose up minio-init
 
       - name: cargo test -p canon-store --features live-pg,live-r2
+        if: env.SEED != 'true'
         env:
           CANON_REQUIRE_LIVE: "1"
           CANON_PG_DSN: "postgres://canon:canon@127.0.0.1:55432/canon_v1"
@@ -559,6 +667,7 @@ jobs:
         run: cargo test -p canon-store --features live-pg,live-r2 --locked
 
       - name: cargo test -p canon-cli --test ledger_pg_live
+        if: env.SEED != 'true'
         env:
           CANON_REQUIRE_LIVE: "1"
           CANON_PG_DSN: "postgres://canon:canon@127.0.0.1:55432/canon_v1"
@@ -569,7 +678,7 @@ jobs:
         run: cargo test -p canon-cli --test ledger_pg_live --locked
 
       - name: docker compose down
-        if: always()
+        if: ${{ always() && env.SEED != 'true' }}
         run: docker compose down -v
 
       # Main only, when no cache of this exact key was restored, and only after the build step succeeded: a failed test does not stop it (see the top of this file).
@@ -589,3 +698,33 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: canon-test-live-tier-deps-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+
+  # The last job of a pull request run: when the seven jobs above are all green, the tree of this merge ref is recorded as tested (see the top of this
+  # file). Re-running failed jobs until they are green runs it again and replaces the marker. Nothing else uploads a `tested-` artifact.
+  record:
+    name: Record that this tree was tested
+    needs: [offline, clippy, atip, bench-shape, launcher, platformer, live-tier]
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read the tree this run tested
+        id: tree
+        run: echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - name: Write the record
+        env:
+          TREE: ${{ steps.tree.outputs.tree }}
+          RUN_ID: ${{ github.run_id }}
+        run: printf '{"tree":"%s","run":%s}\n' "$TREE" "$RUN_ID" > tested.json
+
+      - name: Upload the record
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tested-${{ steps.tree.outputs.tree }}
+          path: tested.json
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true

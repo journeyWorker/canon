@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-44",
+    "role": "reviewer",
+    "session_id": "01a1ef97-34bf-7767-be06-5477e9fd330a"
+  },
+  "at": "2026-11-18T17:09:03.975967761Z",
+  "change_id": "canon-0-44-release-build-once",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "disposition": "open",
+  "file_ref": "scripts/release-build.py:289-295",
+  "introduced_by": "f95e9941e79706c9bdd8fd67cfbb755cc557e6e0",
+  "kind": "finding",
+  "reviewed_sha": "26b3fae5e2102b0a936fdf9127cc159f9d68472d",
+  "reviewer": "rev-0-44",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "P3, I7b deviation, judged acceptable. git_shas() returns HEAD and every parent, so find also looks up the build-native runs of a non-merge commit's single parent. I7b limits the parent lookup to merge commits. Because of this, the scratch docs-only commit (parent c55d95011 has green runs) read tree_mismatch where the brief's Check expected no_run. A non-merge commit whose parent build is still running reads in_progress, although waiting will never produce its tree. Both verdicts fail closed, and the tree_mismatch prescription (`gh workflow run` that commit) is the right fix, so this does not block. Fix: either return the parents only when there are two or more (`shas[:1] if len(shas) == 2 else shas`), or amend I7b and the I12 table to say any commit's parents. Blast radius: verdict code and stderr hint only. Nothing is published either way.",
+  "worktree_dirty": false
+}

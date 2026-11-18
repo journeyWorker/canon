@@ -23,7 +23,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use canon_model::RecordKind;
 use serde_json::Value;
 
-use super::inputs::{BriefNode, Corpus, FeatureScenario, Version};
+use super::inputs::{loop_fields, BriefNode, Corpus, FeatureScenario, Version};
 
 /// A node of the graph.
 #[derive(Debug, Clone)]
@@ -66,6 +66,7 @@ pub struct Item {
     pub current: bool,
     /// The node this item is a version of, when the graph holds one.
     pub node: Option<String>,
+    /// The record's [`loop_fields`]: what the chain's rules read of it, not its body.
     pub body: Value,
 }
 
@@ -117,7 +118,7 @@ fn flatten(value: &Value, out: &mut Vec<String>) {
 }
 
 fn record_title(version: &Version) -> String {
-    let body = &version.body;
+    let body = &version.body.0;
     let pick = |field: &str| text(body, field);
     match version.kind {
         RecordKind::Finding => pick("summary"),
@@ -139,7 +140,7 @@ fn record_title(version: &Version) -> String {
 
 fn record_body(version: &Version) -> String {
     let mut lines = Vec::new();
-    flatten(&version.body, &mut lines);
+    flatten(&version.body.0, &mut lines);
     lines.join("\n")
 }
 
@@ -288,7 +289,7 @@ pub fn build(corpus: &Corpus) -> Graph {
             by_key.entry((target, version.key.clone())).or_default().push(id.clone());
         }
         if version.kind == RecordKind::Review {
-            if let Some(review_id) = text(&version.body, "review_id") {
+            if let Some(review_id) = text(&version.body.0, "review_id") {
                 reviews_by_id.entry(review_id).or_default().push(id.clone());
             }
         }
@@ -297,7 +298,7 @@ pub fn build(corpus: &Corpus) -> Graph {
         scenarios_by_id.entry(scenario.scenario_id.clone()).or_default().push((scenario.project.clone(), id.clone()));
     }
     for (id, version) in current.iter().filter(|(_, v)| v.kind == RecordKind::Scenario) {
-        if let (Some(project), Some(scenario_id)) = (text(&version.body, "project_id"), text(&version.body, "scenario_id")) {
+        if let (Some(project), Some(scenario_id)) = (text(&version.body.0, "project_id"), text(&version.body.0, "scenario_id")) {
             let entry = scenarios_by_id.entry(scenario_id).or_default();
             // The record's node and the file's node of one scenario are one scenario.
             if !entry.iter().any(|(p, _)| *p == project) {
@@ -310,7 +311,7 @@ pub fn build(corpus: &Corpus) -> Graph {
         if !nodes.contains_key(id) {
             continue;
         }
-        for reference in references_of(version.kind, &version.body) {
+        for reference in references_of(version.kind, &version.body.0) {
             let targets: Vec<String> = match reference.target {
                 Target::Scenario => scenarios_by_id.get(&reference.id).into_iter().flatten().filter(|(project, _)| reference.project.as_ref().is_none_or(|wanted| wanted == project)).map(|(_, node)| node.clone()).collect(),
                 Target::Review => reviews_by_id.get(&reference.id).cloned().unwrap_or_default(),
@@ -326,8 +327,8 @@ pub fn build(corpus: &Corpus) -> Graph {
 
     // A change_state also reaches the subjects of its change: the closing says which subjects stop requiring the change.
     for (id, version) in current.iter().filter(|(_, v)| v.kind == RecordKind::ChangeState) {
-        let Some(change) = text(&version.body, "change_id") else { continue };
-        let subjects: Vec<String> = current.iter().filter(|(_, v)| v.kind == RecordKind::Change && v.key == change).flat_map(|(_, v)| strings(&v.body, "subject_ids")).collect();
+        let Some(change) = text(&version.body.0, "change_id") else { continue };
+        let subjects: Vec<String> = current.iter().filter(|(_, v)| v.kind == RecordKind::Change && v.key == change).flat_map(|(_, v)| strings(&v.body.0, "subject_ids")).collect();
         for subject in subjects {
             for to in by_key.get(&(Target::Subject, subject)).into_iter().flatten() {
                 if nodes.contains_key(to) {
@@ -395,11 +396,11 @@ fn items_of(versions: &[Version], node_of: &HashMap<(RecordKind, &str, &str), St
     for version in versions {
         let id = format!("{}:{}", version.kind.as_str(), version.key);
         let node = node_of.get(&(version.kind, version.key.as_str(), version.digest.as_str())).cloned();
-        let body = &version.body;
+        let body = &version.body.0;
         match version.kind {
             RecordKind::Finding => findings.entry(version.key.as_str()).or_default().push(version),
-            RecordKind::Review => items.push(Item { id, kind: version.kind, role: "review", version: version.digest.clone(), at: version.at.clone(), sha: text(body, "pin").filter(|pin| is_sha(pin)), sha_alt: None, review_id: text(body, "review_id"), current: version.current, node, body: body.clone() }),
-            RecordKind::Evidence => items.push(Item { id, kind: version.kind, role: "evidence", version: version.digest.clone(), at: version.at.clone(), sha: text(body, "evidence_sha"), sha_alt: None, review_id: None, current: version.current, node, body: body.clone() }),
+            RecordKind::Review => items.push(Item { id, kind: version.kind, role: "review", version: version.digest.clone(), at: version.at.clone(), sha: text(body, "pin").filter(|pin| is_sha(pin)), sha_alt: None, review_id: text(body, "review_id"), current: version.current, node, body: loop_fields(body) }),
+            RecordKind::Evidence => items.push(Item { id, kind: version.kind, role: "evidence", version: version.digest.clone(), at: version.at.clone(), sha: text(body, "evidence_sha"), sha_alt: None, review_id: None, current: version.current, node, body: loop_fields(body) }),
             _ => {}
         }
     }
@@ -408,9 +409,11 @@ fn items_of(versions: &[Version], node_of: &HashMap<(RecordKind, &str, &str), St
         let id = format!("finding:{key}");
         let node = group.iter().find(|v| v.current).and_then(|v| node_of.get(&(v.kind, v.key.as_str(), v.digest.as_str())).cloned());
         let first = group[0];
-        items.push(Item { id: id.clone(), kind: RecordKind::Finding, role: "finding", version: first.digest.clone(), at: first.at.clone(), sha: text(&first.body, "reviewed_sha"), sha_alt: text(&first.body, "introduced_by"), review_id: text(&first.body, "review_id"), current: first.current, node: node.clone(), body: first.body.clone() });
-        if let Some(fixed) = group.iter().rev().find(|v| text(&v.body, "disposition").as_deref() == Some("fixed")) {
-            items.push(Item { id, kind: RecordKind::Finding, role: "fix", version: fixed.digest.clone(), at: fixed.at.clone(), sha: text(&fixed.body, "resolution_sha"), sha_alt: text(&fixed.body, "introduced_by"), review_id: text(&fixed.body, "review_id"), current: fixed.current, node, body: fixed.body.clone() });
+        let (first_body, fixed_body) = (&first.body.0, group.iter().rev().find(|v| text(&v.body.0, "disposition").as_deref() == Some("fixed")));
+        items.push(Item { id: id.clone(), kind: RecordKind::Finding, role: "finding", version: first.digest.clone(), at: first.at.clone(), sha: text(first_body, "reviewed_sha"), sha_alt: text(first_body, "introduced_by"), review_id: text(first_body, "review_id"), current: first.current, node: node.clone(), body: loop_fields(first_body) });
+        if let Some(fixed) = fixed_body {
+            let fixed_body = &fixed.body.0;
+            items.push(Item { id, kind: RecordKind::Finding, role: "fix", version: fixed.digest.clone(), at: fixed.at.clone(), sha: text(fixed_body, "resolution_sha"), sha_alt: text(fixed_body, "introduced_by"), review_id: text(fixed_body, "review_id"), current: fixed.current, node, body: loop_fields(fixed_body) });
         }
     }
     items.sort_by(|a, b| (&a.at, &a.id, a.role, &a.version).cmp(&(&b.at, &b.id, b.role, &b.version)));

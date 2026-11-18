@@ -103,13 +103,12 @@ class DashboardEmbedTests(unittest.TestCase):
     def workflow(self, name: str) -> str:
         return (ROOT.parent / ".github" / "workflows" / name).read_text(encoding="utf-8")
 
-    def test_accepts_the_shipped_workflows(self) -> None:
-        for name in ("build-native.yml", "publish.yml"):
-            self.assertEqual(CHECKER.dashboard_embed_errors(self.workflow(name), name), [])
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(CHECKER.dashboard_embed_errors(self.workflow("build-native.yml"), "build-native.yml"), [])
 
     def test_rejects_a_build_row_that_skips_the_hand_off(self) -> None:
-        text = self.workflow("publish.yml").replace("CANON_DASHBOARD_DIST:", "UNRELATED:")
-        errors = CHECKER.dashboard_embed_errors(text, "publish.yml")
+        text = self.workflow("build-native.yml").replace("CANON_DASHBOARD_DIST:", "UNRELATED:")
+        errors = CHECKER.dashboard_embed_errors(text, "build-native.yml")
         self.assertTrue(any("CANON_DASHBOARD_DIST" in error for error in errors), errors)
 
     def test_rejects_a_build_job_that_does_not_wait_for_the_app(self) -> None:
@@ -118,8 +117,8 @@ class DashboardEmbedTests(unittest.TestCase):
         self.assertTrue(errors)
 
     def test_rejects_a_second_build_of_the_app(self) -> None:
-        text = self.workflow("publish.yml") + "      - run: bun run --cwd packages/dashboard build\n"
-        errors = CHECKER.dashboard_embed_errors(text, "publish.yml")
+        text = self.workflow("build-native.yml") + "      - run: bun run --cwd packages/dashboard build\n"
+        errors = CHECKER.dashboard_embed_errors(text, "build-native.yml")
         self.assertTrue(errors)
 
 
@@ -326,145 +325,144 @@ class RunnerLabelTests(unittest.TestCase):
 
 
 class BuildRowTests(unittest.TestCase):
-    def rows(self, name: str = "publish.yml") -> list[dict[str, str]]:
-        return CHECKER.matrix_rows(CHECKER._job_block(workflow(name), "build"))
+    NAME = "build-native.yml"
+    X64_ROW = '            package_dir: core-linux-x64\n            binary_ext: ""\n'
+
+    def rows(self) -> list[dict[str, str]]:
+        return CHECKER.matrix_rows(CHECKER._job_block(workflow(self.NAME), "build"))
 
     def test_accepts_the_shipped_rows(self) -> None:
-        for name in ("build-native.yml", "publish.yml"):
-            self.assertEqual(CHECKER.build_row_errors(self.rows(name), name), [])
+        self.assertEqual(CHECKER.build_row_errors(self.rows(), self.NAME), [])
         self.assertEqual(len(self.rows()), 4)
 
-    def broken(self, name: str, old: str, new: str) -> list[str]:
-        text = mutate(workflow(name), old, new)
-        return CHECKER.build_row_errors(CHECKER.matrix_rows(CHECKER._job_block(text, "build")), name)
+    def broken(self, old: str, new: str) -> list[str]:
+        text = mutate(workflow(self.NAME), old, new)
+        return CHECKER.build_row_errors(CHECKER.matrix_rows(CHECKER._job_block(text, "build")), self.NAME)
 
     def test_rejects_a_linux_row_that_builds_gnu(self) -> None:
-        errors = self.broken("publish.yml", "target: x86_64-unknown-linux-musl", "target: x86_64-unknown-linux-gnu")
+        errors = self.broken("target: x86_64-unknown-linux-musl", "target: x86_64-unknown-linux-gnu")
         self.assertTrue(errors)
 
     def test_rejects_a_linux_row_on_the_wrong_architecture(self) -> None:
-        errors = self.broken("build-native.yml", "host: ubuntu-26.04-arm\n            target: aarch64-unknown-linux-musl", "host: ubuntu-26.04\n            target: aarch64-unknown-linux-musl")
+        errors = self.broken("host: ubuntu-26.04-arm\n            target: aarch64-unknown-linux-musl", "host: ubuntu-26.04\n            target: aarch64-unknown-linux-musl")
         self.assertTrue(errors)
 
     def test_rejects_a_missing_row(self) -> None:
-        errors = self.broken("publish.yml", "target: aarch64-unknown-linux-musl", "target: riscv64gc-unknown-linux-musl")
+        errors = self.broken("target: aarch64-unknown-linux-musl", "target: riscv64gc-unknown-linux-musl")
         self.assertTrue(errors)
 
     def test_the_aarch64_musl_row_must_have_the_64k_page_size(self) -> None:
-        errors = self.broken("publish.yml", '            lg_page: "16"\n', "")
+        errors = self.broken('            lg_page: "16"\n', "")
         self.assertTrue(errors)
-        errors = self.broken("build-native.yml", 'lg_page: "16"', 'lg_page: "14"')
+        errors = self.broken('lg_page: "16"', 'lg_page: "14"')
         self.assertTrue(errors)
 
     def test_the_x86_64_row_must_not_have_a_page_size(self) -> None:
-        errors = self.broken("publish.yml", '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n', '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n            lg_page: "16"\n')
+        errors = self.broken(self.X64_ROW, self.X64_ROW + '            lg_page: "16"\n')
         self.assertTrue(errors)
 
     def test_the_aarch64_musl_row_must_name_an_alpine_image(self) -> None:
-        image = f"            alpine_image: {alpine_image('publish.yml')}\n"
-        errors = self.broken("publish.yml", image, "")
+        image = f"            alpine_image: {alpine_image(self.NAME)}\n"
+        errors = self.broken(image, "")
         self.assertTrue(errors)
-        errors = self.broken("build-native.yml", f"alpine_image: {alpine_image('build-native.yml').split('@')[0]}@sha256:", "alpine_image: ubuntu:26.04@sha256:")
+        errors = self.broken(f"alpine_image: {alpine_image(self.NAME).split('@')[0]}@sha256:", "alpine_image: ubuntu:26.04@sha256:")
         self.assertTrue(errors)
 
     def test_the_x86_64_row_must_not_have_an_alpine_image(self) -> None:
-        errors = self.broken("publish.yml", '            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n', f'            package_name: "@journeykit/canon-core-linux-x64"\n            binary_ext: ""\n            alpine_image: {alpine_image("publish.yml")}\n')
+        errors = self.broken(self.X64_ROW, self.X64_ROW + f"            alpine_image: {alpine_image(self.NAME)}\n")
         self.assertTrue(errors)
 
     def test_the_alpine_image_is_pinned_by_digest(self) -> None:
-        image = alpine_image("publish.yml")
-        text = mutate(workflow("publish.yml"), image, image.split("@")[0])
-        errors = CHECKER.image_digest_errors(text, "publish.yml")
+        image = alpine_image(self.NAME)
+        text = mutate(workflow(self.NAME), image, image.split("@")[0])
+        errors = CHECKER.image_digest_errors(text, self.NAME)
         self.assertTrue(errors)
 
     def test_macos_and_windows_are_one_arch_each(self) -> None:
-        errors = self.broken("publish.yml", "target: aarch64-apple-darwin", "target: x86_64-apple-darwin")
+        errors = self.broken("target: aarch64-apple-darwin", "target: x86_64-apple-darwin")
         self.assertTrue(errors)
-        errors = self.broken("publish.yml", "target: x86_64-pc-windows-msvc", "target: aarch64-pc-windows-msvc")
+        errors = self.broken("target: x86_64-pc-windows-msvc", "target: aarch64-pc-windows-msvc")
         self.assertTrue(errors)
 
 
 class AlpineBuildTests(unittest.TestCase):
-    def test_accepts_the_shipped_workflows(self) -> None:
-        for name in ("build-native.yml", "publish.yml"):
-            self.assertEqual(CHECKER.alpine_build_errors(workflow(name), name), [])
+    NAME = "build-native.yml"
 
-    def test_both_workflows_name_the_same_image(self) -> None:
-        images = {name: re.search(r"alpine_image: (\S+)", workflow(name)).group(1) for name in ("build-native.yml", "publish.yml")}
-        self.assertEqual(len(set(images.values())), 1, images)
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(CHECKER.alpine_build_errors(workflow(self.NAME), self.NAME), [])
 
     def test_rejects_a_step_that_does_not_run_the_rows_image(self) -> None:
-        text = mutate(workflow("publish.yml"), '"$ALPINE_IMAGE" sh -s', "alpine:3.24 sh -s")
-        errors = CHECKER.alpine_build_errors(text, "publish.yml")
+        text = mutate(workflow(self.NAME), '"$ALPINE_IMAGE" sh -s', "alpine:3.24 sh -s")
+        errors = CHECKER.alpine_build_errors(text, self.NAME)
         self.assertTrue(errors)
 
     def test_rejects_a_step_that_does_not_mount_the_workspace(self) -> None:
-        text = mutate(workflow("build-native.yml"), '-v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \\\n', "")
-        self.assertTrue(CHECKER.alpine_build_errors(text, "build-native.yml"))
+        text = mutate(workflow(self.NAME), '-v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \\\n', "")
+        self.assertTrue(CHECKER.alpine_build_errors(text, self.NAME))
 
     def test_rejects_a_step_that_loses_the_page_size_or_the_dashboard(self) -> None:
-        text = mutate(workflow("publish.yml"), "-e CANON_DASHBOARD_DIST -e JEMALLOC_SYS_WITH_LG_PAGE ", "")
-        errors = CHECKER.alpine_build_errors(text, "publish.yml")
+        text = mutate(workflow(self.NAME), "-e CANON_DASHBOARD_DIST -e JEMALLOC_SYS_WITH_LG_PAGE ", "")
+        errors = CHECKER.alpine_build_errors(text, self.NAME)
         self.assertTrue(errors)
 
     def test_rejects_a_step_that_does_not_compare_the_toolchain(self) -> None:
-        text = mutate(workflow("publish.yml"), '[ "$got" != "$want" ]', "false")
-        self.assertTrue(CHECKER.alpine_build_errors(text, "publish.yml"))
+        text = mutate(workflow(self.NAME), '[ "$got" != "$want" ]', "false")
+        self.assertTrue(CHECKER.alpine_build_errors(text, self.NAME))
 
     def test_rejects_a_host_toolchain_install_on_the_alpine_row(self) -> None:
-        text = mutate(workflow("build-native.yml"), "        if: matrix.settings.alpine_image == ''\n", "")
-        self.assertTrue(CHECKER.alpine_build_errors(text, "build-native.yml"))
+        text = mutate(workflow(self.NAME), "        if: matrix.settings.alpine_image == ''\n", "")
+        self.assertTrue(CHECKER.alpine_build_errors(text, self.NAME))
 
 
 class JemallocTests(unittest.TestCase):
+    NAME = "build-native.yml"
+
     def check(self, text: str, cargo: str | None = None, main: str | None = None) -> list[str]:
         return CHECKER.jemalloc_errors(
             text,
-            "publish.yml",
+            self.NAME,
             cargo if cargo is not None else repo_file("crates/canon-cli/Cargo.toml"),
             main if main is not None else repo_file("crates/canon-cli/src/main.rs"),
         )
 
     def test_accepts_the_shipped_files(self) -> None:
-        for name in ("build-native.yml", "publish.yml"):
-            self.assertEqual(CHECKER.jemalloc_errors(workflow(name), name, repo_file("crates/canon-cli/Cargo.toml"), repo_file("crates/canon-cli/src/main.rs")), [])
+        self.assertEqual(self.check(workflow(self.NAME)), [])
 
     def test_rejects_the_dependency_outside_the_musl_table(self) -> None:
         cargo = repo_file("crates/canon-cli/Cargo.toml")
         moved = mutate(cargo, "[target.'cfg(target_env = \"musl\")'.dependencies]\ntikv-jemallocator = \"0.6\"\n", "")
         moved = mutate(moved, "[build-dependencies]", "[build-dependencies]\n").replace("[dependencies]\n", "[dependencies]\ntikv-jemallocator = \"0.6\"\n", 1)
-        errors = self.check(workflow("publish.yml"), cargo=moved)
+        errors = self.check(workflow(self.NAME), cargo=moved)
         self.assertTrue(errors)
 
     def test_rejects_the_allocator_on_every_target(self) -> None:
         main = mutate(repo_file("crates/canon-cli/src/main.rs"), '#[cfg(target_env = "musl")]\n#[global_allocator]', "#[global_allocator]")
-        errors = self.check(workflow("publish.yml"), main=main)
+        errors = self.check(workflow(self.NAME), main=main)
         self.assertTrue(errors)
 
     def test_rejects_a_build_step_that_does_not_pass_the_page_size(self) -> None:
-        text = mutate(workflow("publish.yml"), "JEMALLOC_SYS_WITH_LG_PAGE: ${{ matrix.settings.lg_page }}", "UNRELATED: 1")
+        text = mutate(workflow(self.NAME), "JEMALLOC_SYS_WITH_LG_PAGE: ${{ matrix.settings.lg_page }}", "UNRELATED: 1")
         errors = self.check(text)
         self.assertTrue(errors)
 
     def test_rejects_a_hardcoded_page_size(self) -> None:
-        text = workflow("publish.yml") + "      - run: JEMALLOC_SYS_WITH_LG_PAGE=16 cargo build\n"
+        text = workflow(self.NAME) + "      - run: JEMALLOC_SYS_WITH_LG_PAGE=16 cargo build\n"
         errors = self.check(text)
         self.assertTrue(errors)
 
 
 class MacosTargetTests(unittest.TestCase):
-    def test_accepts_the_shipped_workflows(self) -> None:
-        for name in ("build-native.yml", "publish.yml"):
-            self.assertEqual(CHECKER.macos_target_errors(CHECKER.top_level_env(workflow(name)), name), [])
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(CHECKER.macos_target_errors(CHECKER.top_level_env(workflow("build-native.yml")), "build-native.yml"), [])
 
     def test_rejects_another_value_or_none(self) -> None:
-        text = mutate(workflow("publish.yml"), 'MACOSX_DEPLOYMENT_TARGET: "15.0"', 'MACOSX_DEPLOYMENT_TARGET: "14.0"')
-        errors = CHECKER.macos_target_errors(CHECKER.top_level_env(text), "publish.yml")
-        self.assertTrue(any("14.0" in error for error in errors), errors)
+        text = mutate(workflow("build-native.yml"), 'MACOSX_DEPLOYMENT_TARGET: "15.0"', 'MACOSX_DEPLOYMENT_TARGET: "14.0"')
+        errors = CHECKER.macos_target_errors(CHECKER.top_level_env(text), "build-native.yml")
+        self.assertTrue(errors)
         text = mutate(workflow("build-native.yml"), '  MACOSX_DEPLOYMENT_TARGET: "15.0"\n', "")
         self.assertTrue(CHECKER.macos_target_errors(CHECKER.top_level_env(text), "build-native.yml"))
 
-    def test_the_two_workflows_must_agree(self) -> None:
+    def test_the_shipped_files_pass_the_checker(self) -> None:
         result = subprocess.run([sys.executable, str(ROOT / "check-release-workflow-safety.py")], capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("MACOSX_DEPLOYMENT_TARGET", CHECKER.REQUIRED_ENV)
@@ -484,7 +482,7 @@ class CrtStaticTests(unittest.TestCase):
 
     def test_rejects_a_workflow_rustflags(self) -> None:
         workflows = self.workflows()
-        workflows["publish.yml"] = mutate(workflows["publish.yml"], '  CARGO_INCREMENTAL: 0\n', '  CARGO_INCREMENTAL: 0\n  RUSTFLAGS: "-C target-cpu=native"\n', 1)
+        workflows["build-native.yml"] = mutate(workflows["build-native.yml"], '  CARGO_INCREMENTAL: 0\n', '  CARGO_INCREMENTAL: 0\n  RUSTFLAGS: "-C target-cpu=native"\n', 1)
         errors = CHECKER.crt_static_errors(repo_file(".cargo/config.toml"), workflows)
         self.assertTrue(errors)
         workflows["publish.yml"] = workflow("publish.yml") + "      - run: CARGO_BUILD_RUSTFLAGS=-Cx cargo build\n"
@@ -503,34 +501,33 @@ class BinaryCheckStepTests(unittest.TestCase):
             checker if checker is not None else repo_file("scripts/check-release-binary.py"),
         )
 
-    def test_accepts_the_shipped_workflows(self) -> None:
-        for name in ("build-native.yml", "publish.yml"):
-            self.assertEqual(self.check(name), [])
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check("build-native.yml"), [])
 
     def test_rejects_a_build_job_without_the_step(self) -> None:
-        text = mutate(workflow("publish.yml"), CHECKER.BINARY_CHECK_STEP, "Something else")
-        self.assertTrue(self.check("publish.yml", text))
+        text = mutate(workflow("build-native.yml"), CHECKER.BINARY_CHECK_STEP, "Something else")
+        self.assertTrue(self.check("build-native.yml", text))
 
     def test_rejects_a_step_that_does_not_name_the_row(self) -> None:
         text = mutate(workflow("build-native.yml"), '--target "${{ matrix.settings.target }}" "target', '"target')
         self.assertTrue(self.check("build-native.yml", text))
 
     def test_rejects_a_step_that_skips_a_row(self) -> None:
-        text = mutate(workflow("publish.yml"), f"      - name: {CHECKER.BINARY_CHECK_STEP}\n", f"      - name: {CHECKER.BINARY_CHECK_STEP}\n        if: matrix.settings.binary_ext == ''\n")
-        self.assertTrue(self.check("publish.yml", text))
+        text = mutate(workflow("build-native.yml"), f"      - name: {CHECKER.BINARY_CHECK_STEP}\n", f"      - name: {CHECKER.BINARY_CHECK_STEP}\n        if: matrix.settings.binary_ext == ''\n")
+        self.assertTrue(self.check("build-native.yml", text))
 
     def test_rejects_a_target_the_script_does_not_know(self) -> None:
         checker = mutate(repo_file("scripts/check-release-binary.py"), '"aarch64-apple-darwin": {"format"', '"aarch64-apple-ios": {"format"')
-        self.assertTrue(self.check("publish.yml", checker=checker))
+        self.assertTrue(self.check("build-native.yml", checker=checker))
 
     def test_rejects_a_container_build(self) -> None:
-        text = mutate(workflow("publish.yml"), "    timeout-minutes: 50\n    strategy:", "    timeout-minutes: 50\n    container: alpine:3.24\n    strategy:")
-        self.assertTrue(self.check("publish.yml", text))
+        text = mutate(workflow("build-native.yml"), "    timeout-minutes: 45\n    strategy:", "    timeout-minutes: 45\n    container: alpine:3.24\n    strategy:")
+        self.assertTrue(self.check("build-native.yml", text))
 
 
 class LauncherTests(unittest.TestCase):
     def rows(self) -> list[dict[str, str]]:
-        return CHECKER.matrix_rows(CHECKER._job_block(workflow("publish.yml"), "build"))
+        return CHECKER.matrix_rows(CHECKER._job_block(workflow("build-native.yml"), "build"))
 
     def manifests(self) -> dict[str, dict]:
         return {p.name: json.loads((p / "package.json").read_text()) for p in sorted((ROOT.parent / "packages").glob("core-*"))}
@@ -568,13 +565,17 @@ class LauncherTests(unittest.TestCase):
 
 class PackageSetTests(unittest.TestCase):
     def rows(self) -> list[dict[str, str]]:
-        return CHECKER.matrix_rows(CHECKER._job_block(workflow("publish.yml"), "build"))
+        return CHECKER.matrix_rows(CHECKER._job_block(workflow("build-native.yml"), "build"))
+
+    def names(self) -> dict[str, str]:
+        return {p.name: json.loads((p / "package.json").read_text())["name"] for p in sorted((ROOT.parent / "packages").glob("core-*"))}
 
     def check(self, text: str | None = None, bun_lock: str | None = None, optional: set[str] | None = None) -> list[str]:
         cli = json.loads(repo_file("packages/cli/package.json"))
         return CHECKER.package_set_errors(
             text if text is not None else workflow("publish.yml"),
             self.rows(),
+            self.names(),
             cli["name"],
             bun_lock if bun_lock is not None else repo_file("bun.lock"),
             optional if optional is not None else set(cli["optionalDependencies"]),
@@ -826,7 +827,7 @@ class DryRunSettingTests(unittest.TestCase):
         for spelling in ("NPM_CONFIG_DRY_RUN", "npm_config_dry_run", "npm_config_dry-run", "Npm_Config_Dry_Run"):
             job = mutate(workflow("publish.yml"), "    name: Publish npm packages\n", f"    name: Publish npm packages\n    env:\n      {spelling}: true\n")
             self.assertTrue(self.check(job), spelling)
-            top = mutate(workflow("publish.yml"), "  CARGO_INCREMENTAL: 0\n", f"  CARGO_INCREMENTAL: 0\n  {spelling}: true\n", 1)
+            top = mutate(workflow("publish.yml"), "permissions:\n  contents: read\n\njobs:", f"permissions:\n  contents: read\n\nenv:\n  {spelling}: true\n\njobs:", 1)
             self.assertTrue(self.check(top), spelling)
 
     def test_rejects_the_variable_on_another_step(self) -> None:
@@ -1175,6 +1176,372 @@ class TimeoutTests(unittest.TestCase):
     def test_rejects_a_limit_that_is_not_a_multiple_of_five(self) -> None:
         text = mutate(workflow("publish.yml"), "    timeout-minutes: 15\n", "    timeout-minutes: 12\n", 1)
         self.assertTrue(CHECKER.timeout_errors(text, "publish.yml"))
+
+
+class NoCompileTests(unittest.TestCase):
+    """publish.yml compiles nothing: builds belong to build-native.yml."""
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.no_compile_errors(text if text is not None else workflow("publish.yml"), "publish.yml")
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_compile_step_a_toolchain_install_or_a_dashboard_build(self) -> None:
+        for line in (
+            "      - run: cargo build --locked --release\n",
+            "      - run: rustup default stable\n",
+            "      - run: rustc --version\n",
+            "      - uses: ./.github/actions/setup-rust\n",
+            "      - run: bun run --cwd packages/dashboard build\n",
+        ):
+            self.assertTrue(self.check(workflow("publish.yml") + line), line)
+
+    def test_rejects_a_build_matrix_row_and_a_build_job(self) -> None:
+        self.assertTrue(self.check(workflow("publish.yml") + "          - host: macos-15\n"))
+        for job in ("build", "dashboard", "man"):
+            self.assertTrue(self.check(workflow("publish.yml") + f"\n  {job}:\n    runs-on: ubuntu-26.04\n    steps: []\n"), job)
+
+    def test_rejects_a_build_setting_in_the_top_level_env(self) -> None:
+        for key in ("CARGO_INCREMENTAL: 0", 'MACOSX_DEPLOYMENT_TARGET: "15.0"', "CARGO_TERM_COLOR: always"):
+            text = mutate(workflow("publish.yml"), "permissions:\n  contents: read\n\njobs:", f"permissions:\n  contents: read\n\nenv:\n  {key}\n\njobs:", 1)
+            self.assertTrue(self.check(text), key)
+
+    def test_a_comment_that_names_them_is_not_a_compile(self) -> None:
+        self.assertEqual(self.check(workflow("publish.yml") + "      # cargo build and rustc are not run here\n"), [])
+
+
+class FetchBuildTests(unittest.TestCase):
+    """`fetch-build` finds the run, downloads with its id and a token, verifies, reads every floor, then uploads."""
+
+    RUN_ID = "          run-id: ${{ steps.find.outputs.run_id }}\n"
+    REPOSITORY = "          repository: ${{ github.repository }}\n"
+    FLOOR = "      - name: Check the binary keeps the floor of its platform\n"
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.fetch_build_errors(text if text is not None else workflow("publish.yml"), "publish.yml")
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_download_without_the_run_the_token_or_the_repository(self) -> None:
+        publish = workflow("publish.yml")
+        for line in (self.RUN_ID, "          github-token: ${{ github.token }}\n", self.REPOSITORY):
+            self.assertTrue(self.check(mutate(publish, line, "", 1)), line)
+
+    def test_rejects_a_digest_mismatch_that_is_not_an_error(self) -> None:
+        text = mutate(workflow("publish.yml"), self.REPOSITORY, self.REPOSITORY + "          digest-mismatch: ignore\n", 1)
+        self.assertTrue(self.check(text))
+        text = mutate(workflow("publish.yml"), self.REPOSITORY, self.REPOSITORY + "          digest-mismatch: error\n", 1)
+        self.assertEqual(self.check(text), [])
+
+    def test_rejects_a_missing_floor_step_and_a_missing_target(self) -> None:
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), self.FLOOR, "      - name: Something else\n", 1)))
+        line = "          python3 scripts/check-release-binary.py --target x86_64-pc-windows-msvc build/canon-binary-x86_64-pc-windows-msvc/canon.exe\n"
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), line, "", 1)))
+
+    def test_rejects_a_condition_on_the_floor_step(self) -> None:
+        self.assertTrue(self.check(mutate(workflow("publish.yml"), self.FLOOR, self.FLOOR + "        if: always()\n", 1)))
+
+    def test_the_page_size_is_skipped_for_the_aarch64_musl_row_alone(self) -> None:
+        publish = workflow("publish.yml")
+        self.assertTrue(self.check(mutate(publish, "--target aarch64-unknown-linux-musl --page-size skip ", "--target aarch64-unknown-linux-musl ", 1)))
+        self.assertTrue(self.check(mutate(publish, "--target x86_64-unknown-linux-musl build/", "--target x86_64-unknown-linux-musl --page-size skip build/", 1)))
+
+    def test_rejects_a_smoke_floor_check_that_skips_the_page_size_or_is_missing(self) -> None:
+        publish = workflow("publish.yml")
+        self.assertTrue(self.check(mutate(publish, '--target "${{ matrix.settings.target }}" smoke-bin/canon', '--target "${{ matrix.settings.target }}" --page-size skip smoke-bin/canon')))
+        self.assertTrue(self.check(mutate(publish, '          python3 scripts/check-release-binary.py --target "${{ matrix.settings.target }}" smoke-bin/canon\n', "          true\n")))
+
+    def test_rejects_a_job_that_waits_for_build_or_not_for_fetch_build(self) -> None:
+        publish = workflow("publish.yml")
+        self.assertTrue(self.check(mutate(publish, "    needs: [read-version, fetch-build]\n", "    needs: [read-version, build]\n", 1)))
+        self.assertTrue(self.check(mutate(publish, "    needs: [read-version, fetch-build]\n", "    needs: [read-version]\n")))
+
+    def test_rejects_wider_permissions_or_a_missing_read(self) -> None:
+        publish = workflow("publish.yml")
+        self.assertTrue(self.check(mutate(publish, "      actions: read\n", "")))
+        self.assertTrue(self.check(mutate(publish, "      attestations: read\n", "      attestations: write\n")))
+
+    def test_rejects_a_limit_or_runner_that_is_not_the_rule(self) -> None:
+        publish = workflow("publish.yml")
+        self.assertTrue(self.check(mutate(publish, "    timeout-minutes: 10\n", "    timeout-minutes: 15\n", 1)))
+        self.assertTrue(self.check(mutate(publish, "    name: Fetch the binaries of the build-native run\n    needs: read-version\n    runs-on: ubuntu-26.04\n", "    name: Fetch the binaries of the build-native run\n    needs: read-version\n    runs-on: ubuntu-26.04-arm\n")))
+
+    def test_rejects_an_upload_before_the_verification(self) -> None:
+        publish = workflow("publish.yml")
+        verify = "      - name: Verify the download against the attested manifest\n"
+        self.assertTrue(self.check(mutate(publish, verify, "      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n        with:\n          name: man-pages\n          path: build/man-pages\n          retention-days: 7\n" + verify, 1)))
+
+
+class ArtifactContractTests(unittest.TestCase):
+    """What build-native.yml uploads and what publish.yml downloads from it are one set of names."""
+
+    def check(self, build: str | None = None, publish: str | None = None) -> list[str]:
+        return CHECKER.artifact_contract_errors(build if build is not None else workflow("build-native.yml"), publish if publish is not None else workflow("publish.yml"))
+
+    def test_accepts_the_shipped_workflows(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_an_upload_that_is_not_the_contract(self) -> None:
+        self.assertTrue(self.check(build=mutate(workflow("build-native.yml"), "          name: man-pages\n", "          name: man-page\n")))
+        self.assertTrue(self.check(build=mutate(workflow("build-native.yml"), "          name: build-manifest-${{ steps.tree.outputs.tree }}\n", "          name: manifest-${{ steps.tree.outputs.tree }}\n")))
+
+    def test_rejects_a_download_the_build_does_not_upload(self) -> None:
+        publish = workflow("publish.yml")
+        self.assertTrue(self.check(publish=mutate(publish, "          name: man-pages\n          path: build/man-pages\n          run-id", "          name: manpages\n          path: build/man-pages\n          run-id")))
+        self.assertTrue(self.check(publish=mutate(publish, "          name: build-manifest-${{ steps.find.outputs.tree }}\n", "          name: manifest-${{ steps.find.outputs.tree }}\n")))
+
+    def test_rejects_a_later_job_that_downloads_what_fetch_build_does_not_upload(self) -> None:
+        publish = workflow("publish.yml")
+        text = mutate(publish, "          name: canon-binary-x86_64-pc-windows-msvc\n          path: packages/core-win32-x64/bin", "          name: canon-binary-riscv64\n          path: packages/core-win32-x64/bin")
+        self.assertTrue(self.check(publish=text))
+
+
+class RetentionTests(unittest.TestCase):
+    def build(self, text: str | None = None) -> list[str]:
+        return CHECKER.retention_errors(text if text is not None else workflow("build-native.yml"), "build-native.yml", CHECKER.BUILD_RETENTION)
+
+    def publish(self, text: str | None = None) -> list[str]:
+        return CHECKER.retention_errors(text if text is not None else workflow("publish.yml"), "publish.yml", CHECKER.PUBLISH_RETENTION)
+
+    def test_accepts_the_shipped_workflows(self) -> None:
+        self.assertEqual(self.build(), [])
+        self.assertEqual(self.publish(), [])
+
+    def test_rejects_an_upload_without_a_retention(self) -> None:
+        self.assertTrue(self.build(mutate(workflow("build-native.yml"), "          retention-days: 14\n", "", 1)))
+        self.assertTrue(self.publish(mutate(workflow("publish.yml"), "          retention-days: 30\n", "")))
+        self.assertTrue(self.publish(mutate(workflow("publish.yml"), "          retention-days: 7\n", "", 1)))
+
+    def test_rejects_a_retention_that_is_not_the_rule(self) -> None:
+        self.assertTrue(self.build(mutate(workflow("build-native.yml"), "          retention-days: 1\n", "          retention-days: 30\n")))
+        self.assertTrue(self.build(mutate(workflow("build-native.yml"), "          retention-days: 14\n", "          retention-days: 90\n", 1)))
+        self.assertTrue(self.publish(mutate(workflow("publish.yml"), "          retention-days: 30\n", "          retention-days: 7\n")))
+
+
+class ManifestJobTests(unittest.TestCase):
+    ATTEST_IF = "        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\n"
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.manifest_job_errors(text if text is not None else workflow("build-native.yml"), "build-native.yml")
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_workflow_without_the_job(self) -> None:
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), "  manifest:\n", "  manifested:\n")))
+
+    def test_rejects_a_job_that_does_not_wait_for_the_builds(self) -> None:
+        for needs in ("[scope, man]", "[scope, build]"):
+            self.assertTrue(self.check(mutate(workflow("build-native.yml"), "    needs: [scope, build, man]\n", f"    needs: {needs}\n")), needs)
+
+    def test_rejects_a_job_without_the_attestation_permissions(self) -> None:
+        for scope in ("id-token", "attestations"):
+            self.assertTrue(self.check(mutate(workflow("build-native.yml"), f"      {scope}: write\n", "")), scope)
+
+    def test_rejects_the_attestation_permissions_anywhere_else(self) -> None:
+        job = "    name: Generate man pages\n"
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), job, job + "    permissions:\n      id-token: write\n")))
+        self.assertTrue(self.check(mutate(workflow("build-native.yml"), "permissions:\n  contents: read\n\n# A new push", "permissions:\n  contents: read\n  attestations: write\n\n# A new push")))
+
+    def test_rejects_an_attest_step_that_is_missing_unpinned_or_runs_for_forks(self) -> None:
+        build = workflow("build-native.yml")
+        self.assertTrue(self.check(mutate(build, self.ATTEST_IF, "")))
+        self.assertTrue(self.check(mutate(build, "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8", "actions/attest-build-provenance@v4")))
+        self.assertTrue(self.check(mutate(build, "      - name: Attest the manifest\n", "      - name: Do not attest the manifest\n").replace("actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8", "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9")))
+
+    def test_rejects_a_manifest_that_is_not_recorded_or_not_named_by_the_tree(self) -> None:
+        build = workflow("build-native.yml")
+        self.assertTrue(self.check(mutate(build, "release-build.py record", "release-build.py noted")))
+        self.assertTrue(self.check(mutate(build, "          name: build-manifest-${{ steps.tree.outputs.tree }}\n", "          name: manifest\n")))
+
+    def test_the_job_follows_the_scope_rule(self) -> None:
+        build = workflow("build-native.yml")
+        self.assertTrue(CHECKER.scope_errors(mutate(build, "    needs: [scope, build, man]\n", "    needs: [build, man]\n"), "build-native.yml"))
+        self.assertTrue(CHECKER.scope_errors(with_job_field(build, "manifest", "if", None), "build-native.yml"))
+
+
+def with_job_field(text: str, job: str, key: str, value: str | None) -> str:
+    """`text` with the one-line key of a job (4-space indent) set to `value`, or removed when `value` is None."""
+    block = CHECKER._job_block(text, job)
+    replacement = "" if value is None else f"    {key}: {value}"
+    changed = re.sub(rf"^    {re.escape(key)}:.*(?:\n|$)", replacement + ("\n" if replacement else ""), block, count=1, flags=re.MULTILINE)
+    if changed == block:
+        raise AssertionError(f"job {job} has no `{key}` to change")
+    return text.replace(block, changed, 1)
+
+
+def swap_steps(text: str, job: str, first: str, second: str) -> str:
+    """`text` with the two steps of a job that contain `first` and `second` in each other's place."""
+    block = CHECKER._job_block(text, job)
+    steps = CHECKER._steps(block)
+    a = next(i for i, step in enumerate(steps) if first in step)
+    b = next(i for i, step in enumerate(steps) if second in step)
+    steps[a], steps[b] = steps[b], steps[a]
+    return text.replace(block, "\n".join(steps), 1)
+
+
+BUILD_SCOPE_SPEC = importlib.util.spec_from_file_location("build_scope", ROOT / "build-scope.py")
+assert BUILD_SCOPE_SPEC and BUILD_SCOPE_SPEC.loader
+BUILD_SCOPE = importlib.util.module_from_spec(BUILD_SCOPE_SPEC)
+BUILD_SCOPE_SPEC.loader.exec_module(BUILD_SCOPE)
+
+
+class ModeJobTests(unittest.TestCase):
+    """`man` and `manifest` run only in a release (or an unnamed mode); `dashboard` and `build` run in every mode."""
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.mode_job_errors(text if text is not None else workflow("build-native.yml"), "build-native.yml")
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_accepts_a_condition_that_reads_the_same(self) -> None:
+        condition = "needs.scope.outputs.skip != 'true' && !(needs.scope.outputs.mode == 'quick' || needs.scope.outputs.mode == 'native')"
+        self.assertEqual(self.check(with_job_field(workflow("build-native.yml"), "man", "if", condition)), [])
+
+    def test_rejects_man_or_manifest_without_the_mode_condition(self) -> None:
+        for job in ("man", "manifest"):
+            self.assertTrue(self.check(with_job_field(workflow("build-native.yml"), job, "if", "needs.scope.outputs.skip != 'true'")), job)
+
+    def test_rejects_manifest_or_man_that_runs_in_quick_or_native_only_in_part(self) -> None:
+        for job in ("man", "manifest"):
+            for condition in (
+                "needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode != 'quick'",
+                "needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode != 'native'",
+            ):
+                self.assertTrue(self.check(with_job_field(workflow("build-native.yml"), job, "if", condition)), (job, condition))
+
+    def test_rejects_a_release_condition_that_skips_an_unknown_mode(self) -> None:
+        for job in ("man", "manifest"):
+            self.assertTrue(self.check(with_job_field(workflow("build-native.yml"), job, "if", "needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode == 'release'")), job)
+
+    def test_rejects_a_mode_condition_on_the_dashboard_or_the_build(self) -> None:
+        for job in ("dashboard", "build"):
+            self.assertTrue(self.check(with_job_field(workflow("build-native.yml"), job, "if", "needs.scope.outputs.skip != 'true' && needs.scope.outputs.mode != 'quick'")), job)
+
+
+class MatrixModeTests(unittest.TestCase):
+    """The rows `build` runs by mode: one for `quick`, four for the others."""
+
+    NAME = "build-native.yml"
+
+    def check(self, text: str | None = None, exclude_for=BUILD_SCOPE.exclude_for) -> list[str]:
+        return CHECKER.matrix_mode_errors(text if text is not None else workflow(self.NAME), self.NAME, exclude_for)
+
+    def test_accepts_the_shipped_workflow_and_script(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_quick_run_that_builds_four_rows(self) -> None:
+        self.assertTrue(self.check(exclude_for=lambda mode: []))
+
+    def test_rejects_a_release_or_native_or_unnamed_mode_that_leaves_a_row_out(self) -> None:
+        for left_out in ("release", "native", "no-such-mode", ""):
+            self.assertTrue(self.check(exclude_for=lambda mode, left_out=left_out: BUILD_SCOPE.QUICK_EXCLUDE if mode in ("quick", left_out) else []), left_out)
+
+    def test_rejects_a_matrix_that_does_not_read_the_exclude_the_scope_writes(self) -> None:
+        text = re.sub(r"^        exclude:.*\n", "", workflow(self.NAME), flags=re.MULTILINE)
+        self.assertTrue(self.check(text))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "fromJSON(needs.scope.outputs.exclude", "fromJSON(needs.scope.outputs.other")))
+
+    def test_rejects_a_row_the_quick_run_would_also_build(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), '            quick: "false"\n', "", 1)))
+
+
+class CacheSaveTests(unittest.TestCase):
+    """`build` and `man` restore in every run and save in a `release/` pull request run or a manual run, after cleaning."""
+
+    NAME = "build-native.yml"
+    RELEASE_OR_MANUAL = "(startsWith(github.head_ref, 'release/') || github.event_name == 'workflow_dispatch')"
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.cache_save_errors(text if text is not None else workflow(self.NAME), self.NAME)
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_save_that_runs_in_every_pull_request(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), self.RELEASE_OR_MANUAL, "true")))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        if: ${{ steps.cache.outputs.cache-hit != 'true' && steps.strip.outcome == 'success' && " + self.RELEASE_OR_MANUAL + " }}\n", "")))
+
+    def test_rejects_a_save_that_leaves_out_the_manual_run(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), self.RELEASE_OR_MANUAL, "startsWith(github.head_ref, 'release/')")))
+
+    def test_rejects_a_save_that_leaves_out_the_release_pull_request(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), self.RELEASE_OR_MANUAL, "github.event_name == 'workflow_dispatch'")))
+
+    def test_rejects_a_save_that_does_not_need_the_clean_step_to_succeed(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "steps.strip.outcome == 'success' && ", "")))
+
+    def test_rejects_a_save_that_saves_over_an_exact_restore(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "steps.cache.outputs.cache-hit != 'true' && steps.strip.outcome", "steps.strip.outcome")))
+
+    def test_rejects_a_save_before_the_clean_step(self) -> None:
+        for job in ("build", "man"):
+            self.assertTrue(self.check(swap_steps(workflow(self.NAME), job, "actions/cache/save@", "ci-strip-workspace-build.sh")), job)
+
+    def test_rejects_a_clean_or_save_that_can_fail_the_job(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        continue-on-error: true\n", "", 1)))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        continue-on-error: true\n", "")))
+
+    def test_rejects_a_clean_step_the_save_cannot_read(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        id: strip\n", "        id: clean\n")))
+
+    def test_rejects_a_restore_that_does_not_run_in_every_run(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "        id: cache\n", "        id: cache\n        if: github.event_name != 'pull_request'\n")))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "actions/cache/restore@", "actions/cache@")))
+
+
+class TestedTests(unittest.TestCase):
+    """test.yml: `tested` reads the artifacts, a seeding run is a push to main of a tree it says `true` of, `record` is the one uploader."""
+
+    NAME = "test.yml"
+    SEED = "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested == 'true' }}"
+
+    def check(self, text: str | None = None) -> list[str]:
+        return CHECKER.tested_errors(text if text is not None else workflow(self.NAME), self.NAME)
+
+    def test_accepts_the_shipped_workflow(self) -> None:
+        self.assertEqual(self.check(), [])
+
+    def test_rejects_a_tested_job_that_cannot_read_the_artifacts_or_can_write(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "      actions: read\n", "")))
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "      actions: read\n", "      actions: write\n")))
+
+    def test_rejects_a_job_that_does_not_wait_for_tested(self) -> None:
+        for job in ("offline", "launcher", "live-tier"):
+            self.assertTrue(self.check(with_job_field(workflow(self.NAME), job, "needs", "[]")), job)
+
+    def test_rejects_a_job_that_runs_in_a_seeding_run_though_it_must_not(self) -> None:
+        for job in ("launcher", "platformer"):
+            self.assertTrue(self.check(with_job_field(workflow(self.NAME), job, "if", "${{ !cancelled() }}")), job)
+
+    def test_rejects_a_job_that_does_not_run_when_the_answer_is_not_true(self) -> None:
+        for job in ("launcher", "platformer"):
+            self.assertTrue(self.check(with_job_field(workflow(self.NAME), job, "if", "${{ !cancelled() && needs.tested.outputs.tested == 'false' }}")), job)
+        self.assertTrue(self.check(with_job_field(workflow(self.NAME), "offline", "if", "${{ needs.tested.result == 'success' }}")))
+
+    def test_rejects_a_seeding_run_that_is_not_a_push_to_main_of_a_tested_tree(self) -> None:
+        build = workflow(self.NAME)
+        for seed in (
+            "${{ needs.tested.outputs.tested == 'true' }}",
+            "${{ github.event_name == 'push' && needs.tested.outputs.tested == 'true' }}",
+            "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.tested.outputs.tested != 'false' }}",
+            "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}",
+        ):
+            self.assertTrue(self.check(mutate(build, "      SEED: " + self.SEED + "\n", "      SEED: " + seed + "\n", 1)), seed)
+
+    def test_rejects_a_record_that_does_not_wait_for_every_job_or_runs_for_more_than_a_pull_request(self) -> None:
+        self.assertTrue(self.check(with_job_field(workflow(self.NAME), "record", "needs", "[offline, clippy]")))
+        for condition in ("${{ github.event_name != 'workflow_dispatch' }}", "${{ always() }}", "true"):
+            self.assertTrue(self.check(with_job_field(workflow(self.NAME), "record", "if", condition)), condition)
+
+    def test_rejects_a_record_that_does_not_replace_the_marker_and_another_job_that_uploads_one(self) -> None:
+        self.assertTrue(self.check(mutate(workflow(self.NAME), "          overwrite: true\n", "")))
+        step = "      - name: Install workspace dependencies from the frozen lockfile\n"
+        text = mutate(workflow(self.NAME), step, "      - uses: actions/upload-artifact@x\n        with:\n          name: tested-x\n" + step, 1)
+        self.assertTrue(self.check(text))
 
 
 if __name__ == "__main__":

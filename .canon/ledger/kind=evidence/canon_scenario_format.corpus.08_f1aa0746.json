@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:44:43.679291570Z",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --lib -- provenance_comment_in_contiguous_tag_comment_block_above_header_is_detected blank_line_between_leading_comment_and_header_breaks_provenance"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-fmt --lib -- provenance_comment_in_contiguous_tag_comment_block_above_header_is_detected blank_line_between_leading_comment_and_header_breaks_provenance: passes in the workspace nextest run at 21c235635 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 143,
+  "scenario_id": "format.corpus.08",
+  "schema": 1,
+  "staging_id": "e0b88ede",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

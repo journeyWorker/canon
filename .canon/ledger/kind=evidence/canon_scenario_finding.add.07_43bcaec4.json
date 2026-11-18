@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:43:48.931341300Z",
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib outside_a_git_checkout_the_add_is_refused"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --lib outside_a_git_checkout_the_add_is_refused: passes in the workspace nextest run at 21c235635 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 756,
+  "scenario_id": "finding.add.07",
+  "schema": 1,
+  "staging_id": "0c8f371f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,153 @@
+{
+  "actor": {
+    "agent_id": "impl-0-44",
+    "role": "implementer",
+    "session_id": "s-0-44-impl"
+  },
+  "at": "2026-11-18T16:35:07.811204886Z",
+  "attachments": [
+    {
+      "case": "atip_codeexit_01_an_exit_2_error_cannot_be_emitted_with_data",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_a_pre_0_17_spec_root_is_exit_2_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_a_subject_move_the_gate_refuses_for_another_rule_is_subject_invalid",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_a_divergence_the_gate_refuses_is_exit_2_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_a_policy_edited_after_its_approval_refuses_the_ship_with_exit_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_every_code_of_the_table_is_run_here",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_evidence_stale_is_the_registrys_exit_2",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_context_git_required_is_exit_2_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_context_object_conflict_is_exit_2_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_ingest_source_invalid_is_exit_2_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_a_subject_move_without_its_approval_is_exit_2_and_changes_no_status",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_dispatch_run_unavailable_is_exit_2_retryable_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_gate_promote_with_a_refused_record_is_exit_2_and_leaves_it_staged",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_the_strategy_refusals_are_exit_2_and_write_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_the_dashboard_refusals_are_exit_2_and_write_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_the_task_evidence_refusals_are_exit_2_and_write_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_the_evidence_add_refusals_are_exit_2_and_write_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    },
+    {
+      "case": "atip_codeexit_01_the_brief_and_the_task_refusals_are_exit_2_and_write_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "a059525b85992a6d09dd04d5c12164e313b5fa16fe1d780a34efe23ea590f1cd"
+    }
+  ],
+  "code_tree": "6bf35c37d653755b05ba9bf271ec9d13ff6bf414",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3984 passed, 1 skipped) from the clean tree at 21c235635, --rev 21c235635, Rust 1.100.0"
+  },
+  "evidence_sha": "21c2356352085c53c5e70cf6766b214460713bfa",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 355,
+  "scenario_id": "atip.codeexit.01",
+  "schema": 1,
+  "staging_id": "130ec13e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
