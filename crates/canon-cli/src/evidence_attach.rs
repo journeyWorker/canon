@@ -1477,7 +1477,7 @@ mod tests {
     }
 
     #[test]
-    fn binding_refusals_are_errors_and_keep_their_cause() {
+    fn binding_refusals_are_errors() {
         parse_report_spec("junit").unwrap_err();
         parse_report_spec("tap:a.tap").unwrap_err();
         parse_report_spec("junit:").unwrap_err();

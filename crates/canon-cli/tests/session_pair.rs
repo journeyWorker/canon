@@ -108,7 +108,7 @@ fn an_option_the_leaf_lacks_is_a_usage_error_with_and_without_input() {
 }
 
 #[test]
-fn an_unknown_option_hint_lists_what_the_leaf_takes_and_rules_out_attribution_on_a_read_leaf() {
+fn an_unknown_option_is_refused_with_the_leaf_options_expected_and_names_attribution_on_a_read_leaf() {
     let dir = repo();
     let repo = dir.path();
     let refused = |args: &[&str]| -> Value {
@@ -116,7 +116,7 @@ fn an_unknown_option_hint_lists_what_the_leaf_takes_and_rules_out_attribution_on
         assert_eq!(out.status.code(), Some(2), "{args:?}");
         serde_json::from_slice::<Value>(&out.stdout).unwrap()["error"].clone()
     };
-    // A read leaf: every option it has is in `expected` and in the hint, and the hint says why attribution is out.
+    // A read leaf: the refused flag is the field, `expected` lists the leaf's own options, and the hint names the attribution flags.
     let error = refused(&["gate", "check", "--actor", "a", "--session", "s", "--json"]);
     assert_eq!((error["code"].as_str(), error["field"].as_str()), (Some("USAGE"), Some("--actor")), "{error}");
     let expected: Vec<&str> = error["expected"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
