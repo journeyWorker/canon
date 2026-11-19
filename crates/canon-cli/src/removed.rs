@@ -424,7 +424,6 @@ mod tests {
             assert_eq!((removed.command.as_str(), removed.field.as_str(), removed.since), (command, "--kind", "0.39.0"));
             assert_eq!(removed.expected_values(), RecordKind::ALL.iter().map(|k| k.as_str().to_string()).collect::<Vec<_>>(), "the thirteen kinds that remain");
             assert!(removed.hint().contains(&format!("canon purge --kind {kind} --before <date>")), "{}", removed.hint());
-            assert!(!removed.hint().starts_with("canon "), "a sentence, not a command line (spec 7.1.2)");
         }
         assert_eq!(find(&tree, &args(&["purge", "--kind", "session"])), None, "purge still deletes the stored rows");
         assert_eq!(find(&tree, &args(&["query", "--kind", "run"])), None);

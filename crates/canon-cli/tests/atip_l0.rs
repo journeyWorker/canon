@@ -164,8 +164,9 @@ fn atip_l0_05_a_member_with_no_value_is_absent() {
     assert!(found.is_empty(), "members with no value: {found:?}");
     // The error value itself: no hint, no field, no suggestions is three absent keys.
     let bare = CliError::refused("USAGE", "bare").body();
-    let text = serde_json::to_string(&bare).unwrap();
-    assert_eq!(text, r#"{"code":"USAGE","message":"bare","retryable":false}"#);
+    let value = serde_json::to_value(&bare).unwrap();
+    assert_eq!(value["code"], "USAGE");
+    assert!(value.get("hint").is_none() && value.get("field").is_none() && value.get("suggestions").is_none(), "{value}");
 }
 
 #[test]

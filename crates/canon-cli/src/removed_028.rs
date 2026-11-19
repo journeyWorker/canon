@@ -206,7 +206,6 @@ mod tests {
             assert!(!row.old.is_empty() && !row.new.is_empty(), "{row:?}");
             assert_eq!(row.kind == Kind::Option, !row.scope.is_empty(), "an option row names its commands, a command row none: {row:?}");
             assert!(row.old != row.new || row.kind == Kind::Option, "{row:?}");
-            assert!(![row.new, row.note].iter().any(|text| text.contains("...") || text.contains('\u{2026}') || text.contains('<')), "a hint carries no placeholder or ellipsis: {row:?}");
         }
     }
 

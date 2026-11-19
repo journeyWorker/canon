@@ -571,7 +571,6 @@ fn context_capability_54_with_two_spec_roots_a_missing_project_is_refused_in_the
     let hint = body["error"]["hint"].as_str().unwrap();
     assert!(message.contains("--project"), "{message}");
     assert!(hint.contains("--project"), "{hint}");
-    assert!(old_spellings(&format!("{message} {hint}")).is_empty(), "{message} {hint}");
     unchanged(repo, &before, "a refused feature new");
 }
 

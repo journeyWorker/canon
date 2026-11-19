@@ -86,8 +86,8 @@ Feature: ATIP 1.1 contract
   @case:failure
   @flow:canon-0-34-atip-1-1.F4
   @atip.contract11.10
-  Scenario: Every hint in the sources and the corpus is a command line, a template or prose, and a retrieve with no scope is not prose that starts with canon
-    Given the sources and the conformance corpus
+  Scenario: Every hint the corpus froze and every hint the binary prints is a command line, a template or prose, and a retrieve with no scope is not prose that starts with canon
+    Given the conformance corpus and the binary's answers for a bare group and for a bad option
     When every hint is read and canon retrieve runs with no scope argument
     Then a hint that starts with canon is one command line of canon's tree with UPPER_CASE placeholders, a prose hint never starts with canon, and the retrieve hint is canon retrieve --for-role ROLE --domain DOMAIN
 

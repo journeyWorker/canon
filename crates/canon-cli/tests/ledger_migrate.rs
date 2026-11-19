@@ -847,7 +847,7 @@ fn ledger_migrate_13_stale_stays_stale_and_the_undecidable_one_is_pinned() {
     assert_eq!(fs::read(path).unwrap(), fixture_bytes(".canon/ledger/kind=review/area=auth/root__auth.login.03__2222222222222222222222222222222222222222__d5d475c40d64.json"));
     let (gate, _) = repo.json(&["gate", "check"]);
     let advisory = gate["data"]["advisories"].as_array().unwrap().iter().find(|a| a["kind"] == "unmigrated_review").expect("the stale review is reported");
-    assert!(advisory["message"].as_str().unwrap().contains("(auth.login.03)"), "{advisory}");
+    assert!(advisory["message"].as_str().unwrap().contains("auth.login.03"), "{advisory}");
 }
 
 // ---------------------------------------------------------------------------

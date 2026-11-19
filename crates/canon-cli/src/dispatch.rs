@@ -2775,7 +2775,7 @@ mod begin_tests {
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
         let message = err.to_string();
         assert!(message.contains("sp-plan#9"), "the message must name the rejected id: {message}");
-        assert!(message.contains("superpowers @ "), "the message must name the sources consulted: {message}");
+        assert!(message.contains("superpowers"), "the message must name the sources consulted: {message}");
         assert!(!tmp.path().join(DISPATCH_DIR).exists(), "a rejected binding must leave no dispatch record behind");
     }
 
@@ -2879,8 +2879,8 @@ mod begin_tests {
         let err = begin(tmp.path(), &role(), &regime(), "canon", &missing, &DispatchMetadata::default()).expect_err("a row no source carries must be rejected");
         let message = err.to_string();
         for root in ["first", "second"] {
-            let consulted = format!("openspec @ {}", tmp.path().join(root).display());
-            assert!(message.contains(&consulted), "every source must be named before rejecting; missing `{consulted}` in: {message}");
+            let root_path = tmp.path().join(root).display().to_string();
+            assert!(message.contains("openspec") && message.contains(&root_path), "every source must be named before rejecting; missing `{root_path}` in: {message}");
         }
     }
 

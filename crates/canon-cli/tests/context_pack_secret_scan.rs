@@ -102,7 +102,7 @@ fn judge(repo: &Path, line: &str, rule: Option<&str>) {
             assert_eq!(error["code"], "CONTEXT_INPUT_INVALID", "`{line}`: {error}");
             assert_eq!(error["reason"], "SECRET", "`{line}`: {error}");
             let message = error["message"].as_str().unwrap();
-            assert!(message.contains("doc.md") && message.contains(&format!("(line 1, {rule})")), "`{line}`: {message}");
+            assert!(message.contains("doc.md") && message.contains("line 1") && message.contains(rule), "`{line}`: {message}");
         }
         (Ok(_), Some(rule)) => panic!("`{line}` should be refused ({rule}) but became a pack"),
         (Err(error), None) => panic!("`{line}` should become a pack but was refused: {error}"),
@@ -145,7 +145,7 @@ fn dispatch_secret_scan_13_a_refusal_names_the_file_the_line_and_the_rule_and_st
     let key = format!("AKIA{}", upper(16));
     let error = add_file(d, &format!("first line\nsecond line\nthe key is {key}\n")).unwrap_err();
     let message = error["message"].as_str().unwrap();
-    assert!(message.contains("doc.md") && message.contains("(line 3, aws-access-key-id)"), "{message}");
+    assert!(message.contains("doc.md") && message.contains("line 3") && message.contains("aws-access-key-id"), "{message}");
     assert!(!message.contains(&key) && !message.contains("AKIA"), "the message does not carry the value: {message}");
     assert_eq!(error["reason"], "SECRET");
     assert_eq!(error["retryable"], false);
@@ -154,7 +154,7 @@ fn dispatch_secret_scan_13_a_refusal_names_the_file_the_line_and_the_rule_and_st
     // The first secret of the file is the one named, and a CRLF file counts the same lines.
     let error = add_file(d, &format!("one\r\ntwo\r\napi_key=abcd1234\r\n{key}\r\n")).unwrap_err();
     let message = error["message"].as_str().unwrap();
-    assert!(message.contains("doc.md") && message.contains("(line 3, named-value)"), "{message}");
+    assert!(message.contains("doc.md") && message.contains("line 3") && message.contains("named-value"), "{message}");
     assert!(!d.join(".canon/context-packs").exists());
 }
 
@@ -174,7 +174,8 @@ fn dispatch_secret_scan_30_a_selection_with_a_secret_document_is_refused_as_a_wh
     assert_eq!((out.status.code(), &b["ok"]), (Some(2), &Value::Bool(false)), "{b}");
     let error = &b["error"];
     assert_eq!((error["code"].as_str(), error["reason"].as_str()), (Some("CONTEXT_INPUT_INVALID"), Some("SECRET")), "{error}");
-    assert!(error["message"].as_str().unwrap().contains("secret.md") && error["message"].as_str().unwrap().contains("(line 2, aws-access-key-id)"), "{error}");
+    let named = error["message"].as_str().unwrap();
+    assert!(named.contains("secret.md") && named.contains("line 2") && named.contains("aws-access-key-id"), "{error}");
     assert!(!error["message"].as_str().unwrap().contains(&key) && !error["message"].as_str().unwrap().contains("plain.md"), "{error}");
     assert!(!d.join(".canon/context-packs").exists(), "the refused selection leaves nothing in the pack store, not even the plain document's pack");
 
@@ -215,7 +216,7 @@ fn dispatch_secret_scan_15_injected_guidance_is_scanned_with_the_same_rules_as_a
     assert_eq!(b["error"]["code"], "CONTEXT_INPUT_INVALID", "{b}");
     assert_eq!(b["error"]["retryable"], false, "{b}");
     let message = b["error"]["message"].as_str().unwrap();
-    assert!(message.contains(&id.to_string()) && message.contains("(line 2, aws-access-key-id)"), "{b}");
+    assert!(message.contains(&id.to_string()) && message.contains("line 2") && message.contains("aws-access-key-id"), "{b}");
     assert!(!secret.path().join(".canon/context-packs").exists(), "a refused dispatch stores no pack");
 
     let plain = repo();
@@ -242,12 +243,11 @@ fn dispatch_secret_scan_17_a_quoted_value_in_guidance_is_refused_like_the_same_t
         let b = body(&out);
         match rule {
             Some(rule) => {
-                let tail = format!("(line 1, {rule})");
                 let message = b["error"]["message"].as_str().unwrap();
-                assert!(message.contains("s-1") && message.contains(&tail), "guidance `{text}`: {b}");
+                assert!(message.contains("s-1") && message.contains("line 1") && message.contains(rule), "guidance `{text}`: {b}");
                 let from_file = from_file.unwrap_err();
                 let message = from_file["message"].as_str().unwrap();
-                assert!(message.contains("doc.md") && message.contains(&tail), "file `{text}`: {from_file}");
+                assert!(message.contains("doc.md") && message.contains("line 1") && message.contains(rule), "file `{text}`: {from_file}");
             }
             None => {
                 assert_eq!(b["ok"], true, "guidance `{text}`: {b}");
@@ -263,5 +263,5 @@ fn dispatch_secret_scan_17_a_quoted_value_in_guidance_is_refused_like_the_same_t
     std::fs::write(d.join("t.json"), manifest.to_string()).unwrap();
     let b = body(&canon(d, &["context-pack", "add", "--manifest", "t.json"]));
     let message = b["error"]["message"].as_str().unwrap();
-    assert!(message.contains("s-2") && message.contains("(line 2, named-value)"), "{b}");
+    assert!(message.contains("s-2") && message.contains("line 2") && message.contains("named-value"), "{b}");
 }

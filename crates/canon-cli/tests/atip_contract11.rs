@@ -105,7 +105,6 @@ fn atip_contract11_10_a_retrieve_with_no_scope_hints_a_template_and_not_prose_th
     let document = json(&canon(dir.path(), &["retrieve", "--for-role", "reviewer", "--json"]));
     assert_eq!(document["error"]["code"], "USAGE", "{document}");
     let hint = document["error"]["hint"].as_str().unwrap();
-    assert!(!hint.starts_with("canon ") || hint == "canon retrieve --for-role <ROLE> --domain <DOMAIN>", "{hint}");
     assert_eq!(hint, "canon retrieve --for-role <ROLE> --domain <DOMAIN>");
     assert_eq!(document["error"]["field"], "--regime");
 }

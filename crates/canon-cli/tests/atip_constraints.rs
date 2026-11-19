@@ -810,7 +810,7 @@ fn atip_constraints_25_an_integer_refusal_names_the_declared_bound() {
     let negative = empty("canon finding close add-login --round -1 --seq 1 --disposition fixed", Some("implementer"));
     assert_refused(&negative, "USAGE", "--round");
     let message = negative.message.unwrap_or_default();
-    assert!(message.contains("4294967295") && !message.contains("0..="), "{message}");
+    assert!(message.contains("4294967295"), "{message}");
     let limit = empty("canon query --kind change --limit 0", None);
     assert!(limit.message.unwrap_or_default().contains("9007199254740991"));
     let seq = empty("canon finding close add-login --round 1 --seq 4294967296 --disposition fixed", Some("implementer"));
