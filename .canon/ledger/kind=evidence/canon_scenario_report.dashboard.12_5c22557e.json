@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T16:02:13.189469042Z",
+  "attachments": [
+    {
+      "case": "report.dashboard.12: the page total counts advisories across briefs and says when there are none",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "dashboard-junit.xml",
+      "sha256": "8e51d5b6c9dca1823eefb657b8c82bc7541ffdc67ab3ae5b2fe948ee3a23bde2"
+    }
+  ],
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "dashboard-junit.xml"
+  },
+  "evidence_note": {
+    "summary": "bun test packages/dashboard/test/briefs-render.test.ts re-run at ed612d724 on bun 1.3.14; bound to its case"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 693,
+  "scenario_id": "report.dashboard.12",
+  "schema": 1,
+  "staging_id": "87f0ec5d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

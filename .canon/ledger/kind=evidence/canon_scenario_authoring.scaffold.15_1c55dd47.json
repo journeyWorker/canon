@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:52:02.001374488Z",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec028_b scaffold_15"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --test spec028_b scaffold_15: passes in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 255,
+  "scenario_id": "authoring.scaffold.15",
+  "schema": 1,
+  "staging_id": "4ec841ff",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

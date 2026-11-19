@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T16:03:11.647833587Z",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib spec_coverage::tests::a_pinned_review_counts_only_while_its_spec_and_evidence_are_current && cargo test -p canon-cli --test review_pins review_add_32_a_changed_verdict_stales_the_review && cargo test -p canon-cli --test conformance (review-pin-stale-evidence)"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-gate --lib spec_coverage::tests::a_pinned_review_counts_only_while_its_spec_and_evidence_are_current && cargo test -p canon-cli --test review_pins review_add_32_a_changed_verdict_stales_the_review && cargo test -p canon-cli --test conformance (review-pin-stale-evidence): passes in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 670,
+  "scenario_id": "review.add.23",
+  "schema": 1,
+  "staging_id": "28a62905",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

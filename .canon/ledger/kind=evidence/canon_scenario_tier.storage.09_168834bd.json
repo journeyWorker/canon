@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T16:05:30.496130926Z",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-store --lib fold::tests::an_equal_at_tie_goes_to_the_greater_schema_even_when_the_lower_schema_has_the_greater_digest"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-store --lib fold::tests::an_equal_at_tie_goes_to_the_greater_schema_even_when_the_lower_schema_has_the_greater_digest: passes in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 395,
+  "scenario_id": "tier.storage.09",
+  "schema": 1,
+  "staging_id": "9944e029",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

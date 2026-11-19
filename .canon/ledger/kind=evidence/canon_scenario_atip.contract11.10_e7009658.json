@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:50:38.474109655Z",
+  "attachments": [
+    {
+      "case": "atip_contract11_10_a_retrieve_with_no_scope_hints_a_template_and_not_prose_that_starts_with_canon",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_the_conformance_corpus_froze_follows_the_same_rule",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "atip_contract11_10_every_hint_the_binary_prints_for_a_bare_group_or_a_bad_option_follows_the_rule",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    }
+  ],
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "bound to the cases of its previous record that still exist in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 595,
+  "scenario_id": "atip.contract11.10",
+  "schema": 1,
+  "staging_id": "cfc11776",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

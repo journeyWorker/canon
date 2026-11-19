@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:46:11.464954910Z",
+  "attachments": [
+    {
+      "case": "artifacts_object_zstd_02_a_file_that_changed_since_it_was_bound_leaves_the_tier_empty",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "artifact_blobs::tests::artifacts_object_zstd_02_put_refuses_bytes_that_do_not_hash_to_the_digest_and_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    }
+  ],
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3976 passed, 1 skipped) from the clean tree at ed612d724, --rev ed612d724, Rust 1.100.0"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 123,
+  "scenario_id": "artifacts.object-zstd.02",
+  "schema": 1,
+  "staging_id": "4227cf23",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
