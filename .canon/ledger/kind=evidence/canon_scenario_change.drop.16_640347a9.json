@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:46:11.464954910Z",
+  "attachments": [
+    {
+      "case": "change_drop_16_search_finds_the_record_by_reason_and_refs_with_its_change_and_subject_as_neighbours",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "change_drop_16_query_reads_the_current_state_by_change_by_state_and_with_history",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    }
+  ],
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3976 passed, 1 skipped) from the clean tree at ed612d724, --rev ed612d724, Rust 1.100.0"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 191,
+  "scenario_id": "change.drop.16",
+  "schema": 1,
+  "staging_id": "c617bf2b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

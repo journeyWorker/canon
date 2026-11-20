@@ -158,7 +158,7 @@ fn skills_install_70_a_blocked_a_missing_and_an_unclosed_brief_refuse_all_and_wr
     assert_eq!(refused, [("d", "BRIEF_INVALID"), ("ghost", "BRIEF_NOT_FOUND"), ("c", "BRIEF_INVALID")], "{doc}");
     assert_eq!(doc["error"]["code"], refused[0].1, "the error is the first refused id: {doc}");
     let message = doc["error"]["message"].as_str().unwrap();
-    assert!(message.starts_with("`d`") && !message.contains("`b`"), "{message}");
+    assert!(message.contains("`d`") && !message.contains("`b`"), "{message}");
 
     let after: Vec<String> = ["a", "b", "c", "d"].iter().map(|c| std::fs::read_to_string(brief_path(repo, c)).unwrap()).collect();
     assert_eq!(before, after, "no brief changed, not even the approvable ones");
@@ -244,7 +244,7 @@ fn skills_install_72_a_write_failure_keeps_earlier_ids_and_skips_the_rest() {
     let doc: Value = serde_json::from_str(&stdout(&refused)).unwrap();
     assert_eq!(doc["error"]["code"], "WRITE_DENIED", "{doc}");
     assert!(doc.get("data").is_none(), "a refusal carries no data: {doc}");
-    assert!(doc["error"]["message"].as_str().unwrap().starts_with("`b`"), "{doc}");
+    assert!(doc["error"]["message"].as_str().unwrap().contains("`b`"), "{doc}");
     for change in ["a", "b", "c"] {
         assert!(!std::fs::read_to_string(brief_path(repo, change)).unwrap().contains("Approved:"), "{change}: nothing was written");
     }

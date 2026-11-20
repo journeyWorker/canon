@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T16:02:56.256478955Z",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib review_for_one_project_does_not_satisfy_another_projects_same_scenario_id_evidence"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-gate --lib review_for_one_project_does_not_satisfy_another_projects_same_scenario_id_evidence: passes in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 663,
+  "scenario_id": "review.add.07",
+  "schema": 1,
+  "staging_id": "b7e2796e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

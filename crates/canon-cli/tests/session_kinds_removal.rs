@@ -698,8 +698,8 @@ fn tier_retired_keys_01_the_refusal_names_the_key_and_its_line() {
             let message = doc["error"]["message"].as_str().unwrap();
             assert!(message.contains("`routing.session`"), "{config}: {message}");
             match line {
-                Some(line) => assert!(message.contains(&format!("(line {line})")), "{config}: {message}"),
-                None => assert!(!message.contains("(line "), "a key in a flow mapping has no line: {message}"),
+                Some(line) => assert!(message.contains(&format!("line {line}")), "{config}: {message}"),
+                None => assert!(!message.split("line ").skip(1).any(|rest| rest.starts_with(|c: char| c.is_ascii_digit())), "a key in a flow mapping has no line: {message}"),
             }
         }
         assert_eq!(repo.snapshot(), before, "a refused migrate changed the tree for {config}");

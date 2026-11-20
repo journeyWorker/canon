@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:51:30.604475882Z",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate_pins migrate_pins_08"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --test migrate_pins migrate_pins_08: passes in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 1012,
+  "scenario_id": "authoring.migrate.17",
+  "schema": 1,
+  "staging_id": "afb642af",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

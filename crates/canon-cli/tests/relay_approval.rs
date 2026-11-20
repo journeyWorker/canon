@@ -385,13 +385,13 @@ fn subject_lifecycle_59_a_denied_relay_is_human_only_and_the_hint_names_the_key(
     let a = digest_arg(r, "a");
     let brief_call = run_as(r, Some("planner"), &["brief", "approve", "a", "--approver", "Ana", "--note", "ok", "--relayed-via", "ask", "--actor", "plan-1", "--digest", &a, "--json"]);
     let policy_call = run_as(r, Some("planner"), &["policy", "approve", "--approver", "Ana", "--note", "ok", "--relayed-via", "ask", "--actor", "plan-1", "--json"]);
-    for out in [&brief_call, &policy_call] {
+    for (out, human_call) in [(&brief_call, "canon brief approve"), (&policy_call, "canon policy approve")] {
         assert_eq!(out.status.code(), Some(2), "{}", text(out));
         assert_eq!(code(out), "ACTOR_DENIED");
         let doc = json(out);
         let named = format!("{}{}", doc["error"]["message"].as_str().unwrap(), doc["error"]["hint"].as_str().unwrap());
         assert!(named.contains("approval.relay"), "{named}");
-        assert!(doc["error"]["hint"].as_str().unwrap().contains("canon "), "the hint carries the human's call: {doc}");
+        assert!(doc["error"]["hint"].as_str().unwrap().contains(human_call), "the hint carries the human's call: {doc}");
     }
     assert_eq!(snapshot(r), before);
     // `migrate --commit` is refused the same way, whether or not its plan re-binds an `Approved:` line.

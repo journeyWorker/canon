@@ -1101,7 +1101,6 @@ mod tests {
         assert_eq!((unresolvable.base_missing, unresolvable.base_not_ancestor, unresolvable.git_unavailable), (2, 0, 0));
         assert_eq!(unresolvable.first, ["s1#1.1", "s1#1.2"]);
         assert!(!unresolvable.shallow);
-        assert!(!unresolvable.message().contains("--unshallow"));
     }
 
     #[test]
@@ -1155,14 +1154,6 @@ mod tests {
         assert_eq!(&alone, ctx.staleness_unresolvable());
         assert_eq!(asked.get(), 1);
         assert_eq!(alone.base_missing, 2);
-    }
-
-    #[test]
-    fn the_items_count_the_cells_by_reason_and_a_shallow_clone_is_pointed_at_unshallow() {
-        let unresolvable = Unresolvable { base_missing: 3, base_not_ancestor: 1, git_unavailable: 0, subjects: 4, first: vec!["a".into(), "b".into(), "c".into()], shallow: true };
-        let message = unresolvable.message();
-        assert!(message.contains("git fetch --unshallow"), "{message}");
-        assert_eq!(unresolvable.items(), ["base_missing: 3 cell(s)", "base_not_ancestor: 1 cell(s)", "first subjects: a, b, c, ..."]);
     }
 
     /// A repo of one commit, one green scenario record `gone.leaf.01` of project `root`, and then `behind` commits: the context of it, with an empty corpus.

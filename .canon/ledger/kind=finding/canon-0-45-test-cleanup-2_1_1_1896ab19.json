@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-0-45",
+    "role": "reviewer",
+    "session_id": "ses_3c96eb6cc8b8f0de9bdfff9e"
+  },
+  "at": "2026-11-19T16:30:51.996698444Z",
+  "change_id": "canon-0-45-test-cleanup-2",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/evidence_attach.rs:1480; crates/canon-cli/tests/session_pair.rs:111",
+  "introduced_by": "615f0c998de03b5e21d6296cda16be6a2ce288dc",
+  "kind": "finding",
+  "reviewed_sha": "d2ac12f032a50558600309a77e8d1c8674d6ceb1",
+  "reviewer": "rev-0-45",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Two tests keep names for checks this change deleted: binding_refusals_are_errors_and_keep_their_cause no longer asserts the cause (the source() line went), and an_unknown_option_hint_lists_what_the_leaf_takes_... no longer asserts the hint lists the options (only error.expected does). Rename them to what they assert, as was done for load_error_display_names_every_variant. Blast radius: test names only; no product code or scenario binding (neither name starts with a scenario id).",
+  "worktree_dirty": false
+}

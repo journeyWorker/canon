@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T16:05:45.819041361Z",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-vocab --lib bad_enum_value_carries_the_verbatim_expected_one_of_message"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-vocab --lib bad_enum_value_carries_the_verbatim_expected_one_of_message: passes in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 87,
+  "scenario_id": "vocab.typed.05",
+  "schema": 1,
+  "staging_id": "c258b61d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

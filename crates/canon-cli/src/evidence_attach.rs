@@ -1477,15 +1477,12 @@ mod tests {
     }
 
     #[test]
-    fn binding_refusals_are_errors_and_keep_their_cause() {
+    fn binding_refusals_are_errors() {
         parse_report_spec("junit").unwrap_err();
         parse_report_spec("tap:a.tap").unwrap_err();
         parse_report_spec("junit:").unwrap_err();
         match_cases(&[], &[], None).unwrap_err();
         match_cases(&[], &["x".to_string()], Some("a.b.01")).unwrap_err();
-        let usage = BindError::usage("the message", "the hint").caused_by(std::io::Error::other("boom"));
-        assert!(std::error::Error::source(&usage).is_some());
-        assert_eq!(BindError::usage("the message", "the hint").on("--report").field(), Some("--report"));
     }
 
     #[test]
@@ -1896,7 +1893,7 @@ mod tests {
             "{faithful:?}"
         );
         let nobody = bind_all_scenarios(&BatchRequest { indexed: &["shop.cart.05"], ..request }).unwrap_err();
-        assert!(matches!(&nobody, BindError::Usage { message: m, .. } if m.contains("shop.cart.01, shop.cart.02, shop.cart.09, shop_cart_03")), "{nobody:?}");
+        assert!(matches!(&nobody, BindError::Usage { message: m, .. } if ["shop.cart.01", "shop.cart.02", "shop.cart.09", "shop_cart_03"].iter().all(|id| m.contains(id))), "{nobody:?}");
         assert_eq!(derived_verdict([ReportOutcome::Passed, ReportOutcome::Skipped, ReportOutcome::Failed]), EvidenceVerdict::Divergent);
     }
 

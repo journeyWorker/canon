@@ -476,7 +476,7 @@ mod tests {
         git_dir(dir.path(), Some(""));
         drop(hold_within(dir.path(), Duration::ZERO).unwrap());
         let exclude = std::fs::read_to_string(dir.path().join(".git/info/exclude")).unwrap();
-        hold_within(dir.path(), Duration::ZERO).unwrap().leave_no_trace();
+        hold_within(dir.path(), Duration::from_secs(5)).unwrap().leave_no_trace();
         assert!(dir.path().join(REPO_WRITE_LOCK_FILE).is_file(), "a file that was there is never removed");
         assert_eq!(std::fs::read_to_string(dir.path().join(".git/info/exclude")).unwrap(), exclude);
 

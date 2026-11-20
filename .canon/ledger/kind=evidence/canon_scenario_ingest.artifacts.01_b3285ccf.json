@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:59:16.502399736Z",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib artifact_registry::tests::handoff_is_tagged_records_and_every_other_s4_adapter_is_tagged_path"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-ingest --lib artifact_registry::tests::handoff_is_tagged_records_and_every_other_s4_adapter_is_tagged_path: passes in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 104,
+  "scenario_id": "ingest.artifacts.01",
+  "schema": 1,
+  "staging_id": "177ada71",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

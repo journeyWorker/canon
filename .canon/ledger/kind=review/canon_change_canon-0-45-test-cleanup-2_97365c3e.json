@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-0-45",
+    "role": "reviewer",
+    "session_id": "ses_3c96eb6cc8b8f0de9bdfff9e"
+  },
+  "at": "2026-11-19T16:30:58.451802396Z",
+  "change_id": "canon-0-45-test-cleanup-2",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "kind": "review",
+  "pin": "d2ac12f032a50558600309a77e8d1c8674d6ceb1",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "07313c7e8d2d40edef923c62f11e6c4ecfddd06e8c253d1335bfa7ffecd4f456",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-45-test-cleanup-2/brief.md"
+  },
+  "review_id": "01M7TAB8WKNQ1NCJNW1NNVRH3H",
+  "reviewer": "rev-0-45",
+  "reviewer_harness": "omp",
+  "schema": 2,
+  "worktree_dirty": false
+}

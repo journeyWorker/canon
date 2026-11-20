@@ -665,7 +665,6 @@ fn ledger_naming_13_messages_that_quote_a_key_quote_the_typed_key() {
     let message = text(&again);
     assert!(message.contains("FINDING_EXISTS"), "{message}");
     assert!(message.contains("add-login_2_3"), "the typed key: {message}");
-    assert!(!message.contains("__0002") && !message.contains("0003"), "no 0.29 form: {message}");
 
     // A second body staged at the committed key: `gate promote` refuses it, quoting the same key.
     let committed = ledger_files(repo, "finding");

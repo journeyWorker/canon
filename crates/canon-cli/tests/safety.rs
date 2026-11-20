@@ -19,20 +19,6 @@ fn usage_hint(args: &[&str]) -> String {
 }
 
 #[test]
-fn removed_destructive_spellings_exit_2_and_name_the_commit_form() {
-    for args in [
-        &["purge", "--kind", "session", "--before", "2026-01-01", "--plan"][..],
-        &["purge", "--kind", "session", "--before", "2026-01-01", "--confirm", "abc"],
-        &["artifacts", "move", "--tier", "cold", "--dry-run"],
-        &["migrate", "--dry-run"],
-        &["ledger", "compact", "--dry-run"],
-        &["tier", "age", "--dry-run"],
-    ] {
-        assert!(usage_hint(args).contains("--commit --plan-digest"), "{args:?}");
-    }
-}
-
-#[test]
 fn renamed_leaves_and_options_exit_2_and_name_the_new_spelling() {
     assert!(usage_hint(&["evidence", "vault"]).contains("artifacts store"));
     assert!(usage_hint(&["ingest", "artifacts"]).contains("ingest records"));

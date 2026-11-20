@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:55:29.716361350Z",
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op && cargo test -p canon-cli --lib gate::tests::promote_after_stage_reads_the_records_own_outcome_off_staging"
+  },
+  "evidence_note": {
+    "summary": "cargo test -p canon-cli --test write_path promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op && cargo test -p canon-cli --lib gate::tests::promote_after_stage_reads_the_records_own_outcome_off_staging: passes in the workspace nextest run at ed612d724 on Rust 1.100.0 (workspace nextest)"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2582,
+  "scenario_id": "evidence.add.60",
+  "schema": 1,
+  "staging_id": "3fbf48b2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

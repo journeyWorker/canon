@@ -1,6 +1,6 @@
 {
   "name": "@journeykit/canon-core-darwin-arm64",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "canon CLI binary for macOS arm64 (macOS 15.0 or later)",
   "license": "MIT",
   "type": "module",

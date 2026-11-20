@@ -1,8 +1,8 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "journey",
-  "approved_at": "2026-11-18T14:58:33Z",
-  "note": "오너가 채팅에서 'CI 최적화'를 요청하고 레버 6개와 질문 3개를 ask로 답함(2026-11-18). 승인은 오케스트레이터에게 위임. 독립 계획 리뷰 1라운드 approve(P0/P1 없음), P2/P3 반영. 오너는 브리프 본문을 읽지 않음.",
+  "approved_at": "2026-11-19T08:46:58Z",
+  "note": "오너가 채팅에서 질문 4개의 설명(비밀값 거절 메시지 테스트, hints.rs와 ATIP 오류 목록, subject 11개, safety.rs 중복)을 보고 '승인하고'로 직접 승인함(2026-11-19). 오너 지시로 에이전트 계획 리뷰는 돌리지 않음. 브리프 본문 전체는 읽지 않음.",
   "relay": {
     "role": "planner",
     "actor": "planner-oco",

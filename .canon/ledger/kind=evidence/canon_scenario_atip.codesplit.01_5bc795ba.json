@@ -1,0 +1,55 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:46:11.464954910Z",
+  "attachments": [
+    {
+      "case": "evidence::tests::atip_codesplit_01_a_surface_ref_that_gets_past_the_validator_is_an_invalid_argument",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "atip_codesplit_01_a_missing_subject_a_contradiction_and_an_empty_value_answer_with_their_own_condition",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "atip_codesplit_01_a_task_that_names_no_task_is_task_not_found_for_the_payload_and_the_attestation_alike",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "atip_codesplit_01_each_code_of_the_split_is_registered_as_the_table_says",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    }
+  ],
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3976 passed, 1 skipped) from the clean tree at ed612d724, --rev ed612d724, Rust 1.100.0"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 265,
+  "scenario_id": "atip.codesplit.01",
+  "schema": 1,
+  "staging_id": "81fc988b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

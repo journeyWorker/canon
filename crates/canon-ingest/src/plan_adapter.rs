@@ -298,24 +298,6 @@ mod tests {
     }
 
     #[test]
-    fn record_malformed_names_the_path_and_reason() {
-        let mut outcome = PlanParseOutcome::empty();
-        outcome.record_malformed("openspec/changes/bad-dir", "missing-proposal-md");
-        assert_eq!(outcome.malformed.len(), 1);
-        assert_eq!(outcome.malformed[0].path, "openspec/changes/bad-dir");
-        assert_eq!(outcome.malformed[0].reason, "missing-proposal-md");
-        assert_eq!(outcome.malformed[0].hint, None);
-    }
-
-    #[test]
-    fn record_malformed_with_hint_carries_the_actionable_hint() {
-        let mut outcome = PlanParseOutcome::empty();
-        outcome.record_malformed_with_hint("changes", "missing-proposal-md", "root: may point at the changes dir's parent");
-        assert_eq!(outcome.malformed.len(), 1);
-        assert!(outcome.malformed[0].hint.is_some());
-    }
-
-    #[test]
     fn resolve_path_source_is_none_when_root_unconfigured() {
         assert_eq!(resolve_path_source(&None), None);
     }

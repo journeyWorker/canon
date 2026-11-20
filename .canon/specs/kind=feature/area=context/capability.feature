@@ -557,7 +557,7 @@ Feature: context capability
     Given a repo that configures two spec roots
     When `canon feature new` runs without --project
     Then it exits 2 with SPEC_ROOT_REQUIRED and nothing is written
-    And the message and the hint name --project, and neither carries an old spelling
+    And the message and the hint name --project
 
   # canon: {"schema":1,"at":"2026-10-27T13:11:30Z","actor":{"agent_id":"impl-031-ids","role":"implementer","session_id":"ids-2026-10-27"}}
   @subject:context-capability

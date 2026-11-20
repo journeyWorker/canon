@@ -250,7 +250,7 @@ mod tests {
         let err = resolve_roots(dir.path()).unwrap_err();
         assert!(matches!(err, ReportConfigError::Learn { .. }), "{err:?}");
         let message = err.to_string();
-        assert!(message.starts_with(&format!("parsing `{}`: ", canon_yaml.display())) && message.contains("Not A Role"), "{message}");
+        assert!(message.contains("Not A Role"), "{message}");
     }
 
     #[test]

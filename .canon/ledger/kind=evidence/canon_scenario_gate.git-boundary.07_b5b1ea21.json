@@ -1,0 +1,48 @@
+{
+  "actor": {
+    "agent_id": "impl-0-45",
+    "role": "implementer",
+    "session_id": "s-0-45-impl"
+  },
+  "at": "2026-11-19T15:46:11.464954910Z",
+  "attachments": [
+    {
+      "case": "gate_git_boundary_07_a_name_that_is_not_utf8_gives_no_surface_and_never_a_stale_verdict",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "risk::tests::gate_git_boundary_07_a_commit_that_changed_a_name_that_is_not_utf8_closes_the_risk_check",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    },
+    {
+      "case": "staleness::tests::gate_git_boundary_07_a_name_that_is_not_utf8_leaves_the_surface_query_unanswered_and_the_evidence_not_stale",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "junit.xml",
+      "sha256": "0be1b0cbc1bfa9123a23076ed2b93c038075008e7737affd079c3e69b19eb26b"
+    }
+  ],
+  "code_tree": "1d7c8052ff22700a37fcc0e7962bf4eac6436406",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "junit.xml"
+  },
+  "evidence_note": {
+    "summary": "every scenario bound to the workspace nextest run (3976 passed, 1 skipped) from the clean tree at ed612d724, --rev ed612d724, Rust 1.100.0"
+  },
+  "evidence_sha": "ed612d72429f87cb869eca74f9b25bea0c45f9dc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 172,
+  "scenario_id": "gate.git-boundary.07",
+  "schema": 1,
+  "staging_id": "7c56f4fc",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
