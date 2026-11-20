@@ -7,7 +7,7 @@
     },
     "packages/cli": {
       "name": "@journeykit/canon",
-      "version": "0.44.0",
+      "version": "0.45.0",
       "bin": {
         "canon": "./bin.js",
       },
@@ -24,23 +24,23 @@
     },
     "packages/core-darwin-arm64": {
       "name": "@journeykit/canon-core-darwin-arm64",
-      "version": "0.44.0",
+      "version": "0.45.0",
     },
     "packages/core-linux-arm64": {
       "name": "@journeykit/canon-core-linux-arm64",
-      "version": "0.44.0",
+      "version": "0.45.0",
     },
     "packages/core-linux-x64": {
       "name": "@journeykit/canon-core-linux-x64",
-      "version": "0.44.0",
+      "version": "0.45.0",
     },
     "packages/core-win32-x64": {
       "name": "@journeykit/canon-core-win32-x64",
-      "version": "0.44.0",
+      "version": "0.45.0",
     },
     "packages/dashboard": {
       "name": "@canon-dev/dashboard",
-      "version": "0.44.0",
+      "version": "0.45.0",
       "dependencies": {
         "@duckdb/duckdb-wasm": "1.32.0",
         "apache-arrow": "17.0.0",
@@ -54,7 +54,7 @@
     },
     "packages/website": {
       "name": "@canon/website",
-      "version": "0.44.0",
+      "version": "0.45.0",
       "dependencies": {
         "@astrojs/starlight": "^0.36.0",
         "@fontsource-variable/geist-mono": "^5.3.0",

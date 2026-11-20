@@ -4,6 +4,10 @@ The full release notes before 0.32 are readable with `git show e304d13b:README.m
 
 ## Unreleased
 
+## 0.45.0 — 2026-11-20
+
+canon 0.45 is a tests-only chore release: it is not breaking for callers. canon's commands, output, exit values and records are the same as in 0.44, and a caller has nothing to change. What changes is for contributors: the tests no longer assert the wording of an error `message`, `hint` or `effectNote`. They assert machine tokens (warning codes, ids, reason names, file names) instead, the tests that only pinned prose are deleted, and no product text is touched.
+
 ### Contributors
 
 - **Tests no longer assert the wording of an error `message`, `hint` or `effectNote`** (`canon-0-45-test-cleanup-2`; canon's behaviour, output, exit values and records do not change, and no product text is touched). Every test line that read one of those fields was classified: 27 lines now assert machine tokens (warning codes, ids, reason names, file names, `line N`) instead of prefixes, punctuation and count formats; 13 lines were deleted (echoes, duplicates, a hunt for old names, third-party error wording, a `Debug` text); 8 tests were deleted (a scan of the source text for hints, a test of that scan, two that read back the arguments they had just passed, the `items()` prose pin, and a duplicate of the removed-spelling table); 2 scenarios were reworded (`atip.contract11.10`, `context.capability.54`). No scenario was retired. The flaky `write_lock` test `a_call_that_found_the_lock_file_leaves_it_and_a_second_guard_keeps_what_the_first_made` took the same lock file again with no wait right after dropping the guard; `flock` belongs to the open file description, and a thread that spawns `git` meanwhile leaves a forked child holding a copy until it execs, so the lock can outlive the drop. The re-take now waits up to 5 seconds, as its neighbouring test already did.
