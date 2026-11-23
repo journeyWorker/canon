@@ -1,8 +1,8 @@
 {
   "policy_digest": "sha256:cb86210466b05fdec9a37d3f717703b15af87ac5b9c2f833999ac5c5e8ba2d17",
   "approved_by": "journey",
-  "approved_at": "2026-11-19T08:46:58Z",
-  "note": "오너가 채팅에서 질문 4개의 설명(비밀값 거절 메시지 테스트, hints.rs와 ATIP 오류 목록, subject 11개, safety.rs 중복)을 보고 '승인하고'로 직접 승인함(2026-11-19). 오너 지시로 에이전트 계획 리뷰는 돌리지 않음. 브리프 본문 전체는 읽지 않음.",
+  "approved_at": "2026-11-23T06:34:40Z",
+  "note": "Approved on the owner's delegation (ask, 2026-11-23) after independent plan review r1 (revise, 1 P1) and r2 (approve, no P0/P1). The owner did not read the brief text. The oshiz-qa object-store question stays open and needs no code change either way.",
   "relay": {
     "role": "planner",
     "actor": "planner-oco",
